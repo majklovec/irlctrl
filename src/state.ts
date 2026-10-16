@@ -82,9 +82,9 @@ export interface ObsModuleConfig {
 export const ALL_MODULES = ["relay", "encoder", "obs-controller"] as const;
 
 /**
- * Registry module ID → persisted settings key. `srtla` reads the legacy
- * "relay" key. Kept here so methods and the registry both resolve the same
- * persisted slice.
+ * Registry module ID → persisted settings key. `srtla` persists under the
+ * original "relay" key. Kept here so methods and the registry both resolve
+ * the same persisted slice.
  */
 export const MODULE_CONFIG_KEYS: Record<string, string> = {
 	"encoder": "encoder",
@@ -231,7 +231,7 @@ export function fromConfig(cfg: Partial<DeviceConfig> | null): PersistentState {
 /**
  * Default per-module settings for configs written before the module system:
  * the role's pre-selected modules are enabled, all others disabled. The relay
- * and encoder modules mirror the legacy flat config (targets/URLs live on the
+ * and encoder modules mirror the flat config fields (targets/URLs live on the
  * existing settings fields, so only `enabled` is carried here).
  */
 export function defaultModules(role?: Role): ModulesState {
@@ -253,26 +253,15 @@ export function defaultModules(role?: Role): ModulesState {
 }
 
 /**
- * Stored module maps predate the switcher's merge into obs-controller: the
- * switcher's fields arrive either as the legacy top-level `modules["low-bitrate-switcher"]`
- * slice (or the older camelCase `lowBitrateSwitcher` key) and are folded into
- * the obs slice once, here. Missing switcher fields are filled with the
- * defaults; stored values win over the defaults.
+ * Stored module maps predate the switcher's merge into obs-controller: missing
+ * switcher fields are filled with the defaults here (stored values win), so
+ * the obs slice always carries a complete switcher set.
  */
 function backfillModules(stored: Partial<ModulesState> | undefined, role?: Role): ModulesState {
     if (!stored) return defaultModules(role);
-    // The legacy switcher slices, wherever a pre-merge config kept them.
-    const legacySlice = (stored as Record<string, unknown>)["low-bitrate-switcher"] as Record<string, unknown> | undefined;
-    const legacyKey = (stored as Record<string, unknown>)["lowBitrateSwitcher"] as Record<string, unknown> | undefined;
-    const legacy = legacySlice ?? legacyKey;
-    const { "low-bitrate-switcher": _drop, ...rest } =
-        stored as Partial<ModulesState> & Record<string, unknown>;
-    delete (rest as Record<string, unknown>)["lowBitrateSwitcher"];
-    const out: ModulesState = { ...defaultModules(role), ...rest };
-    const obs: Record<string, unknown> = { ...out["obs-controller"], ...(legacy ?? {}) };
-    // The legacy slice's `enabled` flag becomes the obs slice's switcherEnabled.
-    if (typeof legacy?.["enabled"] === "boolean") obs["switcherEnabled"] = legacy["enabled"];
+    const out: ModulesState = { ...defaultModules(role), ...stored };
     // Complete the switcher fields; stored values win over the defaults.
+    const obs: Record<string, unknown> = { ...out["obs-controller"] };
     const rec = (v: unknown): Record<string, unknown> | undefined =>
         v && typeof v === "object" ? (v as Record<string, unknown>) : undefined;
     for (const key of ["triggers", "scenes", "optionalScenes"] as const)

@@ -104,7 +104,7 @@ const dashboardsTopic = "dashboards:kick";
 const devicesTopic = "devices:list";
 const INDEPENDENT_WIDGETS: ReadonlySet<WidgetType> = new Set(["kick-stats", "chat"]);
 const DASH_COLUMNS = 12;
-/** Default `{w, h}` per widget type — seeds new widgets and migrates v1 rows. */
+/** Default `{w, h}` per widget type — seeds new widgets and unknown stored rows. */
 const WIDGET_SIZE: Record<WidgetType, { w: number; h: number }> = {
 	obs: { w: 6, h: 6 },
 	status: { w: 4, h: 4 },
@@ -114,15 +114,6 @@ const WIDGET_SIZE: Record<WidgetType, { w: number; h: number }> = {
 	combined: { w: 6, h: 10 },
 	"kick-stats": { w: 3, h: 3 },
 	chat: { w: 3, h: 8 },
-};
-
-/** Legacy single-platform chat widget types, folded into the merged `chat`
- * widget on load (their config `channel` becomes the platform field). */
-const LEGACY_CHAT_TYPES: Record<string, string> = {
-	"kick-chat": "kick",
-	"twitch-chat": "twitch",
-	"tiktok-chat": "tiktok",
-	"youtube-chat": "youtube",
 };
 
 // ----------------------------------------------------------------------
@@ -474,8 +465,7 @@ interface DashboardsFile {
 	dashboards: ServerDashboard[];
 }
 
-/** Read `{x, y, w, h}` from an inbound widget payload, tolerating a legacy
- * v1 `width` (4/6/12) where the row position has no meaning. */
+/** Read `{x, y, w, h}` from an inbound widget payload (missing fields fall back to the type default). */
 function parseGrid(item: Record<string, unknown>, type: WidgetType): { x: number; y: number; w: number; h: number } {
 	const size = WIDGET_SIZE[type];
 	const toInt = (v: unknown, fallback: number, name: string) => {
@@ -483,8 +473,7 @@ function parseGrid(item: Record<string, unknown>, type: WidgetType): { x: number
 		if (!Number.isInteger(n)) throw new ApiError(`${name} must be an integer`);
 		return n;
 	};
-	const legacyWidth = Number(item.width);
-	const w = toInt(item.w, [4, 6, 12].includes(legacyWidth) ? legacyWidth : size.w, "w");
+	const w = toInt(item.w, size.w, "w");
 	const x = toInt(item.x, 0, "x");
 	const y = toInt(item.y, 0, "y");
 	const h = toInt(item.h, size.h, "h");
@@ -539,45 +528,21 @@ function parseWidgets(raw: unknown): ServerDashboardWidget[] {
 	});
 }
 
-/** Coerce a raw stored dashboard (v1 `{width}` rows or v2 `{x,y,w,h}`) into the
- * normalized v2 shape. `row` is the running baseline used to lay out v1 rows. */
+/** Coerce a raw stored dashboard into the normalized shape, filling in missing
+ * ids, names and grid coordinates with per-type defaults. */
 function normalizeDashboard(raw: Record<string, unknown>, index: number): ServerDashboard {
 	const id = typeof raw.id === "string" && raw.id ? raw.id : randomUUID();
 	const name = typeof raw.name === "string" && raw.name ? raw.name : `Dashboard ${index + 1}`;
 	const columns = Number.isFinite(Number(raw.columns)) && Number(raw.columns) > 0 ? Number(raw.columns) : DASH_COLUMNS;
 	const widgetsRaw = Array.isArray(raw.widgets) ? raw.widgets : [];
-	let row = 0;   // running baseline for stacking v1 rows
-	let migrated = false;
 	const widgets: ServerDashboardWidget[] = widgetsRaw.map((rr) => {
 		const item = (rr && typeof rr === "object" ? rr : {}) as Record<string, unknown>;
-		let type = String(item.type);
-		// Legacy single-platform chat widgets become the merged `chat` widget:
-		// their `config.channel` moves to the platform's config field.
-		const legacyPlatform = LEGACY_CHAT_TYPES[type];
-		if (legacyPlatform) {
-			type = "chat";
-			const cfg = (item.config && typeof item.config === "object" ? item.config : {}) as Record<string, unknown>;
-			const channel = typeof cfg["channel"] === "string" ? (cfg["channel"] as string) : "";
-			if (channel) item.config = { ...cfg, [legacyPlatform]: channel };
-		}
+		const type = String(item.type);
 		const size = WIDGET_SIZE[(type as WidgetType)] ?? { w: 4, h: 4 };
-		const isV1 = item.x === undefined && item.w === undefined && item.width !== undefined;
-		let x: number, y: number, w: number, h: number;
-		if (isV1) {
-			migrated = true;
-			const width = Number(item.width);
-			w = [4, 6, 12].includes(width) ? width : size.w;
-			h = Number.isFinite(Number(item.h)) ? Number(item.h) : size.h;
-			x = 0;
-			y = row;
-			row += h;
-		} else {
-			x = Number(item.x) || 0;
-			y = Number(item.y) || 0;
-			w = Number(item.w) || size.w;
-			h = Number(item.h) || size.h;
-			row = Math.max(row, y + h);
-		}
+		const x = Number(item.x) || 0;
+		const y = Number(item.y) || 0;
+		const w = Number(item.w) || size.w;
+		const h = Number(item.h) || size.h;
 		const independent = INDEPENDENT_WIDGETS.has(type as WidgetType);
 		const cfgRaw = (item.config && typeof item.config === "object" ? item.config : {}) as Record<string, unknown>;
 		// Only the widget module's declared parameters count; keep the config
@@ -601,7 +566,7 @@ function normalizeDashboard(raw: Record<string, unknown>, index: number): Server
 		};
 	});
 	const storedVersion = Number(raw.version);
-	const version = migrated ? 2 : Number.isInteger(storedVersion) ? storedVersion : 1;
+	const version = Number.isInteger(storedVersion) ? storedVersion : 1;
 	return { id, name, version, widgets, columns };
 }
 
