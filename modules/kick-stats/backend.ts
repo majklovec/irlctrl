@@ -5,7 +5,13 @@
  * pushes `kick.stats` events (tagged with the channel) to dashboard websocket
  * subscribers. One instance serves all stats widgets.
  */
-import { eventFrame, type StatsLive, type StatsSample, type ChannelSpecs, type PublishFn } from "./types";
+import {
+	type ChannelSpecs,
+	eventFrame,
+	type PublishFn,
+	type StatsLive,
+	type StatsSample,
+} from "./types";
 
 export const KICK_STATS_POLL_MS = 30_000;
 
@@ -15,8 +21,10 @@ export const KICK_STATS_CONFIG_FIELDS = ["channel"] as const;
 
 /** Channel-hub specs from one widget's config (kick-stats carries a single
  * channel; the hub contract lists one spec per source, null when unconfigured). */
-export function statsSpecsFromConfig(config: Record<string, string> | undefined): readonly (string | null)[] {
-	const name = (config?.["channel"] ?? "").trim().toLowerCase();
+export function statsSpecsFromConfig(
+	config: Record<string, string> | undefined,
+): readonly (string | null)[] {
+	const name = (config?.channel ?? "").trim().toLowerCase();
 	return [name || null];
 }
 /** Per-channel latest stats sample, for the merged hub snapshot. */
@@ -39,7 +47,7 @@ type StatsChannelState = {
 /** Kick's `start_time` strings are UTC without an offset ("2026-10-06 19:26:57"). */
 function parseKickTime(value: string | undefined): number | undefined {
 	if (!value) return undefined;
-	const ms = Date.parse(value.replace(" ", "T") + "Z");
+	const ms = Date.parse(`${value.replace(" ", "T")}Z`);
 	return Number.isNaN(ms) ? undefined : ms;
 }
 
@@ -59,7 +67,13 @@ export class StatsChannelManager {
 		const key = name.trim().toLowerCase();
 		if (!key) return;
 		this.stop(key);
-		const state: StatsChannelState = { channel: key, stats: null, series: [], polling: false, timer: null };
+		const state: StatsChannelState = {
+			channel: key,
+			stats: null,
+			series: [],
+			polling: false,
+			timer: null,
+		};
 		this.#channels.set(key, state);
 		void this.#poll(state);
 		state.timer = setInterval(() => void this.#poll(state), KICK_STATS_POLL_MS);
@@ -102,10 +116,13 @@ export class StatsChannelManager {
 		if (state.polling) return;
 		state.polling = true;
 		try {
-			const res = await fetch(`${KICK_API}/channels/${encodeURIComponent(state.channel)}`, {
-				signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-				headers: { accept: "application/json" },
-			});
+			const res = await fetch(
+				`${KICK_API}/channels/${encodeURIComponent(state.channel)}`,
+				{
+					signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+					headers: { accept: "application/json" },
+				},
+			);
 			if (!res.ok) throw new Error(`kick stats HTTP ${res.status}`);
 			const payload = (await res.json()) as {
 				followersCount?: number;
@@ -132,9 +149,16 @@ export class StatsChannelManager {
 				at,
 				series: [...state.series],
 			};
-			this.#publish(eventFrame("kick.stats", { channel: state.channel, stats: state.stats }));
+			this.#publish(
+				eventFrame("kick.stats", {
+					channel: state.channel,
+					stats: state.stats,
+				}),
+			);
 		} catch (err: unknown) {
-			console.warn(`[kick-stats ${state.channel}] poll failed: ${err instanceof Error ? err.message : String(err)}`);
+			console.warn(
+				`[kick-stats ${state.channel}] poll failed: ${err instanceof Error ? err.message : String(err)}`,
+			);
 		} finally {
 			state.polling = false;
 		}
@@ -154,6 +178,7 @@ export default {
 		snapshotKey: "stats",
 		configFields: KICK_STATS_CONFIG_FIELDS,
 		channelSpec: statsSpecsFromConfig,
-		create: (publish: PublishFn): StatsChannelManager => new StatsChannelManager(publish),
+		create: (publish: PublishFn): StatsChannelManager =>
+			new StatsChannelManager(publish),
 	},
 };

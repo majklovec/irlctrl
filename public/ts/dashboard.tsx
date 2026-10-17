@@ -101,6 +101,12 @@ function ensureDashboardsConn(): void {
     dispatchWidgetFrame(event, data);
     m.redraw();
   });
+  // The feed socket connects at module load, so the server's `widget.snapshot`
+  // can arrive before this handler exists; the chat module's connection badges
+  // (fed only by that snapshot until a reconnect frame) would stay stuck
+  // offline without the replay.
+  if (serverLive.widgetSnapshot !== null)
+    dispatchWidgetFrame("widget.snapshot", serverLive.widgetSnapshot);
 }
 
 /** Open the dashboards websocket so the page can listen for

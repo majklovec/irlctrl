@@ -1,6 +1,7 @@
 import m from "mithril";
-import type { StatsSample } from "./types";
 import type { MithrilJSXComponent } from "../../public/ts/jsx";
+import type { StatsSample } from "./types";
+
 // ---------------------------------------------------------------------------
 // Line chart
 //
@@ -119,7 +120,7 @@ export const LineChart = {
           text-anchor={"middle"}
           font-size={3}
         >
-          {timeLabel(points[idx]!.t)}
+          {timeLabel(points[idx]?.t)}
         </text>,
       );
     }

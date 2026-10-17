@@ -28,6 +28,10 @@ interface Handlers {
 
 const handlers = new Set<Handlers>();
 let dashboards: ServerDashboard[] = [];
+/** The last widget-hub snapshot: the socket can deliver it before a dashboard
+ * page has registered its `onAny` handler (the client connects at module load,
+ * the page subscribes at mount) — late subscribers get a copy on registration. */
+let widgetSnapshot: unknown = null;
 
 const applyDevices = (list: DeviceSummary[]): void => {
 	for (const h of handlers) h.devices?.(list);
@@ -53,6 +57,9 @@ rpc.on("dashboards.changed", (data) => {
 	for (const h of handlers) h.dashboardsChanged?.(e);
 	applyDashboards();
 });
+rpc.on("widget.snapshot", (data) => {
+	widgetSnapshot = data;
+});
 rpc.on("open", () => { for (const h of handlers) h.open?.(); });
 rpc.on("close", () => { for (const h of handlers) h.close?.(); });
 
@@ -68,5 +75,11 @@ export const serverLive = {
 	on(h: Handlers): () => void {
 		handlers.add(h);
 		return () => handlers.delete(h);
+	},
+	/** The last `widget.snapshot` payload (null until the server sent one):
+	 * the socket can deliver it before a dashboard page registers its `onAny`
+	 * handler, so the page replays it into the widget modules on registration. */
+	get widgetSnapshot(): unknown {
+		return widgetSnapshot;
 	},
 };

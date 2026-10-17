@@ -5,7 +5,9 @@
  * unauthenticated `chatrooms.<id>.v2` channel is subscribed; each
  * `App\Events\ChatMessageEvent` payload becomes a `kick.chat` push. The
  * subscribe handshake is capped by a timeout (a stalled handshake would
- * otherwise hang the connection forever).
+ * otherwise hang the connection forever). When the REST response says the
+ * channel is offline (`livestream.is_live` is not true) the provider reports
+ * `disconnected` and re-polls until the stream goes live.
  */
 import type { ChatLive, PublishFn } from "../types";
 import { ChatProvider } from "./base";
@@ -74,9 +76,17 @@ export class KickChatProvider extends ChatProvider {
 				this.#staleKey = "";
 				throw err;
 			})
-			.then((chatroom) => {
+			.then(({ id, isLive }) => {
 				if (this.stopped) return;
-				this.#chatroom = chatroom;
+				if (!isLive) {
+					// Channel is offline: report disconnected and re-poll
+					// (the resolve call doubles as the live check).
+					this.log("connect", "channel offline (livestream.is_live)");
+					this.setConnected(false);
+					this.scheduleReconnect();
+					return;
+				}
+				this.#chatroom = id;
 				const ws = new WebSocket(pusherUrl(this.#pusher));
 				this.#ws = ws;
 				ws.addEventListener("message", (ev: MessageEvent) => this.#onPusherMessage(ev));
@@ -180,17 +190,22 @@ export class KickChatProvider extends ChatProvider {
 	}
 }
 
-/** Resolve a channel slug to the chatroom id hosting its chat. */
-async function resolveChatroom(slug: string): Promise<number> {
+/** Resolve a channel slug to the chatroom id hosting its chat, plus
+ * whether the channel is currently live (`livestream.is_live` in the same
+ * response). */
+async function resolveChatroom(slug: string): Promise<{ id: number; isLive: boolean }> {
 	const res = await fetch(`${KICK_CHANNEL_API}/${encodeURIComponent(slug)}`, {
 		headers: { accept: "application/json" },
 		signal: AbortSignal.timeout(RESOLVE_TIMEOUT_MS),
 	});
 	if (!res.ok) throw new Error(`kick channel HTTP ${res.status}`);
-	const data = (await res.json()) as { chatroom?: { id?: number } };
+	const data = (await res.json()) as {
+		chatroom?: { id?: number };
+		livestream?: { is_live?: boolean };
+	};
 	const id = data.chatroom?.id;
 	if (id === undefined || id === null) throw new Error("no chatroom id in response");
-	return id;
+	return { id, isLive: data.livestream?.is_live === true };
 }
 
 /** Map one Pusher ChatMessageEvent payload to the wire shape. */
