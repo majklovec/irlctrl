@@ -54,8 +54,35 @@ export const TitleWithBack = {
 
 // -- Navigation --------------------------------------------------------------------
 
-/** Main menu of the control server: the device list and the dashboards page. */
+/** Session user shown in the profile menu + whether its menu is open. */
+const profile = { username: null as string | null, open: false };
+
+function closeProfileMenu(ev?: Event): void {
+	ev?.preventDefault();
+	profile.open = false;
+	m.redraw();
+}
+
+/** Main menu of the control server: the device list, the dashboards page,
+ * and the profile menu (profile page + sign out). */
 export const ServerNav = {
+	oncreate() {
+		// The menu label is the session user's login name.
+		void fetch("/api/whoami")
+			.then((r) => (r.ok ? (r.json() as Promise<{ user?: string }>) : null))
+			.then((body) => {
+				if (body?.user) {
+					profile.username = body.user;
+					m.redraw();
+				}
+			})
+			.catch(() => {});
+		// Close the menu on any click outside of it.
+		document.addEventListener("click", closeProfileMenu);
+	},
+	onremove() {
+		document.removeEventListener("click", closeProfileMenu);
+	},
 	view: ({ attrs: { active } }) => (
 		<span>
 			<a
@@ -72,9 +99,68 @@ export const ServerNav = {
 			>
 				{t("dash.title")}
 			</a>
+			<span
+				class={profile.open ? "profile-menu open" : "profile-menu"}
+				onClick={(ev: Event) => ev.stopPropagation()}
+			>
+				<button
+					type={"button"}
+					class={"nav-link"}
+					aria-haspopup={"menu"}
+					aria-expanded={profile.open}
+					onClick={() => {
+						profile.open = !profile.open;
+						m.redraw();
+					}}
+				>
+					{profile.username ?? "…"}
+					<svg
+						width={10}
+						height={10}
+						viewBox={"0 0 16 16"}
+						fill={"none"}
+						stroke={"currentColor"}
+						stroke-width={2}
+						stroke-linecap={"round"}
+						stroke-linejoin={"round"}
+						aria-hidden={"true"}
+					>
+						<path d={"M4 6l4 4 4-4"} />
+					</svg>
+				</button>
+				{profile.open ? (
+					<span class={"profile-menu-dropdown"} role={"menu"}>
+						<a
+							role={"menuitem"}
+							href={"/profile/"}
+							onClick={() => (profile.open = false)}
+						>
+							{t("nav.profile")}
+						</a>
+						<button
+							type={"button"}
+							role={"menuitem"}
+							onClick={() => void logout()}
+						>
+							{t("nav.logout")}
+						</button>
+					</span>
+				) : null}
+			</span>
 		</span>
 	),
-} as MithrilJSXComponent<{ active: "devices" | "dashboards" }>;
+} as unknown as MithrilJSXComponent<{
+  active: "devices" | "dashboards" | "profile";
+}>;
+
+/** Drop the session cookie, then back to the login page. */
+async function logout(): Promise<void> {
+	try {
+		await fetch("/api/logout", { method: "POST" });
+	} finally {
+		location.replace("/login");
+	}
+}
 
 // -- Cards -------------------------------------------------------------------------
 

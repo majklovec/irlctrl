@@ -392,6 +392,8 @@ export interface ServerDashboardWidget {
 }
 export interface ServerDashboard {
 	id: string;
+	/** User profile that owns this dashboard (server-assigned). */
+	owner?: string;
 	name: string;
 	/** Monotonic; bumped on every update. Used for optimistic concurrency. */
 	version: number;

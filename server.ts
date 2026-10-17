@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
-import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
+import { Database } from "bun:sqlite";
+import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 /*
  * SRTLA control server.
  *
@@ -25,6 +26,12 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
  *   POST /api/dashboards   create a dashboard {name, widgets}
  *   PUT  /api/dashboards/<id>   replace a dashboard {name, widgets}
  *   DEL  /api/dashboards/<id>   remove a dashboard
+ *   GET  /profile/       user profile (password change + device tokens)
+ *   GET  /api/whoami     the session user's login name
+ *   GET  /api/profile    username + the user's device tokens
+ *   POST /api/profile/password  change the login password {current, new}
+ *   POST /api/profile/tokens    add a device token; returns it in the body
+ *   DEL  /api/profile/tokens/<id>  remove a device token
  *   WS   /device           device connections (Authorization: Bearer <token>, x-device-id: <id>,
  *                          x-device-role: relay|encoder|combined)
  *   WS   /dashboards/ws    the shared live feed: widget data (kick.stats /
@@ -55,18 +62,26 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
  * list and reappears from scratch the next time it connects.
  *
  * Auth:
- *   devices  shared token (--device-token / SRTLA_DEVICE_TOKEN) and/or a JSON
- *            file of per-device tokens (--devices devices.json: {"<device uuid>": "token"})
- *   browser  HTTP Basic (--ui-user / SRTLA_UI_USER, default "admin";
- *            --ui-password / SRTLA_UI_PASSWORD)
- *   --no-auth disables both (local testing only).
+ *   users    Users live in a SQLite database (--db, default users.db) with
+ *            scrypt-hashed passwords; each user owns the device tokens stored
+ *            for them. --users users.json (or SRTLA_USERS) is a one-time
+ *            import source — {"alice": {"password": "…", "tokens": ["…"]}} —
+ *            applied only while the database has no users (passwords are
+ *            hashed on import). Devices present one of their user's tokens
+ *            (Authorization: Bearer) on connect and are assigned to that
+ *            user; the browser signs in at /login with the username and
+ *            password and receives an opaque HttpOnly session cookie. Each
+ *            user only sees (and may create) their own devices and
+ *            dashboards, and manages their password and tokens on
+ *            /profile/.
+ *   --no-auth disables auth (local testing only; everything maps to "local").
  *
- * Dashboards are a server-level feature: the dashboards page composes them from the
- * modules of connected devices and persists them to --dashboards (default
+ * Dashboards are a per-user feature: the dashboards page composes them from the
+ * modules of the user's devices and persists them to --dashboards (default
  * dashboards.json, created on the first change).
  *
  * Usage:
- *   SRTLA_DEVICE_TOKEN=devsecret SRTLA_UI_PASSWORD=uipass bun server.ts --port 8090
+ *   SRTLA_USERS=users.json bun server.ts --port 8090
  */
 import type { ServerWebSocket } from "bun";
 import type {
@@ -114,16 +129,13 @@ import { COLOR_RE, isRole, type Role } from "./src/validate";
 const PORT = intArg("--port", 8090, 1, 65535);
 const HOST = arg("--host", "0.0.0.0");
 
-const DEVICE_TOKEN = arg(
-	"--device-token",
-	process.env.SRTLA_DEVICE_TOKEN ?? "",
-);
-const DEVICES_FILE = arg("--devices");
-
-const UI_USER = arg("--ui-user", process.env.SRTLA_UI_USER ?? "admin");
-const UI_PASSWORD = arg("--ui-password", process.env.SRTLA_UI_PASSWORD ?? "");
+/** One-time import source: `{"alice": {"password": "…", "tokens": ["…"]}}` —
+ * applied into the SQLite store only while it has no users. */
+const USERS_FILE = arg("--users", process.env.SRTLA_USERS ?? "");
 const NO_AUTH = flag("--no-auth");
 const DASHBOARDS_FILE = arg("--dashboards", "dashboards.json");
+// SQLite database: user logins (hashed passwords) and their device tokens
+const DB_FILE = arg("--db", process.env.SRTLA_DB ?? "users.db");
 
 const STALE_DEVICE_MS = 5 * 60 * 1000;
 const PRUNE_INTERVAL_MS = 30 * 1000;
@@ -142,8 +154,13 @@ const WIDGET_TYPES: WidgetType[] = [
 ];
 const DASH_PATH_RE = /^\/api\/dashboards(?:\/([\w.-]{1,64}))?$/;
 const viewersTopic = (id: string) => `viewers:${id}`;
-const dashboardsTopic = "dashboards:kick";
-const devicesTopic = "devices:list";
+// Per-user broadcast topics (device lists / dashboard list changes are
+// scoped to the owning user, not global).
+const dashboardsTopic = (user: string) => `dashboards:${user}`;
+const devicesTopic = (user: string) => `devices:${user}`;
+// The widget hub is device state, shared across the user's dashboards.
+const WIDGET_HUB_TOPIC = "widgets:hub";
+const LOCAL_USER = "local";
 const INDEPENDENT_WIDGETS: ReadonlySet<WidgetType> = new Set([
 	"kick-stats",
 	"chat",
@@ -160,69 +177,352 @@ const WIDGET_SIZE: Record<WidgetType, { w: number; h: number }> = {
 };
 
 // ----------------------------------------------------------------------
-// Auth
+// Auth (SQLite user store)
 // ----------------------------------------------------------------------
-const deviceTokens: Record<string, string> = DEVICES_FILE
-	? await Bun.file(DEVICES_FILE)
-			.json()
-			.catch((err: unknown) =>
-				argFail(
-					"--devices",
-					DEVICES_FILE,
-					`readable JSON {"id":"token"} (${String(err)})`,
-				),
-			)
-	: {};
+/** scrypt password hash: `scrypt$<salt hex>$<hash hex>`. */
+function hashPassword(password: string): string {
+	const salt = randomBytes(16).toString("hex");
+	return `scrypt$${salt}$${scryptSync(password, salt, 64).toString("hex")}`;
+}
+/** Constant-time check of a password against a stored hash. */
+function verifyPassword(password: string, stored: string): boolean {
+	const parts = stored.split("$");
+	if (parts.length !== 3 || parts[0] !== "scrypt") return false;
+	const expected = Buffer.from(parts[2], "hex");
+	if (expected.length === 0) return false;
+	return timingSafeEqual(scryptSync(password, parts[1], expected.length), expected);
+}
+/** Hash only consumed by the login timing-equalizer below. */
+const DUMMY_PASSWORD_HASH = hashPassword("__padding__");
 
-if (!NO_AUTH) {
-	if (!UI_PASSWORD) {
-		console.error(
-			"Set --ui-password (or SRTLA_UI_PASSWORD), or pass --no-auth for local testing.",
+/** Parse + validate the `--users` import JSON (failures exit 2). */
+async function parseUsersImport(): Promise<
+	Record<string, { password: string; tokens: string[] }>
+> {
+	const parsed: unknown = await Bun.file(USERS_FILE)
+		.json()
+		.catch((err: unknown) =>
+			argFail(
+				"--users",
+				USERS_FILE,
+				`readable JSON {"user": {"password": "…", "tokens": [...]}} (${String(err)})`,
+			),
 		);
-		process.exit(2);
+	const found: Record<string, { password: string; tokens: string[] }> = {};
+	if (parsed && typeof parsed === "object") {
+		for (const [name, profile] of Object.entries(
+			parsed as Record<string, unknown>,
+		)) {
+			const p =
+				profile && typeof profile === "object"
+					? (profile as Record<string, unknown>)
+					: undefined;
+			if (!p || typeof p.password !== "string" || p.password.length === 0)
+				continue;
+			const tokens = Array.isArray(p.tokens) ? p.tokens : [];
+			if (tokens.every((t) => typeof t === "string" && t.length > 0)) {
+				found[name] = { password: p.password, tokens: tokens as string[] };
+			}
+		}
 	}
-	if (!DEVICE_TOKEN && Object.keys(deviceTokens).length === 0) {
-		console.error(
-			"Set --device-token (or SRTLA_DEVICE_TOKEN) and/or --devices, or pass --no-auth.",
+	if (Object.keys(found).length === 0) {
+		argFail("--users", USERS_FILE, `at least one user with a non-empty "password"`);
+	}
+	return found;
+}
+
+/** The user database (null in `--no-auth` mode): logins with scrypt-hashed
+ * passwords and the device tokens assigned to each user. */
+const db: Database | null = NO_AUTH
+	? null
+	: await (async () => {
+			const d = new Database(DB_FILE);
+			d.run(`
+CREATE TABLE IF NOT EXISTS users (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	login TEXT UNIQUE NOT NULL,
+	password TEXT NOT NULL,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS tokens (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	token TEXT NOT NULL,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS tokens_token ON tokens(token);
+`);
+			const empty = (
+				d.prepare("SELECT COUNT(*) AS n FROM users").get() as { n: number }
+			).n === 0;
+			if (empty) {
+				// One-time import: the JSON file seeds the database, which
+				// then becomes the source of truth.
+				if (USERS_FILE) {
+					const imported = await parseUsersImport();
+					const insertUser = d.prepare(
+						"INSERT INTO users (login, password) VALUES (?, ?)",
+					);
+					const insertToken = d.prepare(
+						"INSERT INTO tokens (user_id, token) VALUES (?, ?)",
+					);
+					d.run("BEGIN");
+					try {
+						for (const [name, profile] of Object.entries(imported)) {
+							const row = insertUser.run(
+								name,
+								hashPassword(profile.password),
+							);
+							for (const token of profile.tokens) {
+								insertToken.run(Number(row.lastInsertRowid), token);
+							}
+						}
+						d.run("COMMIT");
+						console.log(
+							`[auth] imported ${Object.keys(imported).length} user(s) from ${USERS_FILE}`,
+						);
+					} catch {
+						d.run("ROLLBACK");
+						throw new Error("failed to import users from " + USERS_FILE);
+					}
+				} else {
+					console.error(`The user database ${DB_FILE} has no users.`);
+					console.error(
+						`Pass --users with {"user": {"password": "…", "tokens": [...]}} to import users into it, or pass --no-auth for local testing.`,
+					);
+					process.exit(2);
+				}
+			}
+			return d;
+		})();
+
+/**
+ * Resolve the user for a presented device token. With `--no-auth` every
+ * connection maps to the single local user.
+ */
+function userForToken(token: string | null): string | null {
+	if (NO_AUTH) return LOCAL_USER;
+	if (!token || !db) return null;
+	const row = db
+		.prepare(
+			"SELECT u.login FROM tokens t JOIN users u ON u.id = t.user_id WHERE t.token = ?",
+		)
+		.get(token) as { login: string } | undefined;
+	return row?.login ?? null;
+}
+
+// Opaque cookie sessions: the browser stores a session id (HttpOnly), so the
+// user token never lives in JS storage and WebSocket upgrades inherit the
+// cookie automatically.
+const SESSION_COOKIE = "srtla_session";
+const sessions = new Map<string, string>(); // session id -> user
+
+function sessionCookie(req: Request): string | null {
+	const raw = req.headers.get("cookie");
+	if (!raw) return null;
+	for (const part of raw.split(";")) {
+		const idx = part.indexOf("=");
+		if (idx > 0 && part.slice(0, idx).trim() === SESSION_COOKIE) {
+			return part.slice(idx + 1).trim() || null;
+		}
+	}
+	return null;
+}
+
+/** Resolve the user from the session cookie (or the local user in
+ *  `--no-auth` mode). Null when unauthenticated. */
+function userFromRequest(req: Request): string | null {
+	if (NO_AUTH) return LOCAL_USER;
+	const id = sessionCookie(req);
+	if (!id) return null;
+	const user = sessions.get(id);
+	if (!user) sessions.delete(id);
+	return user ?? null;
+}
+
+const unauthorized = () => text("Authentication required", 401);
+
+/** Exchange a username + password for an opaque session cookie. */
+async function loginResponse(req: Request): Promise<Response> {
+	let username: unknown;
+	let password: unknown;
+	try {
+		const body = (await req.json()) as {
+			username?: unknown;
+			password?: unknown;
+		};
+		username = body.username;
+		password = body.password;
+	} catch {
+		return Response.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
+	}
+	let match: string | null = null;
+	if (typeof username === "string" && typeof password === "string" && db) {
+		const rows = db
+			.prepare("SELECT login, password FROM users")
+			.all() as { login: string; password: string }[];
+		let checked = false;
+		for (const row of rows) {
+			if (row.login !== username) continue;
+			if (verifyPassword(password, row.password)) match = row.login;
+			checked = true;
+			break;
+		}
+		// One dummy scrypt verify when no account matched, so timing does
+		// not reveal which usernames exist.
+		if (!checked) verifyPassword(password, DUMMY_PASSWORD_HASH);
+	}
+	if (!match)
+		return Response.json(
+			{ ok: false, error: "Invalid username or password" },
+			{ status: 401 },
 		);
-		process.exit(2);
-	}
+	const user = match;
+	const id = randomUUID();
+	sessions.set(id, user);
+	return Response.json(
+		{ ok: true, user },
+		{
+			headers: {
+				"set-cookie": `${SESSION_COOKIE}=${id}; Path=/; HttpOnly; SameSite=Lax`,
+			},
+		},
+	);
 }
 
-const digest = (s: string) => createHash("sha256").update(s).digest();
-const safeEqual = (a: string, b: string): boolean =>
-	timingSafeEqual(digest(a), digest(b));
-
-function deviceAuthorized(id: string, token: string): boolean {
-	if (NO_AUTH) return true;
-	const own = deviceTokens[id];
-	if (own !== undefined) return safeEqual(token, own);
-	return !!DEVICE_TOKEN && safeEqual(token, DEVICE_TOKEN);
+function logoutResponse(req: Request): Response {
+	const id = sessionCookie(req);
+	if (id) sessions.delete(id);
+	return Response.json(
+		{ ok: true },
+		{
+			headers: {
+				"set-cookie": `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
+			},
+		},
+	);
 }
 
-function uiAuthorized(req: Request): boolean {
-	if (NO_AUTH) return true;
-	const m = req.headers.get("authorization")?.match(/^Basic\s+(\S+)$/i);
-	if (!m) return false;
-	const decoded = Buffer.from(m[1], "base64").toString();
-	const sep = decoded.indexOf(":");
-	if (sep < 0) return false;
-	// Evaluate both so timing does not reveal which part was wrong
-	const userOk = safeEqual(decoded.slice(0, sep), UI_USER);
-	const passOk = safeEqual(decoded.slice(sep + 1), UI_PASSWORD);
-	return userOk && passOk;
+// ----------------------------------------------------------------------
+// Profile API: the session user's password and device tokens
+// ----------------------------------------------------------------------
+
+/** The user's tokens as the profile page shows them. */
+function tokensFor(user: string) {
+	return (
+		db?.prepare(
+			"SELECT id, token, created_at FROM tokens WHERE user_id = (SELECT id FROM users WHERE login = ?) ORDER BY id",
+		)
+			.all(user) ?? []
+	) as { id: number; token: string; created_at: string }[];
 }
 
-const unauthorized = () =>
-	text("Authentication required", 401, {
-		"www-authenticate": 'Basic realm="SRTLA control", charset="UTF-8"',
+/** GET /api/whoami — the session user's login name (profile dropdown). */
+function whoamiResponse(user: string): Response {
+	return Response.json({ ok: true, user });
+}
+
+/** GET /api/profile — username + the user's device tokens. */
+function profileResponse(user: string): Response {
+	return Response.json({
+		ok: true,
+		username: user,
+		tokens: tokensFor(user).map((t) => ({
+			id: t.id,
+			token: t.token,
+			createdAt: t.created_at,
+		})),
 	});
+}
+
+/** POST /api/profile/password — {current, new}; the new password is
+ * required to differ from the current one. */
+async function changePasswordResponse(req: Request, user: string): Promise<Response> {
+	let current: unknown;
+	let next: unknown;
+	try {
+		const body = (await req.json()) as { current?: unknown; new?: unknown };
+		current = body.current;
+		next = body.new;
+	} catch {
+		return Response.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
+	}
+	if (
+		typeof current !== "string" ||
+		typeof next !== "string" ||
+		next.length === 0 ||
+		!db
+	) {
+		return Response.json(
+			{ ok: false, error: "A current password and a non-empty new password are required" },
+			{ status: 400 },
+		);
+	}
+	const row = db
+		.prepare("SELECT password FROM users WHERE login = ?")
+		.get(user) as { password: string } | undefined;
+	if (!row || !verifyPassword(current, row.password)) {
+		return Response.json(
+			{ ok: false, error: "Invalid username or password" },
+			{ status: 401 },
+		);
+	}
+	db.prepare("UPDATE users SET password = ? WHERE login = ?").run(
+		hashPassword(next),
+		user,
+	);
+	// The session itself stays valid: only the login secret changed.
+	return Response.json({ ok: true });
+}
+
+/** POST /api/profile/tokens — add a fresh device token; it is returned in
+ * the body (the only time the full value is ever sent). */
+function createTokenResponse(user: string): Response {
+	if (!db) return unauthorized();
+	const token = randomBytes(24).toString("hex");
+	const row = db
+		.prepare(
+			"INSERT INTO tokens (user_id, token) SELECT id, ? FROM users WHERE login = ?",
+		)
+		.run(token, user);
+	const created = db
+		.prepare(
+			"SELECT id, token, created_at FROM tokens WHERE id = ?",
+		)
+		.get(Number(row.lastInsertRowid)) as {
+		id: number;
+		token: string;
+		created_at: string;
+	};
+	return Response.json({
+		ok: true,
+		token: { id: created.id, token: created.token, createdAt: created.created_at },
+	});
+}
+
+/** DELETE /api/profile/tokens/<id> — revoke one of the user's tokens. */
+function deleteTokenResponse(url: URL, user: string): Response {
+	const rawId = url.pathname.split("/").pop() ?? "";
+	const id = Number(rawId);
+	if (!Number.isInteger(id) || id < 1 || !db)
+		return Response.json({ ok: false, error: "Invalid token id" }, { status: 400 });
+	const result = db
+		.prepare(
+			"DELETE FROM tokens WHERE id = ? AND user_id = (SELECT id FROM users WHERE login = ?)",
+		)
+		.run(id, user);
+	if (Number(result.changes) === 0)
+		return Response.json({ ok: false, error: "Token not found" }, { status: 404 });
+	return Response.json({ ok: true });
+}
 
 // ----------------------------------------------------------------------
 // Frontend (bundled once at startup so it can sit behind auth)
 // ----------------------------------------------------------------------
 const PAGES = [
+	"login",
 	"devices",
+	"profile",
 	"index",
 	"settings",
 	"setup",
@@ -283,14 +583,22 @@ const htmlResponse = (page: PageName) =>
 // Device registry and request routing
 // ----------------------------------------------------------------------
 type WsData =
-	| { kind: "device"; id: string; address: string; role?: Role }
-	| { kind: "viewer"; id: string }
-	| { kind: "dashboards" };
+	| {
+			kind: "device";
+			id: string;
+			address: string;
+			owner: string;
+			role?: Role;
+	  }
+	| { kind: "viewer"; id: string; user: string }
+	| { kind: "dashboards"; user: string };
 type Socket = ServerWebSocket<WsData>;
 
 interface Device {
 	/** Stable uuid; the key of this entry. Hostnames change, so the id does not */
 	id: string;
+	/** User this device is assigned to (derived from the connect token) */
+	owner?: string;
 	hostname?: string; // display name, from the device's hello
 	color?: string; // the device's header color, from the device's hello
 	language?: Language; // UI language, from the device's hello
@@ -566,13 +874,14 @@ function onDeviceRequest(origin: Device, msg: Record<string, unknown>): void {
 	};
 
 	if (method === "devices.list") {
+		// Devices only see their own user's assignments
 		respond(
 			JSON.stringify({
 				type: "response",
 				id,
 				method,
 				ok: true,
-				result: summaries(),
+				result: summaries(origin.owner ?? LOCAL_USER),
 			}),
 		);
 		return;
@@ -600,6 +909,7 @@ function onDeviceRequest(origin: Device, msg: Record<string, unknown>): void {
 function onViewerMessage(
 	ws: Socket,
 	deviceId: string,
+	_user: string,
 	raw: string | Buffer,
 ): void {
 	const msg = parseJsonObject(textOf(raw));
@@ -651,7 +961,7 @@ function parseGrid(
 	return { x, y, w, h };
 }
 
-function parseWidgets(raw: unknown): ServerDashboardWidget[] {
+function parseWidgets(raw: unknown, owner: string): ServerDashboardWidget[] {
 	if (!Array.isArray(raw)) throw new ApiError("widgets is required");
 	return raw.map((w) => {
 		const item = (w && typeof w === "object" ? w : {}) as Record<
@@ -711,6 +1021,10 @@ function parseWidgets(raw: unknown): ServerDashboardWidget[] {
 		}
 		if (typeof deviceId !== "string" || deviceId === "")
 			throw new ApiError("Widget needs a deviceId");
+		// A widget may only bind to a device assigned to the dashboard's owner
+		const bound = devices.get(deviceId);
+		if (!bound || (bound.owner ?? LOCAL_USER) !== owner)
+			throw new ApiError(`Device not available: ${deviceId}`);
 		if (item.config !== undefined)
 			throw new ApiError("Only kick widgets accept a config");
 		return { id, deviceId, type: type as WidgetType, name, ...grid, visible };
@@ -773,7 +1087,14 @@ function normalizeDashboard(
 	});
 	const storedVersion = Number(raw.version);
 	const version = Number.isInteger(storedVersion) ? storedVersion : 1;
-	return { id, name, version, widgets, columns };
+	return {
+		id,
+		...(typeof raw.owner === "string" && raw.owner ? { owner: raw.owner } : {}),
+		name,
+		version,
+		widgets,
+		columns,
+	};
 }
 
 let dashboards: ServerDashboard[] = [];
@@ -801,7 +1122,7 @@ function saveDashboards(): void {
 }
 
 /** Kick channel widgets needed by the persisted dashboards; fans out to dashboard viewers. */
-initWidgetHub((msg) => server.publish(dashboardsTopic, msg));
+initWidgetHub((msg) => server.publish(WIDGET_HUB_TOPIC, msg));
 const syncKick = (): void => syncWidgetHub(dashboards);
 syncKick();
 
@@ -818,19 +1139,33 @@ function dashError(code: number, message: string): Response {
 	return Response.json({ ok: false, error: message, code });
 }
 
-/** Push a dashboard change to every subscriber of the live dashboards topic, so
- * open dashboards (view/edit pages) re-render without a refresh. */
+/** Push a dashboard change to the owner's live dashboards topic, so their open
+ * dashboards (view/edit pages) re-render without a refresh. */
 function broadcastDashboard(d: ServerDashboard): void {
-	server.publish(dashboardsTopic, event("dashboards.changed", d));
+	server.publish(
+		dashboardsTopic(d.owner ?? LOCAL_USER),
+		event("dashboards.changed", d),
+	);
 }
 
-async function dashApi(req: Request, url: URL): Promise<Response> {
+/** Dashboards owned by `user`, in stored order. Ownerless (legacy) dashboards
+ * belong to the `local` profile. */
+const dashboardsFor = (user: string) =>
+	dashboards.filter((d) => (d.owner ?? LOCAL_USER) === user);
+
+async function dashApi(
+	req: Request,
+	url: URL,
+	user: string,
+): Promise<Response> {
 	try {
 		const m = url.pathname.match(DASH_PATH_RE);
 		if (!m) return Response.json({ ok: false, error: "Not found", code: 404 });
 		const id = m[1];
 		if (!id) {
-			if (req.method === "GET") return Response.json({ ok: true, dashboards });
+			// The list is always scoped to the requesting user
+			if (req.method === "GET")
+				return Response.json({ ok: true, dashboards: dashboardsFor(user) });
 			if (req.method === "POST") {
 				const body = (await req.json()) as {
 					name?: unknown;
@@ -840,17 +1175,18 @@ async function dashApi(req: Request, url: URL): Promise<Response> {
 				if (!name) return dashError(400, "Dashboard needs a name");
 				const dashboard: ServerDashboard = {
 					id: randomUUID(),
+					owner: user,
 					name,
 					version: 1,
 					columns: DASH_COLUMNS,
-					widgets: parseWidgets(body.widgets),
+					widgets: parseWidgets(body.widgets, user),
 				};
 				dashboards.push(dashboard);
 				saveDashboards();
 				syncKick();
 				broadcastDashboard(dashboard);
 				return Response.json(
-					{ ok: true, dashboard, dashboards },
+					{ ok: true, dashboard, dashboards: dashboardsFor(user) },
 					{ status: 201 },
 				);
 			}
@@ -860,18 +1196,21 @@ async function dashApi(req: Request, url: URL): Promise<Response> {
 				code: 405,
 			});
 		}
-		// Mutations need a body (JSON); the device list is a separate GET
-		const dashboardsById = dashboards.find((d) => d.id === id);
+		// Mutations need a body (JSON); the device list is a separate GET.
+		// Other users' dashboards are invisible (404, not just hidden).
+		const dashboardsById = dashboards.find(
+			(d) => d.id === id && (d.owner ?? LOCAL_USER) === user,
+		);
 		if (req.method === "DELETE") {
 			if (!dashboardsById) return dashError(404, "Unknown dashboard");
 			dashboards = dashboards.filter((d) => d.id !== id);
 			saveDashboards();
 			syncKick();
 			server.publish(
-				dashboardsTopic,
+				dashboardsTopic(user),
 				event("dashboards.changed", { id, deleted: true }),
 			);
-			return Response.json({ ok: true, dashboards });
+			return Response.json({ ok: true, dashboards: dashboardsFor(user) });
 		}
 		if (req.method === "PUT") {
 			if (!dashboardsById) return dashError(404, "Unknown dashboard");
@@ -891,12 +1230,16 @@ async function dashApi(req: Request, url: URL): Promise<Response> {
 				);
 			}
 			dashboardsById.name = name;
-			dashboardsById.widgets = parseWidgets(body.widgets);
+			dashboardsById.widgets = parseWidgets(body.widgets, user);
 			dashboardsById.version += 1;
 			saveDashboards();
 			syncKick();
 			broadcastDashboard(dashboardsById);
-			return Response.json({ ok: true, dashboard: dashboardsById, dashboards });
+			return Response.json({
+				ok: true,
+				dashboard: dashboardsById,
+				dashboards: dashboardsFor(user),
+			});
 		}
 		if (req.method === "GET") {
 			if (!dashboardsById) return dashError(404, "Unknown dashboard");
@@ -915,30 +1258,41 @@ async function dashApi(req: Request, url: URL): Promise<Response> {
 // ----------------------------------------------------------------------
 // HTTP / WebSocket server
 // ----------------------------------------------------------------------
-function summaries(): DeviceSummary[] {
+const deviceSummary = (d: Device): DeviceSummary => ({
+	...deviceInfo(d),
+	statusAt: d.statusAt,
+	srtla: d.status?.state?.srtla,
+	encoder: d.status?.state?.encoder,
+	modules: d.status?.modules,
+	maxBitrate: d.status?.state?.encoder?.config?.maxBitrate,
+	...(d.stats
+		? {
+				bitrate: d.stats.links.reduce(
+					(sum, l) => sum + (l.bitrate_bytes_per_sec || 0),
+					0,
+				),
+				activeLinks: d.stats.active_links,
+				totalLinks: d.stats.total_links,
+			}
+		: {}),
+});
+
+/** Device list scoped to one user's assignments. */
+function summaries(user: string): DeviceSummary[] {
 	return [...devices.values()]
-		.map((d) => ({
-			...deviceInfo(d),
-			statusAt: d.statusAt,
-			srtla: d.status?.state?.srtla,
-			encoder: d.status?.state?.encoder,
-			modules: d.status?.modules,
-			maxBitrate: d.status?.state?.encoder?.config?.maxBitrate,
-			...(d.stats
-				? {
-						bitrate: d.stats.links.reduce(
-							(sum, l) => sum + (l.bitrate_bytes_per_sec || 0),
-							0,
-						),
-						activeLinks: d.stats.active_links,
-						totalLinks: d.stats.total_links,
-					}
-				: {}),
-		}))
+		.filter((d) => (d.owner ?? LOCAL_USER) === user)
+		.map(deviceSummary)
 		.sort(
 			(a, b) => Number(b.online) - Number(a.online) || a.id.localeCompare(b.id),
 		);
 }
+
+/** The set of users with at least one registered device. */
+const deviceOwners = (): string[] => {
+	const owners = new Set<string>();
+	for (const d of devices.values()) owners.add(d.owner ?? LOCAL_USER);
+	return [...owners];
+};
 
 // The per-device push cadence (2 s stats × N devices + 30 s status) would
 // flood the dashboard feed with a full-list re-broadcast even when nothing
@@ -958,25 +1312,41 @@ const stableFingerprint = (list: DeviceSummary[]): string =>
 		),
 	);
 
-let listFingerprint = stableFingerprint([]);
+// Per-user fingerprints: a change to user A's devices must not re-kick
+// user B's (unchanged) list feed.
+const listFingerprints = new Map<string, string>();
+let lastListsFingerprint = "";
 let listPublishedAt = 0;
 
+/** One stable fingerprint over every user's current list. */
+const listsFingerprint = (): string =>
+	deviceOwners()
+		.sort()
+		.map((u) => `${u}:${stableFingerprint(summaries(u))}`)
+		.join("|");
+
 function publishDeviceListNow(): void {
-	const list = summaries();
-	listFingerprint = stableFingerprint(list);
 	listPublishedAt = Date.now();
-	server.publish(devicesTopic, event("devices.changed", list));
+	lastListsFingerprint = listsFingerprint();
+	// Publish per owner so each client only hears about its own devices.
+	for (const user of deviceOwners()) {
+		const list = summaries(user);
+		const fingerprint = stableFingerprint(list);
+		if (listFingerprints.get(user) === fingerprint) continue;
+		listFingerprints.set(user, fingerprint);
+		server.publish(devicesTopic(user), event("devices.changed", list));
+	}
 }
 
-/** Re-broadcast the list to the live-feed subscribers; the full list is
- * identical to what the pages fetch from /api/devices. Throttled to at most
- * one broadcast per tick and skipped when nothing visible changed — except
- * structural events (connect / disconnect / identity), which pass immediate. */
+/** Re-broadcast the per-user lists to the live-feed subscribers; each list
+ * is identical to what the pages fetch from /api/devices. Throttled to at
+ * most one broadcast per tick and skipped when nothing visible changed —
+ * except structural events (connect / disconnect / identity), which pass
+ * immediate. */
 function publishDeviceList(immediate = false): void {
 	const now = Date.now();
 	if (!immediate && now - listPublishedAt < LIST_TICK_MS) return;
-	const list = summaries();
-	if (immediate || stableFingerprint(list) !== listFingerprint)
+	if (immediate || listsFingerprint() !== lastListsFingerprint)
 		publishDeviceListNow();
 }
 
@@ -995,9 +1365,18 @@ function deviceUpgrade(
 		req.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1] ?? "";
 	const address = srv.requestIP(req)?.address ?? "";
 	if (!ID_RE.test(id)) return text("Missing or invalid x-device-id", 400);
-	if (!deviceAuthorized(id, token)) {
+	// The connect token assigns the device to the presenting user
+	const user = userForToken(token);
+	if (!user) {
 		console.warn(`[device ${id}] rejected: bad token from ${address || "?"}`);
 		return text("Unauthorized", 401);
+	}
+	const existing = devices.get(id);
+	if (existing && (existing.owner ?? LOCAL_USER) !== user) {
+		console.warn(
+			`[device ${id}] rejected from ${address || "?"}: assigned to a different user`,
+		);
+		return text("Forbidden", 403);
 	}
 	const role = req.headers.get("x-device-role");
 	if (
@@ -1006,6 +1385,7 @@ function deviceUpgrade(
 				kind: "device",
 				id,
 				address,
+				owner: user,
 				role: isRole(role) ? role : undefined,
 			},
 		})
@@ -1020,14 +1400,19 @@ function devicePath(
 	url: URL,
 	srv: Bun.Server<WsData>,
 	m: RegExpMatchArray,
+	user: string,
 ): Response | undefined {
 	const [, rawId, slash, ws, page, pageSlash] = m;
 	const id = decodeURIComponent(rawId);
 	if (!ID_RE.test(id)) return text("Invalid device id", 400);
+	// Only the user a device is assigned to may view or attach to it
+	const d = devices.get(id);
+	if (!d || (d.owner ?? LOCAL_USER) !== user) return notFound();
 	const base = `/d/${encodeURIComponent(id)}/`;
 	if (ws) {
 		if (!originAllowed(req)) return text("Origin not allowed", 403);
-		if (srv.upgrade(req, { data: { kind: "viewer", id } })) return undefined;
+		if (srv.upgrade(req, { data: { kind: "viewer", id, user } }))
+			return undefined;
 		return upgradeRequired();
 	}
 	if (page)
@@ -1036,8 +1421,7 @@ function devicePath(
 			: Response.redirect(`${base}${page}/`, 308);
 	if (!slash) return Response.redirect(base, 308);
 	// Devices without a config file serve the setup wizard instead of the UI
-	const setupRequired =
-		devices.get(id)?.status?.setupRequired && !url.searchParams.has("ui");
+	const setupRequired = d.status?.setupRequired && !url.searchParams.has("ui");
 	return htmlResponse(setupRequired ? "setup" : "index");
 }
 
@@ -1051,17 +1435,55 @@ const server = Bun.serve({
 
 		if (path === "/healthz") return text("ok");
 		if (path === "/device") return deviceUpgrade(req, url, srv);
-		if (!uiAuthorized(req)) return unauthorized();
+
+		// Public routes: the login page and its (content-hashed) assets and
+		// locale catalogs need no session.
+		if (path === "/login") return htmlResponse("login");
+		if (path.startsWith("/assets/")) {
+			const asset = assets.get(path.slice("/assets/".length));
+			return asset
+				? new Response(asset, {
+						headers: { "cache-control": "public, max-age=31536000, immutable" },
+					})
+				: notFound();
+		}
+		if (path.startsWith("/i18n/")) return await i18nResponse(path, catalog);
+		if (path === "/api/login" && req.method === "POST")
+			return loginResponse(req);
+		if (path === "/api/logout" && req.method === "POST")
+			return logoutResponse(req);
+
+		// Everything else requires an authenticated user
+		const user = userFromRequest(req);
+		if (!user) {
+			// Unauthenticated page navigation goes to the login page; API
+			// calls get a plain 401.
+			if (req.method === "GET" && !path.startsWith("/api/"))
+				return Response.redirect("/login", 302);
+			return unauthorized();
+		}
 
 		if (path === "/") return htmlResponse("devices");
-		if (path.startsWith("/i18n/")) return await i18nResponse(path, catalog);
-		if (path === "/api/devices") return Response.json(summaries());
+		if (path === "/api/devices") return Response.json(summaries(user));
+		if (path === "/profile/") return htmlResponse("profile");
+		if (path === "/profile") return Response.redirect("/profile/", 308);
+		if (path === "/api/whoami") return whoamiResponse(user);
+		if (path === "/api/profile" && req.method === "GET")
+			return profileResponse(user);
+		if (path === "/api/profile/password" && req.method === "POST")
+			return changePasswordResponse(req, user);
+		if (path === "/api/profile/tokens" && req.method === "POST")
+			return createTokenResponse(user);
+		const tokenDel = path.match(/^\/api\/profile\/tokens\/([^/]+)$/);
+		if (tokenDel && req.method === "DELETE")
+			return deleteTokenResponse(url, user);
 		if (path === "/dashboards/") return htmlResponse("dashboards");
-		if (path.startsWith("/api/dashboards")) return dashApi(req, url);
+		if (path.startsWith("/api/dashboards")) return dashApi(req, url, user);
 		if (path === "/dashboards/ws") {
 			// The dashboard pages' live kick data channel (stats + chat)
 			if (!originAllowed(req)) return text("Origin not allowed", 403);
-			if (srv.upgrade(req, { data: { kind: "dashboards" } })) return undefined;
+			if (srv.upgrade(req, { data: { kind: "dashboards", user } }))
+				return undefined;
 			return upgradeRequired();
 		}
 		if (
@@ -1076,16 +1498,8 @@ const server = Bun.serve({
 			// The dedicated "add widget" page for a single dashboard.
 			return htmlResponse("dashboardadd");
 		}
-		if (path.startsWith("/assets/")) {
-			const asset = assets.get(path.slice("/assets/".length));
-			return asset
-				? new Response(asset, {
-						headers: { "cache-control": "public, max-age=31536000, immutable" },
-					})
-				: notFound();
-		}
 		const m = path.match(DEVICE_PATH_RE);
-		if (m) return devicePath(req, url, srv, m);
+		if (m) return devicePath(req, url, srv, m, user);
 		return (await imageResponse(path)) ?? notFound();
 	},
 
@@ -1095,11 +1509,15 @@ const server = Bun.serve({
 		open(ws) {
 			const { data } = ws;
 			if (data.kind === "dashboards") {
-				ws.subscribe(dashboardsTopic);
-				ws.subscribe(devicesTopic);
+				// User-scoped feeds: widget hub, own dashboards, own devices
+				ws.subscribe(WIDGET_HUB_TOPIC);
+				ws.subscribe(dashboardsTopic(data.user));
+				ws.subscribe(devicesTopic(data.user));
 				ws.send(event("widget.snapshot", widgetHubSnapshot()));
-				ws.send(event("dashboards.snapshot", { dashboards }));
-				ws.send(event("devices.snapshot", summaries()));
+				ws.send(event("dashboards.snapshot", {
+					dashboards: dashboardsFor(data.user),
+				}));
+				ws.send(event("devices.snapshot", summaries(data.user)));
 				return;
 			}
 			if (data.kind === "device") {
@@ -1107,6 +1525,7 @@ const server = Bun.serve({
 				if (d.ws) d.ws.close(4001, "replaced by a new connection");
 				d.ws = ws;
 				d.address = data.address;
+				d.owner = data.owner;
 				d.role = data.role ?? d.role;
 				d.connectedAt = d.lastSeen = Date.now();
 				console.log(`[device ${d.id}] connected from ${data.address}`);
@@ -1131,7 +1550,8 @@ const server = Bun.serve({
 		message(ws, raw) {
 			const { data } = ws;
 			if (data.kind === "dashboards") return; // the hub pushes only
-			if (data.kind === "viewer") return onViewerMessage(ws, data.id, raw);
+			if (data.kind === "viewer")
+				return onViewerMessage(ws, data.id, data.user, raw);
 			const d = devices.get(data.id);
 			if (d && d.ws === ws) onDeviceMessage(d, raw);
 		},

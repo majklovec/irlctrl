@@ -110,25 +110,43 @@ Tick **Autostart** in the UI (or call `autostart.set`) to resume the last stream
 
 ## Control server
 
-`server.ts` lists all devices and serves the same web UI for each one at `/d/<id>/`, relaying commands to the device over its outbound connection — so devices behind NAT or on mobile networks can be managed. It also hosts fleet-wide **dashboards** that compose modules from any connected device.
+`server.ts` lists all devices and serves the same web UI for each one at `/d/<id>/`, relaying commands to the device over its outbound connection — so devices behind NAT or on mobile networks can be managed. It also hosts per-user **dashboards** that compose modules from any device owned by that user.
 
-```sh
-SRTLA_DEVICE_TOKEN=devsecret SRTLA_UI_PASSWORD=uipass bun server.ts --port 8090
+### Authentication
 
-# on each device
-CONTROL_SERVER_TOKEN=devsecret bun client.ts --role encoder --remote wss://ctl.example.com/device
+The server replaces HTTP Basic auth with per-user profiles. A `--users` file maps each profile to a login **password** (browser) and one or more **device tokens**:
+
+```json
+{
+  "alice": { "password": "s3cret", "tokens": ["tok-alice-1", "tok-alice-2"] },
+  "bob": { "password": "p4ss", "tokens": ["tok-bob-1"] }
+}
 ```
 
-| Option                       | Env                                  | Notes                                                |
-| ---------------------------- | ------------------------------------ | ---------------------------------------------------- |
-| `--host`, `--port`           |                                      | Default `0.0.0.0:8090`                               |
-| `--device-token`             | `SRTLA_DEVICE_TOKEN`                 | Shared device token                                  |
-| `--devices`                  |                                      | JSON file with per-device tokens `{"cam1": "token"}` |
-| `--ui-user`, `--ui-password` | `SRTLA_UI_USER`, `SRTLA_UI_PASSWORD` | Browser login (HTTP Basic; user defaults to `admin`) |
-| `--no-auth`                  |                                      | Local testing only                                   |
+- **Devices** authenticate with `Authorization: Bearer <token>` when they open their `ws://<server>/device` connection. The server resolves the token to a user and assigns the device to that user — devices are therefore owned by the profile whose token presented them.
+- **Browsers** sign in at `/login` with the username and password. A successful login sets an `HttpOnly` session cookie; all device lists, device pages, and dashboards are then scoped to that user. Only devices owned by the signed-in user are visible, and only that user can open a device's page/WS or edit its dashboards.
+- `--no-auth` maps everything to a single local profile for local testing.
+
+```sh
+# control server (users file maps profiles to tokens)
+SRTLA_USERS=users.json bun server.ts --port 8090
+
+# on each device — that device's owner token
+CONTROL_SERVER_TOKEN=tok-alice-1 bun client.ts --role encoder --remote wss://ctl.example.com/device
+
+# in a browser
+open http://ctl.example.com/  # redirects to /login; enter the username + password
+```
+
+| Option             | Env           | Notes                                                                                             |
+| ------------------ | ------------- | ------------------------------------------------------------------------------------------------- |
+| `--host`, `--port` |               | Default `0.0.0.0:8090`                                                                            |
+| `--users`          | `SRTLA_USERS` | JSON file mapping each user profile to its tokens (required unless `--no-auth`)                   |
+| `--dashboards`     |               | JSON file persisting the (per-user) dashboards                                                     |
+| `--no-auth`        |               | Local testing only — one shared `local` profile, no tokens needed                                  |
 
 > [!IMPORTANT]
-> Run the server behind a TLS reverse proxy — device tokens and Basic auth need `wss://`/`https://`.
+> Run the server behind a TLS reverse proxy — device tokens and the session cookie need `wss://`/`https://`.
 
 ## Deployment
 

@@ -1,2 +1,0 @@
-- OBS controller - on refresh, recording and streaming states are not right - always show start recodinrg, start stream even when recording or streaming
-- Hotovo se nepřekládá
