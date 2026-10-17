@@ -214,6 +214,18 @@ async function obsSetScene(name: string): Promise<boolean> {
 	}
 }
 
+/**
+ * Is the output active? obs-websocket v5 sends the boolean `outputActive` (and
+ * a numeric `outputState`); the older v4 forms stay tolerated.
+ */
+function readStreaming(d: Record<string, unknown> | null | undefined): boolean {
+	if (!d) return false;
+	if (typeof d["outputActive"] === "boolean") return d["outputActive"] as boolean;
+	for (const k of ["outputState", "OutputState"])
+		if (typeof d[k] === "number") return (d[k] as number) === 1;
+	return false;
+}
+
 /** Warm the scene / streaming tracking from OBS itself. */
 async function obsWarmStart(): Promise<void> {
 	const client = obsClient;
@@ -223,12 +235,10 @@ async function obsWarmStart(): Promise<void> {
 			client.sendRequest({ requestType: "GetCurrentProgramScene", requestId: randomUUID(), requestData: {} }),
 			client.sendRequest({ requestType: "GetStreamStatus", requestId: randomUUID(), requestData: {} }),
 		]);
-		if (typeof sc.responseData?.["CurrentProgramSceneName"] === "string") {
-			scene = sc.responseData["CurrentProgramSceneName"] as string;
-		}
-		if (typeof st.responseData?.["OutputState"] === "number") {
-			streaming = (st.responseData["OutputState"] as number) === 1;
-		}
+		// v5 answers { currentProgramSceneName } (v4: CurrentProgramSceneName).
+		const sceneName = sc.responseData?.["currentProgramSceneName"] ?? sc.responseData?.["CurrentProgramSceneName"];
+		if (typeof sceneName === "string") scene = sceneName;
+		streaming = readStreaming(st.responseData);
 	} catch {
 		// Identification is in flight; the event handlers pick it up
 	}
@@ -244,10 +254,12 @@ function attachObsEvents(): void {
 	if (attachedTo === client) return;
 	attachedTo = client;
 	client.on("CurrentProgramSceneChanged", (d: Record<string, unknown>) => {
-		scene = typeof d["CurrentProgramSceneName"] === "string" ? (d["CurrentProgramSceneName"] as string) : scene;
+		// v5 answers events with `sceneName` (v4: CurrentProgramSceneName).
+		const name = d["sceneName"] ?? d["CurrentProgramSceneName"];
+		if (typeof name === "string") scene = name;
 	});
 	client.on("StreamStateChanged", (d: Record<string, unknown>) => {
-		if (typeof d["OutputState"] === "number") streaming = (d["OutputState"] as number) === 1;
+		streaming = readStreaming(d);
 	});
 }
 

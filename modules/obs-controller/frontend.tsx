@@ -266,18 +266,25 @@ export function createObsPanel({
     });
   }
 
-  /** Scenes, inputs, the active scene, studio mode and the selected input's mute state. */
+  /** Scenes, inputs, the active scene, studio mode, stream/record state and the
+   * selected input's mute state. Stream/record are seeded from the status
+   * requests — the StateChanged events only fire on a *change*, so a page load
+   * would otherwise show both outputs as stopped until the next toggle. */
   async function loadAll(): Promise<void> {
     if (ui.loading) return;
     ui.loading = true;
     lastLoadAt = Date.now();
-    const [scenes, inputs, studio, scene] = await Promise.all([
-      obsCall<{ scenes: { sceneName: string }[] }>("GetSceneList"),
-      obsCall<{ inputs: { inputName: string }[] }>("GetInputList"),
-      obsCall<{ studioModeEnabled: boolean }>("GetStudioModeEnabled"),
-      // GetCurrentProgramScene answers { currentProgramSceneName } — not { sceneName }.
-      obsCall<{ currentProgramSceneName: string }>("GetCurrentProgramScene"),
-    ]);
+    const [scenes, inputs, studio, scene, stream, record] =
+      await Promise.all([
+        obsCall<{ scenes: { sceneName: string }[] }>("GetSceneList"),
+        obsCall<{ inputs: { inputName: string }[] }>("GetInputList"),
+        obsCall<{ studioModeEnabled: boolean }>("GetStudioModeEnabled"),
+        // GetCurrentProgramScene answers { currentProgramSceneName } — not { sceneName }.
+        obsCall<{ currentProgramSceneName: string }>("GetCurrentProgramScene"),
+        // obs-websocket v5 answers both with a boolean `outputActive`.
+        obsCall<{ outputActive: boolean }>("GetStreamStatus"),
+        obsCall<{ outputActive: boolean }>("GetRecordStatus"),
+      ]);
     if (scenes?.scenes) ui.scenes = scenes.scenes.map((s) => s.sceneName);
     // Seed the active scene so the preview scene fallback and the scene-deck
     // highlight work before the first scene-change event arrives.
@@ -290,9 +297,14 @@ export function createObsPanel({
     }
     if (studio?.studioModeEnabled !== undefined)
       ui.studio = studio.studioModeEnabled;
+    if (stream?.outputActive !== undefined) ui.streaming = stream.outputActive;
+    if (record?.outputActive !== undefined)
+      ui.recording = record.outputActive;
     await syncAllMute();
     ui.loading = false;
     ui.loaded = true;
+    // Mirror the seeded state to the surface store (st.obs / dashboard live).
+    pushState();
     m.redraw();
   }
 
