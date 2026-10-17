@@ -78,6 +78,10 @@ const DEFAULT_SWITCHER_SLICE: SwitcherConfig & { enabled: boolean } = {
 	obsSourceName: "",
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 // Shape-checked merge of a modules.configure payload into the slice —
 // invalid values are kept as-is (the engine re-reads the corrected slice on
 // the next save; it must never receive a malformed config)
@@ -114,26 +118,27 @@ function mergeBoxSwitcherConfig(
 		raw.pollIntervalMs <= 3_600_000
 	)
 		next.pollIntervalMs = raw.pollIntervalMs;
+	const triggers = isRecord(raw.triggers) ? raw.triggers : {};
 	for (const key of Object.keys(next.triggers) as Array<
 		keyof typeof next.triggers
 	>) {
-		const v = (raw.triggers as Record<string, unknown> | undefined)?.[key];
+		const v = triggers[key];
 		if (typeof v === "number" && Number.isFinite(v) && v >= 0)
 			next.triggers[key] = v;
 	}
+	const scenes = isRecord(raw.scenes) ? raw.scenes : {};
 	for (const key of Object.keys(next.scenes) as Array<
 		keyof typeof next.scenes
 	>) {
-		const v = (raw.scenes as Record<string, unknown> | undefined)?.[key];
+		const v = scenes[key];
 		if (typeof v === "string" && v.length > 0 && v.length <= 255)
 			next.scenes[key] = v;
 	}
+	const optionalScenes = isRecord(raw.optionalScenes) ? raw.optionalScenes : {};
 	for (const key of Object.keys(next.optionalScenes) as Array<
 		keyof typeof next.optionalScenes
 	>) {
-		const v = (raw.optionalScenes as Record<string, unknown> | undefined)?.[
-			key
-		];
+		const v = optionalScenes[key];
 		if (typeof v === "string" && v.length > 0 && v.length <= 255)
 			next.optionalScenes[key] = v;
 	}
@@ -147,7 +152,6 @@ import {
 	EventSubscription,
 	OBS_DISCONNECTED_EVENT,
 	ObsClient,
-	type ObsEvent,
 	type ObsRequestBatch,
 } from "./src/obs/client";
 
@@ -206,6 +210,18 @@ const BunWebSocket = WebSocket as unknown as new (
 	options?: Bun.WebSocketOptions,
 ) => Bun.WebSocket;
 
+const help = (code: number = 0): void => {
+	console.log(
+		"Usage: bun obs-client.ts --remote ws://host:port/device" +
+			" [--obs ws://127.0.0.1:4455] [--obs-password pw]" +
+			" [--remote-token pw] [--hostname name] [--state-file path] [--uuid uuid]",
+	);
+	console.log(
+		"The token/URL may also come from CONTROL_SERVER_TOKEN / CONTROL_SERVER_URL and OBS_PASSWORD env vars.",
+	);
+	process.exit(code);
+};
+
 async function main(): Promise<void> {
 	const obsUrl = arg("--obs",  process.env.OBS_URL ?? "ws://127.0.0.1:4455");
 	const obsPassword = arg("--obs-password", process.env.OBS_PASSWORD ?? "");
@@ -219,26 +235,10 @@ async function main(): Promise<void> {
 	const stateFile = arg("--state-file", join(tmpdir(), "obs-client.json"));
 
 	if (flag("--help") || flag("-h")) {
-		console.log(
-			"Usage: bun obs-client.ts --remote ws://host:port/device" +
-				" [--obs ws://127.0.0.1:4455] [--obs-password pw]" +
-				" [--remote-token pw] [--hostname name] [--state-file path] [--uuid uuid]",
-		);
-		console.log(
-			"The token/URL may also come from CONTROL_SERVER_TOKEN / CONTROL_SERVER_URL and OBS_PASSWORD env vars.",
-		);
-		process.exit(0);
+		help();		
 	}
 	if (!remoteUrl) {
-		console.error(
-			"Usage: bun obs-client.ts --remote ws://host:port/device" +
-				" [--obs ws://127.0.0.1:4455] [--obs-password pw]" +
-				" [--remote-token pw] [--hostname name] [--state-file path] [--uuid uuid]",
-		);
-		console.error(
-			"The token/URL may also come from CONTROL_SERVER_TOKEN / CONTROL_SERVER_URL and OBS_PASSWORD env vars.",
-		);
-		process.exit(2);
+		help(2);		
 	}
 	if (!REMOTE_URL_RE.test(remoteUrl))
 		argFail("--remote", remoteUrl, "ws:// or wss:// URL");
@@ -453,78 +453,10 @@ async function main(): Promise<void> {
 		);
 	};
 
-	// Outgoing requests (this box asks the control server for its device
-	// registry, for the switcher's metric source options).
-	let nextOutgoingId = 1;
-	const outgoing = new Map<
-		number,
-		{ resolve: (v: unknown) => void; reject: (e: Error) => void }
-	>();
-	const serverRequest = (
-		method: string,
-		params?: Record<string, unknown>,
-	): Promise<unknown> => {
-		const id = nextOutgoingId++;
-		return new Promise<unknown>((resolve, reject) => {
-			const timer = setTimeout(() => {
-				outgoing.delete(id);
-				reject(new Error(`request "${method}" timed out`));
-			}, 5_000);
-			outgoing.set(id, {
-				resolve: (v) => {
-					clearTimeout(timer);
-					resolve(v);
-				},
-				reject: (e) => {
-					clearTimeout(timer);
-					reject(e);
-				},
-			});
-			send(
-				JSON.stringify({
-					type: "request",
-					id,
-					method,
-					...(params ? { params } : {}),
-				}),
-			);
-		});
-	};
-	const settleOutgoing = (text: string): boolean => {
-		let msg: {
-			type?: unknown;
-			id?: unknown;
-			ok?: unknown;
-			result?: unknown;
-			error?: unknown;
-		};
-		try {
-			msg = JSON.parse(text);
-		} catch {
-			return false;
-		}
-		if (
-			!msg ||
-			typeof msg !== "object" ||
-			msg.type !== "response" ||
-			typeof msg.id !== "number"
-		)
-			return false;
-		const p = outgoing.get(msg.id);
-		if (!p) return false;
-		outgoing.delete(msg.id);
-		if (msg.ok === false)
-			p.reject(
-				new Error(msg.error ? String(msg.error) : "server refused the request"),
-			);
-		else p.resolve(msg.result);
-		return true;
-	};
-	const failOutgoing = (reason: string): void => {
-		for (const [id, p] of outgoing) {
-			p.reject(new Error(reason));
-			outgoing.delete(id);
-		}
+	const persistSwitcherState = async (): Promise<void> => {
+		await writeBoxState();
+		startEngine();
+		pushStatus();
 	};
 
 	const pushObsEvent = (
@@ -551,14 +483,16 @@ async function main(): Promise<void> {
 		modules: {
 			relay: { enabled: false },
 			encoder: { enabled: false },
+			// The card's form (obsSourceName, scenes, triggers) loads from this
+			// slice — the switcher slice rides on the obs module, like on the
+			// core box (modulesView.ObsModuleView).
 			[OBS_MODULE]: {
-				enabled: true,
 				obsUrl,
 				obsPassword: obsPassword ? { configured: true } : "",
 				sceneEvents: true,
+				// switcherSlice carries `enabled` (the switcher's on/off flag)
+				...switcherSlice,
 			},
-			// The switcher's persisted slice + the engine that runs over this box
-			[SWITCHER_MODULE]: switcherSlice,
 		},
 	});
 
@@ -567,19 +501,13 @@ async function main(): Promise<void> {
 		let method = "";
 		try {
 			const msg: unknown = JSON.parse(text);
-			if (!msg || typeof msg !== "object" || Array.isArray(msg))
+			if (!isRecord(msg))
 				throw new ApiError("Message must be a JSON object");
-			const req = msg as { id?: unknown; method?: unknown; params?: unknown };
-			id = req.id ?? null;
-			if (typeof req.method !== "string")
+			id = msg.id ?? null;
+			if (typeof msg.method !== "string")
 				throw new ApiError("method is required");
-			method = req.method;
-			const params: Record<string, unknown> =
-				req.params &&
-				typeof req.params === "object" &&
-				!Array.isArray(req.params)
-					? (req.params as Record<string, unknown>)
-					: {};
+			method = msg.method;
+			const params = isRecord(msg.params) ? msg.params : {};
 
 			let result: unknown;
 			switch (method) {
@@ -591,11 +519,7 @@ async function main(): Promise<void> {
 							? params.requestId
 							: crypto.randomUUID();
 					const requestData =
-						params.requestData &&
-						typeof params.requestData === "object" &&
-						!Array.isArray(params.requestData)
-							? (params.requestData as Record<string, unknown>)
-							: {};
+						isRecord(params.requestData) ? params.requestData : {};
 					result = await obs.sendRequest({
 						requestType,
 						requestId,
@@ -607,33 +531,28 @@ async function main(): Promise<void> {
 					const requests = params.requests;
 					if (!Array.isArray(requests) || !requests.length)
 						throw new ApiError("requests must be a non-empty array");
-					for (const r of requests) {
-						if (
-							!r ||
-							typeof r !== "object" ||
-							typeof (r as Record<string, unknown>).requestType !== "string"
-						) {
-							throw new ApiError("Each request needs a string requestType");
-						}
-					}
 					const requestId =
 						typeof params.requestId === "string" && params.requestId
 							? params.requestId
 							: crypto.randomUUID();
 					const batch: ObsRequestBatch = {
 						requestId,
-						requests: (requests as Array<Record<string, unknown>>).map(
-							(it) => ({
-								requestType: it.requestType as string,
+						requests: requests.map((request) => {
+							if (!isRecord(request) || typeof request.requestType !== "string")
+								throw new ApiError(
+									"Each request needs a string requestType",
+								);
+							return {
+								requestType: request.requestType,
 								requestId:
-									typeof it.requestId === "string" && it.requestId
-										? it.requestId
+									typeof request.requestId === "string" && request.requestId
+										? request.requestId
 										: crypto.randomUUID(),
-								...(it.requestData
-									? { requestData: it.requestData as Record<string, unknown> }
+								...(isRecord(request.requestData)
+									? { requestData: request.requestData }
 									: {}),
-							}),
-						),
+							};
+						}),
 						...(params.haltOnFailure !== undefined
 							? { haltOnFailure: !!params.haltOnFailure }
 							: {}),
@@ -665,31 +584,19 @@ async function main(): Promise<void> {
 					if (id !== OBS_MODULE && id !== SWITCHER_MODULE)
 						throw new ApiError(`Unknown module: ${id}`, 404);
 					const config =
-						params.config &&
-						typeof params.config === "object" &&
-						!Array.isArray(params.config)
-							? (params.config as Record<string, unknown>)
-							: {};
+						isRecord(params.config) ? params.config : {};
 					if (id === SWITCHER_MODULE)
 						switcherSlice = mergeBoxSwitcherConfig(switcherSlice, config);
-					await writeBoxState();
-					startEngine();
-					pushStatus();
+					await persistSwitcherState();
 					result = { ok: true };
 					break;
 				}
 				case "lowBitrateSwitcher.save": {
 					// The switcher card's Save button sends the full slice as `config`.
 					const config =
-						params.config &&
-						typeof params.config === "object" &&
-						!Array.isArray(params.config)
-							? (params.config as Record<string, unknown>)
-							: params;
+						isRecord(params.config) ? params.config : params;
 					switcherSlice = mergeBoxSwitcherConfig(switcherSlice, config);
-					await writeBoxState();
-					startEngine();
-					pushStatus();
+					await persistSwitcherState();
 					result = { ok: true };
 					break;
 				}
@@ -802,17 +709,10 @@ async function main(): Promise<void> {
 			const text = textOf(
 				(ev as unknown as { data: string | ArrayBuffer }).data,
 			);
-			if (settleOutgoing(text)) return; // a reply to our own outgoing request
 			// Only requests (objects with a `method`) are answered
 			try {
 				const msg: unknown = JSON.parse(text);
-				if (
-					!msg ||
-					typeof msg !== "object" ||
-					Array.isArray(msg) ||
-					!("method" in (msg as Record<string, unknown>))
-				)
-					return;
+				if (!isRecord(msg) || !("method" in msg)) return;
 			} catch {
 				// let handleRequest produce the "Invalid JSON" error
 			}
@@ -821,7 +721,6 @@ async function main(): Promise<void> {
 
 		ws.addEventListener("close", (ev) => {
 			clearTimers();
-			failOutgoing("disconnected from control server");
 			if (sock === ws) sock = null;
 			if (stopped) return;
 			console.warn(
