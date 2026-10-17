@@ -74,7 +74,7 @@ import {
 	requirePort,
 	requireString,
 } from "./params";
-import { configureModule, moduleEnabled, safeModules } from "./modules";
+import { configureModule, moduleEnabled, safeModules } from "./module-core";
 import { removePipelineRepository, syncPipelineRepository } from "./pipelineRepos";
 import { applyRemoteSettings } from "./remote";
 import { detectInterfaces, isMonitorRunning, type ModemConfig, reconfigure, resolveSelection, setSelection } from "./routing";

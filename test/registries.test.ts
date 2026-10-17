@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { allModules } from "../src/registry";
 import { defaultModules, state } from "../src/state";
 import { modulesForRole } from "../src/validate";
-import { safeModules } from "../src/modules";
+import { safeModules } from "../src/module-core";
 
 /**
  * Registry order of the device modules: the result of the registry's topological

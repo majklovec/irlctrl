@@ -10,7 +10,12 @@
  * was handed (and the registry fills `moduleById` after discovery).
  * The bag is intentionally broad-and-structural: a module types only the
  * fields it uses, locally.
+ *
+ * The file also keeps the role/core-facing module helpers that are not
+ * module-specific (moduleEnabled / safeModules / configureModule).
  */
+
+import { requireCapability } from "./capabilities";
 import {
 	BITRATE_FILE,
 	CERACODER_CONF,
@@ -28,28 +33,28 @@ import { run } from "./exec";
 import { writeFileAtomic } from "./files";
 import { t } from "./i18n";
 import { ApiError } from "./params";
+import { listDevices, requestDevice } from "./remote";
 import {
-	type PersistentState,
-	type SrtlaOptions,
-	type SrtlaOptionsResult,
-	notifyStateChange,
-	saveState,
-	state,
-} from "./state";
-import { Supervisor } from "./supervisor";
-import {
-	SRTLA_MODES,
-	type SrtlaCapabilities,
 	latestSrtlaStats,
 	prepareSrtlaControl,
 	rpc,
+	SRTLA_MODES,
+	type SrtlaCapabilities,
 	srtlaCapabilities,
 	srtlaControlState,
 	startSrtlaControl,
 	stopSrtlaControl,
 } from "./srtlaControl";
-import { requireCapability } from "./capabilities";
-import { listDevices, requestDevice } from "./remote";
+import {
+	notifyStateChange,
+	type ModulesState,
+	type PersistentState,
+	type SrtlaOptions,
+	type SrtlaOptionsResult,
+	saveState,
+	state,
+} from "./state";
+import { Supervisor } from "./supervisor";
 import { errorMessage, readLines } from "./util";
 
 /** The live process state a module mutates and persists with `saveState`. */
@@ -117,14 +122,16 @@ export interface ModuleCore {
 }
 
 /** Live srtla scheduler-options types (re-exported for modules to avoid a core import). */
-export type { SrtlaOptions, SrtlaOptionsResult, SrtlaCapabilities };
+export type { SrtlaCapabilities, SrtlaOptions, SrtlaOptionsResult };
 
 /**
  * Build the bag once. `moduleById` delegates to `lookup` (a mutable slot the
  * registry fills after discovery), keeping module → core one-directional with
  * no import cycle.
  */
-export function buildModuleCore(lookup: (id: string) => { id: string; status?: ModuleStatus } | undefined): ModuleCore {
+export function buildModuleCore(
+	lookup: (id: string) => { id: string; status?: ModuleStatus } | undefined,
+): ModuleCore {
 	return {
 		config: {
 			BITRATE_FILE,
@@ -164,4 +171,46 @@ export function buildModuleCore(lookup: (id: string) => { id: string; status?: M
 		listDevices,
 		requestDevice,
 	};
+}
+
+// ---------------------------------------------------------------------------
+// Role/core-facing module helpers (every real module runs through the
+// registry in registry.ts; these are the pieces that are not module-specific)
+// ---------------------------------------------------------------------------
+
+const mods = (): ModulesState | undefined => state.settings.modules;
+
+export const moduleEnabled = (id: string): boolean => {
+	const m = mods();
+	if (!m) return false;
+	return (m as unknown as Record<string, { enabled: boolean }>)[id]?.enabled ?? false;
+};
+
+/** Apply a module's persisted configuration (secrets kept); caller saves state. */
+export function configureModule(id: string, config: Record<string, unknown>): void {
+	const m = mods();
+	if (!m) return;
+	switch (id) {
+		case "relay":
+		case "encoder": {
+			if (typeof config.enabled === "boolean") m[id].enabled = config.enabled;
+			// Subprocess wiring follows the process role and applies on restart
+			break;
+		}
+	}
+}
+
+/** The persisted module map for the status; secret strings come back as `{configured}`. */
+export function safeModules(): object {
+	const m = mods();
+	if (!m) return {};
+	const mask = (cfg: Record<string, unknown>) =>
+		Object.fromEntries(
+			Object.entries(cfg).map(([k, v]) =>
+				/password|token/i.test(k) && typeof v === "string" ? [k, { configured: v !== "" }] : [k, v],
+			),
+		);
+	return Object.fromEntries(
+		Object.entries(m as unknown as Record<string, Record<string, unknown>>).map(([id, cfg]) => [id, mask(cfg)]),
+	);
 }
