@@ -43,15 +43,15 @@
 
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
-import type { SwitcherConfig, SwitcherMetrics } from "./public/types";
 import {
 	collectSrtSample,
 	type SrtBaseline,
 } from "./modules/obs-controller/srt-metrics";
 import {
-	SwitcherEngine,
 	type ObsSnapshot,
+	SwitcherEngine,
 } from "./modules/obs-controller/switcher-engine";
+import type { SwitcherConfig, SwitcherMetrics } from "./public/types";
 import { arg, argFail, flag, intArg } from "./src/args";
 import { ApiError, optionalStringList, requireString } from "./src/params";
 import { errorMessage, scrubUrl, textOf } from "./src/util";
@@ -137,7 +137,8 @@ function mergeBoxSwitcherConfig(
 		if (typeof v === "string" && v.length > 0 && v.length <= 255)
 			next.optionalScenes[key] = v;
 	}
-	if (typeof raw.obsSourceName === "string") next.obsSourceName = raw.obsSourceName;
+	if (typeof raw.obsSourceName === "string")
+		next.obsSourceName = raw.obsSourceName;
 	return next;
 }
 
@@ -152,7 +153,6 @@ import {
 
 // Re-export the protocol lib so importers of this entry keep working.
 export * from "./src/obs/client";
-
 
 // ============================================================================
 // Standalone proxy device: `bun obs-client.ts`
@@ -209,10 +209,10 @@ const BunWebSocket = WebSocket as unknown as new (
 async function main(): Promise<void> {
 	const obsUrl = arg("--obs", "ws://127.0.0.1:4455");
 	const obsPassword = arg("--obs-password", process.env.OBS_PASSWORD ?? "");
-	const remoteUrl = arg("--remote", process.env.SRTLA_REMOTE_URL ?? "");
+	const remoteUrl = arg("--remote", process.env.CONTROL_SERVER_URL ?? "");
 	const remoteToken = arg(
 		"--remote-token",
-		process.env.SRTLA_REMOTE_TOKEN ?? "",
+		process.env.CONTROL_SERVER_TOKEN ?? "",
 	);
 	const remoteInterval = intArg("--remote-interval", 30, 0, 3600);
 	const deviceName = arg("--hostname", hostname());
@@ -225,7 +225,7 @@ async function main(): Promise<void> {
 				" [--remote-token pw] [--hostname name] [--state-file path] [--uuid uuid]",
 		);
 		console.log(
-			"The token/URL may also come from SRTLA_REMOTE_TOKEN / SRTLA_REMOTE_URL and OBS_PASSWORD env vars.",
+			"The token/URL may also come from CONTROL_SERVER_TOKEN / CONTROL_SERVER_URL and OBS_PASSWORD env vars.",
 		);
 		process.exit(0);
 	}
@@ -236,7 +236,7 @@ async function main(): Promise<void> {
 				" [--remote-token pw] [--hostname name] [--state-file path] [--uuid uuid]",
 		);
 		console.error(
-			"The token/URL may also come from SRTLA_REMOTE_TOKEN / SRTLA_REMOTE_URL and OBS_PASSWORD env vars.",
+			"The token/URL may also come from CONTROL_SERVER_TOKEN / CONTROL_SERVER_URL and OBS_PASSWORD env vars.",
 		);
 		process.exit(2);
 	}
@@ -310,7 +310,10 @@ async function main(): Promise<void> {
 	// Throttled engine/SRT log (a bad source name would otherwise log every
 	// poll); the box keeps its own log file, this box logs to stdout.
 	let lastSwitcherWarnAt = 0;
-	const switcherLog = (level: "info" | "warn" | "error", message: string): void => {
+	const switcherLog = (
+		level: "info" | "warn" | "error",
+		message: string,
+	): void => {
 		if (level === "warn") {
 			const now = Date.now();
 			if (now - lastSwitcherWarnAt < 30_000) return;
@@ -373,15 +376,24 @@ async function main(): Promise<void> {
 	// as `sceneName` (events) / `currentProgramSceneName` (requests) and the
 	// output as `outputActive`. Tolerate the older PascalCase forms too, so
 	// the tracking works across obs-websocket versions.
-	const readScene = (d: Record<string, unknown> | null | undefined): string | null => {
+	const readScene = (
+		d: Record<string, unknown> | null | undefined,
+	): string | null => {
 		if (!d) return null;
-		for (const k of ["sceneName", "currentProgramSceneName", "CurrentProgramSceneName"])
+		for (const k of [
+			"sceneName",
+			"currentProgramSceneName",
+			"CurrentProgramSceneName",
+		])
 			if (typeof d[k] === "string") return d[k] as string;
 		return null;
 	};
-	const readStreaming = (d: Record<string, unknown> | null | undefined): boolean => {
+	const readStreaming = (
+		d: Record<string, unknown> | null | undefined,
+	): boolean => {
 		if (!d) return false;
-		if (typeof d["outputActive"] === "boolean") return d["outputActive"] as boolean;
+		if (typeof d["outputActive"] === "boolean")
+			return d["outputActive"] as boolean;
 		for (const k of ["outputState", "OutputState"])
 			if (typeof d[k] === "number") return (d[k] as number) === 1;
 		return false;

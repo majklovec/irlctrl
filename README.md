@@ -21,11 +21,11 @@ Bun-based controller for [BELABOX](https://belabox.net/)-style bonded streaming.
 
 One binary, three device types. Pick the role with `--role`:
 
-| Role | What it does |
-| ---- | ------------ |
-| `relay` (default) | Receives SRT from an encoder and bonds it out over all uplinks with [srtla_send](https://github.com/irlserver/srtla_send). Manages source routing, the uplinks file, and modems (ModemManager). |
-| `encoder` | Runs [belacoder](https://github.com/BELABOX/belacoder) or [ceracoder](https://github.com/CERALIVE/ceracoder) with a GStreamer pipeline and sends SRT to a relay. No routing, modems, or `srtla_send` — does not need root. |
-| `combined` | Encoder and relay in one box: encoder → local `srtla_send` → bonded uplinks. One Start/Stop drives both. |
+| Role              | What it does                                                                                                                                                                                                               |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `relay` (default) | Receives SRT from an encoder and bonds it out over all uplinks with [srtla_send](https://github.com/irlserver/srtla_send). Manages source routing, the uplinks file, and modems (ModemManager).                            |
+| `encoder`         | Runs [belacoder](https://github.com/BELABOX/belacoder) or [ceracoder](https://github.com/CERALIVE/ceracoder) with a GStreamer pipeline and sends SRT to a relay. No routing, modems, or `srtla_send` — does not need root. |
+| `combined`        | Encoder and relay in one box: encoder → local `srtla_send` → bonded uplinks. One Start/Stop drives both.                                                                                                                   |
 
 ```
 encoder ──SRT──▶ relay ──SRTLA (bonded)──▶ SRTLA receiver
@@ -62,7 +62,7 @@ Open `http://<device>:8085/`. The UI shows only what applies to the role.
 For a local checkout with the bundled binaries, override their paths explicitly:
 
 ```sh
-sudo SRTLA_REMOTE_TOKEN=token \
+sudo CONTROL_SERVER_TOKEN=token \
   ENCODER_BIN=./belacoder \
   SRTLA_SEND_BIN=./srtla_send \
   bun client.ts --port 8085 \
@@ -71,30 +71,30 @@ sudo SRTLA_REMOTE_TOKEN=token \
 ```
 
 > [!NOTE]
-> Use `SRTLA_REMOTE_TOKEN`, not `REMOTE_TOKEN` — the former is the variable the client reads. Placing the assignments **after** `sudo` passes them to the command without requiring a persistent shell environment.
+> Use `CONTROL_SERVER_TOKEN`, not `REMOTE_TOKEN` — the former is the variable the client reads. Placing the assignments **after** `sudo` passes them to the command without requiring a persistent shell environment.
 
 ### Options
 
-| Option | Env | Default | Notes |
-| ------ | --- | ------- | ----- |
-| `--role` | `BELABOX_ROLE` | `relay` | `relay`, `encoder`, `combined` |
-| `--host`, `--port` |  | `127.0.0.1`, `8085` | Local web UI and WebSocket API (`/ws`), always on |
-| `--allow-origin` |  |  | Extra browser origins for `/ws` (comma-separated, `*` = any) |
-| `--config` |  | `$TMPDIR/config.json` | Device config — settings, encoder, srtla target, autostart, modems. **Use a persistent path in production** |
-| `--uplinks` |  | `$TMPDIR/srtla_ips.txt` | Uplinks file for `srtla_send` |
-| `--start-srtla` |  |  | Relay/combined: start `srtla_send` on boot with `<listenPort> <remoteHost> <remotePort>` |
-| `--srtla-reload` |  | `signal` | `signal` (SIGHUP) or `restart` |
-| `--srtla-socket` | `SRTLA_CONTROL_SOCKET` | `$TMPDIR/srtla_send.sock` | `srtla_send` control socket (link stats, mode/quality); `""` disables it |
-| `--debounce-ms` |  | `1500` | Interface-event debounce |
-| `--pipelines` | `BELACODER_PIPELINES` | `/usr/share/belacoder/pipelines` | Pipeline files, including subdirectories |
-| `--belacoder` | `ENCODER_BIN` | `belacoder` |  |
-|  | `SRTLA_SEND_BIN` | `srtla_send` |  |
-| `--bitrate-file` |  | `$TMPDIR/belacoder_br` | belacoder bitrate file (re-read on SIGHUP) |
-| `--remote` | `SRTLA_REMOTE_URL` |  | Control server, e.g. `wss://ctl.example.com/device` |
-| `--remote-token` | `SRTLA_REMOTE_TOKEN` |  | Prefer the env var (keeps it out of `ps`) |
-| `--remote-interval` |  | `30` | Periodic status push in seconds (`0` = only on change) |
-| `--remote-stats-interval` |  | `2` | `srtla_send` link-stats push to the control server in seconds (`0` = off) |
-| `--dry-run` |  |  | Print `ip`/process actions instead of running them |
+| Option                    | Env                    | Default                          | Notes                                                                                                       |
+| ------------------------- | ---------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `--role`                  | `BELABOX_ROLE`         | `relay`                          | `relay`, `encoder`, `combined`                                                                              |
+| `--host`, `--port`        |                        | `127.0.0.1`, `8085`              | Local web UI and WebSocket API (`/ws`), always on                                                           |
+| `--allow-origin`          |                        |                                  | Extra browser origins for `/ws` (comma-separated, `*` = any)                                                |
+| `--config`                |                        | `$TMPDIR/config.json`            | Device config — settings, encoder, srtla target, autostart, modems. **Use a persistent path in production** |
+| `--uplinks`               |                        | `$TMPDIR/srtla_ips.txt`          | Uplinks file for `srtla_send`                                                                               |
+| `--start-srtla`           |                        |                                  | Relay/combined: start `srtla_send` on boot with `<listenPort> <remoteHost> <remotePort>`                    |
+| `--srtla-reload`          |                        | `signal`                         | `signal` (SIGHUP) or `restart`                                                                              |
+| `--srtla-socket`          | `SRTLA_CONTROL_SOCKET` | `$TMPDIR/srtla_send.sock`        | `srtla_send` control socket (link stats, mode/quality); `""` disables it                                    |
+| `--debounce-ms`           |                        | `1500`                           | Interface-event debounce                                                                                    |
+| `--pipelines`             | `BELACODER_PIPELINES`  | `/usr/share/belacoder/pipelines` | Pipeline files, including subdirectories                                                                    |
+| `--belacoder`             | `ENCODER_BIN`          | `belacoder`                      |                                                                                                             |
+|                           | `SRTLA_SEND_BIN`       | `srtla_send`                     |                                                                                                             |
+| `--bitrate-file`          |                        | `$TMPDIR/belacoder_br`           | belacoder bitrate file (re-read on SIGHUP)                                                                  |
+| `--remote`                | `CONTROL_SERVER_URL`   |                                  | Control server, e.g. `wss://ctl.example.com/device`                                                         |
+| `--remote-token`          | `CONTROL_SERVER_TOKEN` |                                  | Prefer the env var (keeps it out of `ps`)                                                                   |
+| `--remote-interval`       |                        | `30`                             | Periodic status push in seconds (`0` = only on change)                                                      |
+| `--remote-stats-interval` |                        | `2`                              | `srtla_send` link-stats push to the control server in seconds (`0` = off)                                   |
+| `--dry-run`               |                        |                                  | Print `ip`/process actions instead of running them                                                          |
 
 ### Encoder pipelines
 
@@ -116,16 +116,16 @@ Tick **Autostart** in the UI (or call `autostart.set`) to resume the last stream
 SRTLA_DEVICE_TOKEN=devsecret SRTLA_UI_PASSWORD=uipass bun server.ts --port 8090
 
 # on each device
-SRTLA_REMOTE_TOKEN=devsecret bun client.ts --role encoder --remote wss://ctl.example.com/device
+CONTROL_SERVER_TOKEN=devsecret bun client.ts --role encoder --remote wss://ctl.example.com/device
 ```
 
-| Option | Env | Notes |
-| ------ | --- | ----- |
-| `--host`, `--port` |  | Default `0.0.0.0:8090` |
-| `--device-token` | `SRTLA_DEVICE_TOKEN` | Shared device token |
-| `--devices` |  | JSON file with per-device tokens `{"cam1": "token"}` |
+| Option                       | Env                                  | Notes                                                |
+| ---------------------------- | ------------------------------------ | ---------------------------------------------------- |
+| `--host`, `--port`           |                                      | Default `0.0.0.0:8090`                               |
+| `--device-token`             | `SRTLA_DEVICE_TOKEN`                 | Shared device token                                  |
+| `--devices`                  |                                      | JSON file with per-device tokens `{"cam1": "token"}` |
 | `--ui-user`, `--ui-password` | `SRTLA_UI_USER`, `SRTLA_UI_PASSWORD` | Browser login (HTTP Basic; user defaults to `admin`) |
-| `--no-auth` |  | Local testing only |
+| `--no-auth`                  |                                      | Local testing only                                   |
 
 > [!IMPORTANT]
 > Run the server behind a TLS reverse proxy — device tokens and Basic auth need `wss://`/`https://`.
@@ -181,19 +181,19 @@ Every capability is a **self-contained module** under [`modules/`](modules/READM
 
 **Device modules** — run on the device, each shown as a card in the web UI:
 
-| Module | What it does |
-| ------ | ------------ |
-| `encoder` | Runs and supervises the encoder process for encoder/combined devices: pipeline discovery (ids are paths under `--pipelines`, e.g. `rk3588/h265_hdmi_1440p25`), start/stop with automatic restart, and live bitrate changes. Supports **belacoder** (bitrate via a min/max file, re-read on SIGHUP) and **ceracoder** (INI config with balancer tuning). |
-| `srtla` | Manages the `srtla_send` process for relay/combined devices: start/stop/reload (SIGHUP or restart), and applies scheduler options (mode, quality) over the control socket live. |
-| `modems` | ModemManager (`mmcli`) integration: enumeration, per-modem state, signal quality, operator, and enable/disable/reset/connect/disconnect actions — wired into the bonding selection. |
+| Module           | What it does                                                                                                                                                                                                                                                                                                                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `encoder`        | Runs and supervises the encoder process for encoder/combined devices: pipeline discovery (ids are paths under `--pipelines`, e.g. `rk3588/h265_hdmi_1440p25`), start/stop with automatic restart, and live bitrate changes. Supports **belacoder** (bitrate via a min/max file, re-read on SIGHUP) and **ceracoder** (INI config with balancer tuning).                                                 |
+| `srtla`          | Manages the `srtla_send` process for relay/combined devices: start/stop/reload (SIGHUP or restart), and applies scheduler options (mode, quality) over the control socket live.                                                                                                                                                                                                                         |
+| `modems`         | ModemManager (`mmcli`) integration: enumeration, per-modem state, signal quality, operator, and enable/disable/reset/connect/disconnect actions — wired into the bonding selection.                                                                                                                                                                                                                     |
 | `obs-controller` | Owns the [obs-websocket](https://github.com/obsproject/obs-websocket) (v5) connection to a paired OBS Studio instance and forwards its events into the device event stream. Also runs the **low-bitrate switcher**: a pure state machine ([`switcher-engine.ts`](modules/obs-controller/switcher-engine.ts)) that watches SRT/OBS metrics and switches OBS between `normal` / `low` / `offline` scenes. |
 
 **Channel widgets** — dashboard-only, run on the control server (device-independent); one hub per module serves all widgets of its kind:
 
-| Widget | Source |
-| ------ | ------ |
-| `kick-stats` | Polls Kick's public channel API every 30 s; pushes live viewer/online stats for a line chart (1 h window). |
-| `chat` | One widget, one merged feed: config has a channel per platform (`youtube`, `twitch`, `tiktok`, `kick`) and every filled channel is joined, its messages merged into the single view. Per-platform transports live in `modules/chat/providers/`: Kick joins the public chat Pusher room (no auth), Twitch one IRC-over-websocket connection per channel (anonymous `justinfan` nick, IRCv3 tags), YouTube polls the live-chat endpoint per creator handle (~1 s cadence) via [`youtube-chat-next`](https://www.npmjs.com/package/youtube-chat-next), TikTok one [`tiktok-live-connector`](https://www.npmjs.com/package/tiktok-live-connector) websocket (reconnect loop owned by the module). |
+| Widget       | Source                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kick-stats` | Polls Kick's public channel API every 30 s; pushes live viewer/online stats for a line chart (1 h window).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `chat`       | One widget, one merged feed: config has a channel per platform (`youtube`, `twitch`, `tiktok`, `kick`) and every filled channel is joined, its messages merged into the single view. Per-platform transports live in `modules/chat/providers/`: Kick joins the public chat Pusher room (no auth), Twitch one IRC-over-websocket connection per channel (anonymous `justinfan` nick, IRCv3 tags), YouTube polls the live-chat endpoint per creator handle (~1 s cadence) via [`youtube-chat-next`](https://www.npmjs.com/package/youtube-chat-next), TikTok one [`tiktok-live-connector`](https://www.npmjs.com/package/tiktok-live-connector) websocket (reconnect loop owned by the module). |
 
 All chat/stats widgets share the same guarantees: rolling message history so reconnects don't re-send, and a `seen` set that dedupes message ids across reconnects.
 
