@@ -126,9 +126,12 @@ export interface BridgedModule {
 	handleEvent?(event: string, data: unknown): void;
 }
 
-/** Render context the core hands a widget: the live-state bag of the widget's
- * own device (structurally read; the module knows its own keys). */
+/** Render context the core hands a widget: the widget's normalized channel
+ * key, the live-state bag of its own device (structurally read; the module
+ * knows its own keys) and its device info. */
 export interface WidgetContext {
+	/** The widget's normalized channel key ("" — srtla is device-bound). */
+	channel: string;
 	deviceLive?: Record<string, unknown> | null;
 	device?: Record<string, unknown> | null;
 }
@@ -151,8 +154,6 @@ export interface ChannelWidgetModule<TWidget = unknown> {
 	defaultSize: { w: number; h: number };
 	/** Config parameter names this widget accepts, in editor form order. */
 	configFields: readonly WidgetConfigField[];
-	/** The widget's channel name from its config ("" — srtla is device-bound). */
-	channelOf(w: TWidget): string;
 	body(w: TWidget, ctx: WidgetContext): unknown;
 	badge(w: TWidget, ctx: WidgetContext): unknown;
 	onFrame?(event: string, data: unknown): void;

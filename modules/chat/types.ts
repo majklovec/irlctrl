@@ -47,9 +47,12 @@ export type PublishFn = (msg: string) => void;
 /** Serialize an event frame for the module websockets. */
 export const eventFrame = (event: string, data: unknown): string => JSON.stringify({ type: "event", event, data });
 
-/** Render context passed to a widget by the core: the live state of the widget's
- * own device (undefined for device-independent widgets). */
+/** Render context passed to a widget by the core: the widget's normalized
+ * channel key, the live state of its own device (undefined for
+ * device-independent widgets) and its device info. */
 export interface WidgetContext {
+	/** The widget's normalized channel key ("" when not configured). */
+	channel: string;
 	deviceLive?: Record<string, unknown> | null;
 	device?: Record<string, unknown> | null;
 }
@@ -71,8 +74,6 @@ export interface ChannelWidgetModule<TWidget = unknown> {
 	defaultSize: { w: number; h: number };
 	/** Config parameter names this widget accepts, in editor form order. */
 	configFields: readonly WidgetConfigField[];
-	/** The widget's channel name from its config ("" when not configured). */
-	channelOf(w: TWidget): string;
 	/** Render the widget body from the module's live state. */
 	body(w: TWidget, ctx: WidgetContext): unknown;
 	/** Status badge shown next to the widget title in the card head. */

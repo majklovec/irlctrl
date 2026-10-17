@@ -4,7 +4,6 @@ import type { CeraBalancer, Pipeline, Status } from "../../public/types";
 import { BITRATE_KBPS } from "../../public/types";
 import {
 	Actions,
-	AudioCodecOptions,
 	Badge,
 	Break,
 	Button,
@@ -295,7 +294,7 @@ export function encoderCardBody(host: DeviceCard, status: Status): m.Vnode {
 							label={t("dev.field.audio_codec")}
 							control={
 								<Select target={fields} prop="audioCodec" onChange={() => touched.add("audioCodec")}>
-									<AudioCodecOptions />
+									<Options pairs={[["aac", "AAC"], ["opus", "Opus"]]} />
 								</Select>
 							}
 						/>

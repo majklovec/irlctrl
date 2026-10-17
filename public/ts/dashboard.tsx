@@ -116,14 +116,15 @@ export function ensureDashboardsWs(): void {
 }
 
 /** A channel widget's normalized channel key ("" when not configured) — the
- * module owns which config parameter carries the channel name. */
+ * universal `channel` config parameter shared by the channel widgets. */
 export const widgetChannel = (w: ServerDashboardWidget): string =>
-  widgetModuleForType(w.type)?.channelOf(w) ?? "";
+  (w.config?.channel ?? "").trim().toLowerCase();
 
-/** The render context the core hands a widget module: its device's live bag
- * (null for device-independent widgets) plus the device info — the module
- * reads what it composes structurally. */
+/** The render context the core hands a widget module: its normalized channel,
+ * its device's live bag (null for device-independent widgets) plus the device
+ * info — the module reads what it composes structurally. */
 export const widgetCtx = (w: ServerDashboardWidget): WidgetContext => ({
+  channel: widgetChannel(w),
   deviceLive: (connectionFor(effectiveDeviceId(w))?.live ?? null) as Record<
     string,
     unknown

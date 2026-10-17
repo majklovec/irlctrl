@@ -261,29 +261,6 @@ export const Options = {
 		)),
 } as MithrilJSXComponent<{ pairs: readonly (readonly [string, string])[] }>;
 
-export const AudioCodecOptions = {
-	view: (v) => (
-		<Options
-			pairs={[
-				["aac", "AAC"],
-				["opus", "Opus"],
-			]}
-		/>
-	),
-} as MithrilJSXComponent<{ children?: m.Children }>;
-
-/** srtla_send scheduler modes. */
-export const SchedulerOptions = {
-	view: (v) => (
-		<Options
-			pairs={[
-				["enhanced", t("dev.scheduler_enhanced")],
-				["classic", t("dev.scheduler_classic")],
-			]}
-		/>
-	),
-} as MithrilJSXComponent<{ children?: m.Children }>;
-
 /** <form> whose submit runs `onSubmit` instead of navigating. */
 export const Form = {
 	view: ({ attrs: { onSubmit, ...rest }, children }) => (

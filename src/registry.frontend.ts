@@ -19,12 +19,15 @@ import type { ServerDashboardWidget, Status, WidgetConfigField } from "../public
 import { setFrontendEventSink, type DeviceCard } from "../public/ts/device/store";
 import MANIFEST from "../modules/.generated.frontend";
 
-/** Render context the core hands a widget module: the live state bag of the
- * widget's own device (undefined for device-independent widgets). Lets a module
- * read the device state it composes (e.g. srtla stats) without the core naming a
+/** Render context the core hands a widget module: the widget's normalized
+ * channel key, the live state bag of its own device (undefined for
+ * device-independent widgets) and its device info. Lets a module read the
+ * device state it composes (e.g. srtla stats) without the core naming a
  * module's renderer. `deviceLive` is the core's per-device live data (its own
  * `DeviceLive` bag, read structurally); `device` is the device info. */
 export interface WidgetContext {
+	/** The widget's normalized channel key ("" when not configured). */
+	channel: string;
 	deviceLive?: Record<string, unknown> | null;
 	device?: Record<string, unknown> | null;
 }
@@ -45,7 +48,6 @@ interface ChannelWidgetModule<TWidget = unknown> {
 	/** Grid cell count for a widget of this module's types (grid policy). */
 	defaultSize: { w: number; h: number };
 	configFields: readonly WidgetConfigField[];
-	channelOf(w: TWidget): string;
 	body(w: TWidget, ctx: WidgetContext): unknown;
 	badge(w: TWidget, ctx: WidgetContext): unknown;
 	/** Optional: receive one dashboard-websocket frame and fold it into the

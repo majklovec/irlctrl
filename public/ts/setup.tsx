@@ -7,7 +7,6 @@ import type { AudioSource, Pipeline, Role } from "../types";
 import { roleCardIcon } from "./components/icons";
 import {
   Actions,
-  AudioCodecOptions,
   Break,
   Button,
   Checkbox,
@@ -19,7 +18,6 @@ import {
   numberAttrs,
   Options,
   Page,
-  SchedulerOptions,
   Select,
 } from "./components/ui";
 import { languageOptions, setLanguage, t } from "./i18n";
@@ -419,7 +417,7 @@ function stepBody(key: StepKey): m.Vnode {
           label={t("dev.field.audio_codec")}
           control={
             <Select target={f} prop="audioCodec">
-              <AudioCodecOptions />
+              <Options pairs={[["aac", "AAC"], ["opus", "Opus"]]} />
             </Select>
           }
         />,
@@ -507,7 +505,12 @@ function stepBody(key: StepKey): m.Vnode {
           label={t("dev.scheduler")}
           control={
             <Select target={f} prop="srtlaMode">
-              <SchedulerOptions />
+              <Options
+                pairs={[
+                  ["enhanced", t("dev.scheduler_enhanced")],
+                  ["classic", t("dev.scheduler_classic")],
+                ]}
+              />
             </Select>
           }
         />,

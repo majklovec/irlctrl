@@ -14,7 +14,7 @@ import {
 	FieldGroup,
 	Form,
 	Input,
-	SchedulerOptions,
+	Options,
 } from "../../public/ts/components/ui";
 import { formatBitrate, since } from "../../public/ts/util";
 import { t } from "../../public/ts/i18n";
@@ -111,7 +111,12 @@ export function srtlaCardBody(host: DeviceCard, status: Status): m.Vnode {
 								value={modeValue(host)}
 								onchange={(e: Event) => void setOption(host, "mode", (e.target as HTMLSelectElement).value)}
 							>
-								<SchedulerOptions />
+								<Options
+									pairs={[
+										["enhanced", t("dev.scheduler_enhanced")],
+										["classic", t("dev.scheduler_classic")],
+									]}
+								/>
 							</select>
 						}
 					/>
@@ -212,7 +217,6 @@ const srtlaStatsWidget: ChannelWidgetModule<ServerDashboardWidget> = {
 	widgetTypes: ["stats"],
 	defaultSize: { w: 3, h: 2 },
 	configFields: [] as const,
-	channelOf: () => "",
 	body: statsBody,
 	badge: statsBadge,
 };

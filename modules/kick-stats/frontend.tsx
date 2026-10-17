@@ -43,15 +43,9 @@ function onFrame(event: string, data: unknown): void {
   }
 }
 
-/** The widget's channel name ("" when not configured) — the module owns which
- * config parameter carries it. */
-function channelOf(w: ServerDashboardWidget): string {
-  return (w.config?.channel ?? "").trim().toLowerCase();
-}
-
 /** Card head: the stream badge (not configured, waiting, else streaming/offline). */
-function badge(w: ServerDashboardWidget, _ctx: WidgetContext): m.Vnode {
-  const channel = channelOf(w);
+function badge(_w: ServerDashboardWidget, ctx: WidgetContext): m.Vnode {
+  const channel = ctx.channel;
   if (!channel)
     return <Badge text={t("dash.widget_not_configured")} kind="warn" />;
   const s = live.get(channel)?.stats;
@@ -73,8 +67,8 @@ function durationMinutes(fromMs: number, toMs: number): string {
 }
 
 /** The card body: stream info on top, the viewers line chart below. */
-function body(w: ServerDashboardWidget, _ctx: WidgetContext): m.Children {
-  const channel = channelOf(w);
+function body(_w: ServerDashboardWidget, ctx: WidgetContext): m.Children {
+  const channel = ctx.channel;
   if (!channel) return <p class={"muted"}>{t("dash.widget_not_configured")}</p>;
   const s = live.get(channel)?.stats;
   if (!s) return <p class={"muted"}>{t("kickstats.waiting")}</p>;
@@ -139,7 +133,6 @@ const kickStatsModule: ChannelWidgetModule<ServerDashboardWidget> = {
   widgetTypes: ["kick-stats"],
   defaultSize: { w: 3, h: 2 },
   configFields: KICK_STATS_CONFIG_FIELDS,
-  channelOf,
   body,
   badge,
   onFrame,

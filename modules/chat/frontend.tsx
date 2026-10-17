@@ -527,18 +527,12 @@ function body(w: ServerDashboardWidget, _ctx: WidgetContext): m.Children {
   });
 }
 
-/** This module owns its multi-channel config; no single-channel hook applies. */
-function channelOf(_w: ServerDashboardWidget): string {
-  return "";
-}
-
 const chatModule: ChannelWidgetModule<ServerDashboardWidget> = {
   id: "chat",
   kind: "widget",
   widgetTypes: ["chat"],
   defaultSize: { w: 3, h: 8 },
   configFields: CHAT_CONFIG_FIELDS,
-  channelOf,
   body,
   badge,
   onFrame,
