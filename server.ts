@@ -426,6 +426,32 @@ function failPending(
 	}
 }
 
+function forwardRequest(
+	device: Device,
+	deviceSocket: Socket,
+	viewer: Socket,
+	clientId: unknown,
+	method: string,
+	params: unknown,
+): void {
+	const sid = nextRequestId++;
+	const timer = setTimeout(() => {
+		pending.delete(sid);
+		sendToViewer(
+			viewer,
+			errorResponse(clientId, method, "device did not respond", 504),
+		);
+	}, REQUEST_TIMEOUT_MS);
+	pending.set(sid, {
+		deviceId: device.id,
+		viewer,
+		clientId,
+		method,
+		timer,
+	});
+	deviceSocket.send(JSON.stringify({ id: sid, method, params }));
+}
+
 /** Apply the device's self-reported parameters (hello / status); returns whether any changed. */
 function updateDevice(
 	d: Device,
@@ -560,7 +586,7 @@ function onDeviceRequest(origin: Device, msg: Record<string, unknown>): void {
 	}
 
 	const originWs = origin.ws;
-	if (!target.ws || !originWs) {
+	if (!originWs) {
 		respond(errorResponse(id, method, "device offline", 503));
 		return;
 	}
@@ -568,19 +594,7 @@ function onDeviceRequest(origin: Device, msg: Record<string, unknown>): void {
 		msg.params && typeof msg.params === "object" && !Array.isArray(msg.params)
 			? msg.params
 			: {};
-	const sid = nextRequestId++;
-	const timer = setTimeout(() => {
-		pending.delete(sid);
-		respond(errorResponse(id, method, "device did not respond", 504));
-	}, REQUEST_TIMEOUT_MS);
-	pending.set(sid, {
-		deviceId: target.id,
-		viewer: originWs,
-		clientId: id,
-		method,
-		timer,
-	});
-	target.ws.send(JSON.stringify({ id: sid, method, params }));
+	forwardRequest(target, target.ws, originWs, id, method, params);
 }
 
 function onViewerMessage(
@@ -605,16 +619,7 @@ function onViewerMessage(
 		return;
 	}
 
-	const sid = nextRequestId++;
-	const timer = setTimeout(() => {
-		pending.delete(sid);
-		sendToViewer(
-			ws,
-			errorResponse(clientId, method, "device did not respond", 504),
-		);
-	}, REQUEST_TIMEOUT_MS);
-	pending.set(sid, { deviceId, viewer: ws, clientId, method, timer });
-	d.ws.send(JSON.stringify({ id: sid, method, params: msg.params }));
+	forwardRequest(d, d.ws, ws, clientId, method, msg.params);
 }
 
 // ----------------------------------------------------------------------
@@ -772,6 +777,7 @@ function normalizeDashboard(
 }
 
 let dashboards: ServerDashboard[] = [];
+// biome-ignore lint/complexity/noUselessLoneBlockStatements: <explanation>
 {
 	try {
 		const loaded = (await Bun.file(DASHBOARDS_FILE).json()) as DashboardsFile;
