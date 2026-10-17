@@ -207,7 +207,7 @@ const BunWebSocket = WebSocket as unknown as new (
 ) => Bun.WebSocket;
 
 async function main(): Promise<void> {
-	const obsUrl = arg("--obs", "ws://127.0.0.1:4455");
+	const obsUrl = arg("--obs",  process.env.OBS_URL ?? "ws://127.0.0.1:4455");
 	const obsPassword = arg("--obs-password", process.env.OBS_PASSWORD ?? "");
 	const remoteUrl = arg("--remote", process.env.CONTROL_SERVER_URL ?? "");
 	const remoteToken = arg(
