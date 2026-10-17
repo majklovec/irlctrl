@@ -8,6 +8,9 @@ import {
 import { i18nReady, LanguageSelect, t } from "./i18n";
 import { mountPage } from "./util";
 
+// Show a one-time "account created" note when we just came back from /register.
+const registered = new URLSearchParams(location.search).has("registered");
+
 const state = {
   username: "",
   password: "",
@@ -78,6 +81,7 @@ const App: m.Component = {
               />
             }
           />
+          {registered ? <p class={"ok"}>{t("login.registered")}</p> : null}
           {state.error ? <p class={"error"}>{t("login.error")}</p> : null}
           <div class={"actions"}>
             <button type={"submit"} disabled={state.busy}>
@@ -85,6 +89,9 @@ const App: m.Component = {
             </button>
           </div>
         </form>
+        <div class={"login-alt"}>
+          <a href={"/register"}>{t("login.register")}</a>
+        </div>
       </Card>
     </div>
   ),

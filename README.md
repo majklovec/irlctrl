@@ -114,22 +114,18 @@ Tick **Autostart** in the UI (or call `autostart.set`) to resume the last stream
 
 ### Authentication
 
-The server replaces HTTP Basic auth with per-user profiles. A `--users` file maps each profile to a login **password** (browser) and one or more **device tokens**:
+The server replaces HTTP Basic auth with per-user profiles stored in a local **SQLite** database (`bun:sqlite`). Each profile has a login **password** (browser) and one or more **device tokens**.
 
-```json
-{
-  "alice": { "password": "s3cret", "tokens": ["tok-alice-1", "tok-alice-2"] },
-  "bob": { "password": "p4ss", "tokens": ["tok-bob-1"] }
-}
-```
-
+- **Users** live in the SQLite database (default `users.db`, see `--db`). Passwords are stored as **scrypt hashes** — the plaintext never touches disk.
 - **Devices** authenticate with `Authorization: Bearer <token>` when they open their `ws://<server>/device` connection. The server resolves the token to a user and assigns the device to that user — devices are therefore owned by the profile whose token presented them.
 - **Browsers** sign in at `/login` with the username and password. A successful login sets an `HttpOnly` session cookie; all device lists, device pages, and dashboards are then scoped to that user. Only devices owned by the signed-in user are visible, and only that user can open a device's page/WS or edit its dashboards.
-- `--no-auth` maps everything to a single local profile for local testing.
+- **`/register`** creates a new account (self-service). New profiles start with no device tokens — add them on the profile page after signing in.
+- **`/profile/`** (reached from the username menu in the header) changes the login password and lists/manages the user's device tokens — adding new ones and removing old ones.
+- `--no-auth` maps everything to a single local profile for local testing (no database needed).
 
 ```sh
-# control server (users file maps profiles to tokens)
-SRTLA_USERS=users.json bun server.ts --port 8090
+# control server — the first account is created at /register
+bun server.ts --port 8090
 
 # on each device — that device's owner token
 CONTROL_SERVER_TOKEN=tok-alice-1 bun client.ts --role encoder --remote wss://ctl.example.com/device
@@ -141,7 +137,7 @@ open http://ctl.example.com/  # redirects to /login; enter the username + passwo
 | Option             | Env           | Notes                                                                                             |
 | ------------------ | ------------- | ------------------------------------------------------------------------------------------------- |
 | `--host`, `--port` |               | Default `0.0.0.0:8090`                                                                            |
-| `--users`          | `SRTLA_USERS` | JSON file mapping each user profile to its tokens (required unless `--no-auth`)                   |
+| `--db`             | `SRTLA_DB`    | SQLite user database file (default `users.db`)                                                    |
 | `--dashboards`     |               | JSON file persisting the (per-user) dashboards                                                     |
 | `--no-auth`        |               | Local testing only — one shared `local` profile, no tokens needed                                  |
 

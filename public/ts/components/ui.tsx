@@ -65,7 +65,9 @@ function closeProfileMenu(ev?: Event): void {
 
 /** Main menu of the control server: the device list, the dashboards page,
  * and the profile menu (profile page + sign out). */
-export const ServerNav = {
+const ServerNavComponent: m.Component<{
+  active: "devices" | "dashboards" | "profile";
+}> = {
 	oncreate() {
 		// The menu label is the session user's login name.
 		void fetch("/api/whoami")
@@ -149,7 +151,8 @@ export const ServerNav = {
 			</span>
 		</span>
 	),
-} as unknown as MithrilJSXComponent<{
+};
+export const ServerNav = ServerNavComponent as MithrilJSXComponent<{
   active: "devices" | "dashboards" | "profile";
 }>;
 

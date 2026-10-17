@@ -200,6 +200,18 @@ header > .actions {
   justify-content: flex-end;
   margin-bottom: 0.75rem;
 }
+.login-alt {
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 0.9rem;
+}
+.login-alt a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.login-alt a:hover {
+  text-decoration: underline;
+}
 
 @media (max-width: 640px) {
   .main-nav {

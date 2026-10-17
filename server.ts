@@ -26,6 +26,8 @@ import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypt
  *   POST /api/dashboards   create a dashboard {name, widgets}
  *   PUT  /api/dashboards/<id>   replace a dashboard {name, widgets}
  *   DEL  /api/dashboards/<id>   remove a dashboard
+ *   GET  /register       create an account (public/register.html)
+ *   POST /api/register   create a profile {username, password} → 201 (409 if taken)
  *   GET  /profile/       user profile (password change + device tokens)
  *   GET  /api/whoami     the session user's login name
  *   GET  /api/profile    username + the user's device tokens
@@ -64,16 +66,13 @@ import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypt
  * Auth:
  *   users    Users live in a SQLite database (--db, default users.db) with
  *            scrypt-hashed passwords; each user owns the device tokens stored
- *            for them. --users users.json (or SRTLA_USERS) is a one-time
- *            import source — {"alice": {"password": "…", "tokens": ["…"]}} —
- *            applied only while the database has no users (passwords are
- *            hashed on import). Devices present one of their user's tokens
+ *            for them. Devices present one of their user's tokens
  *            (Authorization: Bearer) on connect and are assigned to that
  *            user; the browser signs in at /login with the username and
- *            password and receives an opaque HttpOnly session cookie. Each
- *            user only sees (and may create) their own devices and
- *            dashboards, and manages their password and tokens on
- *            /profile/.
+ *            password and receives an opaque HttpOnly session cookie. New
+ *            accounts can be created at /register (self-service). Each user
+ *            only sees (and may create) their own devices and dashboards, and
+ *            manages their password and tokens on /profile/.
  *   --no-auth disables auth (local testing only; everything maps to "local").
  *
  * Dashboards are a per-user feature: the dashboards page composes them from the
@@ -81,7 +80,7 @@ import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypt
  * dashboards.json, created on the first change).
  *
  * Usage:
- *   SRTLA_USERS=users.json bun server.ts --port 8090
+ *   bun server.ts --port 8090
  */
 import type { ServerWebSocket } from "bun";
 import type {
@@ -95,7 +94,7 @@ import type {
 	WidgetType,
 } from "./public/types";
 import { configFieldName } from "./public/types";
-import { arg, argFail, flag, intArg } from "./src/args";
+import { arg, flag, intArg } from "./src/args";
 import {
 	i18nResponse,
 	imageResponse,
@@ -129,9 +128,6 @@ import { COLOR_RE, isRole, type Role } from "./src/validate";
 const PORT = intArg("--port", 8090, 1, 65535);
 const HOST = arg("--host", "0.0.0.0");
 
-/** One-time import source: `{"alice": {"password": "…", "tokens": ["…"]}}` —
- * applied into the SQLite store only while it has no users. */
-const USERS_FILE = arg("--users", process.env.SRTLA_USERS ?? "");
 const NO_AUTH = flag("--no-auth");
 const DASHBOARDS_FILE = arg("--dashboards", "dashboards.json");
 // SQLite database: user logins (hashed passwords) and their device tokens
@@ -195,42 +191,6 @@ function verifyPassword(password: string, stored: string): boolean {
 /** Hash only consumed by the login timing-equalizer below. */
 const DUMMY_PASSWORD_HASH = hashPassword("__padding__");
 
-/** Parse + validate the `--users` import JSON (failures exit 2). */
-async function parseUsersImport(): Promise<
-	Record<string, { password: string; tokens: string[] }>
-> {
-	const parsed: unknown = await Bun.file(USERS_FILE)
-		.json()
-		.catch((err: unknown) =>
-			argFail(
-				"--users",
-				USERS_FILE,
-				`readable JSON {"user": {"password": "…", "tokens": [...]}} (${String(err)})`,
-			),
-		);
-	const found: Record<string, { password: string; tokens: string[] }> = {};
-	if (parsed && typeof parsed === "object") {
-		for (const [name, profile] of Object.entries(
-			parsed as Record<string, unknown>,
-		)) {
-			const p =
-				profile && typeof profile === "object"
-					? (profile as Record<string, unknown>)
-					: undefined;
-			if (!p || typeof p.password !== "string" || p.password.length === 0)
-				continue;
-			const tokens = Array.isArray(p.tokens) ? p.tokens : [];
-			if (tokens.every((t) => typeof t === "string" && t.length > 0)) {
-				found[name] = { password: p.password, tokens: tokens as string[] };
-			}
-		}
-	}
-	if (Object.keys(found).length === 0) {
-		argFail("--users", USERS_FILE, `at least one user with a non-empty "password"`);
-	}
-	return found;
-}
-
 /** The user database (null in `--no-auth` mode): logins with scrypt-hashed
  * passwords and the device tokens assigned to each user. */
 const db: Database | null = NO_AUTH
@@ -252,46 +212,13 @@ CREATE TABLE IF NOT EXISTS tokens (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS tokens_token ON tokens(token);
 `);
-			const empty = (
-				d.prepare("SELECT COUNT(*) AS n FROM users").get() as { n: number }
-			).n === 0;
-			if (empty) {
-				// One-time import: the JSON file seeds the database, which
-				// then becomes the source of truth.
-				if (USERS_FILE) {
-					const imported = await parseUsersImport();
-					const insertUser = d.prepare(
-						"INSERT INTO users (login, password) VALUES (?, ?)",
-					);
-					const insertToken = d.prepare(
-						"INSERT INTO tokens (user_id, token) VALUES (?, ?)",
-					);
-					d.run("BEGIN");
-					try {
-						for (const [name, profile] of Object.entries(imported)) {
-							const row = insertUser.run(
-								name,
-								hashPassword(profile.password),
-							);
-							for (const token of profile.tokens) {
-								insertToken.run(Number(row.lastInsertRowid), token);
-							}
-						}
-						d.run("COMMIT");
-						console.log(
-							`[auth] imported ${Object.keys(imported).length} user(s) from ${USERS_FILE}`,
-						);
-					} catch {
-						d.run("ROLLBACK");
-						throw new Error("failed to import users from " + USERS_FILE);
-					}
-				} else {
-					console.error(`The user database ${DB_FILE} has no users.`);
-					console.error(
-						`Pass --users with {"user": {"password": "…", "tokens": [...]}} to import users into it, or pass --no-auth for local testing.`,
-					);
-					process.exit(2);
-				}
+			if (
+				(d.prepare("SELECT COUNT(*) AS n FROM users").get() as { n: number })
+					.n === 0
+			) {
+				console.log(
+					`[auth] the user database ${DB_FILE} has no users yet — create the first account at /register`,
+				);
 			}
 			return d;
 		})();
@@ -388,6 +315,48 @@ async function loginResponse(req: Request): Promise<Response> {
 			},
 		},
 	);
+}
+
+/** POST /api/register — create a new profile. The new account has no device
+ * tokens yet; the user adds them on the profile page after signing in. */
+async function registerResponse(req: Request): Promise<Response> {
+	let username: unknown;
+	let password: unknown;
+	try {
+		const body = (await req.json()) as {
+			username?: unknown;
+			password?: unknown;
+		};
+		username = body.username;
+		password = body.password;
+	} catch {
+		return Response.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
+	}
+	if (
+		typeof username !== "string" ||
+		typeof password !== "string" ||
+		username.trim().length === 0 ||
+		password.length < 8
+	) {
+		return Response.json({ ok: false, error: "Username and an 8+ character password are required" }, { status: 400 });
+	}
+	if (!db)
+		return Response.json({ ok: false, error: "Registration is disabled" }, { status: 403 });
+	const clean = username.trim();
+	// Statement.get() returns null (not undefined) when no row matches.
+	if (db.prepare("SELECT 1 FROM users WHERE login = ?").get(clean)) {
+		return Response.json({ ok: false, error: "That username is already taken" }, { status: 409 });
+	}
+	try {
+		db.prepare("INSERT INTO users (login, password) VALUES (?, ?)").run(
+			clean,
+			hashPassword(password),
+		);
+	} catch {
+		// A concurrent registration won the UNIQUE race.
+		return Response.json({ ok: false, error: "That username is already taken" }, { status: 409 });
+	}
+	return Response.json({ ok: true, user: clean }, { status: 201 });
 }
 
 function logoutResponse(req: Request): Response {
@@ -521,6 +490,7 @@ function deleteTokenResponse(url: URL, user: string): Response {
 // ----------------------------------------------------------------------
 const PAGES = [
 	"login",
+	"register",
 	"devices",
 	"profile",
 	"index",
@@ -1436,9 +1406,10 @@ const server = Bun.serve({
 		if (path === "/healthz") return text("ok");
 		if (path === "/device") return deviceUpgrade(req, url, srv);
 
-		// Public routes: the login page and its (content-hashed) assets and
-		// locale catalogs need no session.
+		// Public routes: the login + register pages and their (content-hashed)
+		// assets and locale catalogs need no session.
 		if (path === "/login") return htmlResponse("login");
+		if (path === "/register") return htmlResponse("register");
 		if (path.startsWith("/assets/")) {
 			const asset = assets.get(path.slice("/assets/".length));
 			return asset
@@ -1450,6 +1421,8 @@ const server = Bun.serve({
 		if (path.startsWith("/i18n/")) return await i18nResponse(path, catalog);
 		if (path === "/api/login" && req.method === "POST")
 			return loginResponse(req);
+		if (path === "/api/register" && req.method === "POST")
+			return registerResponse(req);
 		if (path === "/api/logout" && req.method === "POST")
 			return logoutResponse(req);
 
