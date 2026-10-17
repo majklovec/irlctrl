@@ -3,21 +3,6 @@
  * pushed live over the shared feed websocket, and live widget data flows over the
  * control server's per-device viewer websockets (d/<id>/ws). */
 import m from "mithril";
-import type {
-  DeviceInfo,
-  DeviceSummary,
-  ServerDashboard,
-  ServerDashboardWidget,
-  GridSize,
-  Role,
-  Status,
-  SrtlaStatsEvent,
-  SwitcherStatus,
-  WidgetType,
-} from "../types";
-import { Badge, Button, WidgetTable, type Child } from "./components/ui";
-import { configFieldName } from "../types";
-import { createCardHost, type DeviceCard } from "./device/store";
 /* REFACTOR-modules.md §7: the core names no module by id. Per-device cards
  * (encoder / srtla) are reached through the generated manifest
  * (`deviceCardBody`). The obs panel is the one documented exception: its
@@ -33,12 +18,27 @@ import {
   deviceCardBody,
   dispatchWidgetFrame,
   getFrontendModule,
+  type WidgetContext,
   widgetModuleForType,
   widgetModuleTypes,
-  type WidgetContext,
 } from "../../src/registry.frontend";
+import type {
+  DeviceInfo,
+  DeviceSummary,
+  GridSize,
+  Role,
+  ServerDashboard,
+  ServerDashboardWidget,
+  SrtlaStatsEvent,
+  Status,
+  SwitcherStatus,
+  WidgetType,
+} from "../types";
+import { configFieldName } from "../types";
+import { roleTag } from "./components/icons";
+import { Badge, Button, type Child, WidgetTable } from "./components/ui";
+import { createCardHost, type DeviceCard } from "./device/store";
 import { t } from "./i18n";
-import { roleTag } from "./icons";
 import { RpcClient, socketUrl } from "./services/rpc";
 import { serverLive } from "./services/serverws";
 import { formatBitrate, uuid } from "./util";
@@ -124,13 +124,14 @@ export const widgetChannel = (w: ServerDashboardWidget): string =>
  * (null for device-independent widgets) plus the device info — the module
  * reads what it composes structurally. */
 export const widgetCtx = (w: ServerDashboardWidget): WidgetContext => ({
-  deviceLive:
-    (connectionFor(effectiveDeviceId(w))?.live ?? null) as Record<
-      string,
-      unknown
-    > | null,
-  device: (deviceById(effectiveDeviceId(w)) ??
-    null) as Record<string, unknown> | null,
+  deviceLive: (connectionFor(effectiveDeviceId(w))?.live ?? null) as Record<
+    string,
+    unknown
+  > | null,
+  device: (deviceById(effectiveDeviceId(w)) ?? null) as Record<
+    string,
+    unknown
+  > | null,
 });
 
 // ---------------------------------------------------------------------- devices
@@ -592,17 +593,20 @@ function configEditorForm(w: ServerDashboardWidget): m.Vnode {
                 isSelect ? (
                   <select
                     class={"dash-config-input"}
-                    value={s.values[name] ?? (field.type === "select" ? field.options[0] : "")}
+                    value={
+                      s.values[name] ??
+                      (field.type === "select" ? field.options[0] : "")
+                    }
                     onchange={(e: Event) => {
                       s.values[name] = (e.target as HTMLSelectElement).value;
                     }}
                   >
                     {field.type === "select"
-                      ? field.options.map((opt) =>
+                      ? field.options.map((opt) => (
                           <option key={opt} value={opt}>
                             {t(`dash.widget_${name}.${opt}`)}
-                          </option>,
-                        )
+                          </option>
+                        ))
                       : []}
                   </select>
                 ) : (
@@ -629,7 +633,11 @@ function configEditorForm(w: ServerDashboardWidget): m.Vnode {
                   fields.map((field) => {
                     const nm = configFieldName(field);
                     let v = (s.values[nm] ?? "").trim();
-                    if (typeof field !== "string" && field.type === "select" && v === "") {
+                    if (
+                      typeof field !== "string" &&
+                      field.type === "select" &&
+                      v === ""
+                    ) {
                       v = field.options[0] ?? "";
                     }
                     return [nm, v];
@@ -646,7 +654,7 @@ function configEditorForm(w: ServerDashboardWidget): m.Vnode {
                 widgetConfigState.delete(widgetKey(w));
                 m.redraw();
               }}
-            />
+            />,
           ]}
         </div>,
       ]}
@@ -729,7 +737,9 @@ export function widgetSize(type: WidgetType): {
 } {
   const wm = widgetModuleForType(type);
   if (wm) return { default: wm.defaultSize, min: wm.defaultSize };
-  const mod = CARD_MODULE[type] ? getFrontendModule(CARD_MODULE[type]) : undefined;
+  const mod = CARD_MODULE[type]
+    ? getFrontendModule(CARD_MODULE[type])
+    : undefined;
   if (mod)
     return { default: mod.defaultSize, min: mod.minSize, max: mod.maxSize };
   if (type === "combined")

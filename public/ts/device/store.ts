@@ -17,9 +17,9 @@ import type {
 	SrtlaStatsEvent,
 	Status,
 } from "../../types";
+import type { Level } from "../components/icons";
 import type { KeysOf } from "../components/ui";
 import { t } from "../i18n";
-import type { Level } from "../icons";
 import { type Params, RpcClient, RpcError, socketUrl } from "../services/rpc";
 import { setHeaderColor, uuid } from "../util";
 import { applyLog, log } from "./log";

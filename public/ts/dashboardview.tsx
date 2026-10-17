@@ -9,6 +9,7 @@
  * the dashboard from the server. */
 import m from "mithril";
 import type { ServerDashboard, ServerDashboardWidget } from "../types";
+import { actionIcon } from "./components/icons";
 import { Page, ServerNav, TitleWithBack } from "./components/ui";
 import {
   ensureDashboardsWs,
@@ -20,7 +21,6 @@ import {
 } from "./dashboard";
 import { GridDashboard } from "./dashboardgrid";
 import { t } from "./i18n";
-import { actionIcon } from "./icons";
 import { mountPage } from "./util";
 
 const SAVE_DEBOUNCE_MS = 500;
