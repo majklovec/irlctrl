@@ -4,7 +4,6 @@ import m from "mithril";
 import { moduleCard } from "../../src/registry.frontend";
 import { gearIcon, roleTag } from "./components/icons";
 import { Badge, Page, TitleWithBack } from "./components/ui";
-import { interfacesCard } from "./device/interfaces";
 import { LogCard } from "./device/log";
 import { act, connectDevice, st } from "./device/store";
 import { t } from "./i18n";
@@ -74,11 +73,7 @@ const App: m.Component = {
     const obsOn = status?.modules["obs-controller"]?.enabled === true;
     const children = [
       !obsOnly && hasEncoder && moduleCard("encoder", status),
-      !obsOnly &&
-        hasRelay && [
-          moduleCard("srtla", status),
-          interfacesCard(status),
-        ],
+      !obsOnly && hasRelay && moduleCard("srtla", status),
       // The OBS card carries the low-bitrate switcher inside it (one card).
       obsOn && moduleCard("obs-controller", status),
     ];

@@ -31,6 +31,8 @@ Dockerfile.*
 docker-compose.yml
 docker-compose.*.yml
 .dockerignore
+# Bind-mounted per-service config (not baked into the image)
+config
 
 # ---- Environment / secrets ----
 .env

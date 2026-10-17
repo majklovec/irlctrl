@@ -10,6 +10,26 @@
 #   relay   -> bonds SRT out via srtla_send (needs no root in-container)
 #   encoder -> runs ceracoder/belacoder and sends SRT to a relay
 #
+# SRT is built from the CERALIVE fork (Haivision 1.5.7 + BELABOX patches), the
+# same source the Armbian device image uses (armbian/userpatches/
+# customize-image.sh). The committed ceracoder/belacoder binaries link against
+# this fork. It is kept in a separate build stage so the runtime image stays
+# free of the C/C++ toolchain.
+FROM oven/bun:1 AS srt-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      build-essential cmake git libssl-dev ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /srt
+RUN git clone --depth=1 https://github.com/CERALIVE/srt.git . \
+    && mkdir -p build && cd build \
+    && cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local \
+               -DENABLE_ENCRYPTION=ON -DCRYPTO=openssl \
+    && make -j"$(nproc)" \
+    && make install
+
+# ---- Bun build stage ----
 FROM oven/bun:1 AS builder
 
 WORKDIR /app
@@ -27,6 +47,8 @@ FROM oven/bun:1
 # GStreamer (ceracoder/belacoder encode pipelines), git (pipeline repos),
 # iproute2 (the relay detects uplinks via `ip -o -4 addr show` and watches them
 # with `ip monitor`), ca-certificates (TLS for wss:// control servers).
+# NOTE: SRT is NOT apt-installed here — it is built from the CERALIVE fork in
+# the `srt-builder` stage and copied in below.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ca-certificates \
@@ -36,6 +58,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
     gstreamer1.0-libav gstreamer1.0-x \
     && rm -rf /var/lib/apt/lists/*
+
+# The CERALIVE SRT fork (v1.5.7) installs as /usr/local/lib/libsrt.so.1.5.7,
+# but the committed ceracoder/belacoder binaries were linked against the
+# libsrt.so.1 soname. Copy the built tree and bridge the soname so the loader
+# resolves libsrt.so.1 to the fork.
+COPY --from=srt-builder /usr/local/lib /usr/local/lib
+RUN ln -s /usr/local/lib/libsrt.so.1.5.7 /usr/lib/x86_64-linux-gnu/libsrt.so.1 \
+    && ldconfig
 
 WORKDIR /app
 

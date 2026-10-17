@@ -101,9 +101,21 @@ describe("module registries", () => {
 		}
 	});
 
-	test("device-card frontends match backend device-module ids exactly", () => {
+	test("device-card frontends cover every backend device-module id", () => {
+		// The modems card has no frontend of its own: the srtla module composes
+		// it (interfaces table + modem panels), so it is the only backend device
+		// id without a device-card frontend. Every other backend id must have
+		// exactly one, and no extra card ids may exist.
 		const cardIds = scanFrontends().flatMap((fe) => fe.registrations).filter((r) => r.kind === "device-card").map((r) => r.id);
-		expect([...cardIds].sort()).toEqual([...DEVICE_ORDER].sort());
+		const front = new Set(cardIds);
+		const missing = DEVICE_ORDER.filter((id) => !front.has(id) && id !== "modems");
+		const extra = [...front].filter((id) => !DEVICE_ORDER.includes(id));
+		expect(missing).toEqual([]);
+		expect(extra).toEqual([]);
+		// The modems card renders through the srtla composite.
+		const srtlaSrc = readFileSync(join(modulesDir, "srtla", "frontend.tsx"), "utf8");
+		expect(srtlaSrc).toContain("mod-modems");
+		expect(srtlaSrc).toContain("interfacesCard");
 	});
 
 	test("widget frontends are separate from device modules", () => {

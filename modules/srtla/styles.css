@@ -1,5 +1,34 @@
-/* SRTLA module — no module-specific styles.
- * The card composes the shared core components (Card, form, fieldGroup…) so
- * its look comes from public/css/style.css; the .mod-srtla class on the
- * card root exists for future scoping.
+/* SRTLA module — the card composes the shared core components (Card, form,
+ * fieldGroup…) so its look comes from public/css/style.css; the .mod-srtla
+ * class on the card root exists for future scoping.
+ *
+ * The .mod-modems styles (merged in from the modems module, whose frontend
+ * now lives inside this one) scope the modem panels of the composite card.
  */
+.mod-modems .modem {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+  background: var(--card-subtle);
+  transition:
+    border-color var(--t),
+    background var(--t);
+}
+.mod-modems .modem:hover {
+  border-color: var(--border-strong);
+}
+.mod-modems .modem h3 {
+  font-size: 0.95rem;
+  margin: 0 0 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.mod-modems .modem dl {
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+.mod-modems .modem .actions button {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.8rem;
+}
