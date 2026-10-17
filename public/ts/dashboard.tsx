@@ -35,13 +35,12 @@ import type {
   WidgetType,
 } from "../types";
 import { configFieldName } from "../types";
-import { roleTag } from "./components/icons";
-import { Badge, Button, type Child, WidgetTable } from "./components/ui";
+import { Badge, Button } from "./components/ui";
 import { createCardHost, type DeviceCard } from "./device/store";
 import { t } from "./i18n";
 import { RpcClient, socketUrl } from "./services/rpc";
 import { serverLive } from "./services/serverws";
-import { formatBitrate, uuid } from "./util";
+import { uuid } from "./util";
 
 /** Device-independent widget types: their data (the widget's channel, fetched
  * by the control server) is not tied to any device connection. The widget
@@ -52,19 +51,10 @@ const INDEPENDENT: ReadonlySet<WidgetType> = new Set<WidgetType>(
 export const isIndependent = (type: WidgetType): boolean =>
   INDEPENDENT.has(type);
 
-/** The parts of an srtla stats push the core's status widget summarizes (the
- * full table is rendered by the srtla module itself). */
-interface SrtlaSummary {
-  active_links?: number;
-  total_links?: number;
-  links?: { bitrate_bytes_per_sec?: number }[];
-}
-
 /** Live data for one device, accumulated from its viewer websocket (or a 409). */
 interface DeviceLive {
   device?: DeviceInfo;
   status?: Status;
-  srtla?: SrtlaSummary;
   /** The low-bitrate switcher's live state (pushed as `lowBitrateSwitcher.state`). */
   switcher?: SwitcherStatus | null;
   obsConnected: boolean;
@@ -167,11 +157,11 @@ export const typeLabel = (type: WidgetType): string =>
 
 /** Widget types a role may place on a dashboard. */
 const ROLE_WIDGET_TYPES: Record<Role, WidgetType[]> = {
-  relay: ["stats", "relay"],
+  relay: ["relay"],
   encoder: ["encoder"],
   combined: ["combined"],
   obs: ["obs"],
-  custom: ["status", "stats", "relay", "encoder", "combined", "obs"],
+  custom: ["relay", "encoder", "combined", "obs"],
 };
 
 /** Widget types a specific device offers, from its role + enabled modules. */
@@ -233,7 +223,6 @@ export function syncConnectionsFor(dash: ServerDashboard | undefined): void {
     });
     rpc.on("srtla.stats", (data) => {
       const e = data as SrtlaStatsEvent;
-      live.srtla = e.stats ?? undefined;
       conn.card.handleStats(e);
     });
     rpc.on("lowBitrateSwitcher.state", (data) => {
@@ -289,51 +278,6 @@ const connectionFor = (deviceId: string): Connection | undefined =>
   connections.get(deviceId);
 
 // ---------------------------------------------------------------------- widgets
-
-function statusWidget(
-  deviceId: string,
-  conn: Connection | undefined,
-): m.Children {
-  const d = deviceById(deviceId);
-  if (!d) return <p class={"muted"}>{t("dash.widget_missing")}</p>;
-  const rows: [string, Child][] = [
-    [t("mgmt.th.role"), d.role ? roleTag(d.role) : "—"],
-    [
-      t("mgmt.th.status"),
-      d.online ? (
-        <Badge text={t("dev.badge.online")} kind="on" />
-      ) : (
-        <Badge text={t("dev.badge.offline")} kind="off" />
-      ),
-    ],
-  ];
-  if (d.role !== "encoder" && conn?.live.srtla) {
-    const s = conn.live.srtla;
-    rows.push([
-      t("mgmt.th.links"),
-      `${s.active_links ?? 0}/${s.total_links ?? 0}`,
-    ]);
-    const total = (s.links ?? []).reduce(
-      (sum, l) => sum + (l.bitrate_bytes_per_sec ?? 0),
-      0,
-    );
-    if (total) rows.push([t("mgmt.th_bitrate"), formatBitrate(total)]);
-  }
-  if (d.role !== "relay" && d.encoder) {
-    rows.push([
-      t("dev.card.encoder"),
-      d.encoder.running ? (
-        <Badge
-          text={d.encoder.config?.pipeline ?? t("dev.badge.streaming")}
-          kind="on"
-        />
-      ) : (
-        <Badge text={t("dev.badge.stopped")} kind="warn" />
-      ),
-    ]);
-  }
-  return <WidgetTable rows={rows} />;
-}
 
 /** Card widgets render the full interactive module card (same as the device page);
  * the wrapper keeps the module's CSS scope. */
@@ -714,7 +658,7 @@ function bodyFor(w: ServerDashboardWidget): m.Children {
     default: {
       const mod = widgetModuleForType(w.type);
       if (mod) return mod.body(w, widgetCtx(w)) as m.Children;
-      return statusWidget(deviceId, conn);
+      return <p class={"muted"}>{t("dash.widget_missing")}</p>;
     }
   }
 }

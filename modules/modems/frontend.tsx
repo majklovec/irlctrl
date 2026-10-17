@@ -4,25 +4,25 @@ import type { Status } from "../../public/types";
 import { Actions, Badge, Button, Card, DefinitionList } from "../../public/ts/components/ui";
 import { t } from "../../public/ts/i18n";
 import { signal } from "../../public/ts/device/interfaces";
-import { act, busy, st } from "../../public/ts/device/store";
+import { card, type DeviceCard } from "../../public/ts/device/store";
 import type { ModemInfo } from "../../public/types";
 import type { BridgedModule } from "./types";
 
-function modemAction(method: string, index: number): void {
+function modemAction(host: DeviceCard, method: string, index: number): void {
 	if (method === "modems.reset" && !confirm(t("dev.reset_confirm", index))) return;
-	void act(`modem:${method}:${index}`, method, { index });
+	void host.act(`modem:${method}:${index}`, method, { index });
 }
 
 const stateKind = (state: string) =>
 	state === "connected" ? "on" : state === "disabled" || state === "failed" ? "off" : "warn";
 
-function modemPanel(modem: ModemInfo): m.Vnode {
+function modemPanel(host: DeviceCard, modem: ModemInfo): m.Vnode {
 	const control = (label: string, method: string, cls = "secondary") => (
 		<Button
 			label={label}
 			class={cls}
-			disabled={busy.has(`modem:${method}:${modem.index}`) || !!st.status?.state.srtla}
-			onclick={() => modemAction(method, modem.index)}
+			disabled={host.busy.has(`modem:${method}:${modem.index}`) || !!host.st.status?.state.srtla.running}
+			onclick={() => modemAction(host, method, modem.index)}
 		/>
 	);
 	const connected = modem.state === "connected";
@@ -55,6 +55,14 @@ function modemPanel(modem: ModemInfo): m.Vnode {
 	);
 }
 
+export function modemsContent(host: DeviceCard, status: Status): m.Children {
+	return status.modems.length ? (
+		<div class={"grid"}>{status.modems.map((modem) => modemPanel(host, modem))}</div>
+	) : (
+		<p class={"muted"}>{t("dev.no_modems")}</p>
+	);
+}
+
 const modemsModule: BridgedModule = {
 	id: "modems",
 	kind: "device-card",
@@ -63,11 +71,7 @@ const modemsModule: BridgedModule = {
 	minSize: { w: 3, h: 3 },
 	component: (status: Status) => (
 		<Card title={t("dev.card.modems")} class={"mod-modems"}>
-			{status.modems.length ? (
-				<div class={"grid"}>{status.modems.map(modemPanel)}</div>
-			) : (
-				<p class={"muted"}>{t("dev.no_modems")}</p>
-			)}
+			{modemsContent(card, status)}
 		</Card>
 	),
 };

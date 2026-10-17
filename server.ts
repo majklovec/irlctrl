@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 /*
  * SRTLA control server.
  *
@@ -68,47 +69,89 @@
  *   SRTLA_DEVICE_TOKEN=devsecret SRTLA_UI_PASSWORD=uipass bun server.ts --port 8090
  */
 import type { ServerWebSocket } from "bun";
-import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
-import type { DeviceInfo, DeviceSummary, ServerDashboard, ServerDashboardWidget, SrtlaStats, SrtlaStatsEvent, Status, WidgetType } from "./public/types";
-import { arg, argFail, flag, intArg } from "./src/args";
-import { i18nResponse, imageResponse, notFound, originAllowed, text, upgradeRequired } from "./src/http";
-import { catalog, i18nReady, isLanguage, type Language, translate } from "./src/i18n";
-import { initWidgetHub, syncWidgetHub, widgetConfigFields, widgetHubSnapshot } from "./src/registry";
+import type {
+	DeviceInfo,
+	DeviceSummary,
+	ServerDashboard,
+	ServerDashboardWidget,
+	SrtlaStats,
+	SrtlaStatsEvent,
+	Status,
+	WidgetType,
+} from "./public/types";
 import { configFieldName } from "./public/types";
-import { LOG_MAX, type LogEntry, type LogEvent, type LogLevel } from "./src/logMessages";
+import { arg, argFail, flag, intArg } from "./src/args";
+import {
+	i18nResponse,
+	imageResponse,
+	notFound,
+	originAllowed,
+	text,
+	upgradeRequired,
+} from "./src/http";
+import {
+	catalog,
+	i18nReady,
+	isLanguage,
+	type Language,
+	translate,
+} from "./src/i18n";
+import {
+	LOG_MAX,
+	type LogEntry,
+	type LogEvent,
+	type LogLevel,
+} from "./src/logMessages";
+import {
+	initWidgetHub,
+	syncWidgetHub,
+	widgetConfigFields,
+	widgetHubSnapshot,
+} from "./src/registry";
 import { parseJsonObject, textOf } from "./src/util";
 import { COLOR_RE, isRole, type Role } from "./src/validate";
 
-const PORT         = intArg("--port", 8090, 1, 65535);
-const HOST         = arg("--host", "0.0.0.0");
+const PORT = intArg("--port", 8090, 1, 65535);
+const HOST = arg("--host", "0.0.0.0");
 
-const DEVICE_TOKEN = arg("--device-token", process.env.SRTLA_DEVICE_TOKEN ?? "");
+const DEVICE_TOKEN = arg(
+	"--device-token",
+	process.env.SRTLA_DEVICE_TOKEN ?? "",
+);
 const DEVICES_FILE = arg("--devices");
 
-const UI_USER      = arg("--ui-user", process.env.SRTLA_UI_USER ?? "admin");
-const UI_PASSWORD  = arg("--ui-password", process.env.SRTLA_UI_PASSWORD ?? "");
-const NO_AUTH      = flag("--no-auth");
+const UI_USER = arg("--ui-user", process.env.SRTLA_UI_USER ?? "admin");
+const UI_PASSWORD = arg("--ui-password", process.env.SRTLA_UI_PASSWORD ?? "");
+const NO_AUTH = flag("--no-auth");
 const DASHBOARDS_FILE = arg("--dashboards", "dashboards.json");
 
-const STALE_DEVICE_MS   = 5 * 60 * 1000;
+const STALE_DEVICE_MS = 5 * 60 * 1000;
 const PRUNE_INTERVAL_MS = 30 * 1000;
 const REQUEST_TIMEOUT_MS = 60_000;
 
 const ID_RE = /^[\w.-]{1,64}$/;
 // /d/<id>, /d/<id>/, /d/<id>/ws, /d/<id>/settings[/], /d/<id>/setup[/]
 const DEVICE_PATH_RE = /^\/d\/([^/]+)(?:(\/)(?:(ws)|(settings|setup)(\/)?)?)?$/;
-const WIDGET_TYPES: WidgetType[] = ["obs", "stats", "status", "relay", "encoder", "combined", "kick-stats", "chat"];
+const WIDGET_TYPES: WidgetType[] = [
+	"obs",
+	"relay",
+	"encoder",
+	"combined",
+	"kick-stats",
+	"chat",
+];
 const DASH_PATH_RE = /^\/api\/dashboards(?:\/([\w.-]{1,64}))?$/;
 const viewersTopic = (id: string) => `viewers:${id}`;
 const dashboardsTopic = "dashboards:kick";
 const devicesTopic = "devices:list";
-const INDEPENDENT_WIDGETS: ReadonlySet<WidgetType> = new Set(["kick-stats", "chat"]);
+const INDEPENDENT_WIDGETS: ReadonlySet<WidgetType> = new Set([
+	"kick-stats",
+	"chat",
+]);
 const DASH_COLUMNS = 12;
 /** Default `{w, h}` per widget type — seeds new widgets and unknown stored rows. */
 const WIDGET_SIZE: Record<WidgetType, { w: number; h: number }> = {
 	obs: { w: 6, h: 6 },
-	status: { w: 4, h: 4 },
-	stats: { w: 4, h: 4 },
 	relay: { w: 4, h: 4 },
 	encoder: { w: 6, h: 5 },
 	combined: { w: 6, h: 10 },
@@ -120,78 +163,108 @@ const WIDGET_SIZE: Record<WidgetType, { w: number; h: number }> = {
 // Auth
 // ----------------------------------------------------------------------
 const deviceTokens: Record<string, string> = DEVICES_FILE
-    ? await Bun.file(DEVICES_FILE).json().catch((err: unknown) =>
-          argFail("--devices", DEVICES_FILE, `readable JSON {"id":"token"} (${String(err)})`))
-    : {};
+	? await Bun.file(DEVICES_FILE)
+			.json()
+			.catch((err: unknown) =>
+				argFail(
+					"--devices",
+					DEVICES_FILE,
+					`readable JSON {"id":"token"} (${String(err)})`,
+				),
+			)
+	: {};
 
 if (!NO_AUTH) {
-    if (!UI_PASSWORD) {
-        console.error("Set --ui-password (or SRTLA_UI_PASSWORD), or pass --no-auth for local testing.");
-        process.exit(2);
-    }
-    if (!DEVICE_TOKEN && Object.keys(deviceTokens).length === 0) {
-        console.error("Set --device-token (or SRTLA_DEVICE_TOKEN) and/or --devices, or pass --no-auth.");
-        process.exit(2);
-    }
+	if (!UI_PASSWORD) {
+		console.error(
+			"Set --ui-password (or SRTLA_UI_PASSWORD), or pass --no-auth for local testing.",
+		);
+		process.exit(2);
+	}
+	if (!DEVICE_TOKEN && Object.keys(deviceTokens).length === 0) {
+		console.error(
+			"Set --device-token (or SRTLA_DEVICE_TOKEN) and/or --devices, or pass --no-auth.",
+		);
+		process.exit(2);
+	}
 }
 
 const digest = (s: string) => createHash("sha256").update(s).digest();
-const safeEqual = (a: string, b: string): boolean => timingSafeEqual(digest(a), digest(b));
+const safeEqual = (a: string, b: string): boolean =>
+	timingSafeEqual(digest(a), digest(b));
 
 function deviceAuthorized(id: string, token: string): boolean {
-    if (NO_AUTH) return true;
-    const own = deviceTokens[id];
-    if (own !== undefined) return safeEqual(token, own);
-    return !!DEVICE_TOKEN && safeEqual(token, DEVICE_TOKEN);
+	if (NO_AUTH) return true;
+	const own = deviceTokens[id];
+	if (own !== undefined) return safeEqual(token, own);
+	return !!DEVICE_TOKEN && safeEqual(token, DEVICE_TOKEN);
 }
 
 function uiAuthorized(req: Request): boolean {
-    if (NO_AUTH) return true;
-    const m = req.headers.get("authorization")?.match(/^Basic\s+(\S+)$/i);
-    if (!m) return false;
-    const decoded = Buffer.from(m[1], "base64").toString();
-    const sep = decoded.indexOf(":");
-    if (sep < 0) return false;
-    // Evaluate both so timing does not reveal which part was wrong
-    const userOk = safeEqual(decoded.slice(0, sep), UI_USER);
-    const passOk = safeEqual(decoded.slice(sep + 1), UI_PASSWORD);
-    return userOk && passOk;
+	if (NO_AUTH) return true;
+	const m = req.headers.get("authorization")?.match(/^Basic\s+(\S+)$/i);
+	if (!m) return false;
+	const decoded = Buffer.from(m[1], "base64").toString();
+	const sep = decoded.indexOf(":");
+	if (sep < 0) return false;
+	// Evaluate both so timing does not reveal which part was wrong
+	const userOk = safeEqual(decoded.slice(0, sep), UI_USER);
+	const passOk = safeEqual(decoded.slice(sep + 1), UI_PASSWORD);
+	return userOk && passOk;
 }
 
 const unauthorized = () =>
-    text("Authentication required", 401, { "www-authenticate": 'Basic realm="SRTLA control", charset="UTF-8"' });
+	text("Authentication required", 401, {
+		"www-authenticate": 'Basic realm="SRTLA control", charset="UTF-8"',
+	});
 
 // ----------------------------------------------------------------------
 // Frontend (bundled once at startup so it can sit behind auth)
 // ----------------------------------------------------------------------
-const PAGES = ["devices", "index", "settings", "setup", "dashboards", "dashboardview", "dashboardadd"] as const;
+const PAGES = [
+	"devices",
+	"index",
+	"settings",
+	"setup",
+	"dashboards",
+	"dashboardview",
+	"dashboardadd",
+] as const;
 type PageName = (typeof PAGES)[number];
 const pages = {} as Record<PageName, string>;
 const assets = new Map<string, Blob>();
 {
-    // One build for all pages: shared code (mithril, UI components) lands in common chunks.
-    // Regenerate the frontend module manifest (REFACTOR-modules.md §4.1) so any
-    // new modules/<id>/frontend.tsx is in the bundle before we build it
-    // (npm pre hooks don't run for `bun server.ts`).
-    await Bun.$`bun scripts/gen-modules.ts`.quiet();
-    const result = await Bun.build({
-        entrypoints: PAGES.map((name) => new URL(`./public/${name}.html`, import.meta.url).pathname),
-        target: "browser",
-        minify: true,
-        splitting: true,
-        publicPath: "/assets/",
-        naming: { asset: "[name]-[hash].[ext]", chunk: "[name]-[hash].[ext]", entry: "[name]-[hash].[ext]" },
-    });
-    if (!result.success) {
-        for (const l of result.logs) console.error(l);
-        throw new Error("Failed to bundle the web UI");
-    }
-    for (const out of result.outputs) {
-        const file = out.path.replace(/^\.\//, "");
-        const page = PAGES.find((name) => file.startsWith(`${name}-`) && file.endsWith(".html"));
-        if (page) pages[page] = await out.text();
-        else assets.set(file, out);
-    }
+	// One build for all pages: shared code (mithril, UI components) lands in common chunks.
+	// Regenerate the frontend module manifest (REFACTOR-modules.md §4.1) so any
+	// new modules/<id>/frontend.tsx is in the bundle before we build it
+	// (npm pre hooks don't run for `bun server.ts`).
+	await Bun.$`bun scripts/gen-modules.ts`.quiet();
+	const result = await Bun.build({
+		entrypoints: PAGES.map(
+			(name) => new URL(`./public/${name}.html`, import.meta.url).pathname,
+		),
+		target: "browser",
+		minify: true,
+		splitting: true,
+		publicPath: "/assets/",
+		naming: {
+			asset: "[name]-[hash].[ext]",
+			chunk: "[name]-[hash].[ext]",
+			entry: "[name]-[hash].[ext]",
+		},
+	});
+	if (!result.success) {
+		for (const l of result.logs) console.error(l);
+		throw new Error("Failed to bundle the web UI");
+	}
+	for (const out of result.outputs) {
+		const file = out.path.replace(/^\.\//, "");
+		const page = PAGES.find(
+			(name) => file.startsWith(`${name}-`) && file.endsWith(".html"),
+		);
+		if (page) pages[page] = await out.text();
+		else assets.set(file, out);
+	}
 }
 
 // Log strings (t()/translate) are only served from request handlers, but make
@@ -199,195 +272,258 @@ const assets = new Map<string, Blob>();
 await i18nReady;
 
 const htmlResponse = (page: PageName) =>
-    new Response(pages[page], { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
+	new Response(pages[page], {
+		headers: {
+			"content-type": "text/html; charset=utf-8",
+			"cache-control": "no-cache",
+		},
+	});
 
 // ----------------------------------------------------------------------
 // Device registry and request routing
 // ----------------------------------------------------------------------
 type WsData =
-    | { kind: "device"; id: string; address: string; role?: Role }
-    | { kind: "viewer"; id: string }
-    | { kind: "dashboards" };
+	| { kind: "device"; id: string; address: string; role?: Role }
+	| { kind: "viewer"; id: string }
+	| { kind: "dashboards" };
 type Socket = ServerWebSocket<WsData>;
 
 interface Device {
-    /** Stable uuid; the key of this entry. Hostnames change, so the id does not */
-    id: string;
-    hostname?: string;        // display name, from the device's hello
-    color?: string;           // the device's header color, from the device's hello
-    language?: Language;      // UI language, from the device's hello
-    role?: Role;              // device type, from the upgrade header / hello / status
-    version?: string;         // app build stamp, from the device's hello (absent on pre-version builds)
-    ws: Socket | null;
-    address?: string;
-    connectedAt?: number;
-    lastSeen?: number;
-    statusMsg?: string;       // last serialized status event, replayed to new viewers
-    statsMsg?: string;        // last srtla.stats event, likewise
-    stats?: SrtlaStats | null;
-    status?: Status;
-    statusAt?: number;
-    log: LogEntry[];          // the device's own event log, as last pushed
-    serverLog: LogEntry[];    // online / offline entries added here
+	/** Stable uuid; the key of this entry. Hostnames change, so the id does not */
+	id: string;
+	hostname?: string; // display name, from the device's hello
+	color?: string; // the device's header color, from the device's hello
+	language?: Language; // UI language, from the device's hello
+	role?: Role; // device type, from the upgrade header / hello / status
+	version?: string; // app build stamp, from the device's hello (absent on pre-version builds)
+	ws: Socket | null;
+	address?: string;
+	connectedAt?: number;
+	lastSeen?: number;
+	statusMsg?: string; // last serialized status event, replayed to new viewers
+	statsMsg?: string; // last srtla.stats event, likewise
+	stats?: SrtlaStats | null;
+	status?: Status;
+	statusAt?: number;
+	log: LogEntry[]; // the device's own event log, as last pushed
+	serverLog: LogEntry[]; // online / offline entries added here
 }
 
 interface Pending {
-    deviceId: string;
-    viewer: Socket;
-    clientId: unknown;
-    method: string;
-    timer: ReturnType<typeof setTimeout>;
+	deviceId: string;
+	viewer: Socket;
+	clientId: unknown;
+	method: string;
+	timer: ReturnType<typeof setTimeout>;
 }
 
 const devices = new Map<string, Device>();
-const newDevice = (id: string): Device => ({ id, ws: null, log: [], serverLog: [] });
+const newDevice = (id: string): Device => ({
+	id,
+	ws: null,
+	log: [],
+	serverLog: [],
+});
 const pending = new Map<number, Pending>();
 let nextRequestId = 1;
 let nextServerLogId = 1;
 
 const deviceFor = (id: string): Device => {
-    let d = devices.get(id);
-    if (!d) devices.set(id, (d = newDevice(id)));
-    return d;
+	let d = devices.get(id);
+	if (!d) devices.set(id, (d = newDevice(id)));
+	return d;
 };
 
 const deviceInfo = (d: Device): DeviceInfo => ({
-    id: d.id,
-    hostname: d.hostname,
-    color: d.color,
-    language: d.language,
-    role: d.role,
-    version: d.version,
-    online: d.ws !== null,
-    connectedAt: d.connectedAt,
-    lastSeen: d.lastSeen,
-    address: d.address,
+	id: d.id,
+	hostname: d.hostname,
+	color: d.color,
+	language: d.language,
+	role: d.role,
+	version: d.version,
+	online: d.ws !== null,
+	connectedAt: d.connectedAt,
+	lastSeen: d.lastSeen,
+	address: d.address,
 });
 
-const event = (name: string, data: unknown) => JSON.stringify({ type: "event", event: name, data });
+const event = (name: string, data: unknown) =>
+	JSON.stringify({ type: "event", event: name, data });
 const deviceEvent = (d: Device) => event("device", deviceInfo(d));
 const logEvent = (data: LogEvent) => event("log", data);
-const publish = (d: Device, msg: string) => server.publish(viewersTopic(d.id), msg);
+const publish = (d: Device, msg: string) =>
+	server.publish(viewersTopic(d.id), msg);
 
 const logHistory = (d: Device) =>
-    logEvent({ reset: true, entries: [...d.log, ...d.serverLog].sort((a, b) => a.at - b.at).slice(-LOG_MAX) });
+	logEvent({
+		reset: true,
+		entries: [...d.log, ...d.serverLog]
+			.sort((a, b) => a.at - b.at)
+			.slice(-LOG_MAX),
+	});
 
 /** Keep the newest LOG_MAX entries. */
-const trimLog = (log: LogEntry[]) => log.splice(0, Math.max(0, log.length - LOG_MAX));
+const trimLog = (log: LogEntry[]) =>
+	log.splice(0, Math.max(0, log.length - LOG_MAX));
 
 function addServerLog(d: Device, level: LogLevel, message: string): void {
-    const entry: LogEntry = { id: nextServerLogId++, origin: "server", at: Date.now(), level, section: "Device", message };
-    d.serverLog.push(entry);
-    trimLog(d.serverLog);
-    publish(d, logEvent({ entries: [entry] }));
+	const entry: LogEntry = {
+		id: nextServerLogId++,
+		origin: "server",
+		at: Date.now(),
+		level,
+		section: "Device",
+		message,
+	};
+	d.serverLog.push(entry);
+	trimLog(d.serverLog);
+	publish(d, logEvent({ entries: [entry] }));
 }
 
 /** Apply a device `log` event to the cache; returns the message to forward to viewers. */
-function updateDeviceLog(d: Device, data: LogEvent | undefined, raw: string): string | null {
-    if (!data || !Array.isArray(data.entries)) return null;
-    if (data.reset) {
-        d.log = data.entries.slice(-LOG_MAX);
-        return logHistory(d);
-    }
-    for (const e of data.entries) {
-        const i = d.log.findIndex((x) => x.id === e.id);
-        if (i >= 0) d.log[i] = e;
-        else d.log.push(e);
-    }
-    trimLog(d.log);
-    return raw;
+function updateDeviceLog(
+	d: Device,
+	data: LogEvent | undefined,
+	raw: string,
+): string | null {
+	if (!data || !Array.isArray(data.entries)) return null;
+	if (data.reset) {
+		d.log = data.entries.slice(-LOG_MAX);
+		return logHistory(d);
+	}
+	for (const e of data.entries) {
+		const i = d.log.findIndex((x) => x.id === e.id);
+		if (i >= 0) d.log[i] = e;
+		else d.log.push(e);
+	}
+	trimLog(d.log);
+	return raw;
 }
 
-const errorResponse = (id: unknown, method: string, error: string, code: number) =>
-    JSON.stringify({ type: "response", id, method, ok: false, error, code });
+const errorResponse = (
+	id: unknown,
+	method: string,
+	error: string,
+	code: number,
+) => JSON.stringify({ type: "response", id, method, ok: false, error, code });
 
 function sendToViewer(viewer: Socket, msg: string): void {
-    if (viewer.readyState === WebSocket.OPEN) viewer.send(msg);
+	if (viewer.readyState === WebSocket.OPEN) viewer.send(msg);
 }
 
-function failPending(predicate: (p: Pending) => boolean, error: string, code: number, notify = true): void {
-    for (const [sid, p] of pending) {
-        if (!predicate(p)) continue;
-        clearTimeout(p.timer);
-        pending.delete(sid);
-        if (notify) sendToViewer(p.viewer, errorResponse(p.clientId, p.method, error, code));
-    }
+function failPending(
+	predicate: (p: Pending) => boolean,
+	error: string,
+	code: number,
+	notify = true,
+): void {
+	for (const [sid, p] of pending) {
+		if (!predicate(p)) continue;
+		clearTimeout(p.timer);
+		pending.delete(sid);
+		if (notify)
+			sendToViewer(p.viewer, errorResponse(p.clientId, p.method, error, code));
+	}
 }
 
 /** Apply the device's self-reported parameters (hello / status); returns whether any changed. */
-function updateDevice(d: Device, fields: Partial<Pick<Device, "role" | "hostname" | "color" | "language" | "version">>): boolean {
-    let changed = false;
-    for (const [key, value] of Object.entries(fields) as [keyof typeof fields, string | undefined][]) {
-        if (value === undefined || d[key] === value) continue;
-        (d as unknown as Record<string, string>)[key] = value;
-        changed = true;
-    }
-    return changed;
+function updateDevice(
+	d: Device,
+	fields: Partial<
+		Pick<Device, "role" | "hostname" | "color" | "language" | "version">
+	>,
+): boolean {
+	let changed = false;
+	for (const [key, value] of Object.entries(fields) as [
+		keyof typeof fields,
+		string | undefined,
+	][]) {
+		if (value === undefined || d[key] === value) continue;
+		(d as unknown as Record<string, string>)[key] = value;
+		changed = true;
+	}
+	return changed;
 }
 
 function onDeviceMessage(d: Device, raw: string | Buffer): void {
-    d.lastSeen = Date.now();
-    const text = textOf(raw);
-    const msg = parseJsonObject(text);
-    if (!msg) return;
+	d.lastSeen = Date.now();
+	const text = textOf(raw);
+	const msg = parseJsonObject(text);
+	if (!msg) return;
 
-    if (msg.type === "response" && typeof msg.id === "number") {
-        const p = pending.get(msg.id);
-        if (!p || p.deviceId !== d.id) return;
-        clearTimeout(p.timer);
-        pending.delete(msg.id);
-        sendToViewer(p.viewer, JSON.stringify({ ...msg, id: p.clientId }));
-        return;
-    }
+	if (msg.type === "response" && typeof msg.id === "number") {
+		const p = pending.get(msg.id);
+		if (!p || p.deviceId !== d.id) return;
+		clearTimeout(p.timer);
+		pending.delete(msg.id);
+		sendToViewer(p.viewer, JSON.stringify({ ...msg, id: p.clientId }));
+		return;
+	}
 
-    if (msg.type === "request") {
-        onDeviceRequest(d, msg);
-        return;
-    }
+	if (msg.type === "request") {
+		onDeviceRequest(d, msg);
+		return;
+	}
 
-    if (msg.type === "event") {
-        if (msg.event === "status") {
-            d.statusMsg = text;
-            d.status = msg.data as Status;
-            d.statusAt = Date.now();
-            const role = d.status?.role;
-            // A role change is structural — refresh the list at once for it
-            if (updateDevice(d, { role: isRole(role) ? role : undefined })) {
-                publish(d, deviceEvent(d));
-                publishDeviceList(true);
-                return;
-            }
-            publishDeviceList();
-        } else if (msg.event === "srtla.stats") {
-            d.statsMsg = text;
-            d.stats = (msg.data as SrtlaStatsEvent | undefined)?.stats ?? null;
-            publishDeviceList();
-        } else if (msg.event === "log") {
-            const forward = updateDeviceLog(d, msg.data as LogEvent | undefined, text);
-            if (forward) publish(d, forward);
-            return;
-        }
-        publish(d, text);
-        return;
-    }
+	if (msg.type === "event") {
+		if (msg.event === "status") {
+			d.statusMsg = text;
+			d.status = msg.data as Status;
+			d.statusAt = Date.now();
+			const role = d.status?.role;
+			// A role change is structural — refresh the list at once for it
+			if (updateDevice(d, { role: isRole(role) ? role : undefined })) {
+				publish(d, deviceEvent(d));
+				publishDeviceList(true);
+				return;
+			}
+			publishDeviceList();
+		} else if (msg.event === "srtla.stats") {
+			d.statsMsg = text;
+			d.stats = (msg.data as SrtlaStatsEvent | undefined)?.stats ?? null;
+			publishDeviceList();
+		} else if (msg.event === "log") {
+			const forward = updateDeviceLog(
+				d,
+				msg.data as LogEvent | undefined,
+				text,
+			);
+			if (forward) publish(d, forward);
+			return;
+		}
+		publish(d, text);
+		return;
+	}
 
-    if (msg.type === "hello") {
-        if (msg.id !== d.id) console.warn(`[device ${d.id}] hello announced a different id (${String(msg.id)}) — ignored`);
-        // The per-uuid parameters the device reports about itself; a color change
-        // re-themes the list dot, a hostname change the display name
-        const changed = updateDevice(d, {
-            role: isRole(msg.role) ? msg.role : undefined,
-            hostname: typeof msg.hostname === "string" && msg.hostname !== "" ? msg.hostname : undefined,
-            color: typeof msg.color === "string" && COLOR_RE.test(msg.color) ? msg.color : undefined,
-            language: isLanguage(msg.language) ? msg.language : undefined,
-            // Absent on builds that predate version reporting — stays undefined, which the UI flags as "old app"
-            version: typeof msg.version === "string" && msg.version !== "" ? msg.version : undefined,
-        });
-        if (changed) {
-            publish(d, deviceEvent(d));
-            publishDeviceList(true);
-        }
-    }
+	if (msg.type === "hello") {
+		if (msg.id !== d.id)
+			console.warn(
+				`[device ${d.id}] hello announced a different id (${String(msg.id)}) — ignored`,
+			);
+		// The per-uuid parameters the device reports about itself; a color change
+		// re-themes the list dot, a hostname change the display name
+		const changed = updateDevice(d, {
+			role: isRole(msg.role) ? msg.role : undefined,
+			hostname:
+				typeof msg.hostname === "string" && msg.hostname !== ""
+					? msg.hostname
+					: undefined,
+			color:
+				typeof msg.color === "string" && COLOR_RE.test(msg.color)
+					? msg.color
+					: undefined,
+			language: isLanguage(msg.language) ? msg.language : undefined,
+			// Absent on builds that predate version reporting — stays undefined, which the UI flags as "old app"
+			version:
+				typeof msg.version === "string" && msg.version !== ""
+					? msg.version
+					: undefined,
+		});
+		if (changed) {
+			publish(d, deviceEvent(d));
+			publishDeviceList(true);
+		}
+	}
 }
 
 /** Device-initiated request: `devices.list` is answered by the server itself
@@ -404,7 +540,15 @@ function onDeviceRequest(origin: Device, msg: Record<string, unknown>): void {
 	};
 
 	if (method === "devices.list") {
-		respond(JSON.stringify({ type: "response", id, method, ok: true, result: summaries() }));
+		respond(
+			JSON.stringify({
+				type: "response",
+				id,
+				method,
+				ok: true,
+				result: summaries(),
+			}),
+		);
 		return;
 	}
 
@@ -420,41 +564,57 @@ function onDeviceRequest(origin: Device, msg: Record<string, unknown>): void {
 		respond(errorResponse(id, method, "device offline", 503));
 		return;
 	}
-	const params = msg.params && typeof msg.params === "object" && !Array.isArray(msg.params) ? msg.params : {};
+	const params =
+		msg.params && typeof msg.params === "object" && !Array.isArray(msg.params)
+			? msg.params
+			: {};
 	const sid = nextRequestId++;
 	const timer = setTimeout(() => {
 		pending.delete(sid);
 		respond(errorResponse(id, method, "device did not respond", 504));
 	}, REQUEST_TIMEOUT_MS);
-	pending.set(sid, { deviceId: target.id, viewer: originWs, clientId: id, method, timer });
+	pending.set(sid, {
+		deviceId: target.id,
+		viewer: originWs,
+		clientId: id,
+		method,
+		timer,
+	});
 	target.ws.send(JSON.stringify({ id: sid, method, params }));
 }
 
-function onViewerMessage(ws: Socket, deviceId: string, raw: string | Buffer): void {
-    const msg = parseJsonObject(textOf(raw));
-    if (!msg) {
-        ws.send(errorResponse(null, "", "Invalid JSON object", 400));
-        return;
-    }
-    const clientId = msg.id ?? null;
-    const method = typeof msg.method === "string" ? msg.method : "";
-    if (!method) {
-        ws.send(errorResponse(clientId, method, "method is required", 400));
-        return;
-    }
-    const d = devices.get(deviceId);
-    if (!d?.ws) {
-        ws.send(errorResponse(clientId, method, "device offline", 503));
-        return;
-    }
+function onViewerMessage(
+	ws: Socket,
+	deviceId: string,
+	raw: string | Buffer,
+): void {
+	const msg = parseJsonObject(textOf(raw));
+	if (!msg) {
+		ws.send(errorResponse(null, "", "Invalid JSON object", 400));
+		return;
+	}
+	const clientId = msg.id ?? null;
+	const method = typeof msg.method === "string" ? msg.method : "";
+	if (!method) {
+		ws.send(errorResponse(clientId, method, "method is required", 400));
+		return;
+	}
+	const d = devices.get(deviceId);
+	if (!d?.ws) {
+		ws.send(errorResponse(clientId, method, "device offline", 503));
+		return;
+	}
 
-    const sid = nextRequestId++;
-    const timer = setTimeout(() => {
-        pending.delete(sid);
-        sendToViewer(ws, errorResponse(clientId, method, "device did not respond", 504));
-    }, REQUEST_TIMEOUT_MS);
-    pending.set(sid, { deviceId, viewer: ws, clientId, method, timer });
-    d.ws.send(JSON.stringify({ id: sid, method, params: msg.params }));
+	const sid = nextRequestId++;
+	const timer = setTimeout(() => {
+		pending.delete(sid);
+		sendToViewer(
+			ws,
+			errorResponse(clientId, method, "device did not respond", 504),
+		);
+	}, REQUEST_TIMEOUT_MS);
+	pending.set(sid, { deviceId, viewer: ws, clientId, method, timer });
+	d.ws.send(JSON.stringify({ id: sid, method, params: msg.params }));
 }
 
 // ----------------------------------------------------------------------
@@ -466,7 +626,10 @@ interface DashboardsFile {
 }
 
 /** Read `{x, y, w, h}` from an inbound widget payload (missing fields fall back to the type default). */
-function parseGrid(item: Record<string, unknown>, type: WidgetType): { x: number; y: number; w: number; h: number } {
+function parseGrid(
+	item: Record<string, unknown>,
+	type: WidgetType,
+): { x: number; y: number; w: number; h: number } {
 	const size = WIDGET_SIZE[type];
 	const toInt = (v: unknown, fallback: number, name: string) => {
 		const n = v === undefined ? fallback : Number(v);
@@ -477,7 +640,8 @@ function parseGrid(item: Record<string, unknown>, type: WidgetType): { x: number
 	const x = toInt(item.x, 0, "x");
 	const y = toInt(item.y, 0, "y");
 	const h = toInt(item.h, size.h, "h");
-	if (x < 0 || y < 0 || w < 1 || h < 1) throw new ApiError("Widget position/size must be positive");
+	if (x < 0 || y < 0 || w < 1 || h < 1)
+		throw new ApiError("Widget position/size must be positive");
 	if (x + w > DASH_COLUMNS) throw new ApiError("Widget extends past the grid");
 	return { x, y, w, h };
 }
@@ -485,9 +649,15 @@ function parseGrid(item: Record<string, unknown>, type: WidgetType): { x: number
 function parseWidgets(raw: unknown): ServerDashboardWidget[] {
 	if (!Array.isArray(raw)) throw new ApiError("widgets is required");
 	return raw.map((w) => {
-		const item = (w && typeof w === "object" ? w : {}) as Record<string, unknown>;
+		const item = (w && typeof w === "object" ? w : {}) as Record<
+			string,
+			unknown
+		>;
 		const type = item.type;
-		if (typeof type !== "string" || !WIDGET_TYPES.includes(type as WidgetType)) {
+		if (
+			typeof type !== "string" ||
+			!WIDGET_TYPES.includes(type as WidgetType)
+		) {
 			throw new ApiError(`Unknown widget type: ${String(type)}`);
 		}
 		const independent = INDEPENDENT_WIDGETS.has(type as WidgetType);
@@ -506,45 +676,73 @@ function parseWidgets(raw: unknown): ServerDashboardWidget[] {
 			// source parameters, declared by the widget module (the dashboard
 			// API owns their hub). Values may be missing/empty — a new widget
 			// is added first and its config filled in via the widget editor.
-			const cfg = (item.config && typeof item.config === "object" ? item.config : {}) as Record<string, unknown>;
+			const cfg = (
+				item.config && typeof item.config === "object" ? item.config : {}
+			) as Record<string, unknown>;
 			const fields = widgetConfigFields(type);
 			const fieldNames = fields.map(configFieldName);
 			const config: Record<string, string> = {};
 			for (const name of fieldNames) {
 				const v = cfg[name];
 				if (v !== undefined) {
-					if (typeof v !== "string") throw new ApiError(`config.${name} must be a string`);
+					if (typeof v !== "string")
+						throw new ApiError(`config.${name} must be a string`);
 					config[name] = v.trim();
 				} else config[name] = "";
 			}
 			for (const key of Object.keys(cfg)) {
-				if (!fieldNames.includes(key)) throw new ApiError(`Unknown config field: ${key}`);
+				if (!fieldNames.includes(key))
+					throw new ApiError(`Unknown config field: ${key}`);
 			}
-			return { id, deviceId: typeof deviceId === "string" ? deviceId : "", type: type as WidgetType, name, ...grid, visible, config };
+			return {
+				id,
+				deviceId: typeof deviceId === "string" ? deviceId : "",
+				type: type as WidgetType,
+				name,
+				...grid,
+				visible,
+				config,
+			};
 		}
-		if (typeof deviceId !== "string" || deviceId === "") throw new ApiError("Widget needs a deviceId");
-		if (item.config !== undefined) throw new ApiError("Only kick widgets accept a config");
+		if (typeof deviceId !== "string" || deviceId === "")
+			throw new ApiError("Widget needs a deviceId");
+		if (item.config !== undefined)
+			throw new ApiError("Only kick widgets accept a config");
 		return { id, deviceId, type: type as WidgetType, name, ...grid, visible };
 	});
 }
 
 /** Coerce a raw stored dashboard into the normalized shape, filling in missing
  * ids, names and grid coordinates with per-type defaults. */
-function normalizeDashboard(raw: Record<string, unknown>, index: number): ServerDashboard {
+function normalizeDashboard(
+	raw: Record<string, unknown>,
+	index: number,
+): ServerDashboard {
 	const id = typeof raw.id === "string" && raw.id ? raw.id : randomUUID();
-	const name = typeof raw.name === "string" && raw.name ? raw.name : `Dashboard ${index + 1}`;
-	const columns = Number.isFinite(Number(raw.columns)) && Number(raw.columns) > 0 ? Number(raw.columns) : DASH_COLUMNS;
+	const name =
+		typeof raw.name === "string" && raw.name
+			? raw.name
+			: `Dashboard ${index + 1}`;
+	const columns =
+		Number.isFinite(Number(raw.columns)) && Number(raw.columns) > 0
+			? Number(raw.columns)
+			: DASH_COLUMNS;
 	const widgetsRaw = Array.isArray(raw.widgets) ? raw.widgets : [];
 	const widgets: ServerDashboardWidget[] = widgetsRaw.map((rr) => {
-		const item = (rr && typeof rr === "object" ? rr : {}) as Record<string, unknown>;
+		const item = (rr && typeof rr === "object" ? rr : {}) as Record<
+			string,
+			unknown
+		>;
 		const type = String(item.type);
-		const size = WIDGET_SIZE[(type as WidgetType)] ?? { w: 4, h: 4 };
+		const size = WIDGET_SIZE[type as WidgetType] ?? { w: 4, h: 4 };
 		const x = Number(item.x) || 0;
 		const y = Number(item.y) || 0;
 		const w = Number(item.w) || size.w;
 		const h = Number(item.h) || size.h;
 		const independent = INDEPENDENT_WIDGETS.has(type as WidgetType);
-		const cfgRaw = (item.config && typeof item.config === "object" ? item.config : {}) as Record<string, unknown>;
+		const cfgRaw = (
+			item.config && typeof item.config === "object" ? item.config : {}
+		) as Record<string, unknown>;
 		// Only the widget module's declared parameters count; keep the config
 		// only when it carries at least one.
 		let config: Record<string, string> | undefined;
@@ -560,7 +758,10 @@ function normalizeDashboard(raw: Record<string, unknown>, index: number): Server
 			deviceId: typeof item.deviceId === "string" ? item.deviceId : "",
 			type: type as WidgetType,
 			name: typeof item.name === "string" && item.name ? item.name : type,
-			x, y, w, h,
+			x,
+			y,
+			w,
+			h,
 			visible: item.visible !== false,
 			...(config ? { config } : {}),
 		};
@@ -575,7 +776,9 @@ let dashboards: ServerDashboard[] = [];
 	try {
 		const loaded = (await Bun.file(DASHBOARDS_FILE).json()) as DashboardsFile;
 		if (loaded && Array.isArray(loaded.dashboards)) {
-			dashboards = loaded.dashboards.map((d, i) => normalizeDashboard(d as unknown as Record<string, unknown>, i));
+			dashboards = loaded.dashboards.map((d, i) =>
+				normalizeDashboard(d as unknown as Record<string, unknown>, i),
+			);
 		}
 	} catch {
 		// No file yet: start empty
@@ -584,9 +787,11 @@ let dashboards: ServerDashboard[] = [];
 
 function saveDashboards(): void {
 	const file = Bun.file(DASHBOARDS_FILE);
-	file.write(JSON.stringify({ dashboards }, null, 2)).catch((err: unknown) =>
-		console.error(`[dashboards] persist ${DASHBOARDS_FILE}:`, err),
-	);
+	file
+		.write(JSON.stringify({ dashboards }, null, 2))
+		.catch((err: unknown) =>
+			console.error(`[dashboards] persist ${DASHBOARDS_FILE}:`, err),
+		);
 }
 
 /** Kick channel widgets needed by the persisted dashboards; fans out to dashboard viewers. */
@@ -595,7 +800,10 @@ const syncKick = (): void => syncWidgetHub(dashboards);
 syncKick();
 
 class ApiError extends Error {
-	constructor(message: string, readonly code = 400) {
+	constructor(
+		message: string,
+		readonly code = 400,
+	) {
 		super(message);
 	}
 }
@@ -618,19 +826,33 @@ async function dashApi(req: Request, url: URL): Promise<Response> {
 		if (!id) {
 			if (req.method === "GET") return Response.json({ ok: true, dashboards });
 			if (req.method === "POST") {
-				const body = (await req.json()) as { name?: unknown; widgets?: unknown };
+				const body = (await req.json()) as {
+					name?: unknown;
+					widgets?: unknown;
+				};
 				const name = typeof body.name === "string" ? body.name.trim() : "";
 				if (!name) return dashError(400, "Dashboard needs a name");
 				const dashboard: ServerDashboard = {
-					id: randomUUID(), name, version: 1, columns: DASH_COLUMNS, widgets: parseWidgets(body.widgets),
+					id: randomUUID(),
+					name,
+					version: 1,
+					columns: DASH_COLUMNS,
+					widgets: parseWidgets(body.widgets),
 				};
 				dashboards.push(dashboard);
 				saveDashboards();
 				syncKick();
 				broadcastDashboard(dashboard);
-				return Response.json({ ok: true, dashboard, dashboards }, { status: 201 });
+				return Response.json(
+					{ ok: true, dashboard, dashboards },
+					{ status: 201 },
+				);
 			}
-			return Response.json({ ok: false, error: "Method not allowed", code: 405 });
+			return Response.json({
+				ok: false,
+				error: "Method not allowed",
+				code: 405,
+			});
 		}
 		// Mutations need a body (JSON); the device list is a separate GET
 		const dashboardsById = dashboards.find((d) => d.id === id);
@@ -639,18 +861,28 @@ async function dashApi(req: Request, url: URL): Promise<Response> {
 			dashboards = dashboards.filter((d) => d.id !== id);
 			saveDashboards();
 			syncKick();
-			server.publish(dashboardsTopic, event("dashboards.changed", { id, deleted: true }));
+			server.publish(
+				dashboardsTopic,
+				event("dashboards.changed", { id, deleted: true }),
+			);
 			return Response.json({ ok: true, dashboards });
 		}
 		if (req.method === "PUT") {
 			if (!dashboardsById) return dashError(404, "Unknown dashboard");
-			const body = (await req.json()) as { name?: unknown; widgets?: unknown; version?: unknown };
+			const body = (await req.json()) as {
+				name?: unknown;
+				widgets?: unknown;
+				version?: unknown;
+			};
 			const name = typeof body.name === "string" ? body.name.trim() : "";
 			if (!name) return dashError(400, "Dashboard needs a name");
 			// Optimistic concurrency: the client must echo the version it based
 			// the changes on, or we reject and let it rebase against `current`.
 			if (Number(body.version) !== dashboardsById.version) {
-				return Response.json({ ok: false, error: "version conflict", current: dashboardsById }, { status: 409 });
+				return Response.json(
+					{ ok: false, error: "version conflict", current: dashboardsById },
+					{ status: 409 },
+				);
 			}
 			dashboardsById.name = name;
 			dashboardsById.widgets = parseWidgets(body.widgets);
@@ -667,7 +899,10 @@ async function dashApi(req: Request, url: URL): Promise<Response> {
 		return Response.json({ ok: false, error: "Method not allowed", code: 405 });
 	} catch (err: unknown) {
 		const code = err instanceof ApiError ? err.code : 500;
-		return dashError(code, err instanceof Error ? err.message : "Internal error");
+		return dashError(
+			code,
+			err instanceof Error ? err.message : "Internal error",
+		);
 	}
 }
 
@@ -675,23 +910,28 @@ async function dashApi(req: Request, url: URL): Promise<Response> {
 // HTTP / WebSocket server
 // ----------------------------------------------------------------------
 function summaries(): DeviceSummary[] {
-    return [...devices.values()]
-        .map((d) => ({
-            ...deviceInfo(d),
-            statusAt: d.statusAt,
-            srtla: d.status?.state?.srtla,
-            encoder: d.status?.state?.encoder,
-            modules: d.status?.modules,
-            maxBitrate: d.status?.state?.encoder?.config?.maxBitrate,
-            ...(d.stats
-                ? {
-                      bitrate: d.stats.links.reduce((sum, l) => sum + (l.bitrate_bytes_per_sec || 0), 0),
-                      activeLinks: d.stats.active_links,
-                      totalLinks: d.stats.total_links,
-                  }
-                : {}),
-        }))
-        .sort((a, b) => Number(b.online) - Number(a.online) || a.id.localeCompare(b.id));
+	return [...devices.values()]
+		.map((d) => ({
+			...deviceInfo(d),
+			statusAt: d.statusAt,
+			srtla: d.status?.state?.srtla,
+			encoder: d.status?.state?.encoder,
+			modules: d.status?.modules,
+			maxBitrate: d.status?.state?.encoder?.config?.maxBitrate,
+			...(d.stats
+				? {
+						bitrate: d.stats.links.reduce(
+							(sum, l) => sum + (l.bitrate_bytes_per_sec || 0),
+							0,
+						),
+						activeLinks: d.stats.active_links,
+						totalLinks: d.stats.total_links,
+					}
+				: {}),
+		}))
+		.sort(
+			(a, b) => Number(b.online) - Number(a.online) || a.id.localeCompare(b.id),
+		);
 }
 
 // The per-device push cadence (2 s stats × N devices + 30 s status) would
@@ -699,21 +939,27 @@ function summaries(): DeviceSummary[] {
 // visible changed — so the list is throttled: at most once per tick (2 s),
 // and only when a visible summary field changed (timestamps excluded —
 // they are refreshed by the slow pass below).
-const LIST_TICK_MS      = 2_000;
+const LIST_TICK_MS = 2_000;
 const LIST_SLOW_PASS_MS = 30_000;
 const VOLATILE_KEYS = new Set<PropertyKey>(["lastSeen", "statusAt"]);
 /** JSON of the summary without the per-push volatile timestamps. */
 const stableFingerprint = (list: DeviceSummary[]): string =>
-    JSON.stringify(list.map((d) => Object.fromEntries(Object.entries(d).filter(([k]) => !VOLATILE_KEYS.has(k)))));
+	JSON.stringify(
+		list.map((d) =>
+			Object.fromEntries(
+				Object.entries(d).filter(([k]) => !VOLATILE_KEYS.has(k)),
+			),
+		),
+	);
 
 let listFingerprint = stableFingerprint([]);
 let listPublishedAt = 0;
 
 function publishDeviceListNow(): void {
-    const list = summaries();
-    listFingerprint = stableFingerprint(list);
-    listPublishedAt = Date.now();
-    server.publish(devicesTopic, event("devices.changed", list));
+	const list = summaries();
+	listFingerprint = stableFingerprint(list);
+	listPublishedAt = Date.now();
+	server.publish(devicesTopic, event("devices.changed", list));
 }
 
 /** Re-broadcast the list to the live-feed subscribers; the full list is
@@ -721,10 +967,11 @@ function publishDeviceListNow(): void {
  * one broadcast per tick and skipped when nothing visible changed — except
  * structural events (connect / disconnect / identity), which pass immediate. */
 function publishDeviceList(immediate = false): void {
-    const now = Date.now();
-    if (!immediate && now - listPublishedAt < LIST_TICK_MS) return;
-    const list = summaries();
-    if (immediate || stableFingerprint(list) !== listFingerprint) publishDeviceListNow();
+	const now = Date.now();
+	if (!immediate && now - listPublishedAt < LIST_TICK_MS) return;
+	const list = summaries();
+	if (immediate || stableFingerprint(list) !== listFingerprint)
+		publishDeviceListNow();
 }
 
 // A slow pass keeps the volatile time columns (since / last seen) accurate
@@ -732,162 +979,202 @@ function publishDeviceList(immediate = false): void {
 setInterval(publishDeviceListNow, LIST_SLOW_PASS_MS);
 
 /** Device connection (`/device`): authenticate by uuid + token, then upgrade. */
-function deviceUpgrade(req: Request, url: URL, srv: Bun.Server<WsData>): Response | undefined {
-    const id = req.headers.get("x-device-id") ?? url.searchParams.get("id") ?? "";
-    const token = req.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1] ?? "";
-    const address = srv.requestIP(req)?.address ?? "";
-    if (!ID_RE.test(id)) return text("Missing or invalid x-device-id", 400);
-    if (!deviceAuthorized(id, token)) {
-        console.warn(`[device ${id}] rejected: bad token from ${address || "?"}`);
-        return text("Unauthorized", 401);
-    }
-    const role = req.headers.get("x-device-role");
-    if (srv.upgrade(req, { data: { kind: "device", id, address, role: isRole(role) ? role : undefined } })) return undefined;
-    return upgradeRequired();
+function deviceUpgrade(
+	req: Request,
+	url: URL,
+	srv: Bun.Server<WsData>,
+): Response | undefined {
+	const id = req.headers.get("x-device-id") ?? url.searchParams.get("id") ?? "";
+	const token =
+		req.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1] ?? "";
+	const address = srv.requestIP(req)?.address ?? "";
+	if (!ID_RE.test(id)) return text("Missing or invalid x-device-id", 400);
+	if (!deviceAuthorized(id, token)) {
+		console.warn(`[device ${id}] rejected: bad token from ${address || "?"}`);
+		return text("Unauthorized", 401);
+	}
+	const role = req.headers.get("x-device-role");
+	if (
+		srv.upgrade(req, {
+			data: {
+				kind: "device",
+				id,
+				address,
+				role: isRole(role) ? role : undefined,
+			},
+		})
+	)
+		return undefined;
+	return upgradeRequired();
 }
 
 /** Pages and the viewer socket of one device (`/d/<id>/…`). */
-function devicePath(req: Request, url: URL, srv: Bun.Server<WsData>, m: RegExpMatchArray): Response | undefined {
-    const [, rawId, slash, ws, page, pageSlash] = m;
-    const id = decodeURIComponent(rawId);
-    if (!ID_RE.test(id)) return text("Invalid device id", 400);
-    const base = `/d/${encodeURIComponent(id)}/`;
-    if (ws) {
-        if (!originAllowed(req)) return text("Origin not allowed", 403);
-        if (srv.upgrade(req, { data: { kind: "viewer", id } })) return undefined;
-        return upgradeRequired();
-    }
-    if (page) return pageSlash ? htmlResponse(page as PageName) : Response.redirect(`${base}${page}/`, 308);
-    if (!slash) return Response.redirect(base, 308);
-    // Devices without a config file serve the setup wizard instead of the UI
-    const setupRequired = devices.get(id)?.status?.setupRequired && !url.searchParams.has("ui");
-    return htmlResponse(setupRequired ? "setup" : "index");
+function devicePath(
+	req: Request,
+	url: URL,
+	srv: Bun.Server<WsData>,
+	m: RegExpMatchArray,
+): Response | undefined {
+	const [, rawId, slash, ws, page, pageSlash] = m;
+	const id = decodeURIComponent(rawId);
+	if (!ID_RE.test(id)) return text("Invalid device id", 400);
+	const base = `/d/${encodeURIComponent(id)}/`;
+	if (ws) {
+		if (!originAllowed(req)) return text("Origin not allowed", 403);
+		if (srv.upgrade(req, { data: { kind: "viewer", id } })) return undefined;
+		return upgradeRequired();
+	}
+	if (page)
+		return pageSlash
+			? htmlResponse(page as PageName)
+			: Response.redirect(`${base}${page}/`, 308);
+	if (!slash) return Response.redirect(base, 308);
+	// Devices without a config file serve the setup wizard instead of the UI
+	const setupRequired =
+		devices.get(id)?.status?.setupRequired && !url.searchParams.has("ui");
+	return htmlResponse(setupRequired ? "setup" : "index");
 }
 
 const server = Bun.serve({
-    hostname: HOST,
-    port: PORT,
+	hostname: HOST,
+	port: PORT,
 
-    async fetch(req, srv) {
-        const url = new URL(req.url);
-        const path = url.pathname;
+	async fetch(req, srv) {
+		const url = new URL(req.url);
+		const path = url.pathname;
 
-        if (path === "/healthz") return text("ok");
-        if (path === "/device") return deviceUpgrade(req, url, srv);
-        if (!uiAuthorized(req)) return unauthorized();
+		if (path === "/healthz") return text("ok");
+		if (path === "/device") return deviceUpgrade(req, url, srv);
+		if (!uiAuthorized(req)) return unauthorized();
 
-        if (path === "/") return htmlResponse("devices");
-        if (path.startsWith("/i18n/")) return await i18nResponse(path, catalog);
-        if (path === "/api/devices") return Response.json(summaries());
-        if (path === "/dashboards/") return htmlResponse("dashboards");
-        if (path.startsWith("/api/dashboards")) return dashApi(req, url);
-        if (path === "/dashboards/ws") {
-            // The dashboard pages' live kick data channel (stats + chat)
-            if (!originAllowed(req)) return text("Origin not allowed", 403);
-            if (srv.upgrade(req, { data: { kind: "dashboards" } })) return undefined;
-            return upgradeRequired();
-        }
-        if (path.startsWith("/dashboards/view/") || path.startsWith("/dashboards/edit/")) {
-            // Both routes serve the merged inline grid editor; the page enables
-            // editing when the URL is /dashboards/edit/.
-            return htmlResponse("dashboardview");
-        }
-        if (path.startsWith("/dashboards/add/")) {
-            // The dedicated "add widget" page for a single dashboard.
-            return htmlResponse("dashboardadd");
-        }
-        if (path.startsWith("/assets/")) {
-            const asset = assets.get(path.slice("/assets/".length));
-            return asset
-                ? new Response(asset, { headers: { "cache-control": "public, max-age=31536000, immutable" } })
-                : notFound();
-        }
-        const m = path.match(DEVICE_PATH_RE);
-        if (m) return devicePath(req, url, srv, m);
-        return (await imageResponse(path)) ?? notFound();
-    },
+		if (path === "/") return htmlResponse("devices");
+		if (path.startsWith("/i18n/")) return await i18nResponse(path, catalog);
+		if (path === "/api/devices") return Response.json(summaries());
+		if (path === "/dashboards/") return htmlResponse("dashboards");
+		if (path.startsWith("/api/dashboards")) return dashApi(req, url);
+		if (path === "/dashboards/ws") {
+			// The dashboard pages' live kick data channel (stats + chat)
+			if (!originAllowed(req)) return text("Origin not allowed", 403);
+			if (srv.upgrade(req, { data: { kind: "dashboards" } })) return undefined;
+			return upgradeRequired();
+		}
+		if (
+			path.startsWith("/dashboards/view/") ||
+			path.startsWith("/dashboards/edit/")
+		) {
+			// Both routes serve the merged inline grid editor; the page enables
+			// editing when the URL is /dashboards/edit/.
+			return htmlResponse("dashboardview");
+		}
+		if (path.startsWith("/dashboards/add/")) {
+			// The dedicated "add widget" page for a single dashboard.
+			return htmlResponse("dashboardadd");
+		}
+		if (path.startsWith("/assets/")) {
+			const asset = assets.get(path.slice("/assets/".length));
+			return asset
+				? new Response(asset, {
+						headers: { "cache-control": "public, max-age=31536000, immutable" },
+					})
+				: notFound();
+		}
+		const m = path.match(DEVICE_PATH_RE);
+		if (m) return devicePath(req, url, srv, m);
+		return (await imageResponse(path)) ?? notFound();
+	},
 
-    websocket: {
-        data: {} as WsData,
+	websocket: {
+		data: {} as WsData,
 
-        open(ws) {
-            const { data } = ws;
-            if (data.kind === "dashboards") {
-                ws.subscribe(dashboardsTopic);
-                ws.subscribe(devicesTopic);
-                ws.send(event("widget.snapshot", widgetHubSnapshot()));
-                ws.send(event("dashboards.snapshot", { dashboards }));
-                ws.send(event("devices.snapshot", summaries()));
-                return;
-            }
-            if (data.kind === "device") {
-                const d = deviceFor(data.id);
-                if (d.ws) d.ws.close(4001, "replaced by a new connection");
-                d.ws = ws;
-                d.address = data.address;
-                d.role = data.role ?? d.role;
-                d.connectedAt = d.lastSeen = Date.now();
-                console.log(`[device ${d.id}] connected from ${data.address}`);
-                publish(d, deviceEvent(d));
-                addServerLog(d, "info", translate(d.language, "srv.online", data.address));
-                publishDeviceList(true);
-                return;
-            }
-            // Viewers of never-seen devices must not grow the registry
-            const d = devices.get(data.id) ?? newDevice(data.id);
-            ws.subscribe(viewersTopic(d.id));
-            ws.send(deviceEvent(d));
-            ws.send(logHistory(d));
-            if (d.statusMsg) ws.send(d.statusMsg);
-            if (d.statsMsg) ws.send(d.statsMsg);
-        },
+		open(ws) {
+			const { data } = ws;
+			if (data.kind === "dashboards") {
+				ws.subscribe(dashboardsTopic);
+				ws.subscribe(devicesTopic);
+				ws.send(event("widget.snapshot", widgetHubSnapshot()));
+				ws.send(event("dashboards.snapshot", { dashboards }));
+				ws.send(event("devices.snapshot", summaries()));
+				return;
+			}
+			if (data.kind === "device") {
+				const d = deviceFor(data.id);
+				if (d.ws) d.ws.close(4001, "replaced by a new connection");
+				d.ws = ws;
+				d.address = data.address;
+				d.role = data.role ?? d.role;
+				d.connectedAt = d.lastSeen = Date.now();
+				console.log(`[device ${d.id}] connected from ${data.address}`);
+				publish(d, deviceEvent(d));
+				addServerLog(
+					d,
+					"info",
+					translate(d.language, "srv.online", data.address),
+				);
+				publishDeviceList(true);
+				return;
+			}
+			// Viewers of never-seen devices must not grow the registry
+			const d = devices.get(data.id) ?? newDevice(data.id);
+			ws.subscribe(viewersTopic(d.id));
+			ws.send(deviceEvent(d));
+			ws.send(logHistory(d));
+			if (d.statusMsg) ws.send(d.statusMsg);
+			if (d.statsMsg) ws.send(d.statsMsg);
+		},
 
-        message(ws, raw) {
-            const { data } = ws;
-            if (data.kind === "dashboards") return;   // the hub pushes only
-            if (data.kind === "viewer") return onViewerMessage(ws, data.id, raw);
-            const d = devices.get(data.id);
-            if (d && d.ws === ws) onDeviceMessage(d, raw);
-        },
+		message(ws, raw) {
+			const { data } = ws;
+			if (data.kind === "dashboards") return; // the hub pushes only
+			if (data.kind === "viewer") return onViewerMessage(ws, data.id, raw);
+			const d = devices.get(data.id);
+			if (d && d.ws === ws) onDeviceMessage(d, raw);
+		},
 
-        close(ws, code, reason) {
-            const { data } = ws;
-            if (data.kind === "dashboards") return;
-            if (data.kind === "viewer") {
-                failPending((p) => p.viewer === ws, "", 0, false);
-                return;
-            }
-            const d = devices.get(data.id);
-            if (!d || d.ws !== ws) return;   // an older, replaced connection
-            d.ws = null;
-            d.statsMsg = undefined;   // live telemetry; viewers clear it on the offline device event
-            d.stats = undefined;
-            const why = `${code}${reason ? `: ${reason}` : ""}`;
-            console.log(`[device ${d.id}] disconnected (${why})`);
-            failPending((p) => p.deviceId === d.id, "device disconnected", 503);
-            publish(d, deviceEvent(d));
-            addServerLog(d, "warn", translate(d.language, "srv.offline", why));
-            publishDeviceList(true);
-        },
-    },
+		close(ws, code, reason) {
+			const { data } = ws;
+			if (data.kind === "dashboards") return;
+			if (data.kind === "viewer") {
+				failPending((p) => p.viewer === ws, "", 0, false);
+				return;
+			}
+			const d = devices.get(data.id);
+			if (!d || d.ws !== ws) return; // an older, replaced connection
+			d.ws = null;
+			d.statsMsg = undefined; // live telemetry; viewers clear it on the offline device event
+			d.stats = undefined;
+			const why = `${code}${reason ? `: ${reason}` : ""}`;
+			console.log(`[device ${d.id}] disconnected (${why})`);
+			failPending((p) => p.deviceId === d.id, "device disconnected", 503);
+			publish(d, deviceEvent(d));
+			addServerLog(d, "warn", translate(d.language, "srv.offline", why));
+			publishDeviceList(true);
+		},
+	},
 });
 
 // A device entry is dropped from the list once it has been silent for this long
 // (lastSeen covers every frame received from the device, refreshed on connect).
 setInterval(() => {
-    const now = Date.now();
-    for (const d of [...devices.values()]) {
-        const seen = d.lastSeen ?? d.connectedAt ?? 0;   // never-heard-from phantoms use epoch 0
-        if (now - seen <= STALE_DEVICE_MS) continue;
-        d.ws?.close(4000, "removed after inactivity");
-        devices.delete(d.id);
-        failPending((p) => p.deviceId === d.id, "device disconnected", 503);
-        publish(d, deviceEvent(d));
-        publishDeviceList(true);
-        console.log(`[device ${d.id}] removed: no heartbeat for >${STALE_DEVICE_MS / 60000} minutes`);
-    }
+	const now = Date.now();
+	for (const d of [...devices.values()]) {
+		const seen = d.lastSeen ?? d.connectedAt ?? 0; // never-heard-from phantoms use epoch 0
+		if (now - seen <= STALE_DEVICE_MS) continue;
+		d.ws?.close(4000, "removed after inactivity");
+		devices.delete(d.id);
+		failPending((p) => p.deviceId === d.id, "device disconnected", 503);
+		publish(d, deviceEvent(d));
+		publishDeviceList(true);
+		console.log(
+			`[device ${d.id}] removed: no heartbeat for >${STALE_DEVICE_MS / 60000} minutes`,
+		);
+	}
 }, PRUNE_INTERVAL_MS);
 
 console.log(`SRTLA control server on http://${HOST}:${server.port}/`);
-console.log(`Relays connect with: --remote ws://<this-host>:${server.port}/device`);
-if (NO_AUTH) console.warn("WARNING: --no-auth — anyone can register devices and control them.");
+console.log(
+	`Relays connect with: --remote ws://<this-host>:${server.port}/device`,
+);
+if (NO_AUTH)
+	console.warn(
+		"WARNING: --no-auth — anyone can register devices and control them.",
+	);

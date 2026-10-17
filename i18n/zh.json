@@ -383,8 +383,6 @@
   "wtype.kick_stats": "Kick 统计",
   "wtype.obs": "OBS Studio",
   "wtype.relay": "Relay",
-  "wtype.stats": "Relay 统计",
-  "wtype.status": "状态",
   "dash.widget_channel": "频道",
   "dash.widget_youtube": "YouTube 频道",
   "dash.widget_twitch": "Twitch 频道",

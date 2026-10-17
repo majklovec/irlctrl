@@ -7,6 +7,7 @@
  * refactor. Runtime constants that belong to a single module live there now.
  */
 type Language = import("../src/languages").Language;
+
 import type { Iface, ModemConfig } from "../src/routing";
 import type { SrtlaControlState } from "../src/srtlaControl";
 import type { SrtlaOptions, SrtlaTarget, StreamTarget } from "../src/state";
@@ -126,10 +127,7 @@ export interface SrtlaState {
 // ----------------------------------------------------------------------
 
 /** Widget module ids (the merged `chat` widget covers all platforms). */
-export const WIDGET_MODULE_IDS = [
-	"kick-stats",
-	"chat",
-] as const;
+export const WIDGET_MODULE_IDS = ["kick-stats", "chat"] as const;
 export type WidgetModuleId = (typeof WIDGET_MODULE_IDS)[number];
 
 /** One viewer-count sample for the kick-stats line chart (oldest first). */
@@ -349,8 +347,6 @@ export interface modulesView {
 /** A dashboard widget type, backed by (or showing) one of a device's modules. */
 export type WidgetType =
 	| "obs"
-	| "stats"
-	| "status"
 	| "relay"
 	| "encoder"
 	| "combined"

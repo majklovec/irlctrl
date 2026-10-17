@@ -383,8 +383,6 @@
   "wtype.kick_stats": "Stats Kick",
   "wtype.obs": "OBS Studio",
   "wtype.relay": "Relay",
-  "wtype.stats": "Statistiche relay",
-  "wtype.status": "Stato",
   "dash.widget_channel": "Canale",
   "dash.widget_youtube": "Canale YouTube",
   "dash.widget_twitch": "Canale Twitch",

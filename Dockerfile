@@ -36,6 +36,9 @@ COPY --from=builder /app/modules ./modules
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/i18n ./i18n
 COPY --from=builder /app/scripts ./scripts
+# tsconfig.json drives the JSX transform at bundle time (jsxFactory "m" ->
+# Mithril). Without it Bun defaults to react/jsx-dev-runtime, which isn't a dep.
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 # Expose the default control-server port
 EXPOSE 8090

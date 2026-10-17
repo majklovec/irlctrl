@@ -150,11 +150,18 @@ The units expect Bun at `/usr/local/bin/bun`. The device unit keeps its state in
 
 ### Docker
 
-The control server ships as an image (see `Dockerfile` and `docker-compose.yaml`):
+`docker-compose.yaml` runs the whole stack — the control server plus a relay, an encoder, and an OBS Studio proxy (see `Dockerfile` and `Dockerfile.device`):
 
 ```sh
-docker compose up -d
+docker compose up -d --build
 ```
+
+- **server** — `server.ts`, the control server (`Dockerfile`, image `majkl/belabox-duo-control`), UI on `:8090`.
+- **obs-client** — `obs-client.ts`, proxies a host's OBS Studio (`ws://host.docker.internal:4455`) into the server; reuses the control image with a different entrypoint.
+- **relay** — `client.ts --role relay`, bonds SRT out via `srtla_send` (`Dockerfile.device`, image `majkl/belabox-duo-device`).
+- **encoder** — `client.ts --role encoder`, runs `ceracoder`/GStreamer and sends SRT to the relay; same device image, different role + `ENCODER_BIN`.
+
+The relay/encoder device image bundles `client.ts` plus the native `srtla_send`, `ceracoder`, `belacoder` binaries, the GStreamer pipeline definitions, and `iproute2`. The **relay** grants the `NET_ADMIN` capability (`cap_add`) because at startup it builds per-uplink policy routing (`ip rule add` + route tables) and watches interfaces with `ip monitor`; without it the relay logs `ip rule add … Operation not permitted` and exits. The encoder does not need the capability. On the default bridge network the relay's routing changes act on the container's own network namespace, not the host; for real bonded uplinks on the host's raw interfaces, run the relay with `network_mode: host`.
 
 ## API
 

@@ -78,7 +78,6 @@ const App: m.Component = {
         hasRelay && [
           moduleCard("srtla", status),
           interfacesCard(status),
-          moduleCard("modems", status),
         ],
       // The OBS card carries the low-bitrate switcher inside it (one card).
       obsOn && moduleCard("obs-controller", status),
