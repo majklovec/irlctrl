@@ -75,6 +75,11 @@ export function t(key: string, ...args: (string | number | undefined)[]): string
 	return i18n.t(key, data as TOptions) as string;
 }
 
+/** Translate a pluralized key using i18next's locale-aware count rules. */
+export function tCount(key: string, count: number): string {
+	return i18n.t(key, { count } as TOptions) as string;
+}
+
 // The shared log wording (src/logMessages) localizes through the installed translator.
 setLogTranslator((key, ...args) => t(key, ...(args as (string | number | undefined)[])));
 

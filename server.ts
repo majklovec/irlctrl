@@ -27,13 +27,19 @@ import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypt
  *   PUT  /api/dashboards/<id>   replace a dashboard {name, widgets}
  *   DEL  /api/dashboards/<id>   remove a dashboard
  *   GET  /register       create an account (public/register.html)
- *   POST /api/register   create a profile {username, password} → 201 (409 if taken)
- *   GET  /profile/       user profile (password change + device tokens)
+ *   GET  /api/register/status  does registration require an invite? {needsInvite}
+ *   POST /api/register   create a profile {username, password, invite} → 201
+ *                         (the first account bootstraps as admin with no invite;
+ *                          later accounts need a single-use invite, 403/409)
+ *   GET  /profile/       user profile (password change + device tokens, and the
+ *                        invitations panel for admins)
  *   GET  /api/whoami     the session user's login name
- *   GET  /api/profile    username + the user's device tokens
+ *   GET  /api/profile    username, admin flag + the user's device tokens
  *   POST /api/profile/password  change the login password {current, new}
  *   POST /api/profile/tokens    add a device token; returns it in the body
  *   DEL  /api/profile/tokens/<id>  remove a device token
+ *   GET  /api/invitations  invite history (admin only)
+ *   POST /api/invitations  mint a fresh single-use invite (admin only)
  *   WS   /device           device connections (Authorization: Bearer <token>, x-device-id: <id>,
  *                          x-device-role: relay|encoder|combined)
  *   WS   /dashboards/ws    the shared live feed: widget data (kick.stats /
@@ -202,6 +208,7 @@ CREATE TABLE IF NOT EXISTS users (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	login TEXT UNIQUE NOT NULL,
 	password TEXT NOT NULL,
+	admin INTEGER NOT NULL DEFAULT 0,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS tokens (
@@ -211,7 +218,17 @@ CREATE TABLE IF NOT EXISTS tokens (
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE UNIQUE INDEX IF NOT EXISTS tokens_token ON tokens(token);
+CREATE TABLE IF NOT EXISTS invitations (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	code TEXT UNIQUE NOT NULL,
+	created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	used_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+	used_at DATETIME,
+	expires_at DATETIME
+);
 `);
+
 			if (
 				(d.prepare("SELECT COUNT(*) AS n FROM users").get() as { n: number })
 					.n === 0
@@ -269,6 +286,26 @@ function userFromRequest(req: Request): string | null {
 
 const unauthorized = () => text("Authentication required", 401);
 
+/** Whether a login has the admin flag. `--no-auth` maps everything to the
+ * full-privilege local user. */
+function adminOf(login: string): boolean {
+	if (NO_AUTH) return true;
+	if (!db) return false;
+	const row = db
+		.prepare("SELECT admin FROM users WHERE login = ?")
+		.get(login) as { admin: number } | undefined;
+	return row?.admin === 1;
+}
+
+/** Auth + admin guard: the session user's login, or a 401/403 Response. */
+function requireAdmin(req: Request): string | Response {
+	const user = userFromRequest(req);
+	if (!user) return unauthorized();
+	if (!adminOf(user))
+		return Response.json({ ok: false, error: "Forbidden" }, { status: 403 });
+	return user;
+}
+
 /** Exchange a username + password for an opaque session cookie. */
 async function loginResponse(req: Request): Promise<Response> {
 	let username: unknown;
@@ -317,18 +354,24 @@ async function loginResponse(req: Request): Promise<Response> {
 	);
 }
 
-/** POST /api/register — create a new profile. The new account has no device
- * tokens yet; the user adds them on the profile page after signing in. */
+/** POST /api/register — create a new profile. The first-ever account is
+ * bootstrapped as admin with no invite; every later account requires a valid,
+ * single-use invitation code, which is consumed in the same transaction. The
+ * new account has no device tokens yet; the user adds them on the profile
+ * page after signing in. */
 async function registerResponse(req: Request): Promise<Response> {
 	let username: unknown;
 	let password: unknown;
+	let invite: unknown;
 	try {
 		const body = (await req.json()) as {
 			username?: unknown;
 			password?: unknown;
+			invite?: unknown;
 		};
 		username = body.username;
 		password = body.password;
+		invite = body.invite;
 	} catch {
 		return Response.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
 	}
@@ -343,20 +386,66 @@ async function registerResponse(req: Request): Promise<Response> {
 	if (!db)
 		return Response.json({ ok: false, error: "Registration is disabled" }, { status: 403 });
 	const clean = username.trim();
-	// Statement.get() returns null (not undefined) when no row matches.
-	if (db.prepare("SELECT 1 FROM users WHERE login = ?").get(clean)) {
-		return Response.json({ ok: false, error: "That username is already taken" }, { status: 409 });
-	}
+	const hash = hashPassword(password);
+
+	// Bootstrap: the very first account becomes admin and needs no invite. The
+	// guarded INSERT makes this atomic for concurrent first registrations.
+	const bootstrap = db
+		.prepare(
+			"INSERT INTO users (login, password, admin) SELECT ?, ?, 1 WHERE (SELECT COUNT(*) FROM users) = 0",
+		)
+		.run(clean, hash);
+	if (bootstrap.changes > 0)
+		return Response.json({ ok: true, user: clean, admin: true }, { status: 201 });
+
+	// Everyone after the first account needs a valid, single-use invite.
+	const code = typeof invite === "string" ? invite.trim() : "";
+	if (!code)
+		return Response.json({ ok: false, error: "Invitation code required" }, { status: 403 });
+
+	const row = db
+		.prepare(
+			"SELECT id, used_by, expires_at FROM invitations WHERE code = ?",
+		)
+		.get(code) as
+		| { id: number; used_by: number | null; expires_at: string | null }
+		| undefined;
+	if (!row)
+		return Response.json({ ok: false, error: "Invalid invitation code" }, { status: 403 });
+	if (row.used_by !== null)
+		return Response.json({ ok: false, error: "Invitation already used" }, { status: 403 });
+	if (row.expires_at && new Date(row.expires_at) < new Date())
+		return Response.json({ ok: false, error: "Invitation expired" }, { status: 403 });
+
 	try {
-		db.prepare("INSERT INTO users (login, password) VALUES (?, ?)").run(
-			clean,
-			hashPassword(password),
-		);
+		db.transaction(() => {
+			db.prepare("INSERT INTO users (login, password, admin) VALUES (?, ?, 0)").run(
+				clean,
+				hash,
+			);
+			db.prepare(
+				"UPDATE invitations SET used_by = (SELECT id FROM users WHERE login = ?), " +
+					"used_at = CURRENT_TIMESTAMP WHERE id = ?",
+			).run(clean, row.id);
+		})();
 	} catch {
-		// A concurrent registration won the UNIQUE race.
+		// Username already taken (UNIQUE) or any other insert/commit failure.
 		return Response.json({ ok: false, error: "That username is already taken" }, { status: 409 });
 	}
-	return Response.json({ ok: true, user: clean }, { status: 201 });
+	return Response.json({ ok: true, user: clean, admin: false }, { status: 201 });
+}
+
+/** GET /api/register/status — lets the register page know whether an invite
+ * code is required (i.e. whether any account already exists). */
+function hasUsers(): boolean {
+	return (
+		db !== null &&
+		(db.prepare("SELECT COUNT(*) AS n FROM users").get() as { n: number }).n > 0
+	);
+}
+
+function registerStatusResponse(): Response {
+	return Response.json({ ok: true, needsInvite: hasUsers() });
 }
 
 function logoutResponse(req: Request): Response {
@@ -391,17 +480,66 @@ function whoamiResponse(user: string): Response {
 	return Response.json({ ok: true, user });
 }
 
-/** GET /api/profile — username + the user's device tokens. */
+/** GET /api/profile — username, admin flag + the user's device tokens. */
 function profileResponse(user: string): Response {
 	return Response.json({
 		ok: true,
 		username: user,
+		admin: adminOf(user),
 		tokens: tokensFor(user).map((t) => ({
 			id: t.id,
 			token: t.token,
 			createdAt: t.created_at,
 		})),
 	});
+}
+
+// ----------------------------------------------------------------------
+// Invitations: admin-only minting + history of the single-use codes that gate
+// registration after the first (bootstrapped) account exists.
+// ----------------------------------------------------------------------
+
+/** POST /api/invitations — mint a fresh single-use invite (admin only). */
+function createInvitationResponse(req: Request): Response {
+	const auth = requireAdmin(req);
+	if (auth instanceof Response) return auth;
+	if (!db) return unauthorized();
+
+	const code = randomBytes(16).toString("hex");
+	const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+	db.prepare(
+		"INSERT INTO invitations (code, created_by, expires_at) SELECT ?, id, ? FROM users WHERE login = ?",
+	).run(code, expiresAt, auth);
+
+	return Response.json({ ok: true, code, expiresAt }, { status: 201 });
+}
+
+/** GET /api/invitations — the invite history, newest first (admin only). */
+function listInvitationsResponse(req: Request): Response {
+	const auth = requireAdmin(req);
+	if (auth instanceof Response) return auth;
+	if (!db) return unauthorized();
+
+	const rows = db
+		.prepare(
+			"SELECT i.code, i.created_at, i.expires_at, i.used_at, " +
+				"u1.login AS created_by, u2.login AS used_by " +
+				"FROM invitations i " +
+				"LEFT JOIN users u1 ON u1.id = i.created_by " +
+				"LEFT JOIN users u2 ON u2.id = i.used_by " +
+				"ORDER BY i.id DESC",
+		)
+		.all() as {
+		code: string;
+		created_at: string;
+		expires_at: string | null;
+		used_at: string | null;
+		created_by: string | null;
+		used_by: string | null;
+	}[];
+
+	return Response.json({ ok: true, invitations: rows });
 }
 
 /** POST /api/profile/password — {current, new}; the new password is
@@ -1408,7 +1546,10 @@ const server = Bun.serve({
 
 		// Public routes: the login + register pages and their (content-hashed)
 		// assets and locale catalogs need no session.
-		if (path === "/login") return htmlResponse("login");
+		if (path === "/login") {
+			if (db && !hasUsers()) return Response.redirect("/register", 302);
+			return htmlResponse("login");
+		}
 		if (path === "/register") return htmlResponse("register");
 		if (path.startsWith("/assets/")) {
 			const asset = assets.get(path.slice("/assets/".length));
@@ -1423,16 +1564,17 @@ const server = Bun.serve({
 			return loginResponse(req);
 		if (path === "/api/register" && req.method === "POST")
 			return registerResponse(req);
+		if (path === "/api/register/status" && req.method === "GET")
+			return registerStatusResponse();
 		if (path === "/api/logout" && req.method === "POST")
 			return logoutResponse(req);
 
 		// Everything else requires an authenticated user
 		const user = userFromRequest(req);
 		if (!user) {
-			// Unauthenticated page navigation goes to the login page; API
-			// calls get a plain 401.
+			// Send first-time visitors straight to bootstrap registration.
 			if (req.method === "GET" && !path.startsWith("/api/"))
-				return Response.redirect("/login", 302);
+				return Response.redirect(db && !hasUsers() ? "/register" : "/login", 302);
 			return unauthorized();
 		}
 
@@ -1450,6 +1592,10 @@ const server = Bun.serve({
 		const tokenDel = path.match(/^\/api\/profile\/tokens\/([^/]+)$/);
 		if (tokenDel && req.method === "DELETE")
 			return deleteTokenResponse(url, user);
+		if (path === "/api/invitations" && req.method === "GET")
+			return listInvitationsResponse(req);
+		if (path === "/api/invitations" && req.method === "POST")
+			return createInvitationResponse(req);
 		if (path === "/dashboards/") return htmlResponse("dashboards");
 		if (path.startsWith("/api/dashboards")) return dashApi(req, url, user);
 		if (path === "/dashboards/ws") {

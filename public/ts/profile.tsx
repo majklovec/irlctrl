@@ -2,6 +2,7 @@
 import m from "mithril";
 import {
   Actions,
+  Badge,
   Button,
   Card,
   Field,
@@ -21,6 +22,15 @@ interface Token {
   createdAt: string;
 }
 
+interface Invitation {
+  code: string;
+  created_at: string;
+  expires_at: string | null;
+  used_at: string | null;
+  used_by: string | null;
+  created_by: string | null;
+}
+
 const state = {
   username: "",
   tokens: undefined as Token[] | undefined,
@@ -34,6 +44,10 @@ const state = {
 
   tokenBusy: false,
   removing: false,
+
+  admin: false,
+  invitations: undefined as Invitation[] | undefined,
+  creatingInvite: false,
 };
 
 function render(): void {
@@ -46,18 +60,59 @@ function mergeTokens(loaded: Token[], current: Token[] | undefined): Token[] {
   return [...loaded, ...current.filter(({ id }) => !loadedIds.has(id))];
 }
 
-/** Load the profile (username + existing tokens). */
+/** Load the profile (username, admin flag + existing tokens), and the
+ * invitation history when this user is an admin. */
 async function load(): Promise<void> {
   try {
     const res = await fetch("/api/profile");
     if (!res.ok) return;
-    const body = (await res.json()) as { username: string; tokens: Token[] };
+    const body = (await res.json()) as {
+      username: string;
+      admin: boolean;
+      tokens: Token[];
+    };
     state.username = body.username;
+    state.admin = body.admin;
     state.tokens = mergeTokens(body.tokens, state.tokens);
+    render();
+    if (body.admin) void loadInvitations();
+  } catch {
+    render();
+  }
+}
+
+/** GET /api/invitations → the admin's invitation history (newest first). */
+async function loadInvitations(): Promise<void> {
+  try {
+    const res = await fetch("/api/invitations");
+    if (!res.ok) return;
+    const body = (await res.json()) as { invitations: Invitation[] };
+    state.invitations = body.invitations;
     render();
   } catch {
     render();
   }
+}
+
+/** POST /api/invitations to mint a code, then refresh the list. */
+function mintInvite(): void {
+  if (state.creatingInvite) return;
+  state.creatingInvite = true;
+  render();
+  void fetch("/api/invitations", { method: "POST" })
+    .then(async (res) => {
+      if (res.ok) await loadInvitations();
+    })
+    .catch(() => {})
+    .finally(() => {
+      state.creatingInvite = false;
+      render();
+    });
+}
+
+/** Copy the invite code to the clipboard (best effort, no toast). */
+function copyInvite(code: string): void {
+  void navigator.clipboard?.writeText(code).catch(() => {});
 }
 
 /** POST /api/profile/password, then clear the fields. */
@@ -234,6 +289,81 @@ const App: m.Component = {
           ))
         )}
       </Card>
+      {state.admin ? (
+        <Card
+          title={t("profile.invitations.title")}
+          headActions={
+            <Button
+              label={
+                state.creatingInvite
+                  ? t("invitations.generating")
+                  : t("invitations.create")
+              }
+              disabled={state.creatingInvite}
+              onclick={mintInvite}
+            />
+          }
+        >
+          {state.invitations === undefined ? (
+            <p class={"muted"}>{t("mgmt.loading")}</p>
+          ) : state.invitations.length === 0 ? (
+            <p class={"muted"}>{t("profile.invitations.empty")}</p>
+          ) : (
+            <table class={"dash-table"}>
+              <thead>
+                <tr>
+                  <th>{t("invitations.code")}</th>
+                  <th>{t("invitations.created")}</th>
+                  <th>{t("invitations.expires")}</th>
+                  <th>{t("invitations.status")}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {state.invitations.map((inv) => {
+                  const used = inv.used_by !== null;
+                  const expired =
+                    !used &&
+                    inv.expires_at !== null &&
+                    new Date(inv.expires_at) < new Date();
+                  const status = used
+                    ? t("invitations.statusUsed", inv.used_by ?? "")
+                    : expired
+                      ? t("invitations.statusExpired")
+                      : t("invitations.statusAvailable");
+                  const kind = used ? "off" : expired ? "warn" : "on";
+                  return (
+                    <tr key={inv.code}>
+                      <td>
+                        <code class={"token-value"}>{inv.code}</code>
+                      </td>
+                      <td>{new Date(inv.created_at).toLocaleString()}</td>
+                      <td>
+                        {inv.expires_at
+                          ? new Date(inv.expires_at).toLocaleString()
+                          : "—"}
+                      </td>
+                      <td>
+                        <Badge text={status} kind={kind} />
+                      </td>
+                      <td>
+                        {!used && !expired ? (
+                          <Button
+                            label={t("invitations.copy")}
+                            title={t("invitations.copy")}
+                            aria-label={t("invitations.copy")}
+                            onclick={() => copyInvite(inv.code)}
+                          />
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </Card>
+      ) : null}
     </Page>
   ),
 };

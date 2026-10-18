@@ -146,7 +146,6 @@ header:has(.profile-menu) > .actions {
 }
 .main-nav .profile-menu {
   position: absolute;
-  top: 0.5rem;
   right: 1.25rem;
   z-index: 40;
 }
@@ -318,6 +317,7 @@ h1 {
   font-size: 1.2rem;
   margin: 0;
   letter-spacing: -0.01em;
+  padding: 0.5rem 0;
 }
 h2 {
   font-size: 1rem;
