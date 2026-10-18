@@ -36,10 +36,10 @@ combined ─────────SRTLA (bonded)─────────▶
 
 ### Requirements
 
-- [Bun](https://bun.sh)
-- `srtla_send` (relay, combined)
-- `belacoder`/`ceracoder` and GStreamer (encoder, combined)
-- `iproute2` and ModemManager (`mmcli`) for bonding and modem management
+-   [Bun](https://bun.sh)
+-   `srtla_send` (relay, combined)
+-   `belacoder`/`ceracoder` and GStreamer (encoder, combined)
+-   `iproute2` and ModemManager (`mmcli`) for bonding and modem management
 
 ## Getting started
 
@@ -116,12 +116,12 @@ Tick **Autostart** in the UI (or call `autostart.set`) to resume the last stream
 
 The server replaces HTTP Basic auth with per-user profiles stored in a local **SQLite** database (`bun:sqlite`). Each profile has a login **password** (browser) and one or more **device tokens**.
 
-- **Users** live in the SQLite database (default `users.db`, see `--db`). Passwords are stored as **scrypt hashes** — the plaintext never touches disk.
-- **Devices** authenticate with `Authorization: Bearer <token>` when they open their `ws://<server>/device` connection. The server resolves the token to a user and assigns the device to that user — devices are therefore owned by the profile whose token presented them.
-- **Browsers** sign in at `/login` with the username and password. A successful login sets an `HttpOnly` session cookie; all device lists, device pages, and dashboards are then scoped to that user. Only devices owned by the signed-in user are visible, and only that user can open a device's page/WS or edit its dashboards.
-- **`/register`** creates a new account (self-service). New profiles start with no device tokens — add them on the profile page after signing in.
-- **`/profile/`** (reached from the username menu in the header) changes the login password and lists/manages the user's device tokens — adding new ones and removing old ones.
-- `--no-auth` maps everything to a single local profile for local testing (no database needed).
+-   **Users** live in the SQLite database (default `users.db`, see `--db`). Passwords are stored as **scrypt hashes** — the plaintext never touches disk.
+-   **Devices** authenticate with `Authorization: Bearer <token>` when they open their `ws://<server>/device` connection. The server resolves the token to a user and assigns the device to that user — devices are therefore owned by the profile whose token presented them.
+-   **Browsers** sign in at `/login` with the username and password. A successful login sets an `HttpOnly` session cookie; all device lists, device pages, and dashboards are then scoped to that user. Only devices owned by the signed-in user are visible, and only that user can open a device's page/WS or edit its dashboards.
+-   **`/register`** creates a new account (self-service). New profiles start with no device tokens — add them on the profile page after signing in.
+-   **`/profile/`** (reached from the username menu in the header) changes the login password and lists/manages the user's device tokens — adding new ones and removing old ones.
+-   `--no-auth` maps everything to a single local profile for local testing (no database needed).
 
 ```sh
 # control server — the first account is created at /register
@@ -134,12 +134,12 @@ CONTROL_SERVER_TOKEN=tok-alice-1 bun client.ts --role encoder --remote wss://ctl
 open http://ctl.example.com/  # redirects to /login; enter the username + password
 ```
 
-| Option             | Env           | Notes                                                                                             |
-| ------------------ | ------------- | ------------------------------------------------------------------------------------------------- |
-| `--host`, `--port` |               | Default `0.0.0.0:8090`                                                                            |
-| `--db`             | `SRTLA_DB`    | SQLite user database file (default `users.db`)                                                    |
-| `--dashboards`     |               | JSON file persisting the (per-user) dashboards                                                     |
-| `--no-auth`        |               | Local testing only — one shared `local` profile, no tokens needed                                  |
+| Option             | Env        | Notes                                                             |
+| ------------------ | ---------- | ----------------------------------------------------------------- |
+| `--host`, `--port` |            | Default `0.0.0.0:8090`                                            |
+| `--db`             | `SRTLA_DB` | SQLite user database file (default `users.db`)                    |
+| `--dashboards`     |            | JSON file persisting the (per-user) dashboards                    |
+| `--no-auth`        |            | Local testing only — one shared `local` profile, no tokens needed |
 
 > [!IMPORTANT]
 > Run the server behind a TLS reverse proxy — device tokens and the session cookie need `wss://`/`https://`.
@@ -170,10 +170,10 @@ The units expect Bun at `/usr/local/bin/bun`. The device unit keeps its state in
 docker compose up -d --build
 ```
 
-- **server** — `server.ts`, the control server (`Dockerfile`, image `majkl/belabox-duo-control`), UI on `:8090`.
-- **obs-client** — `obs-client.ts`, proxies a host's OBS Studio (`ws://host.docker.internal:4455`) into the server; reuses the control image with a different entrypoint.
-- **relay** — `client.ts --role relay`, bonds SRT out via `srtla_send` (`Dockerfile.device`, image `majkl/belabox-duo-device`).
-- **encoder** — `client.ts --role encoder`, runs `ceracoder`/GStreamer and sends SRT to the relay; same device image, different role + `ENCODER_BIN`.
+-   **server** — `server.ts`, the control server (`Dockerfile`, image `majkl/belabox-duo-control`), UI on `:8090`.
+-   **obs-client** — `obs-client.ts`, proxies a host's OBS Studio (`ws://host.docker.internal:4455`) into the server; reuses the control image with a different entrypoint.
+-   **relay** — `client.ts --role relay`, bonds SRT out via `srtla_send` (`Dockerfile.device`, image `majkl/belabox-duo-device`).
+-   **encoder** — `client.ts --role encoder`, runs `ceracoder`/GStreamer and sends SRT to the relay; same device image, different role + `ENCODER_BIN`.
 
 The relay/encoder device image bundles `client.ts` plus the native `srtla_send`, `ceracoder`, `belacoder` binaries, the GStreamer pipeline definitions, and `iproute2`. The **relay** grants the `NET_ADMIN` capability (`cap_add`) because at startup it builds per-uplink policy routing (`ip rule add` + route tables) and watches interfaces with `ip monitor`; without it the relay logs `ip rule add … Operation not permitted` and exits. The encoder does not need the capability. On the default bridge network the relay's routing changes act on the container's own network namespace, not the host; for real bonded uplinks on the host's raw interfaces, run the relay with `network_mode: host`.
 
@@ -181,9 +181,9 @@ The relay/encoder device image bundles `client.ts` plus the native `srtla_send`,
 
 The local `/ws` endpoint and the control server speak the same JSON protocol:
 
-- request — `{ "id", "method", "params" }`
-- response — `{ "type": "response", "id", "ok", … }`
-- push — `{ "type": "event", "event": "status" | "log" | "srtla.stats", "data": … }`
+-   request — `{ "id", "method", "params" }`
+-   response — `{ "type": "response", "id", "ok", … }`
+-   push — `{ "type": "event", "event": "status" | "log" | "srtla.stats", "data": … }`
 
 The method list lives at the top of [`src/methods.ts`](src/methods.ts). Methods that do not apply to the device's role are rejected with code 409.
 
@@ -215,10 +215,10 @@ All chat/stats widgets share the same guarantees: rolling message history so rec
 
 Each `modules/<id>/` ships exactly four files:
 
-- `backend.ts` — backend registration (runs in Bun on the host; no DOM)
-- `frontend.tsx` — frontend registration (mithril components; no `../../src` imports)
-- `types.ts` — this module's local types only (may import core types, never another module)
-- `styles.css` — scoped under `.mod-<id>` (device card) or `.dash-card` (widget)
+-   `backend.ts` — backend registration (runs in Bun on the host; no DOM)
+-   `frontend.tsx` — frontend registration (mithril components; no `../../src` imports)
+-   `types.ts` — this module's local types only (may import core types, never another module)
+-   `styles.css` — scoped under `.mod-<id>` (device card) or `.dash-card` (widget)
 
 The **registration contract** is structural: the backend declares its `id`, a `configSchema` the UI renders its config form from, `secretFields` to mask, the ordered `methods` it answers and `events` it emits, `start`/`stop`/`dispatch`, an optional `status()` fragment, an optional `services.capabilities` map, an optional widget `hub`, and `dependencies`. The frontend mirrors the identity and adds the widget `component`, the device `cardBody(host, status)`, and widget hub/sink hooks. Field-by-field tables are in [`modules/README.md`](modules/README.md).
 
@@ -262,6 +262,6 @@ Modules are discovered by a runtime scan of `modules/`; the manifests in `module
 
 ## Credits
 
-- [BELABOX](https://github.com/BELABOX) / [belabox.net](https://belabox.net/) by rationalirl — the bonded-protocol project this builds on. [Support the effort](https://github.com/sponsors/rationalirl)
-- [CERALIVE/ceracoder](https://github.com/CERALIVE/ceracoder)
-- [irlserver/srtla_send](https://github.com/irlserver/srtla_send)
+-   [BELABOX](https://github.com/BELABOX) / [belabox.net](https://belabox.net/) by rationalirl — the bonded-protocol project this builds on. [Support the effort](https://github.com/sponsors/rationalirl)
+-   [CERALIVE/ceracoder](https://github.com/CERALIVE/ceracoder)
+-   [irlserver/srtla_send](https://github.com/irlserver/srtla_send)

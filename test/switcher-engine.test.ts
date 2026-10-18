@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-    type SwitcherConfig,
-    type SwitcherMetrics,
-} from "../public/types";
+import { type SwitcherConfig, type SwitcherMetrics } from "../public/types";
 import {
     determineState,
     SwitcherEngine,
@@ -26,14 +23,22 @@ function makeDeps(opts: DepsOpts = {}): {
     const logs: [string, string][] = [];
     const updated = { count: 0 };
     const deps: SwitcherDeps = {
-        obs: () => (opts.obs === undefined ? { connected: true, streaming: true, scene: "LIVE" } : opts.obs),
+        obs: () =>
+            opts.obs === undefined
+                ? { connected: true, streaming: true, scene: "LIVE" }
+                : opts.obs,
         setScene: async (scene) => {
             scenes.push(scene);
             return opts.setSceneOk ?? true;
         },
         metrics: async () =>
             opts.metrics === undefined
-                ? { bitrateKbps: 5000, rttMs: 50, connected: true, streaming: true }
+                ? {
+                      bitrateKbps: 5000,
+                      rttMs: 50,
+                      connected: true,
+                      streaming: true,
+                  }
                 : opts.metrics,
         log: (level, message) => logs.push([level, message]),
         onUpdate: () => {
@@ -54,7 +59,11 @@ const cfg = (patch: Partial<SwitcherConfig> = {}): SwitcherConfig => ({
     retryAttempts: 5,
     triggers: { low: 500, offline: 400, rtt: 1500 },
     scenes: { normal: "LIVE", low: "LOW", offline: "BRB" },
-    optionalScenes: { starting: "STARTING", ending: "ENDING", privacy: "PRIVACY" },
+    optionalScenes: {
+        starting: "STARTING",
+        ending: "ENDING",
+        privacy: "PRIVACY",
+    },
     logToFile: true,
     obsSourceName: "SRTLA",
     ...patch,
@@ -75,16 +84,35 @@ async function withEngine(
     }
 }
 
-const good: SwitcherMetrics = { bitrateKbps: 5000, rttMs: 50, connected: true, streaming: true };
-const low: SwitcherMetrics = { bitrateKbps: 450, rttMs: 50, connected: true, streaming: true };
-const offline: SwitcherMetrics = { bitrateKbps: 300, rttMs: 50, connected: true, streaming: true };
+const good: SwitcherMetrics = {
+    bitrateKbps: 5000,
+    rttMs: 50,
+    connected: true,
+    streaming: true,
+};
+const low: SwitcherMetrics = {
+    bitrateKbps: 450,
+    rttMs: 50,
+    connected: true,
+    streaming: true,
+};
+const offline: SwitcherMetrics = {
+    bitrateKbps: 300,
+    rttMs: 50,
+    connected: true,
+    streaming: true,
+};
 
 describe("determineState", () => {
     test("master switch off forces NORMAL", () => {
-        expect(determineState(offline, cfg({ autoSwitch: false }))).toBe("NORMAL");
+        expect(determineState(offline, cfg({ autoSwitch: false }))).toBe(
+            "NORMAL",
+        );
     });
     test("disconnected source is OFFLINE", () => {
-        expect(determineState({ ...good, connected: false }, cfg())).toBe("OFFLINE");
+        expect(determineState({ ...good, connected: false }, cfg())).toBe(
+            "OFFLINE",
+        );
     });
     test("bitrate below the offline trigger is OFFLINE", () => {
         expect(determineState(offline, cfg())).toBe("OFFLINE");
@@ -99,7 +127,17 @@ describe("determineState", () => {
         expect(determineState(good, cfg())).toBe("NORMAL");
     });
     test("null metrics fields never trigger an off-state", () => {
-        expect(determineState({ bitrateKbps: null, rttMs: null, connected: null, streaming: null }, cfg())).toBe("NORMAL");
+        expect(
+            determineState(
+                {
+                    bitrateKbps: null,
+                    rttMs: null,
+                    connected: null,
+                    streaming: null,
+                },
+                cfg(),
+            ),
+        ).toBe("NORMAL");
     });
 });
 
@@ -137,21 +175,28 @@ describe("SwitcherEngine", () => {
         let current: SwitcherMetrics = low;
         const { deps, scenes } = makeDeps({});
         deps.metrics = async () => current;
-        await withEngine(cfg({ retryAttempts: 3, instantlySwitchOnRecover: true }), deps, async (engine) => {
-            for (let i = 0; i < 3; i++) await engine.tick();
-            expect(engine.status().state).toBe("LOW");
-            current = good;
-            await engine.tick();
-            expect(engine.status().state).toBe("NORMAL");
-            expect(scenes).toEqual(["LOW", "LIVE"]);
-        });
+        await withEngine(
+            cfg({ retryAttempts: 3, instantlySwitchOnRecover: true }),
+            deps,
+            async (engine) => {
+                for (let i = 0; i < 3; i++) await engine.tick();
+                expect(engine.status().state).toBe("LOW");
+                current = good;
+                await engine.tick();
+                expect(engine.status().state).toBe("NORMAL");
+                expect(scenes).toEqual(["LOW", "LIVE"]);
+            },
+        );
     });
 
     test("without instantlySwitchOnRecover recovery also waits for retries", async () => {
         let current: SwitcherMetrics = low;
         const { deps, scenes } = makeDeps({});
         deps.metrics = async () => current;
-        await withEngine(cfg({ retryAttempts: 2, instantlySwitchOnRecover: false }), deps, async (engine) => {
+        await withEngine(
+            cfg({ retryAttempts: 2, instantlySwitchOnRecover: false }),
+            deps,
+            async (engine) => {
                 await engine.tick();
                 await engine.tick();
                 expect(engine.status().state).toBe("LOW");
@@ -162,7 +207,8 @@ describe("SwitcherEngine", () => {
                 await engine.tick();
                 expect(engine.status().state).toBe("NORMAL");
                 expect(scenes).toEqual(["LOW", "LIVE"]);
-            });
+            },
+        );
     });
 
     test("a switch target change restarts the retry count", async () => {
@@ -185,7 +231,10 @@ describe("SwitcherEngine", () => {
     });
 
     test("never switches away from an optional (operator) scene", async () => {
-        const { deps, scenes, logs } = makeDeps({ metrics: offline, obs: { connected: true, streaming: true, scene: "STARTING" } });
+        const { deps, scenes, logs } = makeDeps({
+            metrics: offline,
+            obs: { connected: true, streaming: true, scene: "STARTING" },
+        });
         await withEngine(cfg({ retryAttempts: 2 }), deps, async (engine) => {
             await engine.tick();
             await engine.tick();
@@ -197,7 +246,10 @@ describe("SwitcherEngine", () => {
     });
 
     test("never switches from a scene the switcher does not own", async () => {
-        const { deps, scenes } = makeDeps({ metrics: offline, obs: { connected: true, streaming: true, scene: "UNKNOWN" } });
+        const { deps, scenes } = makeDeps({
+            metrics: offline,
+            obs: { connected: true, streaming: true, scene: "UNKNOWN" },
+        });
         await withEngine(cfg({ retryAttempts: 2 }), deps, async (engine) => {
             await engine.tick();
             await engine.tick();
@@ -207,7 +259,10 @@ describe("SwitcherEngine", () => {
     });
 
     test("failBehaviour pause: a disconnected OBS pauses the module", async () => {
-        const { deps, scenes } = makeDeps({ metrics: offline, obs: { connected: false, streaming: false, scene: "LIVE" } });
+        const { deps, scenes } = makeDeps({
+            metrics: offline,
+            obs: { connected: false, streaming: false, scene: "LIVE" },
+        });
         await withEngine(cfg({ retryAttempts: 2 }), deps, async (engine) => {
             await engine.tick();
             await engine.tick();
@@ -219,7 +274,10 @@ describe("SwitcherEngine", () => {
 
     test("failBehaviour ignore: keeps the state, never touches the scene", async () => {
         const c = cfg({ retryAttempts: 2, failBehaviour: "ignore" });
-        const { deps, scenes, logs } = makeDeps({ metrics: offline, obs: { connected: false, streaming: false, scene: "LIVE" } });
+        const { deps, scenes, logs } = makeDeps({
+            metrics: offline,
+            obs: { connected: false, streaming: false, scene: "LIVE" },
+        });
         await withEngine(c, deps, async (engine) => {
             await engine.tick();
             await engine.tick();
@@ -236,38 +294,69 @@ describe("SwitcherEngine", () => {
             await engine.tick();
             expect(engine.status().active).toBe(false);
             expect(engine.status().obsConnected).toBe(false);
-            expect(logs.some(([level, m]) => level === "error" && m.includes("unavailable"))).toBe(true);
+            expect(
+                logs.some(
+                    ([level, m]) =>
+                        level === "error" && m.includes("unavailable"),
+                ),
+            ).toBe(true);
         });
     });
 
     test("onlySwitchWhenStreaming ignores metrics while not streaming", async () => {
-        const { deps, scenes } = makeDeps({ metrics: offline, obs: { connected: true, streaming: false, scene: "LIVE" } });
-        await withEngine(cfg({ retryAttempts: 2, onlySwitchWhenStreaming: true }), deps, async (engine) => {
-            await engine.tick();
-            await engine.tick();
-            expect(engine.status().state).toBe("NORMAL");
-            expect(engine.status().active).toBe(false);
-            expect(scenes).toEqual([]);
+        const { deps, scenes } = makeDeps({
+            metrics: offline,
+            obs: { connected: true, streaming: false, scene: "LIVE" },
         });
+        await withEngine(
+            cfg({ retryAttempts: 2, onlySwitchWhenStreaming: true }),
+            deps,
+            async (engine) => {
+                await engine.tick();
+                await engine.tick();
+                expect(engine.status().state).toBe("NORMAL");
+                expect(engine.status().active).toBe(false);
+                expect(scenes).toEqual([]);
+            },
+        );
     });
 
     test("onlySwitchWhenStreaming still displays SRT while not streaming", async () => {
         // SRTLA is an in-bound source: the receive keeps flowing before the
         // program stream starts, so the card should show the live numbers even
         // though no scene switching is allowed yet.
-        const { deps, scenes } = makeDeps({ metrics: { bitrateKbps: 5200, rttMs: 40, connected: true, streaming: false }, obs: { connected: true, streaming: false, scene: "LIVE" } });
-        await withEngine(cfg({ retryAttempts: 2, onlySwitchWhenStreaming: true }), deps, async (engine) => {
-            await engine.tick();
-            expect(engine.status().active).toBe(false);
-            expect(engine.status().state).toBe("NORMAL");
-            expect(scenes).toEqual([]);
-            expect(engine.status().srt).toEqual({ connected: true, bitrateKbps: 5200, rttMs: 40 });
-            expect(engine.status().updatedAt).toBe(1_700_000_000_000);
+        const { deps, scenes } = makeDeps({
+            metrics: {
+                bitrateKbps: 5200,
+                rttMs: 40,
+                connected: true,
+                streaming: false,
+            },
+            obs: { connected: true, streaming: false, scene: "LIVE" },
         });
+        await withEngine(
+            cfg({ retryAttempts: 2, onlySwitchWhenStreaming: true }),
+            deps,
+            async (engine) => {
+                await engine.tick();
+                expect(engine.status().active).toBe(false);
+                expect(engine.status().state).toBe("NORMAL");
+                expect(scenes).toEqual([]);
+                expect(engine.status().srt).toEqual({
+                    connected: true,
+                    bitrateKbps: 5200,
+                    rttMs: 40,
+                });
+                expect(engine.status().updatedAt).toBe(1_700_000_000_000);
+            },
+        );
     });
 
     test("a failed scene switch keeps counting toward the next attempt", async () => {
-        const { deps, scenes } = makeDeps({ metrics: offline, setSceneOk: false });
+        const { deps, scenes } = makeDeps({
+            metrics: offline,
+            setSceneOk: false,
+        });
         await withEngine(cfg({ retryAttempts: 2 }), deps, async (engine) => {
             await engine.tick();
             await engine.tick();
@@ -284,7 +373,12 @@ describe("SwitcherEngine", () => {
         await withEngine(cfg({ retryAttempts: 2 }), deps, async (engine) => {
             await engine.tick();
             expect(engine.status().active).toBe(false);
-            expect(logs.some(([level, m]) => level === "warn" && m.includes("no SRT sample"))).toBe(true);
+            expect(
+                logs.some(
+                    ([level, m]) =>
+                        level === "warn" && m.includes("no SRT sample"),
+                ),
+            ).toBe(true);
         });
     });
 
@@ -314,4 +408,3 @@ describe("SwitcherEngine", () => {
         });
     });
 });
-

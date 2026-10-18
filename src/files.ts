@@ -12,7 +12,10 @@ import { rename, unlink, writeFile } from "node:fs/promises";
  * left by an earlier non-root run. Replacing via rename avoids that, and readers reloading on
  * SIGHUP never see a half-written file.
  */
-export async function writeFileAtomic(path: string, data: string): Promise<void> {
+export async function writeFileAtomic(
+    path: string,
+    data: string,
+): Promise<void> {
     const tmp = `${path}.${randomBytes(6).toString("hex")}.tmp`;
     try {
         await writeFile(tmp, data, { flag: "wx" });

@@ -6,11 +6,11 @@
  * subscribers. One instance serves all stats widgets.
  */
 import {
-	type ChannelSpecs,
-	eventFrame,
-	type PublishFn,
-	type StatsLive,
-	type StatsSample,
+    type ChannelSpecs,
+    eventFrame,
+    type PublishFn,
+    type StatsLive,
+    type StatsSample,
 } from "./types";
 
 export const KICK_STATS_POLL_MS = 30_000;
@@ -22,14 +22,14 @@ export const KICK_STATS_CONFIG_FIELDS = ["channel"] as const;
 /** Channel-hub specs from one widget's config (kick-stats carries a single
  * channel; the hub contract lists one spec per source, null when unconfigured). */
 export function statsSpecsFromConfig(
-	config: Record<string, string> | undefined,
+    config: Record<string, string> | undefined,
 ): readonly (string | null)[] {
-	const name = (config?.channel ?? "").trim().toLowerCase();
-	return [name || null];
+    const name = (config?.channel ?? "").trim().toLowerCase();
+    return [name || null];
 }
 /** Per-channel latest stats sample, for the merged hub snapshot. */
 export interface StatsSnapshot {
-	[channel: string]: StatsLive | null;
+    [channel: string]: StatsLive | null;
 }
 const FETCH_TIMEOUT_MS = 10_000;
 const KICK_API = "https://kick.com/api/v1";
@@ -37,18 +37,18 @@ const KICK_API = "https://kick.com/api/v1";
 const SERIES_CAP = 120;
 
 type StatsChannelState = {
-	channel: string;
-	stats: StatsLive | null;
-	series: StatsSample[];
-	polling: boolean;
-	timer: ReturnType<typeof setInterval> | null;
+    channel: string;
+    stats: StatsLive | null;
+    series: StatsSample[];
+    polling: boolean;
+    timer: ReturnType<typeof setInterval> | null;
 };
 
 /** Kick's `start_time` strings are UTC without an offset ("2026-10-06 19:26:57"). */
 function parseKickTime(value: string | undefined): number | undefined {
-	if (!value) return undefined;
-	const ms = Date.parse(`${value.replace(" ", "T")}Z`);
-	return Number.isNaN(ms) ? undefined : ms;
+    if (!value) return undefined;
+    const ms = Date.parse(`${value.replace(" ", "T")}Z`);
+    return Number.isNaN(ms) ? undefined : ms;
 }
 
 /**
@@ -56,113 +56,116 @@ function parseKickTime(value: string | undefined): number | undefined {
  * channels not yet attached and stops the removed ones.
  */
 export class StatsChannelManager {
-	#channels = new Map<string, StatsChannelState>();
-	#publish: PublishFn;
+    #channels = new Map<string, StatsChannelState>();
+    #publish: PublishFn;
 
-	constructor(publish: PublishFn) {
-		this.#publish = publish;
-	}
+    constructor(publish: PublishFn) {
+        this.#publish = publish;
+    }
 
-	start(name: string): void {
-		const key = name.trim().toLowerCase();
-		if (!key) return;
-		this.stop(key);
-		const state: StatsChannelState = {
-			channel: key,
-			stats: null,
-			series: [],
-			polling: false,
-			timer: null,
-		};
-		this.#channels.set(key, state);
-		void this.#poll(state);
-		state.timer = setInterval(() => void this.#poll(state), KICK_STATS_POLL_MS);
-	}
+    start(name: string): void {
+        const key = name.trim().toLowerCase();
+        if (!key) return;
+        this.stop(key);
+        const state: StatsChannelState = {
+            channel: key,
+            stats: null,
+            series: [],
+            polling: false,
+            timer: null,
+        };
+        this.#channels.set(key, state);
+        void this.#poll(state);
+        state.timer = setInterval(
+            () => void this.#poll(state),
+            KICK_STATS_POLL_MS,
+        );
+    }
 
-	stop(channel: string): void {
-		const key = channel.trim().toLowerCase();
-		const state = this.#channels.get(key);
-		if (!state) return;
-		if (state.timer) clearInterval(state.timer);
-		this.#channels.delete(key);
-	}
+    stop(channel: string): void {
+        const key = channel.trim().toLowerCase();
+        const state = this.#channels.get(key);
+        if (!state) return;
+        if (state.timer) clearInterval(state.timer);
+        this.#channels.delete(key);
+    }
 
-	sync(specs: ChannelSpecs): void {
-		for (const name of specs) {
-			const key = name.trim().toLowerCase();
-			if (key && !this.#channels.has(key)) this.start(key);
-		}
-		for (const key of [...this.#channels.keys()]) {
-			if (!specs.has(key)) this.stop(key);
-		}
-	}
+    sync(specs: ChannelSpecs): void {
+        for (const name of specs) {
+            const key = name.trim().toLowerCase();
+            if (key && !this.#channels.has(key)) this.start(key);
+        }
+        for (const key of [...this.#channels.keys()]) {
+            if (!specs.has(key)) this.stop(key);
+        }
+    }
 
-	startedChannels(): string[] {
-		return [...this.#channels.keys()];
-	}
+    startedChannels(): string[] {
+        return [...this.#channels.keys()];
+    }
 
-	/** Latest sample per channel (null until the first poll lands). */
-	snapshot(): StatsSnapshot {
-		const out: StatsSnapshot = {};
-		for (const [key, state] of this.#channels) out[key] = state.stats;
-		return out;
-	}
+    /** Latest sample per channel (null until the first poll lands). */
+    snapshot(): StatsSnapshot {
+        const out: StatsSnapshot = {};
+        for (const [key, state] of this.#channels) out[key] = state.stats;
+        return out;
+    }
 
-	destroy(): void {
-		for (const key of this.startedChannels()) this.stop(key);
-	}
+    destroy(): void {
+        for (const key of this.startedChannels()) this.stop(key);
+    }
 
-	async #poll(state: StatsChannelState): Promise<void> {
-		if (state.polling) return;
-		state.polling = true;
-		try {
-			const res = await fetch(
-				`${KICK_API}/channels/${encodeURIComponent(state.channel)}`,
-				{
-					signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-					headers: { accept: "application/json" },
-				},
-			);
-			if (!res.ok) throw new Error(`kick stats HTTP ${res.status}`);
-			const payload = (await res.json()) as {
-				followersCount?: number;
-				livestream?: {
-					viewers?: number;
-					is_live?: boolean;
-					session_title?: string;
-					start_time?: string;
-					categories?: { name?: string }[];
-				} | null;
-			};
-			const stream = payload.livestream ?? null;
-			const at = Date.now();
-			// Offline polls record 0, so the chart shows the dip (as the reference page does).
-			state.series.push({ t: at, v: stream?.viewers ?? 0 });
-			if (state.series.length > SERIES_CAP) state.series.shift();
-			state.stats = {
-				viewers: stream?.viewers,
-				followers: payload.followersCount,
-				isLive: Boolean(stream?.is_live),
-				title: stream?.session_title,
-				category: stream?.categories?.[0]?.name,
-				startTime: parseKickTime(stream?.start_time),
-				at,
-				series: [...state.series],
-			};
-			this.#publish(
-				eventFrame("kick.stats", {
-					channel: state.channel,
-					stats: state.stats,
-				}),
-			);
-		} catch (err: unknown) {
-			console.warn(
-				`[kick-stats ${state.channel}] poll failed: ${err instanceof Error ? err.message : String(err)}`,
-			);
-		} finally {
-			state.polling = false;
-		}
-	}
+    async #poll(state: StatsChannelState): Promise<void> {
+        if (state.polling) return;
+        state.polling = true;
+        try {
+            const res = await fetch(
+                `${KICK_API}/channels/${encodeURIComponent(state.channel)}`,
+                {
+                    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+                    headers: { accept: "application/json" },
+                },
+            );
+            if (!res.ok) throw new Error(`kick stats HTTP ${res.status}`);
+            const payload = (await res.json()) as {
+                followersCount?: number;
+                livestream?: {
+                    viewers?: number;
+                    is_live?: boolean;
+                    session_title?: string;
+                    start_time?: string;
+                    categories?: { name?: string }[];
+                } | null;
+            };
+            const stream = payload.livestream ?? null;
+            const at = Date.now();
+            // Offline polls record 0, so the chart shows the dip (as the reference page does).
+            state.series.push({ t: at, v: stream?.viewers ?? 0 });
+            if (state.series.length > SERIES_CAP) state.series.shift();
+            state.stats = {
+                viewers: stream?.viewers,
+                followers: payload.followersCount,
+                isLive: Boolean(stream?.is_live),
+                title: stream?.session_title,
+                category: stream?.categories?.[0]?.name,
+                startTime: parseKickTime(stream?.start_time),
+                at,
+                series: [...state.series],
+            };
+            this.#publish(
+                eventFrame("kick.stats", {
+                    channel: state.channel,
+                    stats: state.stats,
+                }),
+            );
+        } catch (err: unknown) {
+            console.warn(
+                `[kick-stats ${state.channel}] poll failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
+        } finally {
+            state.polling = false;
+        }
+    }
 }
 
 /**
@@ -170,15 +173,15 @@ export class StatsChannelManager {
  * this module only through it; no per-module imports in the core.
  */
 export default {
-	id: "kick-stats",
-	kind: "widget" as const,
-	title: "Kick Stats",
-	hub: {
-		widgetType: "kick-stats",
-		snapshotKey: "stats",
-		configFields: KICK_STATS_CONFIG_FIELDS,
-		channelSpec: statsSpecsFromConfig,
-		create: (publish: PublishFn): StatsChannelManager =>
-			new StatsChannelManager(publish),
-	},
+    id: "kick-stats",
+    kind: "widget" as const,
+    title: "Kick Stats",
+    hub: {
+        widgetType: "kick-stats",
+        snapshotKey: "stats",
+        configFields: KICK_STATS_CONFIG_FIELDS,
+        channelSpec: statsSpecsFromConfig,
+        create: (publish: PublishFn): StatsChannelManager =>
+            new StatsChannelManager(publish),
+    },
 };

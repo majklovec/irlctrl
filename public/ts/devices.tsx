@@ -4,206 +4,221 @@ import m from "mithril";
 import type { DeviceSummary } from "../types";
 import { icon, roleTag } from "./components/icons";
 import {
-  Badge,
-  Card,
-  type Child,
-  EncoderIssueBadge,
-  hasEncoderIssue,
-  Page,
-  ServerNav,
+    Badge,
+    Card,
+    type Child,
+    EncoderIssueBadge,
+    hasEncoderIssue,
+    Page,
+    ServerNav,
 } from "./components/ui";
 import { i18nReady, t } from "./i18n";
 import { serverLive } from "./services/serverws";
 import { formatBitrate, mountPage, since } from "./util";
 
 const state = {
-  connected: false,
-  devices: null as DeviceSummary[] | null, // null = before the first snapshot landed
+    connected: false,
+    devices: null as DeviceSummary[] | null, // null = before the first snapshot landed
 };
 
 serverLive.on({
-  devices: (list) => {
-    state.devices = list;
-    m.redraw();
-  },
-  open: () => {
-    state.connected = true;
-    m.redraw();
-  },
-  close: () => {
-    state.connected = false;
-    m.redraw();
-  },
+    devices: (list) => {
+        state.devices = list;
+        m.redraw();
+    },
+    open: () => {
+        state.connected = true;
+        m.redraw();
+    },
+    close: () => {
+        state.connected = false;
+        m.redraw();
+    },
 });
 
 /** Header badge: the socket state, then the online count once connected. */
 function connBadge(): m.Vnode {
-  if (!state.connected)
-    return <Badge text={t("dev.disconnected")} kind="off" />;
-  const online = state.devices?.filter((d) => d.online).length ?? 0;
-  return (
-    <Badge
-      text={t("dev.badge.online_count", online, state.devices?.length ?? 0)}
-      kind={online ? "on" : "warn"}
-    />
-  );
+    if (!state.connected)
+        return <Badge text={t("dev.disconnected")} kind="off" />;
+    const online = state.devices?.filter((d) => d.online).length ?? 0;
+    return (
+        <Badge
+            text={t(
+                "dev.badge.online_count",
+                online,
+                state.devices?.length ?? 0,
+            )}
+            kind={online ? "on" : "warn"}
+        />
+    );
 }
 
 const hasEncoder = (d: DeviceSummary) =>
-  d.role === "encoder" || d.role === "combined";
+    d.role === "encoder" || d.role === "combined";
 
 /** Live stream state, mirroring the device page's encoder / srtla_send badges. */
 function streamState(d: DeviceSummary): Child {
-  if (!d.online) return "—";
-  const { srtla: s, encoder: e } = d;
-  if (hasEncoder(d)) {
-    if (!e) return "—";
-    if (hasEncoderIssue(d.role, e, s))
-      return <EncoderIssueBadge role={d.role} e={e} srtla={s} />;
-  } else if (!s?.running) {
-    return <Badge text={t("dev.badge.stopped")} kind="off" />;
-  }
-  if (d.activeLinks === 0)
-    return <Badge text={t("dev.badge.no_links")} kind="warn" />;
-  return <Badge text={t("dev.badge.live")} kind="on" />;
+    if (!d.online) return "—";
+    const { srtla: s, encoder: e } = d;
+    if (hasEncoder(d)) {
+        if (!e) return "—";
+        if (hasEncoderIssue(d.role, e, s))
+            return <EncoderIssueBadge role={d.role} e={e} srtla={s} />;
+    } else if (!s?.running) {
+        return <Badge text={t("dev.badge.stopped")} kind="off" />;
+    }
+    if (d.activeLinks === 0)
+        return <Badge text={t("dev.badge.no_links")} kind="warn" />;
+    return <Badge text={t("dev.badge.live")} kind="on" />;
 }
 
 function bitrate(d: DeviceSummary): Child {
-  const live =
-    d.online && d.bitrate !== undefined ? formatBitrate(d.bitrate) : null;
-  const max =
-    d.maxBitrate !== undefined
-      ? t("dev.max_value", formatBitrate(d.maxBitrate * 125))
-      : null;
-  if (live && max)
-    return (
-      <span>
-        {live}
-        {" / "}
-        <span class={"muted"}>{max}</span>
-      </span>
-    );
-  return live ?? max ?? "—";
+    const live =
+        d.online && d.bitrate !== undefined ? formatBitrate(d.bitrate) : null;
+    const max =
+        d.maxBitrate !== undefined
+            ? t("dev.max_value", formatBitrate(d.maxBitrate * 125))
+            : null;
+    if (live && max)
+        return (
+            <span>
+                {live}
+                {" / "}
+                <span class={"muted"}>{max}</span>
+            </span>
+        );
+    return live ?? max ?? "—";
 }
 
 function row(d: DeviceSummary): m.Vnode {
-  const { srtla: s, encoder: e } = d;
-  // A new vnode per cell: mithril cannot patch one vnode object into two slots
-  const stoppedBadge = () => (
-    <Badge text={t("dev.badge.stopped")} kind="warn" />
-  );
-  return (
-    <tr key={d.id}>
-      <td>
-        <a
-          class={"device"}
-          href={`d/${encodeURIComponent(d.id)}/`}
-          title={d.id}
-        >
-          <span
-            class={["device-dot", d.online ? "online" : ""]
-              .filter(Boolean)
-              .join(" ")}
-            style={d.color ? `background:${d.color};color:${d.color}` : ""}
-          />
-          {d.hostname || d.id}
-        </a>
-      </td>
-      <td class={"muted"}>{d.role ? roleTag(d.role) : "—"}</td>
-      <td>
-        {d.online ? (
-          <Badge text={t("dev.badge.online")} kind="on" />
-        ) : (
-          <Badge text={t("dev.badge.offline")} kind="off" />
-        )}
-      </td>
-      <td>
-        {d.online
-          ? since(d.connectedAt)
-          : t("mgmt.last_seen", since(d.lastSeen))}
-      </td>
-      <td>{streamState(d)}</td>
-      <td>{bitrate(d)}</td>
-      <td>
-        {d.online && d.totalLinks !== undefined
-          ? `${d.activeLinks ?? 0}/${d.totalLinks}`
-          : "—"}
-      </td>
-      <td>
-        {hasEncoder(d) && e ? (
-          e.running ? (
-            <Badge
-              text={e.config?.pipeline ?? t("dev.badge.streaming")}
-              kind="on"
-            />
-          ) : (
-            stoppedBadge()
-          )
-        ) : (
-          "—"
-        )}
-      </td>
-      <td>
-        {d.role !== "encoder" && s ? (
-          s.running ? (
-            <Badge text={`→ ${s.remoteHost}:${s.remotePort}`} kind="on" />
-          ) : (
-            stoppedBadge()
-          )
-        ) : (
-          "—"
-        )}
-      </td>
-    </tr>
-  );
+    const { srtla: s, encoder: e } = d;
+    // A new vnode per cell: mithril cannot patch one vnode object into two slots
+    const stoppedBadge = () => (
+        <Badge text={t("dev.badge.stopped")} kind="warn" />
+    );
+    return (
+        <tr key={d.id}>
+            <td>
+                <a
+                    class={"device"}
+                    href={`d/${encodeURIComponent(d.id)}/`}
+                    title={d.id}>
+                    <span
+                        class={["device-dot", d.online ? "online" : ""]
+                            .filter(Boolean)
+                            .join(" ")}
+                        style={
+                            d.color
+                                ? `background:${d.color};color:${d.color}`
+                                : ""
+                        }
+                    />
+                    {d.hostname || d.id}
+                </a>
+            </td>
+            <td class={"muted"}>{d.role ? roleTag(d.role) : "—"}</td>
+            <td>
+                {d.online ? (
+                    <Badge text={t("dev.badge.online")} kind="on" />
+                ) : (
+                    <Badge text={t("dev.badge.offline")} kind="off" />
+                )}
+            </td>
+            <td>
+                {d.online
+                    ? since(d.connectedAt)
+                    : t("mgmt.last_seen", since(d.lastSeen))}
+            </td>
+            <td>{streamState(d)}</td>
+            <td>{bitrate(d)}</td>
+            <td>
+                {d.online && d.totalLinks !== undefined
+                    ? `${d.activeLinks ?? 0}/${d.totalLinks}`
+                    : "—"}
+            </td>
+            <td>
+                {hasEncoder(d) && e ? (
+                    e.running ? (
+                        <Badge
+                            text={
+                                e.config?.pipeline ?? t("dev.badge.streaming")
+                            }
+                            kind="on"
+                        />
+                    ) : (
+                        stoppedBadge()
+                    )
+                ) : (
+                    "—"
+                )}
+            </td>
+            <td>
+                {d.role !== "encoder" && s ? (
+                    s.running ? (
+                        <Badge
+                            text={`→ ${s.remoteHost}:${s.remotePort}`}
+                            kind="on"
+                        />
+                    ) : (
+                        stoppedBadge()
+                    )
+                ) : (
+                    "—"
+                )}
+            </td>
+        </tr>
+    );
 }
 
 const columnHeaders = (): m.Children[] => [
-  t("mgmt.th.device"),
-  t("mgmt.th.role"),
-  t("mgmt.th.status"),
-  t("mgmt.th.connected"),
-  t("mgmt.th.stream"),
-  t("mgmt.th_bitrate"),
-  t("mgmt.th.links"),
-  [icon("encoder"), ` ${t("setup.step.encoder")}`],
-  [icon("relay"), ` ${t("setup.step.relay")}`],
+    t("mgmt.th.device"),
+    t("mgmt.th.role"),
+    t("mgmt.th.status"),
+    t("mgmt.th.connected"),
+    t("mgmt.th.stream"),
+    t("mgmt.th_bitrate"),
+    t("mgmt.th.links"),
+    [icon("encoder"), ` ${t("setup.step.encoder")}`],
+    [icon("relay"), ` ${t("setup.step.relay")}`],
 ];
 
 const App: m.Component = {
-  view: () => {
-    const headers = columnHeaders();
-    return (
-      <Page
-        title={t("mgmt.title")}
-        nav={<ServerNav active="devices" />}
-        headerRight={connBadge()}
-      >
-        <Card>
-          <table>
-            <thead>
-              <tr>
-                {headers.map((h) => (
-                  <th>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {state.devices?.length ? (
-                state.devices.map(row)
-              ) : (
-                <tr>
-                  <td colspan={headers.length} class={"muted"}>
-                    {state.devices ? t("mgmt.none") : t("mgmt.loading")}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </Card>
-      </Page>
-    );
-  },
+    view: () => {
+        const headers = columnHeaders();
+        return (
+            <Page
+                title={t("mgmt.title")}
+                nav={<ServerNav active="devices" />}
+                headerRight={connBadge()}>
+                <Card>
+                    <table>
+                        <thead>
+                            <tr>
+                                {headers.map((h) => (
+                                    <th>{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {state.devices?.length ? (
+                                state.devices.map(row)
+                            ) : (
+                                <tr>
+                                    <td
+                                        colspan={headers.length}
+                                        class={"muted"}>
+                                        {state.devices
+                                            ? t("mgmt.none")
+                                            : t("mgmt.loading")}
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </Card>
+            </Page>
+        );
+    },
 };
 
 void mountPage(() => t("mgmt.title"), App);

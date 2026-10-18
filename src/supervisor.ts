@@ -68,9 +68,12 @@ export class Supervisor {
 
     /** Restart after the configured delay; no-op if stopped or running meanwhile. */
     scheduleRestart(): void {
-        if (!this.wantedFlag || this.proc || this.timer || !this.starter) return;
+        if (!this.wantedFlag || this.proc || this.timer || !this.starter)
+            return;
         const starter = this.starter;
-        console.warn(`${this.name} stopped unexpectedly; restarting in ${this.restartDelayMs / 1000}s`);
+        console.warn(
+            `${this.name} stopped unexpectedly; restarting in ${this.restartDelayMs / 1000}s`,
+        );
         this.timer = setTimeout(() => {
             this.timer = null;
             if (!this.wantedFlag || this.proc || !this.starter) return;
@@ -88,15 +91,20 @@ export class Supervisor {
 
     private watch(proc: Bun.Subprocess): void {
         this.proc = proc;
-        proc.exited.then((code) => {
-            if (this.proc !== proc) return;   // replaced; the new handler owns that exit
-            this.proc = null;
-            this.clearTimer();
-            this.onExit(code ?? null);
-        }).catch(() => {});
+        proc.exited
+            .then((code) => {
+                if (this.proc !== proc) return; // replaced; the new handler owns that exit
+                this.proc = null;
+                this.clearTimer();
+                this.onExit(code ?? null);
+            })
+            .catch(() => {});
     }
 
     private clearTimer(): void {
-        if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+        if (this.timer) {
+            clearTimeout(this.timer);
+            this.timer = null;
+        }
     }
 }

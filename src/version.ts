@@ -7,11 +7,14 @@
 import { execSync } from "node:child_process";
 
 export const APP_VERSION = (() => {
-	try {
-		return execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"], timeout: 2000 })
-			.toString()
-			.trim();
-	} catch {
-		return "dev";
-	}
+    try {
+        return execSync("git rev-parse --short HEAD", {
+            stdio: ["ignore", "pipe", "ignore"],
+            timeout: 2000,
+        })
+            .toString()
+            .trim();
+    } catch {
+        return "dev";
+    }
 })();

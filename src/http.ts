@@ -2,8 +2,11 @@
  * HTTP helpers shared by the device API (src/api.ts) and the control server (server.ts).
  */
 
-export const text = (body: string, status = 200, headers?: HeadersInit): Response =>
-    new Response(`${body}\n`, { status, headers });
+export const text = (
+    body: string,
+    status = 200,
+    headers?: HeadersInit,
+): Response => new Response(`${body}\n`, { status, headers });
 
 export const notFound = (): Response => text("Not found", 404);
 
@@ -14,7 +17,10 @@ export const upgradeRequired = (): Response =>
  * Browsers always send `Origin`; reject cross-site pages so a random website cannot
  * drive the WebSocket API. Non-browser clients (no Origin) are allowed.
  */
-export function originAllowed(req: Request, extra: readonly string[] = []): boolean {
+export function originAllowed(
+    req: Request,
+    extra: readonly string[] = [],
+): boolean {
     const origin = req.headers.get("origin");
     if (!origin || extra.includes("*") || extra.includes(origin)) return true;
     try {
@@ -34,16 +40,19 @@ const I18N_PATH_RE = /^\/i18n\/([a-z]{2})\.json$/;
  * unknown codes.
  */
 export async function i18nResponse(
-	path: string,
-	catalog: (lang: string) => Promise<Record<string, string> | null>,
+    path: string,
+    catalog: (lang: string) => Promise<Record<string, string> | null>,
 ): Promise<Response> {
-	const m = I18N_PATH_RE.exec(path);
-	const c = m ? await catalog(m[1]) : null;
-	return c
-		? new Response(JSON.stringify(c), {
-				headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-cache" },
-			})
-		: notFound();
+    const m = I18N_PATH_RE.exec(path);
+    const c = m ? await catalog(m[1]) : null;
+    return c
+        ? new Response(JSON.stringify(c), {
+              headers: {
+                  "content-type": "application/json; charset=utf-8",
+                  "cache-control": "no-cache",
+              },
+          })
+        : notFound();
 }
 
 const IMG_PATH_RE = /^\/img\/[\w-]+\.svg$/;
@@ -53,6 +62,11 @@ export async function imageResponse(path: string): Promise<Response | null> {
     if (!IMG_PATH_RE.test(path)) return null;
     const file = Bun.file(new URL(`../public${path}`, import.meta.url));
     return (await file.exists())
-        ? new Response(file, { headers: { "content-type": "image/svg+xml; charset=utf-8", "cache-control": "no-cache" } })
+        ? new Response(file, {
+              headers: {
+                  "content-type": "image/svg+xml; charset=utf-8",
+                  "cache-control": "no-cache",
+              },
+          })
         : notFound();
 }

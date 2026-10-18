@@ -12,9 +12,20 @@
 import { randomUUID } from "node:crypto";
 
 import { CONFIG_EXISTS, CONFIG_FILE, DRY_RUN, INITIAL_CONFIG } from "./config";
-import type { CeraConfig, EncoderConfig, EncoderState, SrtlaState, SwitcherConfig } from "../public/types";
+import type {
+    CeraConfig,
+    EncoderConfig,
+    EncoderState,
+    SrtlaState,
+    SwitcherConfig,
+} from "../public/types";
 import { writeFileAtomic } from "./files";
-import { asLanguage, DEFAULT_LANGUAGE, type Language, setCurrentLanguage } from "./i18n";
+import {
+    asLanguage,
+    DEFAULT_LANGUAGE,
+    type Language,
+    setCurrentLanguage,
+} from "./i18n";
 import type { ModemConfig } from "./routing";
 import type { SrtlaMode } from "./srtlaControl";
 import { stableStringify } from "./util";
@@ -37,16 +48,30 @@ export interface DeviceSettings {
 }
 
 /** srtla_send scheduler settings; applied live over the control socket and on every start. */
-export interface SrtlaOptions { mode?: SrtlaMode; quality?: boolean; }
+export interface SrtlaOptions {
+    mode?: SrtlaMode;
+    quality?: boolean;
+}
 
 /** Result of persisting+applying scheduler settings (`applied` is false until the next start). */
-export interface SrtlaOptionsResult { options: SrtlaOptions; applied: boolean; }
+export interface SrtlaOptionsResult {
+    options: SrtlaOptions;
+    applied: boolean;
+}
 
 /** Last target of a combined-device stream (`stream.start`), kept for the UI to prefill. */
-export interface StreamTarget { remoteHost: string; remotePort: string; listenPort: string; }
+export interface StreamTarget {
+    remoteHost: string;
+    remotePort: string;
+    listenPort: string;
+}
 
 /** Last srtla_send target (`srtla.start`), kept after stop for prefill and autostart. */
-export interface SrtlaTarget { listenPort: string; remoteHost: string; remotePort: string; }
+export interface SrtlaTarget {
+    listenPort: string;
+    remoteHost: string;
+    remotePort: string;
+}
 
 /** srtla section of the config file: target and scheduler options. */
 export interface SrtlaConfig {
@@ -87,10 +112,10 @@ export const ALL_MODULES = ["relay", "encoder", "obs-controller"] as const;
  * the same persisted slice.
  */
 export const MODULE_CONFIG_KEYS: Record<string, string> = {
-	"encoder": "encoder",
-	"srtla": "relay",
-	"modems": "modems",
-	"obs-controller": "obs-controller",
+    encoder: "encoder",
+    srtla: "relay",
+    modems: "modems",
+    "obs-controller": "obs-controller",
 };
 
 export type ModuleId = (typeof ALL_MODULES)[number];
@@ -153,9 +178,9 @@ export interface PersistentState {
     srtlaTarget?: SrtlaTarget;
     srtlaOptions?: SrtlaOptions;
     encoder: EncoderState;
-    ceracoder?: CeraConfig;   // only with the ceracoder encoder
+    ceracoder?: CeraConfig; // only with the ceracoder encoder
     stream?: StreamTarget;
-    autostart?: boolean;      // resume the last stream when the service starts
+    autostart?: boolean; // resume the last stream when the service starts
 }
 
 // A fresh device (no config file) shows the setup wizard first.
@@ -167,7 +192,8 @@ export let setupRequired = !CONFIG_EXISTS;
 
 function projectConfig(s: PersistentState): DeviceConfig {
     const { settings } = s;
-    const target = s.srtlaTarget ?? s.stream ?? { listenPort: "", remoteHost: "", remotePort: "" };
+    const target = s.srtlaTarget ??
+        s.stream ?? { listenPort: "", remoteHost: "", remotePort: "" };
     const options = s.srtlaOptions ?? {};
     const cfg: DeviceConfig = {
         autostart: !!s.autostart,
@@ -188,7 +214,8 @@ function projectConfig(s: PersistentState): DeviceConfig {
         },
     };
     if (settings.remoteToken) cfg.remoteToken = settings.remoteToken;
-    if (settings.pipelineRepositories?.length) cfg.pipelineRepositories = settings.pipelineRepositories;
+    if (settings.pipelineRepositories?.length)
+        cfg.pipelineRepositories = settings.pipelineRepositories;
     if (s.ceracoder) cfg.ceracoder = s.ceracoder;
     if (settings.modules) cfg.modules = settings.modules;
     return cfg;
@@ -197,9 +224,17 @@ function projectConfig(s: PersistentState): DeviceConfig {
 // Exported for the backfill regression tests (test/state.test.ts)
 export function fromConfig(cfg: Partial<DeviceConfig> | null): PersistentState {
     const section: Partial<SrtlaConfig> = cfg?.srtla ?? {};
-    const hasTarget = !!(section.listenPort || section.remoteHost || section.remotePort);
+    const hasTarget = !!(
+        section.listenPort ||
+        section.remoteHost ||
+        section.remotePort
+    );
     const target = hasTarget
-        ? { listenPort: section.listenPort ?? "", remoteHost: section.remoteHost ?? "", remotePort: section.remotePort ?? "" }
+        ? {
+              listenPort: section.listenPort ?? "",
+              remoteHost: section.remoteHost ?? "",
+              remotePort: section.remotePort ?? "",
+          }
         : undefined;
     return {
         settings: {
@@ -218,9 +253,10 @@ export function fromConfig(cfg: Partial<DeviceConfig> | null): PersistentState {
         selection: cfg?.modems ?? {},
         srtla: { running: false },
         srtlaTarget: target,
-        srtlaOptions: section.mode !== undefined || section.quality !== undefined
-            ? { mode: section.mode, quality: section.quality }
-            : undefined,
+        srtlaOptions:
+            section.mode !== undefined || section.quality !== undefined
+                ? { mode: section.mode, quality: section.quality }
+                : undefined,
         encoder: { running: false, config: cfg?.encoder },
         ceracoder: cfg?.ceracoder,
         stream: target,
@@ -257,7 +293,10 @@ export function defaultModules(role?: Role): ModulesState {
  * switcher fields are filled with the defaults here (stored values win), so
  * the obs slice always carries a complete switcher set.
  */
-function backfillModules(stored: Partial<ModulesState> | undefined, role?: Role): ModulesState {
+function backfillModules(
+    stored: Partial<ModulesState> | undefined,
+    role?: Role,
+): ModulesState {
     if (!stored) return defaultModules(role);
     const out: ModulesState = { ...defaultModules(role), ...stored };
     // Complete the switcher fields; stored values win over the defaults.
@@ -322,14 +361,21 @@ export async function completeSetup(): Promise<void> {
 /** Shared mutable state; modules mutate its fields and call `saveState()`. */
 export const state: PersistentState = CONFIG_EXISTS
     ? fromConfig(INITIAL_CONFIG as Partial<DeviceConfig> | null)
-    : { settings: {}, selection: {}, srtla: { running: false }, encoder: { running: false } };
+    : {
+          settings: {},
+          selection: {},
+          srtla: { running: false },
+          encoder: { running: false },
+      };
 
 // Hostnames change; the uuid is the device's permanent identity on the control server.
 // It is auto-assigned here (backfilled into older config files) and never changes.
 // Older config files have no language either; normalize so it is always present.
 // A fresh device keeps both in memory only, so the setup wizard still runs.
 {
-    const backfill = CONFIG_EXISTS && (!state.settings.uuid || state.settings.language === undefined);
+    const backfill =
+        CONFIG_EXISTS &&
+        (!state.settings.uuid || state.settings.language === undefined);
     state.settings.uuid ||= randomUUID();
     state.settings.language ??= DEFAULT_LANGUAGE;
     if (backfill) await saveState();

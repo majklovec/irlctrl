@@ -44,12 +44,12 @@
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-	collectSrtSample,
-	type SrtBaseline,
+    collectSrtSample,
+    type SrtBaseline,
 } from "./modules/obs-controller/srt-metrics";
 import {
-	type ObsSnapshot,
-	SwitcherEngine,
+    type ObsSnapshot,
+    SwitcherEngine,
 } from "./modules/obs-controller/switcher-engine";
 import type { SwitcherConfig, SwitcherMetrics } from "./public/types";
 import { arg, argFail, flag, intArg } from "./src/args";
@@ -63,96 +63,98 @@ const SWITCHER_MODULE = "low-bitrate-switcher";
 // Card-form defaults (the box has no factory of its own) — used only for the
 // in-memory slice, so the status always carries the full shape
 const DEFAULT_SWITCHER_SLICE: SwitcherConfig & { enabled: boolean } = {
-	enabled: true,
-	failBehaviour: "pause",
-	autoSwitch: true,
-	onlySwitchWhenStreaming: false,
-	instantlySwitchOnRecover: true,
-	retryAttempts: 5,
-	pollIntervalMs: 1000,
-	triggers: { low: 500, offline: 400, rtt: 1500 },
-	// Scenes come from the card form (the real OBS scene list) — no placeholders
-	scenes: { normal: "", low: "", offline: "" },
-	optionalScenes: { starting: "", ending: "", privacy: "" },
-	logToFile: true,
-	obsSourceName: "",
+    enabled: true,
+    failBehaviour: "pause",
+    autoSwitch: true,
+    onlySwitchWhenStreaming: false,
+    instantlySwitchOnRecover: true,
+    retryAttempts: 5,
+    pollIntervalMs: 1000,
+    triggers: { low: 500, offline: 400, rtt: 1500 },
+    // Scenes come from the card form (the real OBS scene list) — no placeholders
+    scenes: { normal: "", low: "", offline: "" },
+    optionalScenes: { starting: "", ending: "", privacy: "" },
+    logToFile: true,
+    obsSourceName: "",
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-	return value !== null && typeof value === "object" && !Array.isArray(value);
+    return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 // Shape-checked merge of a modules.configure payload into the slice —
 // invalid values are kept as-is (the engine re-reads the corrected slice on
 // the next save; it must never receive a malformed config)
 function mergeBoxSwitcherConfig(
-	cur: SwitcherConfig & { enabled: boolean },
-	raw: Record<string, unknown>,
+    cur: SwitcherConfig & { enabled: boolean },
+    raw: Record<string, unknown>,
 ): SwitcherConfig & { enabled: boolean } {
-	const next: SwitcherConfig & { enabled: boolean } = {
-		...cur,
-		triggers: { ...cur.triggers },
-		scenes: { ...cur.scenes },
-		optionalScenes: { ...cur.optionalScenes },
-	};
-	if (typeof raw.enabled === "boolean") next.enabled = raw.enabled;
-	for (const key of [
-		"autoSwitch",
-		"onlySwitchWhenStreaming",
-		"instantlySwitchOnRecover",
-		"logToFile",
-	] as const)
-		if (typeof raw[key] === "boolean") next[key] = raw[key];
-	if (raw.failBehaviour === "pause" || raw.failBehaviour === "ignore")
-		next.failBehaviour = raw.failBehaviour;
-	if (
-		typeof raw.retryAttempts === "number" &&
-		Number.isInteger(raw.retryAttempts) &&
-		raw.retryAttempts >= 1 &&
-		raw.retryAttempts <= 100
-	)
-		next.retryAttempts = raw.retryAttempts;
-	if (
-		typeof raw.pollIntervalMs === "number" &&
-		raw.pollIntervalMs >= 200 &&
-		raw.pollIntervalMs <= 3_600_000
-	)
-		next.pollIntervalMs = raw.pollIntervalMs;
-	const triggers = isRecord(raw.triggers) ? raw.triggers : {};
-	for (const key of Object.keys(next.triggers) as Array<
-		keyof typeof next.triggers
-	>) {
-		const v = triggers[key];
-		if (typeof v === "number" && Number.isFinite(v) && v >= 0)
-			next.triggers[key] = v;
-	}
-	const scenes = isRecord(raw.scenes) ? raw.scenes : {};
-	for (const key of Object.keys(next.scenes) as Array<
-		keyof typeof next.scenes
-	>) {
-		const v = scenes[key];
-		if (typeof v === "string" && v.length > 0 && v.length <= 255)
-			next.scenes[key] = v;
-	}
-	const optionalScenes = isRecord(raw.optionalScenes) ? raw.optionalScenes : {};
-	for (const key of Object.keys(next.optionalScenes) as Array<
-		keyof typeof next.optionalScenes
-	>) {
-		const v = optionalScenes[key];
-		if (typeof v === "string" && v.length > 0 && v.length <= 255)
-			next.optionalScenes[key] = v;
-	}
-	if (typeof raw.obsSourceName === "string")
-		next.obsSourceName = raw.obsSourceName;
-	return next;
+    const next: SwitcherConfig & { enabled: boolean } = {
+        ...cur,
+        triggers: { ...cur.triggers },
+        scenes: { ...cur.scenes },
+        optionalScenes: { ...cur.optionalScenes },
+    };
+    if (typeof raw.enabled === "boolean") next.enabled = raw.enabled;
+    for (const key of [
+        "autoSwitch",
+        "onlySwitchWhenStreaming",
+        "instantlySwitchOnRecover",
+        "logToFile",
+    ] as const)
+        if (typeof raw[key] === "boolean") next[key] = raw[key];
+    if (raw.failBehaviour === "pause" || raw.failBehaviour === "ignore")
+        next.failBehaviour = raw.failBehaviour;
+    if (
+        typeof raw.retryAttempts === "number" &&
+        Number.isInteger(raw.retryAttempts) &&
+        raw.retryAttempts >= 1 &&
+        raw.retryAttempts <= 100
+    )
+        next.retryAttempts = raw.retryAttempts;
+    if (
+        typeof raw.pollIntervalMs === "number" &&
+        raw.pollIntervalMs >= 200 &&
+        raw.pollIntervalMs <= 3_600_000
+    )
+        next.pollIntervalMs = raw.pollIntervalMs;
+    const triggers = isRecord(raw.triggers) ? raw.triggers : {};
+    for (const key of Object.keys(next.triggers) as Array<
+        keyof typeof next.triggers
+    >) {
+        const v = triggers[key];
+        if (typeof v === "number" && Number.isFinite(v) && v >= 0)
+            next.triggers[key] = v;
+    }
+    const scenes = isRecord(raw.scenes) ? raw.scenes : {};
+    for (const key of Object.keys(next.scenes) as Array<
+        keyof typeof next.scenes
+    >) {
+        const v = scenes[key];
+        if (typeof v === "string" && v.length > 0 && v.length <= 255)
+            next.scenes[key] = v;
+    }
+    const optionalScenes = isRecord(raw.optionalScenes)
+        ? raw.optionalScenes
+        : {};
+    for (const key of Object.keys(next.optionalScenes) as Array<
+        keyof typeof next.optionalScenes
+    >) {
+        const v = optionalScenes[key];
+        if (typeof v === "string" && v.length > 0 && v.length <= 255)
+            next.optionalScenes[key] = v;
+    }
+    if (typeof raw.obsSourceName === "string")
+        next.obsSourceName = raw.obsSourceName;
+    return next;
 }
 
 import {
-	DEFAULT_EVENT_SUBSCRIPTIONS,
-	EventSubscription,
-	OBS_DISCONNECTED_EVENT,
-	ObsClient,
-	type ObsRequestBatch,
+    DEFAULT_EVENT_SUBSCRIPTIONS,
+    EventSubscription,
+    OBS_DISCONNECTED_EVENT,
+    ObsClient,
+    type ObsRequestBatch,
 } from "./src/obs/client";
 
 // Re-export the protocol lib so importers of this entry keep working.
@@ -179,578 +181,612 @@ const OBS_MODULE = "obs-controller";
 // Note: OBS v5 output events carry no "Current" prefix — it is StreamStateChanged /
 // RecordStateChanged (the same names mapResponseToEvent uses), not *CurrentRecordingStateChanged*.
 const FORWARDED_EVENTS = [
-	"CurrentProgramSceneChanged",
-	"CurrentPreviewSceneChanged",
-	"CurrentProgramSceneItemChanged",
-	"CurrentTransitionChanged",
-	"CurrentProgramInputChanged",
-	"ActiveInputChanged",
-	"SceneItemAdded",
-	"SceneItemRemoved",
-	"MediaInputPlaybackStateChanged",
-	"MediaInputStateChanged",
-	"StreamStateChanged",
-	"RecordStateChanged",
-	// The VU meter needs the per-input level events (absent from the defaults above).
-	"InputVolumeMeters",
-	"InputMute",
-	"InputMuteStateChanged",
+    "CurrentProgramSceneChanged",
+    "CurrentPreviewSceneChanged",
+    "CurrentProgramSceneItemChanged",
+    "CurrentTransitionChanged",
+    "CurrentProgramInputChanged",
+    "ActiveInputChanged",
+    "SceneItemAdded",
+    "SceneItemRemoved",
+    "MediaInputPlaybackStateChanged",
+    "MediaInputStateChanged",
+    "StreamStateChanged",
+    "RecordStateChanged",
+    // The VU meter needs the per-input level events (absent from the defaults above).
+    "InputVolumeMeters",
+    "InputMute",
+    "InputMuteStateChanged",
 ] as const;
 
 // Case-insensitive event-name -> subscription bit (same names methods.ts accepts)
 const SUBSCRIPTION_LOOKUP: Record<string, number> = Object.fromEntries(
-	Object.entries(EventSubscription)
-		.filter(([name]) => name !== "None")
-		.map(([name, bit]) => [name.toUpperCase(), bit]),
+    Object.entries(EventSubscription)
+        .filter(([name]) => name !== "None")
+        .map(([name, bit]) => [name.toUpperCase(), bit]),
 );
 
 // The global is typed by lib.dom in this project; use Bun's client typings (headers, ping, terminate)
 const BunWebSocket = WebSocket as unknown as new (
-	url: string,
-	options?: Bun.WebSocketOptions,
+    url: string,
+    options?: Bun.WebSocketOptions,
 ) => Bun.WebSocket;
 
 const help = (code: number = 0): void => {
-	console.log(
-		"Usage: bun obs-client.ts --remote ws://host:port/device" +
-			" [--obs ws://127.0.0.1:4455] [--obs-password pw]" +
-			" [--remote-token pw] [--hostname name] [--state-file path] [--uuid uuid]",
-	);
-	console.log(
-		"The token/URL may also come from CONTROL_SERVER_TOKEN / CONTROL_SERVER_URL and OBS_PASSWORD env vars.",
-	);
-	process.exit(code);
+    console.log(
+        "Usage: bun obs-client.ts --remote ws://host:port/device" +
+            " [--obs ws://127.0.0.1:4455] [--obs-password pw]" +
+            " [--remote-token pw] [--hostname name] [--state-file path] [--uuid uuid]",
+    );
+    console.log(
+        "The token/URL may also come from CONTROL_SERVER_TOKEN / CONTROL_SERVER_URL and OBS_PASSWORD env vars.",
+    );
+    process.exit(code);
 };
 
 async function main(): Promise<void> {
-	const obsUrl = arg("--obs",  process.env.OBS_URL ?? "ws://127.0.0.1:4455");
-	const obsPassword = arg("--obs-password", process.env.OBS_PASSWORD ?? "");
-	const remoteUrl = arg("--remote", process.env.CONTROL_SERVER_URL ?? "");
-	const remoteToken = arg(
-		"--remote-token",
-		process.env.CONTROL_SERVER_TOKEN ?? "",
-	);
-	const remoteInterval = intArg("--remote-interval", 30, 0, 3600);
-	const deviceName = arg("--hostname", hostname());
-	const stateFile = arg("--state-file", join(tmpdir(), "obs-client.json"));
+    const obsUrl = arg("--obs", process.env.OBS_URL ?? "ws://127.0.0.1:4455");
+    const obsPassword = arg("--obs-password", process.env.OBS_PASSWORD ?? "");
+    const remoteUrl = arg("--remote", process.env.CONTROL_SERVER_URL ?? "");
+    const remoteToken = arg(
+        "--remote-token",
+        process.env.CONTROL_SERVER_TOKEN ?? "",
+    );
+    const remoteInterval = intArg("--remote-interval", 30, 0, 3600);
+    const deviceName = arg("--hostname", hostname());
+    const stateFile = arg("--state-file", join(tmpdir(), "obs-client.json"));
 
-	if (flag("--help") || flag("-h")) {
-		help();		
-	}
-	if (!remoteUrl) {
-		help(2);		
-	}
-	if (!REMOTE_URL_RE.test(remoteUrl))
-		argFail("--remote", remoteUrl, "ws:// or wss:// URL");
+    if (flag("--help") || flag("-h")) {
+        help();
+    }
+    if (!remoteUrl) {
+        help(2);
+    }
+    if (!REMOTE_URL_RE.test(remoteUrl))
+        argFail("--remote", remoteUrl, "ws:// or wss:// URL");
 
-	// Stable device identity: the uuid is assigned once and persisted, so the
-	// control server (and its dashboards) keep seeing the same device. The
-	// state file also carries the switcher's slice (the engine that runs it
-	// lives in this box, over this OBS connection). Pre-extraction state
-	// files stored the switcher under the obs slice (switcherEnabled + nested
-	// switcher) — that shape is merged into the flat slice once, here.
-	const stored = (await Bun.file(stateFile)
-		.json()
-		.catch(() => null)) as {
-		uuid?: string;
-		"low-bitrate-switcher"?: unknown;
-		switcherEnabled?: boolean;
-		switcher?: Record<string, unknown> & { enabled?: boolean };
-	} | null;
-	const uuid = arg("--uuid") ?? stored?.uuid ?? crypto.randomUUID();
-	const storedSlice = stored?.["low-bitrate-switcher"] as
-		| (Partial<SwitcherConfig> & { enabled?: boolean })
-		| undefined;
-	let switcherSlice: SwitcherConfig & { enabled: boolean };
-	if (storedSlice) {
-		switcherSlice = { ...DEFAULT_SWITCHER_SLICE, ...storedSlice };
-	} else {
-		switcherSlice = { ...DEFAULT_SWITCHER_SLICE };
-	}
-	const writeBoxState = async (): Promise<void> => {
-		await Bun.write(
-			stateFile,
-			JSON.stringify({ uuid, "low-bitrate-switcher": switcherSlice }, null, 2),
-		);
-	};
-	await writeBoxState();
+    // Stable device identity: the uuid is assigned once and persisted, so the
+    // control server (and its dashboards) keep seeing the same device. The
+    // state file also carries the switcher's slice (the engine that runs it
+    // lives in this box, over this OBS connection). Pre-extraction state
+    // files stored the switcher under the obs slice (switcherEnabled + nested
+    // switcher) — that shape is merged into the flat slice once, here.
+    const stored = (await Bun.file(stateFile)
+        .json()
+        .catch(() => null)) as {
+        uuid?: string;
+        "low-bitrate-switcher"?: unknown;
+        switcherEnabled?: boolean;
+        switcher?: Record<string, unknown> & { enabled?: boolean };
+    } | null;
+    const uuid = arg("--uuid") ?? stored?.uuid ?? crypto.randomUUID();
+    const storedSlice = stored?.["low-bitrate-switcher"] as
+        | (Partial<SwitcherConfig> & { enabled?: boolean })
+        | undefined;
+    let switcherSlice: SwitcherConfig & { enabled: boolean };
+    if (storedSlice) {
+        switcherSlice = { ...DEFAULT_SWITCHER_SLICE, ...storedSlice };
+    } else {
+        switcherSlice = { ...DEFAULT_SWITCHER_SLICE };
+    }
+    const writeBoxState = async (): Promise<void> => {
+        await Bun.write(
+            stateFile,
+            JSON.stringify(
+                { uuid, "low-bitrate-switcher": switcherSlice },
+                null,
+                2,
+            ),
+        );
+    };
+    await writeBoxState();
 
-	const obs = new ObsClient({
-		url: obsUrl,
-		...(obsPassword ? { password: obsPassword } : {}),
-		// The VU meter needs the InputVolumeMeters bit (absent from the defaults).
-		eventSubscriptions:
-			DEFAULT_EVENT_SUBSCRIPTIONS | EventSubscription.InputVolumeMeters,
-		log: (msg, ...rest) => console.log(`[obs] ${msg}`, ...rest),
-	});
+    const obs = new ObsClient({
+        url: obsUrl,
+        ...(obsPassword ? { password: obsPassword } : {}),
+        // The VU meter needs the InputVolumeMeters bit (absent from the defaults).
+        eventSubscriptions:
+            DEFAULT_EVENT_SUBSCRIPTIONS | EventSubscription.InputVolumeMeters,
+        log: (msg, ...rest) => console.log(`[obs] ${msg}`, ...rest),
+    });
 
-	// The switcher engine runs here (this is the box that talks to OBS and is
-	// where the card renders), so the OBS SRT numbers reach the dashboard.
-	let engine: SwitcherEngine | null = null;
-	let srtBaseline: SrtBaseline | null = null;
-	let obsScene: string | null = null;
-	let obsStreaming = false;
+    // The switcher engine runs here (this is the box that talks to OBS and is
+    // where the card renders), so the OBS SRT numbers reach the dashboard.
+    let engine: SwitcherEngine | null = null;
+    let srtBaseline: SrtBaseline | null = null;
+    let obsScene: string | null = null;
+    let obsStreaming = false;
 
-	let sock: Bun.WebSocket | null = null;
-	let stopped = false;
-	let backoff = BACKOFF_MIN_MS;
-	let pingTimer: ReturnType<typeof setInterval> | null = null;
-	let statusTimer: ReturnType<typeof setInterval> | null = null;
-	let lastSeen = 0;
+    let sock: Bun.WebSocket | null = null;
+    let stopped = false;
+    let backoff = BACKOFF_MIN_MS;
+    let pingTimer: ReturnType<typeof setInterval> | null = null;
+    let statusTimer: ReturnType<typeof setInterval> | null = null;
+    let lastSeen = 0;
 
-	const send = (msg: string): void => {
-		if (sock && sock.readyState === WebSocket.OPEN) sock.send(msg);
-	};
+    const send = (msg: string): void => {
+        if (sock && sock.readyState === WebSocket.OPEN) sock.send(msg);
+    };
 
-	const pushStatus = (): void =>
-		send(
-			JSON.stringify({ type: "event", event: "status", data: buildStatus() }),
-		);
+    const pushStatus = (): void =>
+        send(
+            JSON.stringify({
+                type: "event",
+                event: "status",
+                data: buildStatus(),
+            }),
+        );
 
-	// Throttled engine/SRT log (a bad source name would otherwise log every
-	// poll); the box keeps its own log file, this box logs to stdout.
-	let lastSwitcherWarnAt = 0;
-	const switcherLog = (
-		level: "info" | "warn" | "error",
-		message: string,
-	): void => {
-		if (level === "warn") {
-			const now = Date.now();
-			if (now - lastSwitcherWarnAt < 30_000) return;
-			lastSwitcherWarnAt = now;
-		}
-		console.log(`[switcher:${level}] ${message}`);
-	};
+    // Throttled engine/SRT log (a bad source name would otherwise log every
+    // poll); the box keeps its own log file, this box logs to stdout.
+    let lastSwitcherWarnAt = 0;
+    const switcherLog = (
+        level: "info" | "warn" | "error",
+        message: string,
+    ): void => {
+        if (level === "warn") {
+            const now = Date.now();
+            if (now - lastSwitcherWarnAt < 30_000) return;
+            lastSwitcherWarnAt = now;
+        }
+        console.log(`[switcher:${level}] ${message}`);
+    };
 
-	// The switcher's live state, pushed each poll so the dashboard card shows
-	// the current SRT numbers (the server fans the event out to this device's
-	// viewers).
-	const pushSwitcherState = (): void =>
-		send(
-			JSON.stringify({
-				type: "event",
-				event: "lowBitrateSwitcher.state",
-				data: engine?.status() ?? null,
-			}),
-		);
+    // The switcher's live state, pushed each poll so the dashboard card shows
+    // the current SRT numbers (the server fans the event out to this device's
+    // viewers).
+    const pushSwitcherState = (): void =>
+        send(
+            JSON.stringify({
+                type: "event",
+                event: "lowBitrateSwitcher.state",
+                data: engine?.status() ?? null,
+            }),
+        );
 
-	// The obs-websocket client as the engine sees it. This box owns the
-	// connection, so the snapshot is always present (connected=false until the
-	// websocket is identified) — the engine handles the disconnected state via
-	// its failBehaviour.
-	const obsSnapshot = (): ObsSnapshot => ({
-		connected: obs.connected && obs.identified,
-		streaming: obsStreaming,
-		scene: obsScene,
-	});
+    // The obs-websocket client as the engine sees it. This box owns the
+    // connection, so the snapshot is always present (connected=false until the
+    // websocket is identified) — the engine handles the disconnected state via
+    // its failBehaviour.
+    const obsSnapshot = (): ObsSnapshot => ({
+        connected: obs.connected && obs.identified,
+        streaming: obsStreaming,
+        scene: obsScene,
+    });
 
-	const obsSetScene = async (name: string): Promise<boolean> => {
-		try {
-			const res = await obs.sendRequest({
-				requestType: "SetCurrentProgramScene",
-				requestId: crypto.randomUUID(),
-				// obs-websocket 5 wants camelCase `sceneName` (PascalCase is rejected).
-				requestData: { sceneName: name },
-			});
-			return res.requestStatus.result;
-		} catch {
-			return false;
-		}
-	};
+    const obsSetScene = async (name: string): Promise<boolean> => {
+        try {
+            const res = await obs.sendRequest({
+                requestType: "SetCurrentProgramScene",
+                requestId: crypto.randomUUID(),
+                // obs-websocket 5 wants camelCase `sceneName` (PascalCase is rejected).
+                requestData: { sceneName: name },
+            });
+            return res.requestStatus.result;
+        } catch {
+            return false;
+        }
+    };
 
-	const collectSrtMetrics = async (): Promise<SwitcherMetrics | null> => {
-		const sourceName = (switcherSlice.obsSourceName ?? "").trim();
-		if (!sourceName) return null;
-		const { sample, baseline } = await collectSrtSample(
-			obs,
-			sourceName,
-			srtBaseline,
-			obsStreaming,
-			(message) => switcherLog("warn", message),
-		);
-		srtBaseline = baseline;
-		return sample;
-	};
+    const collectSrtMetrics = async (): Promise<SwitcherMetrics | null> => {
+        const sourceName = (switcherSlice.obsSourceName ?? "").trim();
+        if (!sourceName) return null;
+        const { sample, baseline } = await collectSrtSample(
+            obs,
+            sourceName,
+            srtBaseline,
+            obsStreaming,
+            (message) => switcherLog("warn", message),
+        );
+        srtBaseline = baseline;
+        return sample;
+    };
 
-	// obs-websocket 5 delivers these payloads with camelCase keys — the scene
-	// as `sceneName` (events) / `currentProgramSceneName` (requests) and the
-	// output as `outputActive`. Tolerate the older PascalCase forms too, so
-	// the tracking works across obs-websocket versions.
-	const readScene = (
-		d: Record<string, unknown> | null | undefined,
-	): string | null => {
-		if (!d) return null;
-		for (const k of [
-			"sceneName",
-			"currentProgramSceneName",
-			"CurrentProgramSceneName",
-		])
-			if (typeof d[k] === "string") return d[k] as string;
-		return null;
-	};
-	const readStreaming = (
-		d: Record<string, unknown> | null | undefined,
-	): boolean => {
-		if (!d) return false;
-		if (typeof d["outputActive"] === "boolean")
-			return d["outputActive"] as boolean;
-		for (const k of ["outputState", "OutputState"])
-			if (typeof d[k] === "number") return (d[k] as number) === 1;
-		return false;
-	};
+    // obs-websocket 5 delivers these payloads with camelCase keys — the scene
+    // as `sceneName` (events) / `currentProgramSceneName` (requests) and the
+    // output as `outputActive`. Tolerate the older PascalCase forms too, so
+    // the tracking works across obs-websocket versions.
+    const readScene = (
+        d: Record<string, unknown> | null | undefined,
+    ): string | null => {
+        if (!d) return null;
+        for (const k of [
+            "sceneName",
+            "currentProgramSceneName",
+            "CurrentProgramSceneName",
+        ])
+            if (typeof d[k] === "string") return d[k] as string;
+        return null;
+    };
+    const readStreaming = (
+        d: Record<string, unknown> | null | undefined,
+    ): boolean => {
+        if (!d) return false;
+        if (typeof d["outputActive"] === "boolean")
+            return d["outputActive"] as boolean;
+        for (const k of ["outputState", "OutputState"])
+            if (typeof d[k] === "number") return (d[k] as number) === 1;
+        return false;
+    };
 
-	// Warm the scene / streaming tracking from OBS (the connect + reconnect
-	// state-replay re-emits these, which keep the values current).
-	const warmStartObs = async (): Promise<void> => {
-		try {
-			const [sc, st] = await Promise.all([
-				obs.sendRequest({
-					requestType: "GetCurrentProgramScene",
-					requestId: crypto.randomUUID(),
-					requestData: {},
-				}),
-				obs.sendRequest({
-					requestType: "GetStreamStatus",
-					requestId: crypto.randomUUID(),
-					requestData: {},
-				}),
-			]);
-			const s = readScene(sc.responseData);
-			if (s) obsScene = s;
-			obsStreaming = readStreaming(st.responseData);
-		} catch {
-			// Identification is in flight; the event handlers pick it up
-		}
-	};
+    // Warm the scene / streaming tracking from OBS (the connect + reconnect
+    // state-replay re-emits these, which keep the values current).
+    const warmStartObs = async (): Promise<void> => {
+        try {
+            const [sc, st] = await Promise.all([
+                obs.sendRequest({
+                    requestType: "GetCurrentProgramScene",
+                    requestId: crypto.randomUUID(),
+                    requestData: {},
+                }),
+                obs.sendRequest({
+                    requestType: "GetStreamStatus",
+                    requestId: crypto.randomUUID(),
+                    requestData: {},
+                }),
+            ]);
+            const s = readScene(sc.responseData);
+            if (s) obsScene = s;
+            obsStreaming = readStreaming(st.responseData);
+        } catch {
+            // Identification is in flight; the event handlers pick it up
+        }
+    };
 
-	const stopEngine = (): void => {
-		engine?.stop();
-		engine = null;
-		srtBaseline = null;
-	};
+    const stopEngine = (): void => {
+        engine?.stop();
+        engine = null;
+        srtBaseline = null;
+    };
 
-	// (Re)start the engine against the current slice. The `SwitcherEngine`
-	// captures the slice object, and a save rebuilds that object — so a config
-	// change recreates the engine rather than patching it in place.
-	const startEngine = (): void => {
-		stopEngine();
-		if (!switcherSlice.enabled || !switcherSlice.obsSourceName) {
-			pushSwitcherState();
-			return;
-		}
-		engine = new SwitcherEngine(switcherSlice, {
-			obs: obsSnapshot,
-			setScene: obsSetScene,
-			metrics: collectSrtMetrics,
-			log: switcherLog,
-			onUpdate: pushSwitcherState,
-			now: () => Date.now(),
-		});
-		engine.start();
-		void warmStartObs();
-		console.log(
-			`[switcher] started (OBS source: "${switcherSlice.obsSourceName}")`,
-		);
-	};
+    // (Re)start the engine against the current slice. The `SwitcherEngine`
+    // captures the slice object, and a save rebuilds that object — so a config
+    // change recreates the engine rather than patching it in place.
+    const startEngine = (): void => {
+        stopEngine();
+        if (!switcherSlice.enabled || !switcherSlice.obsSourceName) {
+            pushSwitcherState();
+            return;
+        }
+        engine = new SwitcherEngine(switcherSlice, {
+            obs: obsSnapshot,
+            setScene: obsSetScene,
+            metrics: collectSrtMetrics,
+            log: switcherLog,
+            onUpdate: pushSwitcherState,
+            now: () => Date.now(),
+        });
+        engine.start();
+        void warmStartObs();
+        console.log(
+            `[switcher] started (OBS source: "${switcherSlice.obsSourceName}")`,
+        );
+    };
 
-	const persistSwitcherState = async (): Promise<void> => {
-		await writeBoxState();
-		startEngine();
-		pushStatus();
-	};
+    const persistSwitcherState = async (): Promise<void> => {
+        await writeBoxState();
+        startEngine();
+        pushStatus();
+    };
 
-	const pushObsEvent = (
-		eventType: string,
-		eventIntent: number,
-		eventData?: Record<string, unknown>,
-	): void =>
-		send(
-			JSON.stringify({
-				type: "event",
-				event: "obs.event",
-				module: OBS_MODULE,
-				data: { eventType, eventIntent, eventData },
-			}),
-		);
+    const pushObsEvent = (
+        eventType: string,
+        eventIntent: number,
+        eventData?: Record<string, unknown>,
+    ): void =>
+        send(
+            JSON.stringify({
+                type: "event",
+                event: "obs.event",
+                module: OBS_MODULE,
+                data: { eventType, eventIntent, eventData },
+            }),
+        );
 
-	const buildStatus = (): Record<string, unknown> => ({
-		role: "obs",
-		setupRequired: false,
-		state: { obs: { connected: obs.identified, url: scrubUrl(obsUrl) } },
-		// Live switcher state (replayed to newly-connected dashboard viewers;
-		// the lowBitrateSwitcher.state events carry the live updates)
-		lowBitrateSwitcher: engine?.status() ?? null,
-		modules: {
-			relay: { enabled: false },
-			encoder: { enabled: false },
-			// The card's form (obsSourceName, scenes, triggers) loads from this
-			// slice — the switcher slice rides on the obs module, like on the
-			// core box (modulesView.ObsModuleView).
-			[OBS_MODULE]: {
-				obsUrl,
-				obsPassword: obsPassword ? { configured: true } : "",
-				sceneEvents: true,
-				// switcherSlice carries `enabled` (the switcher's on/off flag)
-				...switcherSlice,
-			},
-		},
-	});
+    const buildStatus = (): Record<string, unknown> => ({
+        role: "obs",
+        setupRequired: false,
+        state: { obs: { connected: obs.identified, url: scrubUrl(obsUrl) } },
+        // Live switcher state (replayed to newly-connected dashboard viewers;
+        // the lowBitrateSwitcher.state events carry the live updates)
+        lowBitrateSwitcher: engine?.status() ?? null,
+        modules: {
+            relay: { enabled: false },
+            encoder: { enabled: false },
+            // The card's form (obsSourceName, scenes, triggers) loads from this
+            // slice — the switcher slice rides on the obs module, like on the
+            // core box (modulesView.ObsModuleView).
+            [OBS_MODULE]: {
+                obsUrl,
+                obsPassword: obsPassword ? { configured: true } : "",
+                sceneEvents: true,
+                // switcherSlice carries `enabled` (the switcher's on/off flag)
+                ...switcherSlice,
+            },
+        },
+    });
 
-	async function handleRequest(text: string): Promise<string> {
-		let id: unknown = null;
-		let method = "";
-		try {
-			const msg: unknown = JSON.parse(text);
-			if (!isRecord(msg))
-				throw new ApiError("Message must be a JSON object");
-			id = msg.id ?? null;
-			if (typeof msg.method !== "string")
-				throw new ApiError("method is required");
-			method = msg.method;
-			const params = isRecord(msg.params) ? msg.params : {};
+    async function handleRequest(text: string): Promise<string> {
+        let id: unknown = null;
+        let method = "";
+        try {
+            const msg: unknown = JSON.parse(text);
+            if (!isRecord(msg))
+                throw new ApiError("Message must be a JSON object");
+            id = msg.id ?? null;
+            if (typeof msg.method !== "string")
+                throw new ApiError("method is required");
+            method = msg.method;
+            const params = isRecord(msg.params) ? msg.params : {};
 
-			let result: unknown;
-			switch (method) {
-				case "obs.request": {
-					// op7 passthrough: the obs-websocket v5 response `d`, statuses unmapped
-					const requestType = requireString(params, "requestType");
-					const requestId =
-						typeof params.requestId === "string" && params.requestId
-							? params.requestId
-							: crypto.randomUUID();
-					const requestData =
-						isRecord(params.requestData) ? params.requestData : {};
-					result = await obs.sendRequest({
-						requestType,
-						requestId,
-						requestData,
-					});
-					break;
-				}
-				case "obs.requestBatch": {
-					const requests = params.requests;
-					if (!Array.isArray(requests) || !requests.length)
-						throw new ApiError("requests must be a non-empty array");
-					const requestId =
-						typeof params.requestId === "string" && params.requestId
-							? params.requestId
-							: crypto.randomUUID();
-					const batch: ObsRequestBatch = {
-						requestId,
-						requests: requests.map((request) => {
-							if (!isRecord(request) || typeof request.requestType !== "string")
-								throw new ApiError(
-									"Each request needs a string requestType",
-								);
-							return {
-								requestType: request.requestType,
-								requestId:
-									typeof request.requestId === "string" && request.requestId
-										? request.requestId
-										: crypto.randomUUID(),
-								...(isRecord(request.requestData)
-									? { requestData: request.requestData }
-									: {}),
-							};
-						}),
-						...(params.haltOnFailure !== undefined
-							? { haltOnFailure: !!params.haltOnFailure }
-							: {}),
-						...(params.executionType !== undefined
-							? { executionType: params.executionType as 0 | 1 | 2 }
-							: {}),
-					};
-					// op9 passthrough: the obs-websocket v5 batch response `d`
-					result = await obs.sendBatch(batch);
-					break;
-				}
-				case "obs.setEventSubscriptions": {
-					const names = optionalStringList(params, "eventSubscriptions") ?? [];
-					const intents = names.reduce(
-						(acc: number, name) =>
-							acc |
-							(SUBSCRIPTION_LOOKUP[name.toUpperCase()] ??
-								EventSubscription.None),
-						0,
-					);
-					obs.setEventSubscriptions(intents);
-					result = { ok: true, eventSubscriptions: intents };
-					break;
-				}
-				case "modules.configure": {
-					// The browser's switcher toggle and form send their config here;
-					// obsUrl / obsPassword / sceneEvents are CLI-driven and ignored.
-					const id = requireString(params, "id");
-					if (id !== OBS_MODULE && id !== SWITCHER_MODULE)
-						throw new ApiError(`Unknown module: ${id}`, 404);
-					const config =
-						isRecord(params.config) ? params.config : {};
-					if (id === SWITCHER_MODULE)
-						switcherSlice = mergeBoxSwitcherConfig(switcherSlice, config);
-					await persistSwitcherState();
-					result = { ok: true };
-					break;
-				}
-				case "lowBitrateSwitcher.save": {
-					// The switcher card's Save button sends the full slice as `config`.
-					const config =
-						isRecord(params.config) ? params.config : params;
-					switcherSlice = mergeBoxSwitcherConfig(switcherSlice, config);
-					await persistSwitcherState();
-					result = { ok: true };
-					break;
-				}
-				default:
-					throw new ApiError(`Unknown method: ${method}`, 404);
-			}
-			return JSON.stringify({ type: "response", id, method, ok: true, result });
-		} catch (err: unknown) {
-			const code = err instanceof ApiError ? err.code : 500;
-			if (code >= 500)
-				console.error(`[obs-client] ${method || "?"} failed:`, err);
-			return JSON.stringify({
-				type: "response",
-				id,
-				method,
-				ok: false,
-				error: errorMessage(err),
-				code,
-			});
-		}
-	}
+            let result: unknown;
+            switch (method) {
+                case "obs.request": {
+                    // op7 passthrough: the obs-websocket v5 response `d`, statuses unmapped
+                    const requestType = requireString(params, "requestType");
+                    const requestId =
+                        typeof params.requestId === "string" && params.requestId
+                            ? params.requestId
+                            : crypto.randomUUID();
+                    const requestData = isRecord(params.requestData)
+                        ? params.requestData
+                        : {};
+                    result = await obs.sendRequest({
+                        requestType,
+                        requestId,
+                        requestData,
+                    });
+                    break;
+                }
+                case "obs.requestBatch": {
+                    const requests = params.requests;
+                    if (!Array.isArray(requests) || !requests.length)
+                        throw new ApiError(
+                            "requests must be a non-empty array",
+                        );
+                    const requestId =
+                        typeof params.requestId === "string" && params.requestId
+                            ? params.requestId
+                            : crypto.randomUUID();
+                    const batch: ObsRequestBatch = {
+                        requestId,
+                        requests: requests.map((request) => {
+                            if (
+                                !isRecord(request) ||
+                                typeof request.requestType !== "string"
+                            )
+                                throw new ApiError(
+                                    "Each request needs a string requestType",
+                                );
+                            return {
+                                requestType: request.requestType,
+                                requestId:
+                                    typeof request.requestId === "string" &&
+                                    request.requestId
+                                        ? request.requestId
+                                        : crypto.randomUUID(),
+                                ...(isRecord(request.requestData)
+                                    ? { requestData: request.requestData }
+                                    : {}),
+                            };
+                        }),
+                        ...(params.haltOnFailure !== undefined
+                            ? { haltOnFailure: !!params.haltOnFailure }
+                            : {}),
+                        ...(params.executionType !== undefined
+                            ? {
+                                  executionType: params.executionType as
+                                      | 0
+                                      | 1
+                                      | 2,
+                              }
+                            : {}),
+                    };
+                    // op9 passthrough: the obs-websocket v5 batch response `d`
+                    result = await obs.sendBatch(batch);
+                    break;
+                }
+                case "obs.setEventSubscriptions": {
+                    const names =
+                        optionalStringList(params, "eventSubscriptions") ?? [];
+                    const intents = names.reduce(
+                        (acc: number, name) =>
+                            acc |
+                            (SUBSCRIPTION_LOOKUP[name.toUpperCase()] ??
+                                EventSubscription.None),
+                        0,
+                    );
+                    obs.setEventSubscriptions(intents);
+                    result = { ok: true, eventSubscriptions: intents };
+                    break;
+                }
+                case "modules.configure": {
+                    // The browser's switcher toggle and form send their config here;
+                    // obsUrl / obsPassword / sceneEvents are CLI-driven and ignored.
+                    const id = requireString(params, "id");
+                    if (id !== OBS_MODULE && id !== SWITCHER_MODULE)
+                        throw new ApiError(`Unknown module: ${id}`, 404);
+                    const config = isRecord(params.config) ? params.config : {};
+                    if (id === SWITCHER_MODULE)
+                        switcherSlice = mergeBoxSwitcherConfig(
+                            switcherSlice,
+                            config,
+                        );
+                    await persistSwitcherState();
+                    result = { ok: true };
+                    break;
+                }
+                case "lowBitrateSwitcher.save": {
+                    // The switcher card's Save button sends the full slice as `config`.
+                    const config = isRecord(params.config)
+                        ? params.config
+                        : params;
+                    switcherSlice = mergeBoxSwitcherConfig(
+                        switcherSlice,
+                        config,
+                    );
+                    await persistSwitcherState();
+                    result = { ok: true };
+                    break;
+                }
+                default:
+                    throw new ApiError(`Unknown method: ${method}`, 404);
+            }
+            return JSON.stringify({
+                type: "response",
+                id,
+                method,
+                ok: true,
+                result,
+            });
+        } catch (err: unknown) {
+            const code = err instanceof ApiError ? err.code : 500;
+            if (code >= 500)
+                console.error(`[obs-client] ${method || "?"} failed:`, err);
+            return JSON.stringify({
+                type: "response",
+                id,
+                method,
+                ok: false,
+                error: errorMessage(err),
+                code,
+            });
+        }
+    }
 
-	for (const name of FORWARDED_EVENTS) {
-		obs.on(name, (data, event) => {
-			// Track the engine's inputs from the forwarded events (these also
-			// re-arrive via the reconnect state-replay, keeping them current).
-			// obs-websocket 5 payloads use `sceneName` / `outputActive`.
-			if (data) {
-				if (name === "CurrentProgramSceneChanged") {
-					const s = readScene(data);
-					if (s) obsScene = s;
-				}
-				if (name === "StreamStateChanged") obsStreaming = readStreaming(data);
-			}
-			pushObsEvent(name, event.eventIntent, event.eventData);
-			pushStatus(); // the event proves the OBS link is alive
-		});
-	}
-	// Synthetic drop event (clearly marked as non-standard by the client)
-	obs.on(OBS_DISCONNECTED_EVENT, () => {
-		send(
-			JSON.stringify({
-				type: "event",
-				event: "obs.event",
-				module: OBS_MODULE,
-				data: { disconnected: true },
-			}),
-		);
-		pushStatus();
-	});
+    for (const name of FORWARDED_EVENTS) {
+        obs.on(name, (data, event) => {
+            // Track the engine's inputs from the forwarded events (these also
+            // re-arrive via the reconnect state-replay, keeping them current).
+            // obs-websocket 5 payloads use `sceneName` / `outputActive`.
+            if (data) {
+                if (name === "CurrentProgramSceneChanged") {
+                    const s = readScene(data);
+                    if (s) obsScene = s;
+                }
+                if (name === "StreamStateChanged")
+                    obsStreaming = readStreaming(data);
+            }
+            pushObsEvent(name, event.eventIntent, event.eventData);
+            pushStatus(); // the event proves the OBS link is alive
+        });
+    }
+    // Synthetic drop event (clearly marked as non-standard by the client)
+    obs.on(OBS_DISCONNECTED_EVENT, () => {
+        send(
+            JSON.stringify({
+                type: "event",
+                event: "obs.event",
+                module: OBS_MODULE,
+                data: { disconnected: true },
+            }),
+        );
+        pushStatus();
+    });
 
-	function clearTimers(): void {
-		if (pingTimer) clearInterval(pingTimer);
-		if (statusTimer) clearInterval(statusTimer);
-		pingTimer = statusTimer = null;
-	}
+    function clearTimers(): void {
+        if (pingTimer) clearInterval(pingTimer);
+        if (statusTimer) clearInterval(statusTimer);
+        pingTimer = statusTimer = null;
+    }
 
-	function connect(): void {
-		if (stopped) return;
-		const headers: Record<string, string> = {
-			"x-device-id": uuid,
-			"x-device-role": "obs",
-		};
-		if (remoteToken) headers.authorization = `Bearer ${remoteToken}`;
+    function connect(): void {
+        if (stopped) return;
+        const headers: Record<string, string> = {
+            "x-device-id": uuid,
+            "x-device-role": "obs",
+        };
+        if (remoteToken) headers.authorization = `Bearer ${remoteToken}`;
 
-		console.log(
-			`[obs-client] connecting to ${scrubUrl(remoteUrl)} as "${deviceName}"`,
-		);
-		const ws = new BunWebSocket(remoteUrl, { headers });
-		sock = ws;
-		const touch = (): void => {
-			lastSeen = Date.now();
-		};
+        console.log(
+            `[obs-client] connecting to ${scrubUrl(remoteUrl)} as "${deviceName}"`,
+        );
+        const ws = new BunWebSocket(remoteUrl, { headers });
+        sock = ws;
+        const touch = (): void => {
+            lastSeen = Date.now();
+        };
 
-		ws.addEventListener("open", () => {
-			console.log("[obs-client] connected to control server");
-			backoff = BACKOFF_MIN_MS;
-			touch();
-			send(
-				JSON.stringify({
-					type: "hello",
-					id: uuid,
-					role: "obs",
-					hostname: deviceName,
-					color: "",
-					version: APP_VERSION,
-					...(remoteToken ? { token: remoteToken } : {}),
-				}),
-			);
-			pushStatus();
-			pingTimer = setInterval(() => {
-				if (Date.now() - lastSeen > LIVENESS_TIMEOUT_MS) {
-					console.warn(
-						"[obs-client] no traffic from server — dropping connection",
-					);
-					ws.terminate();
-					return;
-				}
-				ws.ping();
-			}, PING_INTERVAL_MS);
-			if (remoteInterval > 0)
-				statusTimer = setInterval(pushStatus, remoteInterval * 1000);
-		});
+        ws.addEventListener("open", () => {
+            console.log("[obs-client] connected to control server");
+            backoff = BACKOFF_MIN_MS;
+            touch();
+            send(
+                JSON.stringify({
+                    type: "hello",
+                    id: uuid,
+                    role: "obs",
+                    hostname: deviceName,
+                    color: "",
+                    version: APP_VERSION,
+                    ...(remoteToken ? { token: remoteToken } : {}),
+                }),
+            );
+            pushStatus();
+            pingTimer = setInterval(() => {
+                if (Date.now() - lastSeen > LIVENESS_TIMEOUT_MS) {
+                    console.warn(
+                        "[obs-client] no traffic from server — dropping connection",
+                    );
+                    ws.terminate();
+                    return;
+                }
+                ws.ping();
+            }, PING_INTERVAL_MS);
+            if (remoteInterval > 0)
+                statusTimer = setInterval(pushStatus, remoteInterval * 1000);
+        });
 
-		// Bun's client emits `pong` for ping replies (not in the DOM typings)
-		ws.addEventListener("pong", touch);
+        // Bun's client emits `pong` for ping replies (not in the DOM typings)
+        ws.addEventListener("pong", touch);
 
-		ws.addEventListener("message", (ev) => {
-			touch();
-			const text = textOf(
-				(ev as unknown as { data: string | ArrayBuffer }).data,
-			);
-			// Only requests (objects with a `method`) are answered
-			try {
-				const msg: unknown = JSON.parse(text);
-				if (!isRecord(msg) || !("method" in msg)) return;
-			} catch {
-				// let handleRequest produce the "Invalid JSON" error
-			}
-			void handleRequest(text).then(send);
-		});
+        ws.addEventListener("message", (ev) => {
+            touch();
+            const text = textOf(
+                (ev as unknown as { data: string | ArrayBuffer }).data,
+            );
+            // Only requests (objects with a `method`) are answered
+            try {
+                const msg: unknown = JSON.parse(text);
+                if (!isRecord(msg) || !("method" in msg)) return;
+            } catch {
+                // let handleRequest produce the "Invalid JSON" error
+            }
+            void handleRequest(text).then(send);
+        });
 
-		ws.addEventListener("close", (ev) => {
-			clearTimers();
-			if (sock === ws) sock = null;
-			if (stopped) return;
-			console.warn(
-				`[obs-client] disconnected (${ev.code}${ev.reason ? `: ${ev.reason}` : ""}); retrying in ${backoff / 1000}s`,
-			);
-			setTimeout(connect, backoff);
-			backoff = Math.min(backoff * 2, BACKOFF_MAX_MS);
-		});
-	}
+        ws.addEventListener("close", (ev) => {
+            clearTimers();
+            if (sock === ws) sock = null;
+            if (stopped) return;
+            console.warn(
+                `[obs-client] disconnected (${ev.code}${ev.reason ? `: ${ev.reason}` : ""}); retrying in ${backoff / 1000}s`,
+            );
+            setTimeout(connect, backoff);
+            backoff = Math.min(backoff * 2, BACKOFF_MAX_MS);
+        });
+    }
 
-	const shutdown = (): void => {
-		if (stopped) return;
-		stopped = true;
-		clearTimers();
-		stopEngine();
-		obs.disconnect();
-		sock?.close(1001, "shutting down");
-		sock = null;
-		process.exit(0);
-	};
-	process.once("SIGINT", shutdown);
-	process.once("SIGTERM", shutdown);
+    const shutdown = (): void => {
+        if (stopped) return;
+        stopped = true;
+        clearTimers();
+        stopEngine();
+        obs.disconnect();
+        sock?.close(1001, "shutting down");
+        sock = null;
+        process.exit(0);
+    };
+    process.once("SIGINT", shutdown);
+    process.once("SIGTERM", shutdown);
 
-	if (remoteToken && remoteUrl.startsWith("ws://")) {
-		console.warn(
-			"[obs-client] sending token over unencrypted ws:// — prefer wss://",
-		);
-	}
-	startEngine(); // polls OBS locally; state events queue until the link opens
-	connect();
+    if (remoteToken && remoteUrl.startsWith("ws://")) {
+        console.warn(
+            "[obs-client] sending token over unencrypted ws:// — prefer wss://",
+        );
+    }
+    startEngine(); // polls OBS locally; state events queue until the link opens
+    connect();
 }
 
 import { realpathSync } from "node:fs";
@@ -763,22 +799,23 @@ import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const isBunBinary =
-	import.meta.url.includes("$bunfs") ||
-	import.meta.url.includes("~BUN") ||
-	import.meta.url.includes("%7EBUN");
+    import.meta.url.includes("$bunfs") ||
+    import.meta.url.includes("~BUN") ||
+    import.meta.url.includes("%7EBUN");
 
 // Safe entry detection (your existing logic)
 const isEntry = (() => {
-	if (isBunBinary) return true;
-	const target = process.argv[1];
-	if (!target) return false;
-	try {
-		return (
-			realpathSync(fileURLToPath(import.meta.url)) === realpathSync(target)
-		);
-	} catch {
-		return false;
-	}
+    if (isBunBinary) return true;
+    const target = process.argv[1];
+    if (!target) return false;
+    try {
+        return (
+            realpathSync(fileURLToPath(import.meta.url)) ===
+            realpathSync(target)
+        );
+    } catch {
+        return false;
+    }
 })();
 
 if (isEntry) void main();

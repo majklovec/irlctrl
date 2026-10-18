@@ -24,16 +24,16 @@ modules/
 
 Each module ships exactly:
 
-- `backend.ts` — default-exports a backend registration. Runs in Bun on the
-  host: **no** mithril/DOM, no browser globals.
-- `frontend.tsx` — default-exports a frontend registration. Runs in the browser
-  (mithril components), **no** `../../src` imports.
-- `types.ts` — **this module's** local types: its own config keys, status
-  fragment, capability types, hub/widget types. Core-free.
-- `styles.css` — scoped under `.mod-<id>` (device card) or `.dash-card`
-  (dashboard widget).
-- any number of plain helpers for its own use (e.g. obs-controller's
-  `switcher-engine.ts`, kick-stats' `graph-linechart.tsx`)
+-   `backend.ts` — default-exports a backend registration. Runs in Bun on the
+    host: **no** mithril/DOM, no browser globals.
+-   `frontend.tsx` — default-exports a frontend registration. Runs in the browser
+    (mithril components), **no** `../../src` imports.
+-   `types.ts` — **this module's** local types: its own config keys, status
+    fragment, capability types, hub/widget types. Core-free.
+-   `styles.css` — scoped under `.mod-<id>` (device card) or `.dash-card`
+    (dashboard widget).
+-   any number of plain helpers for its own use (e.g. obs-controller's
+    `switcher-engine.ts`, kick-stats' `graph-linechart.tsx`)
 
 There is no shared `modules/types.ts`, no `modules/widgets.ts`, no
 `modules/registry.*.ts` — the old aggregate layer is gone. The only thing in
@@ -51,20 +51,20 @@ lowercase lifecycle/event names (`oncreate`, `onclick`, `oninput`).
 
 Default-exports an object the registry validates structurally:
 
-| field                              | required | purpose                                                                                                         |
-| ---------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------- |
-| `kind`, `id`, `title`              | yes      | identity (`id` = directory name)                                                                                |
-| `configSchema`                     | yes      | `Record<field, {label, type, default, options?, min?, max?, step?}>` — the UI renders the config form from this |
-| `secretFields`                     | yes      | config field names that are masked                                                                              |
-| `methods`                          | yes      | ordered list of RPC methods this module answers                                                                 |
-| `events`                           | yes      | ordered list of events it emits                                                                                 |
-| `start({config, emit, log, core})` | yes      | bring it up; `core` is the per-role services object (subprocess, srtla, …)                                      |
-| `stop()`                           | yes      | tear down                                                                                                       |
-| `dispatch(method, params)`         | yes      | handle an RPC call routed to this module                                                                        |
-| `status?()`                        | no       | status fragment merged into `sys.status` (`buildStatus` asks it; the core never imports the module for this)    |
-| `services?`                        | no       | `{ capabilities?: Record<string, Capability> }` — see the capability bus                                        |
-| `hub?`                             | no       | channel-widget hub (`widgetType`, `snapshotKey`, `configFields`, `channelSpec` (one spec per channel, `null` for unconfigured), `create`, `enabled?`)   |
-| `dependencies?`                    | no       | ids of modules that must have `start()`ed first (see ordering)                                                  |
+| field                              | required | purpose                                                                                                                                               |
+| ---------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kind`, `id`, `title`              | yes      | identity (`id` = directory name)                                                                                                                      |
+| `configSchema`                     | yes      | `Record<field, {label, type, default, options?, min?, max?, step?}>` — the UI renders the config form from this                                       |
+| `secretFields`                     | yes      | config field names that are masked                                                                                                                    |
+| `methods`                          | yes      | ordered list of RPC methods this module answers                                                                                                       |
+| `events`                           | yes      | ordered list of events it emits                                                                                                                       |
+| `start({config, emit, log, core})` | yes      | bring it up; `core` is the per-role services object (subprocess, srtla, …)                                                                            |
+| `stop()`                           | yes      | tear down                                                                                                                                             |
+| `dispatch(method, params)`         | yes      | handle an RPC call routed to this module                                                                                                              |
+| `status?()`                        | no       | status fragment merged into `sys.status` (`buildStatus` asks it; the core never imports the module for this)                                          |
+| `services?`                        | no       | `{ capabilities?: Record<string, Capability> }` — see the capability bus                                                                              |
+| `hub?`                             | no       | channel-widget hub (`widgetType`, `snapshotKey`, `configFields`, `channelSpec` (one spec per channel, `null` for unconfigured), `create`, `enabled?`) |
+| `dependencies?`                    | no       | ids of modules that must have `start()`ed first (see ordering)                                                                                        |
 
 ### Frontend (`modules/<id>/frontend.tsx`)
 
@@ -81,16 +81,16 @@ registry bridges:
 
 ## Discovery (the core names no module)
 
-- **Backend** — `src/registry.ts` `readdirSync`s `modules/*/` and imports each
-  `backend.ts`'s default export. Add a directory, it appears. (In a compiled
-  binary the runtime scan can't reach disk, so it falls back to the generated
-  `modules/.generated.backend.ts` manifest — same scan, same shape.)
-- **Frontend** — the browser bundle cannot glob at runtime, so
-  `scripts/gen-modules.ts` writes `modules/.generated.frontend.ts` (a fixed
-  `export const FRONTEND_MANIFEST = [...]` of `{ id, path }` entries) from the
-  same `readdirSync` scan. `src/registry.frontend.ts` does a plain `import` of
-  that manifest — **no Glob, no module ids in core source**. The manifest is
-  gitignored and regenerated by `predev` (and `gen:modules`).
+-   **Backend** — `src/registry.ts` `readdirSync`s `modules/*/` and imports each
+    `backend.ts`'s default export. Add a directory, it appears. (In a compiled
+    binary the runtime scan can't reach disk, so it falls back to the generated
+    `modules/.generated.backend.ts` manifest — same scan, same shape.)
+-   **Frontend** — the browser bundle cannot glob at runtime, so
+    `scripts/gen-modules.ts` writes `modules/.generated.frontend.ts` (a fixed
+    `export const FRONTEND_MANIFEST = [...]` of `{ id, path }` entries) from the
+    same `readdirSync` scan. `src/registry.frontend.ts` does a plain `import` of
+    that manifest — **no Glob, no module ids in core source**. The manifest is
+    gitignored and regenerated by `predev` (and `gen:modules`).
 
 Tests pin both directions: the frontend registry must import the manifest (and
 contain no `Glob`/`modules/*` import patterns), and the manifest must exist and
@@ -98,20 +98,20 @@ be marked auto-generated.
 
 ## Core ↔ module: registries and the capability bus only
 
-- `src/methods.ts` routes RPC methods via the registry's method-owner map
-  (built from each module's `methods` array) — it does not import any module.
-- `src/registry.frontend.ts` exposes accessors the UI calls: `moduleCard(id)`,
-  `deviceCardBody(id, host, status)`, `getFrontendModule(id)`, and
-  `WIDGET_MODULES`.
-- **Capability bus** — a module that exposes a service registers it under a
-  dotted name (`stream.encoder`, `stream.srtla`) in `services.capabilities`;
-  consumers look it up by name through `src/capabilities.ts` rather than
-  importing the providing module.
-- The **only** core→module import allowed in the browser is the documented
-  exception `public/ts/dashboard.ts → modules/obs-controller/frontend`
-  (`createObsPanel` + transport types): the obs panel is stateful and its event
-  types are module-owned, so a generic `Panel` signature would force the core
-  to re-declare obs types (§6 violation). It is allow-listed in the ban test.
+-   `src/methods.ts` routes RPC methods via the registry's method-owner map
+    (built from each module's `methods` array) — it does not import any module.
+-   `src/registry.frontend.ts` exposes accessors the UI calls: `moduleCard(id)`,
+    `deviceCardBody(id, host, status)`, `getFrontendModule(id)`, and
+    `WIDGET_MODULES`.
+-   **Capability bus** — a module that exposes a service registers it under a
+    dotted name (`stream.encoder`, `stream.srtla`) in `services.capabilities`;
+    consumers look it up by name through `src/capabilities.ts` rather than
+    importing the providing module.
+-   The **only** core→module import allowed in the browser is the documented
+    exception `public/ts/dashboard.ts → modules/obs-controller/frontend`
+    (`createObsPanel` + transport types): the obs panel is stateful and its event
+    types are module-owned, so a generic `Panel` signature would force the core
+    to re-declare obs types (§6 violation). It is allow-listed in the ban test.
 
 Each module's `frontend.tsx` side-effect-imports its own `styles.css`
 (`import "./styles.css"`); Bun's bundler emits it into the page (see

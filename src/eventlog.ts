@@ -67,14 +67,20 @@ export function logEvent(
     const at = Date.now();
     const last = entries.at(-1);
     let entry: LogEntry;
-    if (last && last.level === level && last.section === section && last.message === message) {
+    if (
+        last &&
+        last.level === level &&
+        last.section === section &&
+        last.message === message
+    ) {
         last.count = (last.count ?? 1) + 1;
         last.at = at;
         entry = last;
     } else {
         entry = { id: nextId++, at, level, section, message };
         entries.push(entry);
-        if (entries.length > LOG_MAX) entries.splice(0, entries.length - LOG_MAX);
+        if (entries.length > LOG_MAX)
+            entries.splice(0, entries.length - LOG_MAX);
     }
     scheduleSave();
     for (const listener of listeners) listener(entry);

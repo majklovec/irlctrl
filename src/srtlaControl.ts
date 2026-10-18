@@ -46,25 +46,56 @@ export interface SrtlaStats {
 }
 
 /** Payload of the `srtla.stats` event; `stats` is null once srtla_send stops. */
-export interface SrtlaStatsEvent { at: number; stats: SrtlaStats | null; }
+export interface SrtlaStatsEvent {
+    at: number;
+    stats: SrtlaStats | null;
+}
 
-export interface SrtlaControlState { supported: boolean; connected: boolean; }
+export interface SrtlaControlState {
+    supported: boolean;
+    connected: boolean;
+}
 
 const RETRY_MS = 500;
 const RPC_TIMEOUT_MS = 5_000;
 
 const LINK_KEYS: readonly (keyof SrtlaLinkStats)[] = [
-    "ip", "label", "connected", "timed_out", "bitrate_bytes_per_sec", "rtt_ms", "rtt_min_ms", "window",
-    "in_flight", "nak_count", "cc_loss_permille", "cc_state", "cc_target_bps", "quality_multiplier",
-    "base_score", "weak", "weak_reason", "stall_gated", "sole_carrier",
+    "ip",
+    "label",
+    "connected",
+    "timed_out",
+    "bitrate_bytes_per_sec",
+    "rtt_ms",
+    "rtt_min_ms",
+    "window",
+    "in_flight",
+    "nak_count",
+    "cc_loss_permille",
+    "cc_state",
+    "cc_target_bps",
+    "quality_multiplier",
+    "base_score",
+    "weak",
+    "weak_reason",
+    "stall_gated",
+    "sole_carrier",
 ];
 const STATS_KEYS: readonly (keyof SrtlaStats)[] = [
-    "mode", "quality_enabled", "active_links", "total_links", "total_in_flight", "total_window",
+    "mode",
+    "quality_enabled",
+    "active_links",
+    "total_links",
+    "total_in_flight",
+    "total_window",
     "negotiated_latency_ms",
 ];
 
 const pick = <T>(src: Record<string, unknown>, keys: readonly (keyof T)[]): T =>
-    Object.fromEntries(keys.filter((k) => src[k as string] !== undefined).map((k) => [k, src[k as string]])) as T;
+    Object.fromEntries(
+        keys
+            .filter((k) => src[k as string] !== undefined)
+            .map((k) => [k, src[k as string]]),
+    ) as T;
 
 /** Keep the pushed snapshot small: it is forwarded to browsers and the control server every second. */
 function trimStats(raw: unknown): SrtlaStats | null {
@@ -74,7 +105,10 @@ function trimStats(raw: unknown): SrtlaStats | null {
     return {
         ...pick<SrtlaStats>(r, STATS_KEYS),
         links: links
-            .filter((l): l is Record<string, unknown> => !!l && typeof l === "object")
+            .filter(
+                (l): l is Record<string, unknown> =>
+                    !!l && typeof l === "object",
+            )
             .map((l) => pick<SrtlaLinkStats>(l, LINK_KEYS)),
     };
 }
@@ -89,8 +123,15 @@ function helpText(bin: string): Promise<string> {
     if (!p) {
         p = (async () => {
             try {
-                const proc = Bun.spawn([bin, "--help"], { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
-                const [out, err] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
+                const proc = Bun.spawn([bin, "--help"], {
+                    stdout: "pipe",
+                    stderr: "pipe",
+                    stdin: "ignore",
+                });
+                const [out, err] = await Promise.all([
+                    new Response(proc.stdout).text(),
+                    new Response(proc.stderr).text(),
+                ]);
                 await proc.exited;
                 return out + err;
             } catch {
@@ -102,9 +143,15 @@ function helpText(bin: string): Promise<string> {
     return p;
 }
 
-export interface SrtlaCapabilities { controlSocket: boolean; mode: boolean; quality: boolean; }
+export interface SrtlaCapabilities {
+    controlSocket: boolean;
+    mode: boolean;
+    quality: boolean;
+}
 
-export async function srtlaCapabilities(bin: string): Promise<SrtlaCapabilities> {
+export async function srtlaCapabilities(
+    bin: string,
+): Promise<SrtlaCapabilities> {
     const help = await helpText(bin);
     return {
         controlSocket: help.includes("--control-socket"),
@@ -119,18 +166,28 @@ export async function srtlaCapabilities(bin: string): Promise<SrtlaCapabilities>
 type StatsListener = (ev: SrtlaStatsEvent) => void;
 type ChangeListener = () => void;
 
-let socketPath: string | null = null;   // non-null while srtla_send should be reachable
+let socketPath: string | null = null; // non-null while srtla_send should be reachable
 let sock: Socket<undefined> | null = null;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let buffer = "";
 let nextId = 1;
 let supported = false;
 let latest: SrtlaStatsEvent = { at: 0, stats: null };
-const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>();
+const pending = new Map<
+    number,
+    {
+        resolve: (v: unknown) => void;
+        reject: (e: Error) => void;
+        timer: ReturnType<typeof setTimeout>;
+    }
+>();
 const statsListeners = new Set<StatsListener>();
 const changeListeners = new Set<ChangeListener>();
 
-export const srtlaControlState = (): SrtlaControlState => ({ supported, connected: sock !== null });
+export const srtlaControlState = (): SrtlaControlState => ({
+    supported,
+    connected: sock !== null,
+});
 export const latestSrtlaStats = (): SrtlaStatsEvent => latest;
 
 /** Subscribe to stats pushes; returns an unsubscribe function. */
@@ -150,7 +207,9 @@ function publishStats(stats: SrtlaStats | null): void {
     for (const l of statsListeners) l(latest);
 }
 
-const notifyChange = () => { for (const l of changeListeners) l(); };
+const notifyChange = () => {
+    for (const l of changeListeners) l();
+};
 
 function failPending(reason: string): void {
     for (const p of pending.values()) {
@@ -161,7 +220,13 @@ function failPending(reason: string): void {
 }
 
 function handleLine(line: string): void {
-    let msg: { id?: unknown; method?: unknown; params?: { data?: unknown }; result?: unknown; error?: { message?: string } };
+    let msg: {
+        id?: unknown;
+        method?: unknown;
+        params?: { data?: unknown };
+        result?: unknown;
+        error?: { message?: string };
+    };
     try {
         msg = JSON.parse(line);
     } catch {
@@ -172,11 +237,13 @@ function handleLine(line: string): void {
         pending.delete(msg.id);
         if (!p) return;
         clearTimeout(p.timer);
-        if (msg.error) p.reject(new Error(msg.error.message ?? "srtla_send error"));
+        if (msg.error)
+            p.reject(new Error(msg.error.message ?? "srtla_send error"));
         else p.resolve(msg.result);
         return;
     }
-    if (msg.method === "stats.update") publishStats(trimStats(msg.params?.data));
+    if (msg.method === "stats.update")
+        publishStats(trimStats(msg.params?.data));
 }
 
 function scheduleConnect(): void {
@@ -201,10 +268,15 @@ async function connect(): Promise<void> {
                     }
                     sock = s;
                     buffer = "";
-                    console.log(`srtla_send control socket connected (${path})`);
+                    console.log(
+                        `srtla_send control socket connected (${path})`,
+                    );
                     notifyChange();
                     rpc("subscribe", { topic: "stats" }).catch((err: unknown) =>
-                        console.warn(`srtla_send stats subscribe failed: ${errorMessage(err)}`));
+                        console.warn(
+                            `srtla_send stats subscribe failed: ${errorMessage(err)}`,
+                        ),
+                    );
                 },
                 data(_s, chunk) {
                     buffer += textOf(chunk);
@@ -237,7 +309,10 @@ async function connect(): Promise<void> {
 }
 
 /** Send a JSON-RPC request and wait for its result. */
-export function rpc<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T> {
+export function rpc<T = unknown>(
+    method: string,
+    params?: Record<string, unknown>,
+): Promise<T> {
     return new Promise((resolve, reject) => {
         if (!sock) {
             reject(new Error("srtla_send control socket not connected"));
@@ -249,7 +324,9 @@ export function rpc<T = unknown>(method: string, params?: Record<string, unknown
             reject(new Error(`srtla_send ${method} timed out`));
         }, RPC_TIMEOUT_MS);
         pending.set(id, { resolve: (v) => resolve(v as T), reject, timer });
-        sock.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, ...(params ? { params } : {}) })}\n`);
+        sock.write(
+            `${JSON.stringify({ jsonrpc: "2.0", id, method, ...(params ? { params } : {}) })}\n`,
+        );
     });
 }
 

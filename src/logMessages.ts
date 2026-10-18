@@ -12,8 +12,10 @@
 
 /** Translator injected by whichever runtime uses the log wording (see above). */
 let translate: (key: string, ...args: unknown[]) => string = (key) => key;
-export const setLogTranslator = (fn: (key: string, ...args: unknown[]) => string): void => {
-	translate = fn;
+export const setLogTranslator = (
+    fn: (key: string, ...args: unknown[]) => string,
+): void => {
+    translate = fn;
 };
 
 /** Cap shared by every view of the event log (device, control server, UI). */
@@ -26,11 +28,11 @@ export interface LogEntry {
     /** Set by the control server on entries it adds itself (device online / offline); the web UI
      *  uses "browser" for its own page-local entries. */
     origin?: "server" | "browser";
-    at: number;           // last occurrence, ms since epoch
+    at: number; // last occurrence, ms since epoch
     level: LogLevel;
-    section: string;      // canonical English section name
-    message: string;      // localized at creation time
-    count?: number;       // consecutive repeats folded into this entry
+    section: string; // canonical English section name
+    message: string; // localized at creation time
+    count?: number; // consecutive repeats folded into this entry
 }
 
 /** `event: "log"` payload: the full history when `reset`, otherwise new or updated entries. */
@@ -43,11 +45,15 @@ type Params = Record<string, unknown>;
 
 export interface MethodLog {
     section: string;
-    action: string;                    // canonical English, for `<action> failed: <reason>`
-    done: (p: Params) => string;       // resolves the current language at call time
+    action: string; // canonical English, for `<action> failed: <reason>`
+    done: (p: Params) => string; // resolves the current language at call time
 }
 
-const log = (section: string, action: string, done: string | ((p: Params) => string)): MethodLog => ({
+const log = (
+    section: string,
+    action: string,
+    done: string | ((p: Params) => string),
+): MethodLog => ({
     section,
     action,
     done: typeof done === "string" ? () => translate(done) : done,
@@ -57,8 +63,14 @@ const log = (section: string, action: string, done: string | ((p: Params) => str
 const METHOD_LOG: Record<string, MethodLog> = {
     "encoder.start": log("Encoder", "Start", "mlog.done.started"),
     "encoder.stop": log("Encoder", "Stop", "mlog.done.stopped"),
-    "encoder.bitrate": log("Encoder", "Bitrate change", (p) => translate("mlog.done.bitrate", p.minBitrate, p.maxBitrate)),
-    "ceracoder.set": log("Encoder", "Bitrate control", "mlog.done.cera_settings"),
+    "encoder.bitrate": log("Encoder", "Bitrate change", (p) =>
+        translate("mlog.done.bitrate", p.minBitrate, p.maxBitrate),
+    ),
+    "ceracoder.set": log(
+        "Encoder",
+        "Bitrate control",
+        "mlog.done.cera_settings",
+    ),
     "stream.start": log("Stream", "Start", "mlog.done.started"),
     "stream.stop": log("Stream", "Stop", "mlog.done.stopped"),
     "srtla.start": log("SRTLA", "Start", "mlog.done.started"),
@@ -67,24 +79,57 @@ const METHOD_LOG: Record<string, MethodLog> = {
     "srtla.options": log("SRTLA", "Options update", (p) =>
         [
             p.mode !== undefined && translate("mlog.done.mode", p.mode),
-            p.quality !== undefined && translate(p.quality ? "mlog.done.quality_on" : "mlog.done.quality_off"),
-        ].filter(Boolean).join(", ")),
-    "modems.select": log("Interfaces", "Bond selection", "mlog.done.bond_updated"),
-    "modems.toggle": log("Interfaces", "Bond toggle", (p) => translate("mlog.done.bond_toggled", p.iface)),
+            p.quality !== undefined &&
+                translate(
+                    p.quality
+                        ? "mlog.done.quality_on"
+                        : "mlog.done.quality_off",
+                ),
+        ]
+            .filter(Boolean)
+            .join(", "),
+    ),
+    "modems.select": log(
+        "Interfaces",
+        "Bond selection",
+        "mlog.done.bond_updated",
+    ),
+    "modems.toggle": log("Interfaces", "Bond toggle", (p) =>
+        translate("mlog.done.bond_toggled", p.iface),
+    ),
     reconfigure: log("Interfaces", "Reconfigure", "mlog.done.reconfigured"),
-    "modems.enable": log("Modems", "Enable", (p) => translate("mlog.done.modem_enabled", p.index)),
-    "modems.disable": log("Modems", "Disable", (p) => translate("mlog.done.modem_disabled", p.index)),
-    "modems.connect": log("Modems", "Connect", (p) => translate("mlog.done.modem_connected", p.index)),
-    "modems.disconnect": log("Modems", "Disconnect", (p) => translate("mlog.done.modem_disconnected", p.index)),
-    "modems.reset": log("Modems", "Reset", (p) => translate("mlog.done.modem_reset", p.index)),
-    "autostart.set": log("Autostart", "Update", (p) => translate(p.enabled ? "mlog.done.enabled" : "mlog.done.disabled")),
-    "modules.enable": log("Modules", "Enable", (p) => translate("mlog.done.module_enabled", p.id)),
-    "modules.disable": log("Modules", "Disable", (p) => translate("mlog.done.module_disabled", p.id)),
-    "modules.configure": log("Modules", "Configuration", (p) => translate("mlog.done.module_configured", p.id)),
+    "modems.enable": log("Modems", "Enable", (p) =>
+        translate("mlog.done.modem_enabled", p.index),
+    ),
+    "modems.disable": log("Modems", "Disable", (p) =>
+        translate("mlog.done.modem_disabled", p.index),
+    ),
+    "modems.connect": log("Modems", "Connect", (p) =>
+        translate("mlog.done.modem_connected", p.index),
+    ),
+    "modems.disconnect": log("Modems", "Disconnect", (p) =>
+        translate("mlog.done.modem_disconnected", p.index),
+    ),
+    "modems.reset": log("Modems", "Reset", (p) =>
+        translate("mlog.done.modem_reset", p.index),
+    ),
+    "autostart.set": log("Autostart", "Update", (p) =>
+        translate(p.enabled ? "mlog.done.enabled" : "mlog.done.disabled"),
+    ),
+    "modules.enable": log("Modules", "Enable", (p) =>
+        translate("mlog.done.module_enabled", p.id),
+    ),
+    "modules.disable": log("Modules", "Disable", (p) =>
+        translate("mlog.done.module_disabled", p.id),
+    ),
+    "modules.configure": log("Modules", "Configuration", (p) =>
+        translate("mlog.done.module_configured", p.id),
+    ),
 };
 
 /** Whether the device records this method in its event log. */
-export const isLoggedMethod = (method: string): boolean => Object.hasOwn(METHOD_LOG, method);
+export const isLoggedMethod = (method: string): boolean =>
+    Object.hasOwn(METHOD_LOG, method);
 
 /** Read-only methods still need wording for (browser-side) failures. */
 const READ_LOG: Record<string, MethodLog> = {
@@ -108,9 +153,15 @@ const SECTIONS: Record<string, string> = {
  * failure the caller renders the localized "<action> failed: <reason>" (mlog.failed).
  */
 export function methodLog(method: string): MethodLog {
-    const own = (table: Record<string, MethodLog>) => (Object.hasOwn(table, method) ? table[method] : undefined);
-    return own(METHOD_LOG) ?? own(READ_LOG)
-        ?? log(SECTIONS[method.split(".")[0]] ?? method, method, () => translate("mlog.done.generic", method));
+    const own = (table: Record<string, MethodLog>) =>
+        Object.hasOwn(table, method) ? table[method] : undefined;
+    return (
+        own(METHOD_LOG) ??
+        own(READ_LOG) ??
+        log(SECTIONS[method.split(".")[0]] ?? method, method, () =>
+            translate("mlog.done.generic", method),
+        )
+    );
 }
 
 /** Canonical label (section / action) → i18n key. Labels are English constants so log
@@ -145,7 +196,7 @@ const LABEL_KEYS: Record<string, string> = {
     "Options update": "mlog.action.options",
     "Bond selection": "mlog.action.bond_selection",
     "Bond toggle": "mlog.action.bond_toggle",
-    "Load": "mlog.action.load",
+    Load: "mlog.action.load",
     Configuration: "mlog.action.configuration",
     Create: "mlog.action.create",
     Delete: "mlog.action.delete",

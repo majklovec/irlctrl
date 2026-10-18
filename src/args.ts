@@ -2,8 +2,14 @@
 export const argv = Bun.argv.slice(2);
 export const flag = (name: string): boolean => argv.includes(name);
 
-export const argFail = (name: string, value: string, expected: string): never => {
-    console.error(`Invalid value for ${name}: "${value}" (expected ${expected})`);
+export const argFail = (
+    name: string,
+    value: string,
+    expected: string,
+): never => {
+    console.error(
+        `Invalid value for ${name}: "${value}" (expected ${expected})`,
+    );
     process.exit(2);
 };
 
@@ -20,15 +26,28 @@ export function arg(name: string, fallback?: string): string | undefined {
     return fallback;
 }
 
-export const intArg = (name: string, fallback: number, min = 0, max = Number.MAX_SAFE_INTEGER): number => {
+export const intArg = (
+    name: string,
+    fallback: number,
+    min = 0,
+    max = Number.MAX_SAFE_INTEGER,
+): number => {
     const raw = arg(name);
     if (raw === undefined) return fallback;
     const n = Number(raw);
-    return Number.isInteger(n) && n >= min && n <= max ? n : argFail(name, raw, `integer ${min}-${max}`);
+    return Number.isInteger(n) && n >= min && n <= max
+        ? n
+        : argFail(name, raw, `integer ${min}-${max}`);
 };
 
-export const enumArg = <T extends string>(name: string, allowed: readonly T[], fallback: T): T => {
+export const enumArg = <T extends string>(
+    name: string,
+    allowed: readonly T[],
+    fallback: T,
+): T => {
     const raw = arg(name);
     if (raw === undefined) return fallback;
-    return (allowed as readonly string[]).includes(raw) ? (raw as T) : argFail(name, raw, allowed.join(" | "));
+    return (allowed as readonly string[]).includes(raw)
+        ? (raw as T)
+        : argFail(name, raw, allowed.join(" | "));
 };

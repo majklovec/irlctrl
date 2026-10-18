@@ -32,30 +32,30 @@
 
 import i18next, { type TOptions } from "i18next";
 import {
-	asLanguage,
-	DEFAULT_LANGUAGE,
-	isLanguage,
-	type Language,
+    asLanguage,
+    DEFAULT_LANGUAGE,
+    isLanguage,
+    type Language,
 } from "./languages";
 import { setLogTranslator } from "./logMessages";
 
 export type { Language } from "./languages";
 export {
-	asLanguage,
-	DEFAULT_LANGUAGE,
-	isLanguage,
-	LANGUAGE_INFO,
-	LANGUAGES,
+    asLanguage,
+    DEFAULT_LANGUAGE,
+    isLanguage,
+    LANGUAGE_INFO,
+    LANGUAGES,
 } from "./languages";
 
 const i18n = i18next.createInstance();
 
 /** Unbundled (disk) path first, then the embedded copy in a compiled binary. */
 function candidateUrls(lng: Language): URL[] {
-	return [
-		new URL(`../i18n/${lng}.json`, import.meta.url),
-		new URL(`./i18n/${lng}.json`, import.meta.url),
-	];
+    return [
+        new URL(`../i18n/${lng}.json`, import.meta.url),
+        new URL(`./i18n/${lng}.json`, import.meta.url),
+    ];
 }
 
 const cached = new Map<Language, Record<string, string>>();
@@ -63,20 +63,20 @@ const inFlight = new Map<Language, Promise<Record<string, string>>>();
 
 /** The English catalog, loaded once at startup so i18next has a fallback. */
 const initGate: Promise<void> = (async () => {
-	const en = await readRaw(DEFAULT_LANGUAGE);
-	cached.set(DEFAULT_LANGUAGE, en);
-	await i18n.init({
-		resources: { en: { translation: en } },
-		lng: DEFAULT_LANGUAGE,
-		fallbackLng: DEFAULT_LANGUAGE,
-		// Keys are flat strings that may contain dots, so no path splitting.
-		keySeparator: false,
-		nsSeparator: false,
-		// Positional placeholders: {0}, {1}, ... (escapeValue off — values are
-		// plain text, never HTML-escaped by i18next).
-		interpolation: { prefix: "{", suffix: "}", escapeValue: false },
-		returnNull: false,
-	});
+    const en = await readRaw(DEFAULT_LANGUAGE);
+    cached.set(DEFAULT_LANGUAGE, en);
+    await i18n.init({
+        resources: { en: { translation: en } },
+        lng: DEFAULT_LANGUAGE,
+        fallbackLng: DEFAULT_LANGUAGE,
+        // Keys are flat strings that may contain dots, so no path splitting.
+        keySeparator: false,
+        nsSeparator: false,
+        // Positional placeholders: {0}, {1}, ... (escapeValue off — values are
+        // plain text, never HTML-escaped by i18next).
+        interpolation: { prefix: "{", suffix: "}", escapeValue: false },
+        returnNull: false,
+    });
 })();
 
 export const i18nReady: Promise<void> = initGate;
@@ -86,19 +86,19 @@ export const i18nReady: Promise<void> = initGate;
  * @internal
  */
 function readRaw(lng: Language): Promise<Record<string, string>> {
-	return (async () => {
-		let last: unknown;
-		for (const url of candidateUrls(lng)) {
-			try {
-				return (await Bun.file(url).json()) as Record<string, string>;
-			} catch (error) {
-				last = error;
-			}
-		}
-		throw last instanceof Error
-			? last
-			: new Error(`missing i18n catalog for ${lng}`);
-	})();
+    return (async () => {
+        let last: unknown;
+        for (const url of candidateUrls(lng)) {
+            try {
+                return (await Bun.file(url).json()) as Record<string, string>;
+            } catch (error) {
+                last = error;
+            }
+        }
+        throw last instanceof Error
+            ? last
+            : new Error(`missing i18n catalog for ${lng}`);
+    })();
 }
 
 /**
@@ -106,22 +106,22 @@ function readRaw(lng: Language): Promise<Record<string, string>> {
  * The default language is served from the cache populated by `initGate`.
  */
 function readCatalog(lng: Language): Promise<Record<string, string>> {
-	const hit = cached.get(lng);
-	if (hit) return Promise.resolve(hit);
-	const pending = inFlight.get(lng);
-	if (pending) return pending;
-	const load = (async () => {
-		const bundle = await readRaw(lng);
-		cached.set(lng, bundle);
-		// Guard i18next's addResourceBundle behind init (the default language
-		// is already inside `resources`, so this only runs for other languages).
-		await initGate;
-		i18n.addResourceBundle(lng, "translation", bundle, true, true);
-		return bundle;
-	})();
-	const tracked = load.finally(() => inFlight.delete(lng));
-	inFlight.set(lng, tracked);
-	return tracked;
+    const hit = cached.get(lng);
+    if (hit) return Promise.resolve(hit);
+    const pending = inFlight.get(lng);
+    if (pending) return pending;
+    const load = (async () => {
+        const bundle = await readRaw(lng);
+        cached.set(lng, bundle);
+        // Guard i18next's addResourceBundle behind init (the default language
+        // is already inside `resources`, so this only runs for other languages).
+        await initGate;
+        i18n.addResourceBundle(lng, "translation", bundle, true, true);
+        return bundle;
+    })();
+    const tracked = load.finally(() => inFlight.delete(lng));
+    inFlight.set(lng, tracked);
+    return tracked;
 }
 
 /** The language t() currently resolves to; set at startup and on change. */
@@ -133,25 +133,25 @@ let current: Language = DEFAULT_LANGUAGE;
  * background, then i18next is pointed at it once the read settles.
  */
 export function setCurrentLanguage(lang: unknown): void {
-	current = asLanguage(lang);
-	void readCatalog(current)
-		.then(() => i18n.changeLanguage(current))
-		.catch((error) =>
-			console.error(`failed to load i18n catalog for ${current}`, error),
-		);
+    current = asLanguage(lang);
+    void readCatalog(current)
+        .then(() => i18n.changeLanguage(current))
+        .catch((error) =>
+            console.error(`failed to load i18n catalog for ${current}`, error),
+        );
 }
 
 /** Maps t(key, a, b) onto i18next's `{0}`, `{1}` interpolation data. */
 function interpolate(
-	key: string,
-	args: readonly unknown[],
-	lng?: Language,
+    key: string,
+    args: readonly unknown[],
+    lng?: Language,
 ): string {
-	const data: Record<string, unknown> = {};
-	args.forEach((arg, i) => {
-		data[String(i)] = arg ?? "";
-	});
-	return i18n.t(key, { ...(data as object), lng } as TOptions) as string;
+    const data: Record<string, unknown> = {};
+    args.forEach((arg, i) => {
+        data[String(i)] = arg ?? "";
+    });
+    return i18n.t(key, { ...(data as object), lng } as TOptions) as string;
 }
 
 /**
@@ -160,16 +160,16 @@ function interpolate(
  * `{0}`, `{1}`, ... are replaced by the corresponding arguments.
  */
 export function translate(
-	lang: unknown,
-	key: string,
-	...args: unknown[]
+    lang: unknown,
+    key: string,
+    ...args: unknown[]
 ): string {
-	return interpolate(key, args, asLanguage(lang));
+    return interpolate(key, args, asLanguage(lang));
 }
 
 /** Translate using the current language. */
 export function t(key: string, ...args: unknown[]): string {
-	return interpolate(key, args, current);
+    return interpolate(key, args, current);
 }
 
 // The log wording (src/logMessages) localizes through the installed translator.
@@ -181,5 +181,5 @@ setLogTranslator(t);
  * caches. null for unknown codes.
  */
 export function catalog(lang: string): Promise<Record<string, string> | null> {
-	return isLanguage(lang) ? readCatalog(lang) : Promise.resolve(null);
+    return isLanguage(lang) ? readCatalog(lang) : Promise.resolve(null);
 }

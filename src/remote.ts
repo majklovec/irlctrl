@@ -24,10 +24,21 @@
  * runtime so settings saved in the UI apply without a process restart.
  */
 import type { DeviceSummary } from "../public/types";
-import { REMOTE_INTERVAL, REMOTE_STATS_INTERVAL, REMOTE_TOKEN, REMOTE_URL, ROLE } from "./config";
+import {
+    REMOTE_INTERVAL,
+    REMOTE_STATS_INTERVAL,
+    REMOTE_TOKEN,
+    REMOTE_URL,
+    ROLE,
+} from "./config";
 import { asLanguage } from "./i18n";
 import { handleRequest } from "./methods";
-import { addStatusSink, logHistoryEvent, statsEvent, statusEvent } from "./push";
+import {
+    addStatusSink,
+    logHistoryEvent,
+    statsEvent,
+    statusEvent,
+} from "./push";
 import { latestSrtlaStats } from "./srtlaControl";
 import { state } from "./state";
 import { errorMessage, scrubUrl, textOf } from "./util";
@@ -39,7 +50,10 @@ const PING_INTERVAL_MS = 15_000;
 const LIVENESS_TIMEOUT_MS = 45_000;
 
 // The global is typed by lib.dom in this project; use Bun's client typings (headers, ping, terminate)
-const BunWebSocket = WebSocket as unknown as new (url: string, options?: Bun.WebSocketOptions) => Bun.WebSocket;
+const BunWebSocket = WebSocket as unknown as new (
+    url: string,
+    options?: Bun.WebSocketOptions,
+) => Bun.WebSocket;
 
 let ws: Bun.WebSocket | null = null;
 let stopped = true;
@@ -58,33 +72,53 @@ const isOpen = (): boolean => ws !== null && ws.readyState === WebSocket.OPEN;
 // device by it); shorter than the server's forward timeout so we fail first.
 const OUTGOING_TIMEOUT_MS = 5_000;
 let nextOutgoingId = 1;
-const outgoing = new Map<number, { resolve: (value: unknown) => void; reject: (reason: Error) => void; timer: ReturnType<typeof setTimeout> }>();
+const outgoing = new Map<
+    number,
+    {
+        resolve: (value: unknown) => void;
+        reject: (reason: Error) => void;
+        timer: ReturnType<typeof setTimeout>;
+    }
+>();
 
 /** Settle an outgoing request when its response frame arrives; false for other frames. */
 function settleOutgoing(text: string): boolean {
-	try {
-		const msg: unknown = JSON.parse(text);
-		if (!msg || typeof msg !== "object" || Array.isArray(msg)) return false;
-		const m = msg as { type?: unknown; id?: unknown; ok?: unknown; result?: unknown; error?: unknown };
-		if (m.type !== "response" || typeof m.id !== "number") return false;
-		const p = outgoing.get(m.id);
-		if (!p) return false;
-		clearTimeout(p.timer);
-		outgoing.delete(m.id);
-		if (m.ok === false) p.reject(new Error(typeof m.error === "string" && m.error !== "" ? m.error : "request failed"));
-		else p.resolve(m.result);
-		return true;
-	} catch {
-		return false;
-	}
+    try {
+        const msg: unknown = JSON.parse(text);
+        if (!msg || typeof msg !== "object" || Array.isArray(msg)) return false;
+        const m = msg as {
+            type?: unknown;
+            id?: unknown;
+            ok?: unknown;
+            result?: unknown;
+            error?: unknown;
+        };
+        if (m.type !== "response" || typeof m.id !== "number") return false;
+        const p = outgoing.get(m.id);
+        if (!p) return false;
+        clearTimeout(p.timer);
+        outgoing.delete(m.id);
+        if (m.ok === false)
+            p.reject(
+                new Error(
+                    typeof m.error === "string" && m.error !== ""
+                        ? m.error
+                        : "request failed",
+                ),
+            );
+        else p.resolve(m.result);
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 function failOutgoing(reason: string): void {
-	for (const [id, p] of outgoing) {
-		clearTimeout(p.timer);
-		outgoing.delete(id);
-		p.reject(new Error(reason));
-	}
+    for (const [id, p] of outgoing) {
+        clearTimeout(p.timer);
+        outgoing.delete(id);
+        p.reject(new Error(reason));
+    }
 }
 
 // Never log the token-bearing parts of the URL
@@ -112,9 +146,14 @@ function clearTimers(): void {
 function isRequest(text: string): boolean {
     try {
         const msg: unknown = JSON.parse(text);
-        return !!msg && typeof msg === "object" && !Array.isArray(msg) && "method" in msg;
+        return (
+            !!msg &&
+            typeof msg === "object" &&
+            !Array.isArray(msg) &&
+            "method" in msg
+        );
     } catch {
-        return true;   // let handleRequest produce the "Invalid JSON" error
+        return true; // let handleRequest produce the "Invalid JSON" error
     }
 }
 
@@ -127,44 +166,58 @@ function connect(): void {
     // ride along in the hello as display parameters
     const id = state.settings.uuid ?? "";
     const role = state.settings.role ?? ROLE;
-    const headers: Record<string, string> = { "x-device-id": id, "x-device-role": role };
+    const headers: Record<string, string> = {
+        "x-device-id": id,
+        "x-device-role": role,
+    };
     if (target.token) headers.authorization = `Bearer ${target.token}`;
 
     console.log(`[remote] connecting to ${safeUrl()} as "${id}"...`);
     const sock = new BunWebSocket(target.url, { headers });
     ws = sock;
-    const touch = () => { lastSeen = Date.now(); };
+    const touch = () => {
+        lastSeen = Date.now();
+    };
 
     sock.addEventListener("open", () => {
         console.log("[remote] connected");
         backoff = BACKOFF_MIN_MS;
         touch();
-        send(JSON.stringify({
-            type: "hello",
-            id,
-            role,
-            hostname: state.settings.hostname ?? "",
-            color: state.settings.color ?? "",
-            language: asLanguage(state.settings.language),
-            version: APP_VERSION,
-            ...(state.encoder.config?.maxBitrate !== undefined
-                ? { maxBitrate: state.encoder.config.maxBitrate }
-                : {}),
-            ...(target.token ? { token: target.token } : {}),
-        }));
+        send(
+            JSON.stringify({
+                type: "hello",
+                id,
+                role,
+                hostname: state.settings.hostname ?? "",
+                color: state.settings.color ?? "",
+                language: asLanguage(state.settings.language),
+                version: APP_VERSION,
+                ...(state.encoder.config?.maxBitrate !== undefined
+                    ? { maxBitrate: state.encoder.config.maxBitrate }
+                    : {}),
+                ...(target.token ? { token: target.token } : {}),
+            }),
+        );
         send(logHistoryEvent());
         void sendStatus();
-        if (REMOTE_STATS_INTERVAL > 0 && latestSrtlaStats().stats) send(statsEvent());
+        if (REMOTE_STATS_INTERVAL > 0 && latestSrtlaStats().stats)
+            send(statsEvent());
 
         pingTimer = setInterval(() => {
             if (Date.now() - lastSeen > LIVENESS_TIMEOUT_MS) {
-                console.warn("[remote] no traffic from server — dropping connection");
+                console.warn(
+                    "[remote] no traffic from server — dropping connection",
+                );
                 sock.terminate();
                 return;
             }
             sock.ping();
         }, PING_INTERVAL_MS);
-        if (REMOTE_INTERVAL > 0) statusTimer = setInterval(() => void sendStatus(), REMOTE_INTERVAL * 1000);
+        if (REMOTE_INTERVAL > 0)
+            statusTimer = setInterval(
+                () => void sendStatus(),
+                REMOTE_INTERVAL * 1000,
+            );
     });
 
     // Bun's client emits `pong` for ping replies (not in the DOM typings)
@@ -188,7 +241,9 @@ function connect(): void {
         failOutgoing("disconnected from control server");
         if (ws === sock) ws = null;
         if (stopped) return;
-        console.warn(`[remote] disconnected (${ev.code}${ev.reason ? `: ${ev.reason}` : ""}); retrying in ${backoff / 1000}s`);
+        console.warn(
+            `[remote] disconnected (${ev.code}${ev.reason ? `: ${ev.reason}` : ""}); retrying in ${backoff / 1000}s`,
+        );
         reconnectTimer = setTimeout(connect, backoff);
         backoff = Math.min(backoff * 2, BACKOFF_MAX_MS);
     });
@@ -197,13 +252,16 @@ function connect(): void {
 export function startRemote(): void {
     if (!target.url || !stopped) return;
     if (target.token && target.url.startsWith("ws://")) {
-        console.warn("[remote] sending token over unencrypted ws:// — prefer wss://");
+        console.warn(
+            "[remote] sending token over unencrypted ws:// — prefer wss://",
+        );
     }
     stopped = false;
     removeSink = addStatusSink({
         active: isOpen,
         send,
-        statsIntervalMs: REMOTE_STATS_INTERVAL > 0 ? REMOTE_STATS_INTERVAL * 1000 : -1,
+        statsIntervalMs:
+            REMOTE_STATS_INTERVAL > 0 ? REMOTE_STATS_INTERVAL * 1000 : -1,
     });
     connect();
 }
@@ -223,30 +281,46 @@ export function stopRemote(): void {
 /** Send a request over the link to the control server; rejects when the
  * link is down or no response arrives within the timeout. With `target`, the
  * server routes the request to that device and relays its response back. */
-export function serverRequest(method: string, params?: Record<string, unknown>, target?: string): Promise<unknown> {
-	return new Promise((resolve, reject) => {
-		if (!isOpen()) {
-			reject(new Error("control server not connected"));
-			return;
-		}
-		const id = nextOutgoingId++;
-		const timer = setTimeout(() => {
-			outgoing.delete(id);
-			reject(new Error(`no response to ${method} (timeout)`));
-		}, OUTGOING_TIMEOUT_MS);
-		outgoing.set(id, { resolve, reject, timer });
-		send(JSON.stringify({ type: "request", id, method, params: params ?? {}, ...(target ? { target } : {}) }));
-	});
+export function serverRequest(
+    method: string,
+    params?: Record<string, unknown>,
+    target?: string,
+): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+        if (!isOpen()) {
+            reject(new Error("control server not connected"));
+            return;
+        }
+        const id = nextOutgoingId++;
+        const timer = setTimeout(() => {
+            outgoing.delete(id);
+            reject(new Error(`no response to ${method} (timeout)`));
+        }, OUTGOING_TIMEOUT_MS);
+        outgoing.set(id, { resolve, reject, timer });
+        send(
+            JSON.stringify({
+                type: "request",
+                id,
+                method,
+                params: params ?? {},
+                ...(target ? { target } : {}),
+            }),
+        );
+    });
 }
 
 /** The control server's registry — the devices registered on it. */
 export function listDevices(): Promise<DeviceSummary[]> {
-	return serverRequest("devices.list") as Promise<DeviceSummary[]>;
+    return serverRequest("devices.list") as Promise<DeviceSummary[]>;
 }
 
 /** Request a method on another registered device (server-mediated). */
-export function requestDevice(deviceId: string, method: string, params?: Record<string, unknown>): Promise<unknown> {
-	return serverRequest(method, params, deviceId);
+export function requestDevice(
+    deviceId: string,
+    method: string,
+    params?: Record<string, unknown>,
+): Promise<unknown> {
+    return serverRequest(method, params, deviceId);
 }
 
 /**
