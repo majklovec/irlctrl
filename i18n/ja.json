@@ -190,6 +190,7 @@
     "log.reconfigure_failed": "初期再設定に失敗しました: {0}",
     "log.restart_failed": "再起動に失敗しました: {0}",
     "log.settings_saved_reconnect": "設定を保存しました; {0} に再接続中",
+    "log.settings_saved_renamed": "設定を保存しました; デバイスを {0} に名前変更しました",
     "log.srtla_exited": "srtla_send がコード {0} で終了しました; {1}s 後に再起動します",
     "log.started": "サービスを開始しました ({0})",
     "log.stopped_signal": "サービスを停止しました ({0})",

@@ -190,6 +190,7 @@
     "log.reconfigure_failed": "Počiatočná rekonfigurácia zlyhala: {0}",
     "log.restart_failed": "Reštart zlyhal: {0}",
     "log.settings_saved_reconnect": "Nastavenia uložené; znovu sa pripájam k {0}",
+    "log.settings_saved_renamed": "Nastavenia uložené; zariadenie premenované na {0}",
     "log.srtla_exited": "srtla_send skončil s kódom {0}; reštart za {1}s",
     "log.started": "Služba spustená ({0})",
     "log.stopped_signal": "Služba zastavená ({0})",

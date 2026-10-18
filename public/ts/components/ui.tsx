@@ -195,10 +195,12 @@ export const Card = {
 export type BadgeKind = "on" | "off" | "warn" | "";
 
 export const Badge = {
-    view: ({ attrs: { text, kind = "" } }) => (
-        <span class={`badge ${kind}`.trim()}>{text}</span>
+    view: ({ attrs: { text, label = "", kind = "" } }) => (
+        <span class={`badge ${kind}`.trim()} title={label || undefined}>
+            {text}
+        </span>
     ),
-} as MithrilJSXComponent<{ text: string; kind?: BadgeKind }>;
+} as MithrilJSXComponent<{ text: string; label?: string; kind?: BadgeKind }>;
 
 /** "connected" / "disconnected" header badge. */
 export const ConnectionBadge = {

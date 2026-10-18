@@ -931,10 +931,8 @@ export function createObsPanel({
                                             <Badge
                                                 text={t("lowbs.idle")}
                                                 kind={"off"}
+                                                label={t("lowbs.idle_hint")}
                                             />
-                                            <span class={"muted"}>
-                                                {t("lowbs.idle_hint")}
-                                            </span>
                                         </span>
                                     ),
                                 ],

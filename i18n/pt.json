@@ -190,6 +190,7 @@
     "log.reconfigure_failed": "Falha na reconfiguração inicial: {0}",
     "log.restart_failed": "Falha ao reiniciar: {0}",
     "log.settings_saved_reconnect": "Definições guardadas; a religar a {0}",
+    "log.settings_saved_renamed": "Definições guardadas; dispositivo renomeado para {0}",
     "log.srtla_exited": "srtla_send saiu com código {0}; a reiniciar em {1}s",
     "log.started": "Serviço iniciado ({0})",
     "log.stopped_signal": "Serviço parado ({0})",

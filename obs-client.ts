@@ -739,6 +739,9 @@ async function main(): Promise<void> {
                     const remoteChanged =
                         remoteUrl_ !== remoteUrl ||
                         (remoteToken_ ?? "") !== remoteToken;
+                    // A renamed device must re-hello so the server sees the
+                    // new name; the re-dial reuses the current URL/token.
+                    const renamed = deviceName_ !== deviceName;
                     deviceName = deviceName_;
                     deviceColor = deviceColor_;
                     remoteUrl = remoteUrl_;
@@ -753,10 +756,15 @@ async function main(): Promise<void> {
                         } satisfies ObsClientConfig,
                     );
                     writeCfg();
-                    if (remoteChanged) {
+                    if (remoteChanged || (renamed && remoteUrl)) {
                         // The socket's close handler re-dials `connect()`,
-                        // which picks up the new URL/token.
-                        sock?.close(1001, "remote settings changed");
+                        // which re-sends hello with the new URL/name/token.
+                        sock?.close(
+                            1001,
+                            remoteChanged
+                                ? "remote settings changed"
+                                : "device renamed",
+                        );
                     }
                     result = {
                         settings: {

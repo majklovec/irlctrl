@@ -413,6 +413,9 @@ async function updateSettings(p: Params): Promise<object> {
             : oneOf(p.language, "language", LANGUAGES);
     const remoteChanged =
         remoteUrl !== current.remoteUrl || remoteToken !== current.remoteToken;
+    // A new display name is only visible to the control server after a re-hello,
+    // which happens on (re)connect; a rename forces that re-dial to the same URL.
+    const renamed = hostname !== current.hostname;
 
     state.settings = {
         ...current,
@@ -425,8 +428,9 @@ async function updateSettings(p: Params): Promise<object> {
     };
     setCurrentLanguage(language);
     await saveState();
-    // Re-dial the control-server link only when the endpoint or its token changed;
-    // unrelated saves (hostname, color, language, …) keep the existing connection.
+    // Re-dial the control-server link when the endpoint/token changed or the
+    // device was renamed; unrelated saves (color, language, …) keep the
+    // existing connection.
     if (remoteChanged) {
         applyRemoteSettings(remoteUrl ?? "", remoteToken);
         logEvent(
@@ -436,6 +440,9 @@ async function updateSettings(p: Params): Promise<object> {
                 ? t("log.settings_saved_reconnect", scrubUrl(remoteUrl))
                 : t("mlog.done.remote_disabled"),
         );
+    } else if (renamed && remoteUrl) {
+        applyRemoteSettings(remoteUrl, remoteToken);
+        logEvent("info", "Settings", t("log.settings_saved_renamed", hostname));
     } else {
         logEvent("info", "Settings", t("mlog.done.settings_saved"));
     }

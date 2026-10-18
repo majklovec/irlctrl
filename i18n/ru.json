@@ -190,6 +190,7 @@
     "log.reconfigure_failed": "Первичная перенастройка не удалась: {0}",
     "log.restart_failed": "Перезапуск не удался: {0}",
     "log.settings_saved_reconnect": "Настройки сохранены; переподключение к {0}",
+    "log.settings_saved_renamed": "Настройки сохранены; устройство переименовано в {0}",
     "log.srtla_exited": "srtla_send завершился с кодом {0}; перезапуск через {1}s",
     "log.started": "Служба запущена ({0})",
     "log.stopped_signal": "Служба остановлена ({0})",

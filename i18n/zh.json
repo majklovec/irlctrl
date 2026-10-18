@@ -190,6 +190,7 @@
     "log.reconfigure_failed": "初始重新配置失败：{0}",
     "log.restart_failed": "重启失败：{0}",
     "log.settings_saved_reconnect": "设置已保存；正在重连到 {0}",
+    "log.settings_saved_renamed": "设置已保存；设备已重命名为 {0}",
     "log.srtla_exited": "srtla_send 以代码 {0} 退出；将在 {1}s 后重启",
     "log.started": "服务已启动 ({0})",
     "log.stopped_signal": "服务已停止 ({0})",
