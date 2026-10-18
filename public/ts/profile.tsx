@@ -11,6 +11,7 @@ import {
   Page,
   ServerNav,
 } from "./components/ui";
+import { actionIcon } from "./components/icons";
 import { i18nReady, t } from "./i18n";
 import { mountPage } from "./util";
 
@@ -31,13 +32,18 @@ const state = {
   pwOk: false,
   pwError: false,
 
-  newToken: undefined as Token | undefined,
   tokenBusy: false,
   removing: false,
 };
 
 function render(): void {
   m.redraw();
+}
+
+function mergeTokens(loaded: Token[], current: Token[] | undefined): Token[] {
+  if (!current) return loaded;
+  const loadedIds = new Set(loaded.map(({ id }) => id));
+  return [...loaded, ...current.filter(({ id }) => !loadedIds.has(id))];
 }
 
 /** Load the profile (username + existing tokens). */
@@ -47,7 +53,7 @@ async function load(): Promise<void> {
     if (!res.ok) return;
     const body = (await res.json()) as { username: string; tokens: Token[] };
     state.username = body.username;
-    state.tokens = body.tokens;
+    state.tokens = mergeTokens(body.tokens, state.tokens);
     render();
   } catch {
     render();
@@ -96,12 +102,12 @@ function changePassword(): void {
 function addToken(): void {
   if (state.tokenBusy) return;
   state.tokenBusy = true;
-  state.newToken = undefined;
   render();
   void fetch("/api/profile/tokens", { method: "POST" })
     .then(async (res) => {
       if (!res.ok) throw new Error();
-      state.newToken = ((await res.json()) as { token: Token }).token;
+      const token = ((await res.json()) as { token: Token }).token;
+      state.tokens = [...(state.tokens ?? []), token];
     })
     .catch(() => {})
     .finally(() => {
@@ -197,22 +203,10 @@ const App: m.Component = {
           <Button
             label={t("profile.tokens.add")}
             disabled={state.tokenBusy}
-            onClick={addToken}
+            onclick={addToken}
           />
         }
       >
-        {state.newToken ? (
-          <div class={"token-item new"}>
-            <code
-              class={"token-value"}
-              title={t("profile.tokens.copy")}
-              onClick={() => copyToken(state.newToken!.token)}
-            >
-              {state.newToken.token}
-            </code>
-            <span class={"muted"}>{new Date(state.newToken.createdAt).toLocaleString()}</span>
-          </div>
-        ) : null}
         {state.tokens === undefined ? (
           <p class={"muted"}>{t("mgmt.loading")}</p>
         ) : state.tokens.length === 0 ? (
@@ -223,16 +217,18 @@ const App: m.Component = {
               <code
                 class={"token-value"}
                 title={t("profile.tokens.copy")}
-                onClick={() => copyToken(tk.token)}
+                onclick={() => copyToken(tk.token)}
               >
                 {tk.token}
               </code>
               <span class={"muted"}>{new Date(tk.createdAt).toLocaleString()}</span>
               <Button
-                class={"danger"}
-                label={t("profile.tokens.remove")}
+                class={"icon-link dash-delete"}
+                label={actionIcon("delete")}
+                title={t("profile.tokens.remove")}
+                aria-label={t("profile.tokens.remove")}
                 disabled={state.removing}
-                onClick={() => removeToken(tk.id)}
+                onclick={() => removeToken(tk.id)}
               />
             </div>
           ))

@@ -81,13 +81,13 @@ const App: m.Component = {
               />
             }
           />
-          {registered ? <p class={"ok"}>{t("login.registered")}</p> : null}
-          {state.error ? <p class={"error"}>{t("login.error")}</p> : null}
           <div class={"actions"}>
             <button type={"submit"} disabled={state.busy}>
               {t("login.submit")}
             </button>
           </div>
+          {registered ? <p class={"ok"}>{t("login.registered")}</p> : null}
+          {state.error ? <p class={"error"}>{t("login.error")}</p> : null}
         </form>
         <div class={"login-alt"}>
           <a href={"/register"}>{t("login.register")}</a>

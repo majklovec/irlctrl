@@ -136,25 +136,46 @@ header > .actions {
   border-bottom-color: var(--accent);
 }
 
-/* Profile menu (username + dropdown) styled like the nav links */
-.main-nav .profile-menu {
+/* Keep the profile trigger in the header's top-right, separate from navigation. */
+header:has(.profile-menu) {
   position: relative;
-  margin-left: 1.25rem;
+  z-index: 50;
 }
-.main-nav .profile-menu > button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  background: none;
-  border: 0;
+header:has(.profile-menu) > .actions {
+  margin-right: 3.25rem;
+}
+.main-nav .profile-menu {
+  position: absolute;
+  top: 0.5rem;
+  right: 1.25rem;
+  z-index: 40;
+}
+.profile-menu-trigger {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
   font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
   cursor: pointer;
-  padding: 0 0 2px;
+}
+.profile-menu-trigger:hover {
+  background: var(--accent-hover);
+}
+.profile-menu-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 .profile-menu-dropdown {
   position: absolute;
   right: 0;
-  top: calc(100% + 4px);
+  top: calc(100% + 0.5rem);
   z-index: 30;
   display: flex;
   flex-direction: column;
@@ -194,6 +215,17 @@ header > .actions {
 .login-page .card {
   width: 100%;
   max-width: 22rem;
+}
+.login-page form {
+  flex-direction: column;
+}
+.login-page form > label {
+  width: 100%;
+}
+.login-page form > .actions {
+  width: 100%;
+  justify-content: center;
+  margin-top: 1rem;
 }
 .login-lang {
   display: flex;
@@ -352,6 +384,16 @@ main {
   font-size: 0.85rem;
   user-select: all;
   cursor: copy;
+}
+.token-item > .icon-link {
+  flex: none;
+  padding: 0;
+  box-shadow: none;
+}
+.token-item > .dash-delete:hover {
+  color: var(--bad);
+  border-color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 10%, transparent);
 }
 
 .badge {

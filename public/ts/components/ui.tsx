@@ -57,8 +57,8 @@ export const TitleWithBack = {
 /** Session user shown in the profile menu + whether its menu is open. */
 const profile = { username: null as string | null, open: false };
 
-function closeProfileMenu(ev?: Event): void {
-	ev?.preventDefault();
+function closeProfileMenu(): void {
+	if (!profile.open) return;
 	profile.open = false;
 	m.redraw();
 }
@@ -103,46 +103,36 @@ const ServerNavComponent: m.Component<{
 			</a>
 			<span
 				class={profile.open ? "profile-menu open" : "profile-menu"}
-				onClick={(ev: Event) => ev.stopPropagation()}
+				onclick={(ev: Event) => ev.stopPropagation()}
 			>
 				<button
 					type={"button"}
-					class={"nav-link"}
+					class={"profile-menu-trigger"}
+					aria-label={profile.username ?? t("nav.profile")}
+					title={profile.username ?? t("nav.profile")}
 					aria-haspopup={"menu"}
 					aria-expanded={profile.open}
-					onClick={() => {
+					onclick={() => {
 						profile.open = !profile.open;
 						m.redraw();
 					}}
 				>
-					{profile.username ?? "…"}
-					<svg
-						width={10}
-						height={10}
-						viewBox={"0 0 16 16"}
-						fill={"none"}
-						stroke={"currentColor"}
-						stroke-width={2}
-						stroke-linecap={"round"}
-						stroke-linejoin={"round"}
-						aria-hidden={"true"}
-					>
-						<path d={"M4 6l4 4 4-4"} />
-					</svg>
+					{profile.username
+						? Array.from(profile.username).slice(0, 2).join("").toUpperCase()
+						: "…"}
 				</button>
 				{profile.open ? (
 					<span class={"profile-menu-dropdown"} role={"menu"}>
 						<a
 							role={"menuitem"}
 							href={"/profile/"}
-							onClick={() => (profile.open = false)}
 						>
 							{t("nav.profile")}
 						</a>
 						<button
 							type={"button"}
 							role={"menuitem"}
-							onClick={() => void logout()}
+							onclick={() => void logout()}
 						>
 							{t("nav.logout")}
 						</button>
