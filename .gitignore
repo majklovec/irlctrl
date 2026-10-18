@@ -11,3 +11,4 @@ pipeline/majklovec
 modules/.generated.frontend.ts
 modules/.generated.backend.ts
 dist/*
+users.db
