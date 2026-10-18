@@ -168,6 +168,29 @@ describe("module registries", () => {
         expect(readFileSync(manifest, "utf8")).toMatch(/AUTO-GENERATED/i);
     });
 
+    test("settings framework discovers via the generated manifest (no per-module imports)", () => {
+        const settings = readFileSync(
+            join(import.meta.dir, "..", "public", "ts", "settings.tsx"),
+            "utf8",
+        );
+        expect(settings).not.toMatch(
+            /from "\.\.\/\.\.\/modules\/[\w-]+\/settings/,
+        );
+        const framework = readFileSync(
+            join(import.meta.dir, "..", "public", "ts", "modules.tsx"),
+            "utf8",
+        );
+        expect(framework).not.toMatch(
+            /from "\.\.\/\.\.\/modules\/[\w-]+\/settings/,
+        );
+        expect(framework).toMatch(
+            /from "\.\.\/\.\.\/modules\/\.generated\.settings\*?"/,
+        );
+        const manifest = join(modulesDir, ".generated.settings.ts");
+        expect(statSync(manifest).size).toBeGreaterThan(0);
+        expect(readFileSync(manifest, "utf8")).toMatch(/AUTO-GENERATED/i);
+    });
+
     test("backend registry discovers by directory scan + compiled-binary manifest, no per-module imports", () => {
         const src = readFileSync(
             join(import.meta.dir, "..", "src", "registry.ts"),

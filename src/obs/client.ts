@@ -185,6 +185,27 @@ export class ObsClient {
         return this.ws?.readyState === WebSocket.OPEN;
     }
 
+    /**
+     * Point the client at a different OBS server (and/or password) and
+     * reconnect if a session is live. An empty password clears it.
+     * Returns true when the connection settings actually changed.
+     */
+    setConnection(url: string, password = ""): boolean {
+        const changed =
+            url !== this.opts.url ||
+            password !== (this.opts.password ?? "");
+        if (!changed) return false;
+        this.opts.url = url;
+        this.opts.password = password || undefined;
+        if (this.ws) {
+            this.disconnect();
+            this.connect().catch((err) =>
+                this.opts.log("reconnect after endpoint change failed", err),
+            );
+        }
+        return true;
+    }
+
     get identified(): boolean {
         return this._identified;
     }

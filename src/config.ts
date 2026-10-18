@@ -38,14 +38,15 @@ export const ALLOWED_ORIGINS = arg("--allow-origin", "")
     .map((o) => o.trim())
     .filter(Boolean);
 // Outbound control connection: status is pushed to and requests accepted from this server.
-// Token/URL may come from env to keep secrets out of the process list.
+// CLI > config file > env: the env vars are only initial values (first run);
+// values persisted to the config file (e.g. by the settings page) win.
 export const REMOTE_URL = arg(
     "--remote",
-    process.env.CONTROL_SERVER_URL ?? persisted("remoteUrl") ?? "",
+    persisted("remoteUrl") ?? process.env.CONTROL_SERVER_URL ?? "",
 );
 export const REMOTE_TOKEN = arg(
     "--remote-token",
-    process.env.CONTROL_SERVER_TOKEN ?? persisted("remoteToken") ?? "",
+    persisted("remoteToken") ?? process.env.CONTROL_SERVER_TOKEN ?? "",
 );
 export const REMOTE_INTERVAL = intArg("--remote-interval", 30); // periodic status push, seconds (0 = off)
 export const REMOTE_STATS_INTERVAL = intArg("--remote-stats-interval", 2); // srtla_send link stats push, seconds (0 = off)
@@ -55,7 +56,7 @@ if (REMOTE_URL && !REMOTE_URL_RE.test(REMOTE_URL))
 export const ROLE: Role = enumArg(
     "--role",
     ROLES,
-    (process.env.ROLE ?? persisted("role") ?? "relay") as Role,
+    (persisted("role") ?? process.env.ROLE ?? "relay") as Role,
 );
 if (!isRole(ROLE)) argFail("ROLE", ROLE, ROLES.join(" | "));
 export const HAS_RELAY = ROLE !== "encoder";

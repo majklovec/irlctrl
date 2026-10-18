@@ -9,12 +9,20 @@
  *   bun obs-client.ts --obs ws://127.0.0.1:4455 \
  *       --remote ws://10.0.0.5:8090/device --remote-token secret
  *
+ * The connection info (OBS url/password, control-server url/token,
+ * hostname), the device uuid, and the low-bitrate switcher settings are kept
+ * in this box's own config file (--config, defaults to
+ * tmpdir/obs-client-config.json): CLI flags > config file > env vars >
+ * defaults, and the resolved values are written back to the file on start.
+ *
  * Device side (like client.ts):
  *   - registers on the control server's /device socket by stable uuid
- *     (persisted to --state-file; `role: "obs"` in the hello),
+ *     (persisted in the config file; `role: "obs"` in the hello),
  *   - pushes a `status` event on connect and every --remote-interval seconds,
  *   - answers `obs.request` / `obs.requestBatch` / `obs.setEventSubscriptions`
  *     requests from the server (and thereby from browser UIs),
+ *   - answers `settings.get` / `settings.update` / `modules.list` so the
+ *     shared settings page works on this box (name / color / remote URL),
  *   - pushes `obs.event` frames tagged `module: "obs-controller"` so the
  *     server-side dashboards pick up scene / stream / record changes.
  *
@@ -53,9 +61,17 @@ import {
 } from "./modules/obs-controller/switcher-engine";
 import type { SwitcherConfig, SwitcherMetrics } from "./public/types";
 import { arg, argFail, flag, intArg } from "./src/args";
-import { ApiError, optionalStringList, requireString } from "./src/params";
+import {
+    checkColor,
+    checkHostname,
+    checkRemoteUrl,
+    ApiError,
+    optionalSettingString,
+    optionalStringList,
+    requireString,
+} from "./src/params";
 import { errorMessage, scrubUrl, textOf } from "./src/util";
-import { REMOTE_URL_RE } from "./src/validate";
+import { DEFAULT_COLOR, REMOTE_URL_RE } from "./src/validate";
 import { APP_VERSION } from "./src/version";
 
 const SWITCHER_MODULE = "low-bitrate-switcher";
@@ -216,25 +232,77 @@ const help = (code: number = 0): void => {
     console.log(
         "Usage: bun obs-client.ts --remote ws://host:port/device" +
             " [--obs ws://127.0.0.1:4455] [--obs-password pw]" +
-            " [--remote-token pw] [--hostname name] [--state-file path] [--uuid uuid]",
+            " [--remote-token pw] [--hostname name]" +
+            " [--config path] [--uuid uuid]",
     );
     console.log(
-        "The token/URL may also come from CONTROL_SERVER_TOKEN / CONTROL_SERVER_URL and OBS_PASSWORD env vars.",
+        "The connection info (uuid, obsUrl, obsPassword, remoteUrl, remoteToken," +
+            " hostname, low-bitrate-switcher) is kept in the config file" +
+            " (defaults to tmpdir/obs-client-config.json);" +
+            " CLI flags > config file > env vars > defaults.",
+    );
+    console.log(
+        "The CONTROL_SERVER_TOKEN / CONTROL_SERVER_URL / OBS_URL / OBS_PASSWORD env vars provide initial values (the config file wins).",
     );
     process.exit(code);
 };
 
+/** The low-bitrate switcher's persisted slice (shape: SwitcherConfig + enabled). */
+type SwitcherStateSlice = Partial<SwitcherConfig> & { enabled?: boolean };
+
+/** Everything this box persists in its own config file (see the file header). */
+interface ObsClientConfig {
+    uuid?: string;
+    obsUrl?: string;
+    obsPassword?: string;
+    remoteUrl?: string;
+    remoteToken?: string;
+    hostname?: string;
+    color?: string;
+    remoteInterval?: number;
+    "low-bitrate-switcher"?: SwitcherStateSlice;
+}
+
 async function main(): Promise<void> {
-    const obsUrl = arg("--obs", process.env.OBS_URL ?? "ws://127.0.0.1:4455");
-    const obsPassword = arg("--obs-password", process.env.OBS_PASSWORD ?? "");
-    const remoteUrl = arg("--remote", process.env.CONTROL_SERVER_URL ?? "");
-    const remoteToken = arg(
-        "--remote-token",
-        process.env.CONTROL_SERVER_TOKEN ?? "",
+    const configFile = arg(
+        "--config",
+        join(tmpdir(), "obs-client-config.json"),
     );
-    const remoteInterval = intArg("--remote-interval", 30, 0, 3600);
-    const deviceName = arg("--hostname", hostname());
-    const stateFile = arg("--state-file", join(tmpdir(), "obs-client.json"));
+    let cfg: ObsClientConfig =
+        ((await Bun.file(configFile)
+            .json()
+            .catch(() => null)) as ObsClientConfig | null) ?? {};
+    const cfgStr = (key: keyof ObsClientConfig): string | undefined =>
+        typeof cfg[key] === "string" ? (cfg[key] as string) : undefined;
+    // CLI flags > config file > env vars > defaults: the env vars are only
+    // initial values (first run); values persisted to the config file (e.g.
+    // by the settings page) win on later runs.
+    const obsUrl = arg(
+        "--obs",
+        cfgStr("obsUrl") ?? process.env.OBS_URL ?? "ws://127.0.0.1:4455",
+    );
+    const obsPassword = arg(
+        "--obs-password",
+        cfgStr("obsPassword") ?? process.env.OBS_PASSWORD ?? "",
+    );
+    // mutable — `settings.update` can change these while the box runs
+    let remoteUrl = arg(
+        "--remote",
+        cfgStr("remoteUrl") ?? process.env.CONTROL_SERVER_URL ?? "",
+    );
+    let remoteToken = arg(
+        "--remote-token",
+        cfgStr("remoteToken") ?? process.env.CONTROL_SERVER_TOKEN ?? "",
+    );
+    const remoteInterval =
+        arg("--remote-interval") !== undefined
+            ? intArg("--remote-interval", 30, 0, 3600)
+            : (cfg.remoteInterval ?? 30);
+    let deviceName = arg(
+        "--hostname",
+        cfgStr("hostname") ?? hostname(),
+    );
+    let deviceColor = checkColor(cfgStr("color") ?? DEFAULT_COLOR);
 
     if (flag("--help") || flag("-h")) {
         help();
@@ -245,41 +313,56 @@ async function main(): Promise<void> {
     if (!REMOTE_URL_RE.test(remoteUrl))
         argFail("--remote", remoteUrl, "ws:// or wss:// URL");
 
-    // Stable device identity: the uuid is assigned once and persisted, so the
-    // control server (and its dashboards) keep seeing the same device. The
-    // state file also carries the switcher's slice (the engine that runs it
-    // lives in this box, over this OBS connection). Pre-extraction state
-    // files stored the switcher under the obs slice (switcherEnabled + nested
-    // switcher) — that shape is merged into the flat slice once, here.
-    const stored = (await Bun.file(stateFile)
-        .json()
-        .catch(() => null)) as {
-        uuid?: string;
-        "low-bitrate-switcher"?: unknown;
-        switcherEnabled?: boolean;
-        switcher?: Record<string, unknown> & { enabled?: boolean };
-    } | null;
-    const uuid = arg("--uuid") ?? stored?.uuid ?? crypto.randomUUID();
-    const storedSlice = stored?.["low-bitrate-switcher"] as
-        | (Partial<SwitcherConfig> & { enabled?: boolean })
-        | undefined;
+    // This box's own config file: the resolved connection info is written
+    // back (CLI flags win), so the file always reflects the connection
+    // actually in use and survives restarts; env vars only seed first run.
+    const cfgUuid = arg("--uuid");
+    if (cfgUuid) cfg["uuid"] = cfgUuid;
+    Object.assign(cfg, {
+        obsUrl,
+        obsPassword,
+        remoteUrl,
+        remoteToken,
+        hostname: deviceName,
+        color: deviceColor,
+        remoteInterval,
+    } satisfies ObsClientConfig);
+    const writeCfg = (): void =>
+        void Bun.write(configFile, JSON.stringify(cfg, null, 2) + "\n");
+
+    // One-time migration: before the state file merged into the config file,
+    // the uuid and the switcher's slice lived in a separate state file.
+    // Pull them into the config file if it doesn't have them yet, so existing
+    // boxes keep their identity and switcher settings.
+    if (cfg["uuid"] === undefined || cfg["low-bitrate-switcher"] === undefined) {
+        const legacy = (await Bun.file(join(tmpdir(), "obs-client.json"))
+            .json()
+            .catch(() => null)) as
+            | { uuid?: string; "low-bitrate-switcher"?: SwitcherStateSlice }
+            | null;
+        if (cfg["uuid"] === undefined && legacy?.uuid)
+            cfg["uuid"] = legacy.uuid;
+        if (cfg["low-bitrate-switcher"] === undefined && legacy?.["low-bitrate-switcher"])
+            cfg["low-bitrate-switcher"] = legacy["low-bitrate-switcher"];
+    }
+
+    // Stable device identity: the uuid is assigned once and persisted in the
+    // config file, so the control server (and its dashboards) keep seeing the
+    // same device. The file also carries the switcher's slice (the engine
+    // that runs it lives in this box, over this OBS connection).
+    const uuid = cfg["uuid"] ?? crypto.randomUUID();
+    cfg["uuid"] = uuid;
     let switcherSlice: SwitcherConfig & { enabled: boolean };
-    if (storedSlice) {
-        switcherSlice = { ...DEFAULT_SWITCHER_SLICE, ...storedSlice };
+    if (cfg["low-bitrate-switcher"]) {
+        switcherSlice = {
+            ...DEFAULT_SWITCHER_SLICE,
+            ...cfg["low-bitrate-switcher"],
+        };
     } else {
         switcherSlice = { ...DEFAULT_SWITCHER_SLICE };
     }
-    const writeBoxState = async (): Promise<void> => {
-        await Bun.write(
-            stateFile,
-            JSON.stringify(
-                { uuid, "low-bitrate-switcher": switcherSlice },
-                null,
-                2,
-            ),
-        );
-    };
-    await writeBoxState();
+    cfg["low-bitrate-switcher"] = switcherSlice;
+    writeCfg();
 
     const obs = new ObsClient({
         url: obsUrl,
@@ -463,8 +546,9 @@ async function main(): Promise<void> {
         );
     };
 
-    const persistSwitcherState = async (): Promise<void> => {
-        await writeBoxState();
+    const persistSwitcherState = (): void => {
+        cfg["low-bitrate-switcher"] = switcherSlice;
+        writeCfg();
         startEngine();
         pushStatus();
     };
@@ -483,6 +567,22 @@ async function main(): Promise<void> {
             }),
         );
 
+    // The modules card (shared by the status page and the settings page).
+    const moduleState = (): Record<string, unknown> => ({
+        relay: { enabled: false },
+        encoder: { enabled: false },
+        // The card's form (obsSourceName, scenes, triggers) loads from this
+        // slice — the switcher slice rides on the obs module, like on the
+        // core box (modulesView.ObsModuleView).
+        [OBS_MODULE]: {
+            obsUrl,
+            obsPassword: obsPassword ? { configured: true } : "",
+            sceneEvents: true,
+            // switcherSlice carries `enabled` (the switcher's on/off flag)
+            ...switcherSlice,
+        },
+    });
+
     const buildStatus = (): Record<string, unknown> => ({
         role: "obs",
         setupRequired: false,
@@ -490,20 +590,7 @@ async function main(): Promise<void> {
         // Live switcher state (replayed to newly-connected dashboard viewers;
         // the lowBitrateSwitcher.state events carry the live updates)
         lowBitrateSwitcher: engine?.status() ?? null,
-        modules: {
-            relay: { enabled: false },
-            encoder: { enabled: false },
-            // The card's form (obsSourceName, scenes, triggers) loads from this
-            // slice — the switcher slice rides on the obs module, like on the
-            // core box (modulesView.ObsModuleView).
-            [OBS_MODULE]: {
-                obsUrl,
-                obsPassword: obsPassword ? { configured: true } : "",
-                sceneEvents: true,
-                // switcherSlice carries `enabled` (the switcher's on/off flag)
-                ...switcherSlice,
-            },
-        },
+        modules: moduleState(),
     });
 
     async function handleRequest(text: string): Promise<string> {
@@ -600,9 +687,100 @@ async function main(): Promise<void> {
                     result = { ok: true, eventSubscriptions: intents };
                     break;
                 }
+                case "settings.get": {
+                    // The shared settings page loads the common fields
+                    // (name / role / color / remote) from here.
+                    result = {
+                        settings: {
+                            uuid,
+                            hostname: deviceName,
+                            role: "obs",
+                            remoteUrl,
+                            hasRemoteToken: !!remoteToken,
+                            color: deviceColor,
+                            // This box has no pipeline repositories (encoder-only)
+                            pipelineRepositories: [],
+                        },
+                        restartRequired: true,
+                    };
+                    break;
+                }
+                case "settings.update": {
+                    // The shared settings page saves the common fields here.
+                    const p = params;
+                    if (p.uuid !== undefined && p.uuid !== uuid)
+                        throw new ApiError(
+                            "The device uuid can't be changed",
+                        );
+                    const deviceName_ =
+                        checkHostname(
+                            optionalSettingString(p, "hostname", deviceName),
+                        ) ?? deviceName;
+                    const deviceColor_ =
+                        checkColor(
+                            optionalSettingString(p, "color", deviceColor),
+                        ) ?? deviceColor;
+                    if (p.role !== undefined && p.role !== "obs")
+                        throw new ApiError(
+                            "The role of an obs box is always “obs”",
+                        );
+                    const remoteUrl_ =
+                        checkRemoteUrl(
+                            optionalSettingString(p, "remoteUrl", remoteUrl),
+                        ) ?? remoteUrl;
+                    let remoteToken_: string | undefined;
+                    if (p.remoteToken !== undefined) {
+                        if (typeof p.remoteToken !== "string")
+                            throw new ApiError("remoteToken must be a string");
+                        remoteToken_ = p.remoteToken.trim() || undefined;
+                    } else {
+                        remoteToken_ = remoteToken || undefined;
+                    }
+                    const remoteChanged =
+                        remoteUrl_ !== remoteUrl ||
+                        (remoteToken_ ?? "") !== remoteToken;
+                    deviceName = deviceName_;
+                    deviceColor = deviceColor_;
+                    remoteUrl = remoteUrl_;
+                    remoteToken = remoteToken_ ?? "";
+                    Object.assign(
+                        cfg,
+                        {
+                            hostname: deviceName,
+                            color: deviceColor,
+                            remoteUrl,
+                            remoteToken,
+                        } satisfies ObsClientConfig,
+                    );
+                    writeCfg();
+                    if (remoteChanged) {
+                        // The socket's close handler re-dials `connect()`,
+                        // which picks up the new URL/token.
+                        sock?.close(1001, "remote settings changed");
+                    }
+                    result = {
+                        settings: {
+                            uuid,
+                            hostname: deviceName,
+                            role: "obs",
+                            remoteUrl,
+                            hasRemoteToken: !!remoteToken,
+                            color: deviceColor,
+                            pipelineRepositories: [],
+                        },
+                        restartRequired: true,
+                    };
+                    break;
+                }
+                case "modules.list": {
+                    result = { modules: moduleState() };
+                    break;
+                }
                 case "modules.configure": {
-                    // The browser's switcher toggle and form send their config here;
-                    // obsUrl / obsPassword / sceneEvents are CLI-driven and ignored.
+                    // The browser's switcher toggle and form send their config
+                    // here. obsUrl / obsPassword are persisted to this box's
+                    // own config file and applied to the live connection;
+                    // sceneEvents stays CLI-driven.
                     const id = requireString(params, "id");
                     if (id !== OBS_MODULE && id !== SWITCHER_MODULE)
                         throw new ApiError(`Unknown module: ${id}`, 404);
@@ -612,8 +790,36 @@ async function main(): Promise<void> {
                             switcherSlice,
                             config,
                         );
-                    await persistSwitcherState();
-                    result = { ok: true };
+                    if (id === OBS_MODULE) {
+                        let changed = false;
+                        if (
+                            typeof config["obsUrl"] === "string" &&
+                            config["obsUrl"]
+                        ) {
+                            cfg["obsUrl"] = config["obsUrl"];
+                            changed = true;
+                        }
+                        if (typeof config["obsPassword"] === "string") {
+                            cfg["obsPassword"] = config["obsPassword"];
+                            changed = true;
+                        }
+                        if (changed) {
+                            writeCfg();
+                            if (
+                                obs.setConnection(
+                                    cfg["obsUrl"] ?? "",
+                                    cfg["obsPassword"] ?? "",
+                                )
+                            )
+                                console.log(
+                                    "[obs] endpoint changed — reconnecting",
+                                );
+                        }
+                    }
+                    persistSwitcherState();
+                    // Same contract as the core: return the modules map so the
+                    // settings page can refresh the module state in place
+                    result = { ok: true, modules: moduleState() };
                     break;
                 }
                 case "lowBitrateSwitcher.save": {
@@ -625,7 +831,7 @@ async function main(): Promise<void> {
                         switcherSlice,
                         config,
                     );
-                    await persistSwitcherState();
+                    persistSwitcherState();
                     result = { ok: true };
                     break;
                 }
@@ -717,7 +923,7 @@ async function main(): Promise<void> {
                     id: uuid,
                     role: "obs",
                     hostname: deviceName,
-                    color: "",
+                    color: deviceColor,
                     version: APP_VERSION,
                     ...(remoteToken ? { token: remoteToken } : {}),
                 }),

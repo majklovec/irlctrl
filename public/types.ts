@@ -344,6 +344,17 @@ export interface modulesView {
     modems: { enabled: boolean };
     "obs-controller": ObsModuleView;
 }
+/** Device settings as returned by `settings.get` / accepted by `settings.update`. */
+export interface Settings {
+    /** Stable identity on the control server; hostnames change, the uuid does not */
+    uuid: string;
+    hostname: string;
+    role: string;
+    remoteUrl: string;
+    hasRemoteToken: boolean;
+    color: string;
+    pipelineRepositories: string[];
+}
 /** A dashboard widget type, backed by (or showing) one of a device's modules. */
 export type WidgetType =
     | "obs"

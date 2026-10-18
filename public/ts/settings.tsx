@@ -1,4 +1,9 @@
-/* Device settings + pipeline repositories — a Mithril view over the WebSocket API. */
+/*
+ * Device settings — a Mithril view over the WebSocket API. Device-level
+ * fields (hostname, role, color, remote connection) are saved here; each
+ * module's own configuration card lives in `modules/<id>/settings.tsx` and
+ * is auto-registered by the module framework from the generated manifest.
+ */
 import m from "mithril";
 import { errorMessage } from "../../src/util";
 import { DEFAULT_COLOR } from "../../src/validate";
@@ -18,30 +23,14 @@ import {
 import { t } from "./i18n";
 import { RpcClient, socketUrl } from "./services/rpc";
 import { HOSTNAME_PATTERN, mountPage, setHeaderColor } from "./util";
-
-interface Settings {
-    /** Stable identity on the control server; hostnames change, the uuid does not */
-    uuid: string;
-    hostname: string;
-    role: string;
-    remoteUrl: string;
-    hasRemoteToken: boolean;
-    color: string;
-    pipelineRepositories: string[];
-}
-
-const REPO_PATTERN = "[A-Za-z0-9_.\\-]+/[A-Za-z0-9_.\\-]+";
+import { bind, refreshDevice, renderModuleCards, setDraftRole } from "./modules";
+import type { Settings, modulesView } from "../../public/types";
 
 const state = {
     connected: false,
     settings: null as Settings | null,
     message: "",
     saving: false,
-    // Repository section
-    repository: "",
-    repositories: [] as string[],
-    repoMessage: "",
-    repoBusy: false,
 };
 
 /** Editable copy of the settings; the token is write-only (never sent back by the device). */
@@ -54,6 +43,7 @@ const draft = {
 };
 
 const rpc = new RpcClient(() => socketUrl("../ws"));
+bind(rpc);
 rpc.on("open", () => {
     state.connected = true;
     state.settings = null;
@@ -65,15 +55,12 @@ rpc.on("close", () => {
     m.redraw();
 });
 
-/** Run an RPC call, routing its error message into `state[messageKey]`; redraws afterwards. */
-async function run<T>(
-    messageKey: "message" | "repoMessage",
-    call: () => Promise<T>,
-): Promise<T | undefined> {
+/** Run an RPC call, routing its error message into `state.message`; redraws afterwards. */
+async function run<T>(call: () => Promise<T>): Promise<T | undefined> {
     try {
         return await call();
     } catch (error: unknown) {
-        state[messageKey] = errorMessage(error);
+        state.message = errorMessage(error);
         return undefined;
     } finally {
         m.redraw();
@@ -81,34 +68,44 @@ async function run<T>(
 }
 
 async function load(): Promise<void> {
-    const result = await run("message", () =>
-        rpc.call<{ settings: Settings }>("settings.get"),
+    const result = await run(() =>
+        Promise.all([
+            rpc.call<{ settings: Settings }>("settings.get"),
+            rpc.call<{ modules: modulesView }>("modules.list"),
+        ]),
     );
     if (!result) return;
-    const s = result.settings;
-    state.settings = s;
-    state.repositories = s.pipelineRepositories;
+    const [settings, modules] = result;
+    state.settings = settings.settings;
     Object.assign(draft, {
-        hostname: s.hostname,
-        role: s.role,
-        color: s.color,
-        remoteUrl: s.remoteUrl,
+        hostname: settings.settings.hostname,
+        role: settings.settings.role,
+        color: settings.settings.color,
+        remoteUrl: settings.settings.remoteUrl,
     });
-    setHeaderColor(s.color);
+    refreshDevice({
+        settings: settings.settings,
+        modules: modules.modules,
+        role: draft.role,
+    });
+    setHeaderColor(settings.settings.color);
 }
 
 async function save(): Promise<void> {
     state.saving = true;
     state.message = "";
     const { remoteToken, ...rest } = draft;
-    const result = await run("message", () =>
+    const result = await run(() =>
         rpc.call<{ settings: Settings }>("settings.update", {
             ...rest,
             ...(remoteToken ? { remoteToken } : {}),
         }),
     );
+    if (!result) {
+        state.saving = false;
+        return;
+    }
     state.saving = false;
-    if (!result) return;
     draft.remoteToken = "";
     const roleChanged = result.settings.role !== state.settings?.role;
     state.message = roleChanged
@@ -117,54 +114,6 @@ async function save(): Promise<void> {
     // Parameters may have changed on the device side; drop the socket so the
     // reconnect re-fetches fresh settings (hostname, role, color, …).
     rpc.reconnect();
-}
-
-async function addRepository(): Promise<void> {
-    const repository = state.repository.trim();
-    if (!repository) return;
-    state.repoBusy = true;
-    state.repoMessage = t("set.repo_importing", repository);
-    const response = await run("repoMessage", () =>
-        rpc.call<{ repositories: string[]; result: { files: number } }>(
-            "pipelines.repositories.add",
-            { repository },
-        ),
-    );
-    state.repoBusy = false;
-    if (!response) return;
-    state.repositories = response.repositories;
-    state.repository = "";
-    state.repoMessage = t("set.repo_imported", response.result.files);
-}
-
-async function removeRepository(repository: string): Promise<void> {
-    state.repoMessage = t("set.repo_removing", repository);
-    const result = await run("repoMessage", () =>
-        rpc.call<{ repositories: string[] }>("pipelines.repositories.remove", {
-            repository,
-        }),
-    );
-    if (!result) return;
-    state.repositories = result.repositories;
-    state.repoMessage = t("set.repo_removed", repository);
-}
-
-async function updateAllRepositories(): Promise<void> {
-    state.repoBusy = true;
-    state.repoMessage = t("set.repo_updating_all");
-    const response = await run("repoMessage", () =>
-        rpc.call<{ results: { repository: string; files: number }[] }>(
-            "pipelines.repositories.updateAll",
-        ),
-    );
-    state.repoBusy = false;
-    if (!response) return;
-    const files = response.results.reduce((total, r) => total + r.files, 0);
-    state.repoMessage = t(
-        "set.repo_updated_all",
-        response.results.length,
-        files,
-    );
 }
 
 function settingsCard(): m.Vnode {
@@ -190,7 +139,11 @@ function settingsCard(): m.Vnode {
                 <Field
                     label={t("set.role")}
                     control={
-                        <Select target={draft} prop="role">
+                        <Select
+                            target={draft}
+                            prop="role"
+                            onChange={() => setDraftRole(draft.role)}
+                        >
                             <Options
                                 pairs={[
                                     ["", t("set.role_keep")],
@@ -255,58 +208,6 @@ function settingsCard(): m.Vnode {
     );
 }
 
-function repositoriesCard(): m.Vnode {
-    return (
-        <Card title={t("set.repos")}>
-            <p class={"muted"}>{t("set.repos_desc")}</p>
-            <Form onSubmit={addRepository}>
-                <Field
-                    label={t("set.repo_field")}
-                    control={
-                        <Input
-                            target={state}
-                            prop="repository"
-                            required={true}
-                            pattern={REPO_PATTERN}
-                            placeholder={"author/repository"}
-                        />
-                    }
-                />
-                <Actions>
-                    <Button
-                        label={t("set.repo_add")}
-                        type={"submit"}
-                        disabled={state.repoBusy}
-                    />
-                    <Button
-                        label={t("set.repo_update_all")}
-                        class={"secondary"}
-                        disabled={state.repoBusy}
-                        onclick={() => void updateAllRepositories()}
-                    />
-                </Actions>
-            </Form>
-            {state.repositories.length ? (
-                state.repositories.map((repository) => (
-                    <div class={"card-head"} key={repository}>
-                        <code>{repository}</code>
-                        <Button
-                            label={t("ui.remove")}
-                            class={"danger"}
-                            onclick={() => void removeRepository(repository)}
-                        />
-                    </div>
-                ))
-            ) : (
-                <p class={"muted"}>{t("set.no_repos")}</p>
-            )}
-            <p class={"muted"} role={"status"}>
-                {state.repoMessage}
-            </p>
-        </Card>
-    );
-}
-
 const App: m.Component = {
     view: () => (
         <Page
@@ -318,7 +219,7 @@ const App: m.Component = {
             ]}
             headerRight={<ConnectionBadge connected={state.connected} />}>
             {settingsCard()}
-            {repositoriesCard()}
+            {renderModuleCards()}
         </Page>
     ),
 };

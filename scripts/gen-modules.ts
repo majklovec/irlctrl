@@ -1,12 +1,15 @@
 // REFACTOR-modules.md §4.1 — build-time generated module manifests.
 //
-// Emits two manifests, one static import per module (sorted for deterministic
-// output), default-exporting the registrations as an array. Each file lists
-// paths only — it never imports a module — so a broken module cannot break
-// the generator:
+// Emits three manifests, one static import per module (sorted for
+// deterministic output), default-exporting the registrations as an array.
+// Each file lists paths only — it never imports a module — so a broken module
+// cannot break the generator:
 //
 //   modules/.generated.frontend.ts — one import per modules/<id>/frontend.tsx;
 //   the browser bundle statically resolves every import (no runtime Glob).
+//   modules/.generated.settings.ts — one import per modules/<id>/settings.tsx;
+//   the settings framework (public/ts/modules.tsx) registers each module's
+//   settings card from this manifest.
 //   modules/.generated.backend.ts  — one import per modules/<id>/backend.ts;
 //   used by the compiled binaries (bun build --compile), where the runtime
 //   directory scan in src/registry.ts cannot reach disk (import.meta.url
@@ -85,6 +88,16 @@ await Promise.all([
         importSuffix: "frontend",
         purpose:
             "REFACTOR-modules.md §4.1: one static import per modules/<id>/frontend.tsx; the browser bundle never uses Glob",
+    }),
+    buildManifest({
+        outFile: fileURLToPath(
+            new URL("../modules/.generated.settings.ts", import.meta.url),
+        ),
+        pattern: "modules/*/settings.tsx",
+        variable: "s",
+        importSuffix: "settings",
+        purpose:
+            "one static import per modules/<id>/settings.tsx; the settings framework registers each module's settings card from this manifest",
     }),
     buildManifest({
         outFile: fileURLToPath(

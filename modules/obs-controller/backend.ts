@@ -552,7 +552,10 @@ export default {
     },
     services: {
         capabilities: {
-            "obs.controller": obsServices,
+            // The core consumes the OBS client through the "stream.obs" bus
+            // slot (src/services.ts) — obsServices must be provided under that
+            // name or the settings page can't save the OBS connection info.
+            "stream.obs": obsServices,
         },
     },
 };

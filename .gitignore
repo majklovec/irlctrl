@@ -10,5 +10,6 @@ pipeline/majklovec
 # Generated module manifests — emitted by scripts/gen-modules.ts (predev / pretest / release build).
 modules/.generated.frontend.ts
 modules/.generated.backend.ts
+modules/.generated.settings.ts
 dist/*
 users.db
