@@ -66,7 +66,7 @@ export const def: ModuleDef = {
               ? t("set.token_ph_configured")
               : t("set.token_ph_missing");
         return [
-            <p class={"muted"}>{t("set.obs_desc")}</p>,
+            <p class={"muted"} key={"hint"}>{t("set.obs_desc")}</p>,
             <Form key={"form"} onSubmit={() => void save(ctx)}>
                 <Field
                     label={t("set.obs_url")}

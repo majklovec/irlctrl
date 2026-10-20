@@ -79,7 +79,7 @@ export const def: ModuleDef = {
         state.repositories = ctx.settings.pipelineRepositories;
     },
     render: (ctx) => [
-        <p class={"muted"}>{t("set.repos_desc")}</p>,
+        <p class={"muted"} key={"hint"}>{t("set.repos_desc")}</p>,
         <Form key={"form"} onSubmit={() => void addRepository(ctx)}>
             <Field
                 label={t("set.repo_field")}
@@ -108,24 +108,26 @@ export const def: ModuleDef = {
                 />
             </Actions>
         </Form>,
-        state.repositories.length ? (
-            state.repositories.map((repository) => (
-                <div class={"card-head"} key={repository}>
-                    <code>{repository}</code>
-                    <Button
-                        label={t("ui.remove")}
-                        class={"danger"}
-                        onclick={() =>
-                            void removeRepository(ctx, repository)
-                        }
-                    />
-                </div>
-            ))
-        ) : (
-            <p key={"none"} class={"muted"}>
-                {t("set.no_repos")}
-            </p>
-        ),
+        // Spread the repo rows into the outer fragment: a nested array would
+        // be an unkeyed vnode among keyed siblings and Mithril rejects that.
+        ...(state.repositories.length
+            ? state.repositories.map((repository) => (
+                  <div class={"card-head"} key={repository}>
+                      <code>{repository}</code>
+                      <Button
+                          label={t("ui.remove")}
+                          class={"danger"}
+                          onclick={() =>
+                              void removeRepository(ctx, repository)
+                          }
+                      />
+                  </div>
+              ))
+            : [
+                  <p key={"none"} class={"muted"}>
+                      {t("set.no_repos")}
+                  </p>,
+              ]),
     ],
 };
 

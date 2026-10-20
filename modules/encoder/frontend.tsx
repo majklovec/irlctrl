@@ -206,7 +206,9 @@ function pipelineOptions(host: DeviceCard): m.Children {
                 }>{`${t("dev.no_pipelines", host.st.pipelineDir)} ${t("dev.no_pipelines_hint")}`}</option>
         );
     return [...groups].map(([group, list]) => {
-        const opts = <Options pairs={list.map((p) => [p.id, p.name])} />;
+        const opts = (
+            <Options key={group || "ungrouped"} pairs={list.map((p) => [p.id, p.name])} />
+        );
         return group ? (
             <optgroup key={group} label={group}>
                 {opts}
