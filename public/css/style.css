@@ -1343,6 +1343,35 @@ td.num {
     border-color: var(--bad);
     background: color-mix(in srgb, var(--bad) 10%, transparent);
 }
+
+/* Foldable pipeline groups (encoder settings) */
+.pipe-group {
+    margin-bottom: 0.25rem;
+}
+.pipe-group-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.35rem 0.25rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--text);
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+}
+.pipe-group-toggle:hover {
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.pipe-group-toggle svg {
+    flex: none;
+    transition: transform var(--t);
+}
+.pipe-group-toggle.open svg {
+    transform: rotate(90deg);
+}
 .dash-toolbar {
     display: flex;
     gap: 16px;
@@ -1405,6 +1434,46 @@ p.message {
     border: none;
     background: none;
     box-shadow: none;
+}
+
+/* Pipeline editor panel (encoder settings) */
+.pipeline-editor {
+    margin: 0.5rem 0 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+.pipeline-editor-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+}
+.pipeline-editor-title {
+    font-weight: 600;
+}
+.pipeline-editor-id {
+    color: var(--muted);
+    word-break: break-all;
+}
+.pipeline-editor-text {
+    width: 100%;
+    min-height: 14rem;
+    resize: vertical;
+    font-family:
+        ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas,
+        monospace;
+    font-size: 0.9em;
+    line-height: 1.5;
+    tab-size: 4;
+}
+.pipeline-editor-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
 }
 
 /* ──────────────────────────────────────────────────────────

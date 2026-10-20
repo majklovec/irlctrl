@@ -23,7 +23,7 @@ import {
     Form,
     Input,
 } from "../../public/ts/components/ui";
-import { actionIcon } from "../../public/ts/components/icons";
+import { actionIcon, chevronIcon } from "../../public/ts/components/icons";
 import { t, tCount } from "../../public/ts/i18n";
 import type { ModuleContext, ModuleDef } from "../../public/ts/modules";
 import type { Pipeline } from "../../public/types";
@@ -51,6 +51,8 @@ const state = {
     editingId: "",
     newPath: "",
     content: "",
+    // Group name → true when expanded. Groups default to folded.
+    expandedGroups: {} as Record<string, boolean>,
 };
 
 function applyPayload(payload: PipelinesPayload): void {
@@ -59,12 +61,26 @@ function applyPayload(payload: PipelinesPayload): void {
     m.redraw();
 }
 
-/** Background list load; the page-level load already reports failures. */
+// Guards against an older, slower `pipelines.list` response clobbering
+// the state a newer load (or create/update/delete) has already applied.
+let loadSeq = 0;
+
+/** Background list load; the page-level load already reports failures.
+ * Retries a few times: right after a (re)start the device link to the
+ * server is flapping and the first call can time out. */
 async function loadPipelines(ctx: ModuleContext): Promise<void> {
-    try {
-        applyPayload(await ctx.rpc.call<PipelinesPayload>("pipelines.list"));
-    } catch {
-        // ignored, see above
+    const seq = ++loadSeq;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) await new Promise((r) => setTimeout(r, 1500));
+        try {
+            const payload = await ctx.rpc.call<PipelinesPayload>(
+                "pipelines.list",
+            );
+            if (seq === loadSeq) applyPayload(payload);
+            return;
+        } catch {
+            // retry, see above
+        }
     }
 }
 
@@ -82,6 +98,7 @@ async function addRepository(ctx: ModuleContext): Promise<void> {
     );
     state.repositories = response.repositories;
     state.repository = "";
+    loadSeq++;
     applyPayload(response);
     ctx.note(t("set.repo_imported", response.result.files));
 }
@@ -98,6 +115,7 @@ async function removeRepository(
         ),
     );
     state.repositories = response.repositories;
+    loadSeq++;
     applyPayload(response);
     ctx.note(t("set.repo_removed", repository));
 }
@@ -113,6 +131,7 @@ async function updateRepository(
             { repository },
         ),
     );
+    loadSeq++;
     applyPayload(response);
     ctx.note(t("set.repo_updated", repository, response.result.files));
 }
@@ -126,9 +145,15 @@ async function updateAllRepositories(ctx: ModuleContext): Promise<void> {
             }
         >("pipelines.repositories.updateAll"),
     );
+    loadSeq++;
     applyPayload(response);
     const files = response.results.reduce((total, r) => total + r.files, 0);
     ctx.note(t("set.repo_updated_all", response.results.length, files));
+}
+
+function toggleGroup(group: string): void {
+    state.expandedGroups[group] = !state.expandedGroups[group];
+    m.redraw();
 }
 
 function closeEditor(): void {
@@ -156,6 +181,8 @@ async function openPipelineEditor(
     state.editorOpen = true;
     state.editingId = response.id;
     state.content = response.content;
+    // Make sure the edited pipeline's group is visible.
+    state.expandedGroups[pipeline.group] = true;
 }
 
 async function savePipeline(ctx: ModuleContext): Promise<void> {
@@ -168,6 +195,7 @@ async function savePipeline(ctx: ModuleContext): Promise<void> {
             { id, content: state.content },
         ),
     );
+    loadSeq++;
     applyPayload(response);
     closeEditor();
     ctx.note(
@@ -185,6 +213,7 @@ async function deletePipeline(
             id: pipeline.id,
         }),
     );
+    loadSeq++;
     applyPayload(response);
     ctx.note(t("set.pipeline_deleted", pipeline.id));
 }
@@ -222,56 +251,116 @@ export const def: ModuleDef = {
                       </p>,
                   ]
                 : [...groups.entries()].flatMap(
-                      ([group, pipelines]): m.Children[] => [
-                          <p class={"muted"}>{group}</p>,
-                          ...pipelines.map((pipeline) => (
-                              <div class={"card-head"}>
-                                  <code>{pipeline.id}</code>
-                                  <div class={"dash-row-actions"}>
-                                      <Button
-                                          label={actionIcon("edit")}
-                                          class={"icon-link"}
-                                          title={t("set.pipeline_edit")}
-                                          aria-label={t("set.pipeline_edit")}
-                                          disabled={
-                                              ctx.busy || editorOpen
-                                          }
-                                          onclick={() =>
-                                              void openPipelineEditor(
-                                                  ctx,
-                                                  pipeline,
-                                              )
-                                          }
-                                      />
-                                      <Button
-                                          label={actionIcon("delete")}
-                                          class={"icon-link dash-delete"}
-                                          title={t(
-                                              "set.pipeline_delete",
+                      ([group, pipelines]): m.Children[] => {
+                          const expanded =
+                              state.expandedGroups[group] === true;
+                          return [
+                              <div class={"pipe-group"}>
+                                  <button
+                                      type={"button"}
+                                      class={
+                                          "pipe-group-toggle" +
+                                          (expanded ? " open" : "")
+                                      }
+                                      aria-expanded={expanded}
+                                      disabled={ctx.busy}
+                                      title={t(
+                                          expanded
+                                              ? "set.group_collapse"
+                                              : "set.group_expand",
+                                      )}
+                                      aria-label={t(
+                                          expanded
+                                              ? "set.group_collapse"
+                                              : "set.group_expand",
+                                      ) +
+                                          " " +
+                                          group}
+                                      onclick={() =>
+                                          toggleGroup(group)
+                                      }
+                                  >
+                                      {chevronIcon()}
+                                      <span class={"pipe-group-name"}>
+                                          {group}
+                                      </span>
+                                      <Badge
+                                          text={tCount(
+                                              "set.pipeline_count",
+                                              pipelines.length,
                                           )}
-                                          aria-label={t(
-                                              "set.pipeline_delete",
-                                          )}
-                                          disabled={
-                                              ctx.busy || editorOpen
-                                          }
-                                          onclick={() =>
-                                              void deletePipeline(
-                                                  ctx,
-                                                  pipeline,
-                                              )
-                                          }
                                       />
-                                  </div>
-                              </div>
-                          )),
-                      ],
+                                  </button>
+                                  {expanded
+                                      ? pipelines.map((pipeline) => (
+                                            <div class={"card-head"}>
+                                                <code>{pipeline.id}</code>
+                                                <div
+                                                    class={
+                                                        "dash-row-actions"
+                                                    }
+                                                >
+                                                    <Button
+                                                        label={actionIcon(
+                                                            "edit",
+                                                        )}
+                                                        class={
+                                                            "icon-link"
+                                                        }
+                                                        title={t(
+                                                            "set.pipeline_edit",
+                                                        )}
+                                                        aria-label={t(
+                                                            "set.pipeline_edit",
+                                                        )}
+                                                        disabled={
+                                                            ctx.busy ||
+                                                            editorOpen
+                                                        }
+                                                        onclick={() =>
+                                                            void openPipelineEditor(
+                                                                ctx,
+                                                                pipeline,
+                                                            )
+                                                        }
+                                                    />
+                                                    <Button
+                                                        label={actionIcon(
+                                                            "delete",
+                                                        )}
+                                                        class={
+                                                            "icon-link dash-delete"
+                                                        }
+                                                        title={t(
+                                                            "set.pipeline_delete",
+                                                        )}
+                                                        aria-label={t(
+                                                            "set.pipeline_delete",
+                                                        )}
+                                                        disabled={
+                                                            ctx.busy ||
+                                                            editorOpen
+                                                        }
+                                                        onclick={() =>
+                                                            void deletePipeline(
+                                                                ctx,
+                                                                pipeline,
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))
+                                       : null}
+                              </div>,
+                          ];
+                      },
                   );
         const repositoryRows: m.Children[] = state.repositories.length
             ? state.repositories.map((repository) => (
                   <div class={"card-head"}>
                       <code>{repository}</code>
-                      <div class={"actions"}>
+                      <div class={"dash-row-actions"}>
                           <Badge
                               text={tCount(
                                   "set.pipeline_count",
@@ -290,7 +379,7 @@ export const def: ModuleDef = {
                           />
                           <Button
                               label={actionIcon("delete")}
-                              class={"icon-link danger"}
+                              class={"icon-link dash-delete"}
                               title={t("ui.remove")}
                               aria-label={t("ui.remove")}
                               disabled={ctx.busy}
@@ -335,18 +424,24 @@ export const def: ModuleDef = {
             ...repositoryRows,
         ];
         const editorElement: m.Children = editorOpen ? (
-            <Form onSubmit={() => void savePipeline(ctx)}>
-                <p class={"muted"}>
-                    {state.editingId
-                        ? t("set.pipeline_editing", state.editingId)
-                        : t("set.pipeline_new")}
-                </p>
-                <Field
-                    label={t("set.pipeline_path")}
-                    control={
-                        state.editingId !== "" ? (
-                            <code>{state.editingId}</code>
-                        ) : (
+            <Form
+                class={"pipeline-editor"}
+                onSubmit={() => void savePipeline(ctx)}
+            >
+                <div class={"pipeline-editor-head"}>
+                    <span class={"pipeline-editor-title"}>
+                        {state.editingId
+                            ? t("set.pipeline_editing", state.editingId)
+                            : t("set.pipeline_new")}
+                    </span>
+                    <code class={"pipeline-editor-id"}>
+                        {state.editingId || state.newPath}
+                    </code>
+                </div>
+                {state.editingId === "" ? (
+                    <Field
+                        label={t("set.pipeline_path")}
+                        control={
                             <Input
                                 target={state}
                                 prop="newPath"
@@ -354,25 +449,36 @@ export const def: ModuleDef = {
                                 pattern={PIPELINE_PATH_PATTERN}
                                 placeholder={t("set.pipeline_path_ph")}
                             />
-                        )
-                    }
-                />
+                        }
+                    />
+                ) : null}
                 <Field
                     label={t("set.pipeline_content")}
                     control={
                         <textarea
-                            rows={8}
+                            class={"pipeline-editor-text"}
+                            rows={14}
+                            spellCheck={false}
                             value={state.content}
                             oninput={(e: Event) => {
                                 state.content = (
                                     e.target as HTMLTextAreaElement
                                 ).value;
                             }}
+                            onkey={(e: Event) => {
+                                const key = e as KeyboardEvent;
+                                if (
+                                    (key.ctrlKey || key.metaKey) &&
+                                    key.key === "s"
+                                ) {
+                                    key.preventDefault();
+                                    void savePipeline(ctx);
+                                }
+                            }}
                         />
                     }
                 />
-                <Break />
-                <Actions>
+                <div class={"pipeline-editor-actions"}>
                     <Button
                         label={
                             state.editingId !== ""
@@ -380,6 +486,7 @@ export const def: ModuleDef = {
                                 : t("set.pipeline_add")
                         }
                         type={"submit"}
+                        title={t("set.pipeline_save_hint")}
                         disabled={ctx.busy}
                     />
                     <Button
@@ -388,7 +495,7 @@ export const def: ModuleDef = {
                         disabled={ctx.busy}
                         onclick={closeEditor}
                     />
-                </Actions>
+                </div>
             </Form>
         ) : (
             <Actions>

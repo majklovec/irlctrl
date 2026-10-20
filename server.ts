@@ -146,7 +146,9 @@ const DB_FILE = arg("--db", process.env.SRTLA_DB ?? "users.db");
 
 const STALE_DEVICE_MS = 5 * 60 * 1000;
 const PRUNE_INTERVAL_MS = 30 * 1000;
-const REQUEST_TIMEOUT_MS = 60_000;
+// A flapping device link loses forwarded requests; fail before the client's
+// 30 s timeout so the page surfaces the error and retries promptly.
+const REQUEST_TIMEOUT_MS = 20_000;
 
 const ID_RE = /^[\w.-]{1,64}$/;
 // /d/<id>, /d/<id>/, /d/<id>/ws, /d/<id>/settings[/], /d/<id>/setup[/]

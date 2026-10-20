@@ -187,6 +187,18 @@ export const actionIcon = (action: keyof typeof ACTION_SHAPES): m.Vnode =>
         "stroke-linejoin": "round",
     });
 
+/** Right-pointing chevron; rotate via CSS to point down when expanded. */
+export const chevronIcon = (): m.Vnode =>
+    draw([["path", { d: "m9 6 6 6-6 6" }]], {
+        width: "14",
+        height: "14",
+        fill: "none",
+        stroke: "currentColor",
+        "stroke-width": "2",
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+    });
+
 /** Role icon(s) with the translated role as tooltip; combined devices get both icons. */
 export const roleTag = (role: Role): m.Vnode => (
     <span class="role" title={t(`role.${role}`)}>

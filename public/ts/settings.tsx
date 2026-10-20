@@ -68,12 +68,21 @@ async function run<T>(call: () => Promise<T>): Promise<T | undefined> {
 }
 
 async function load(): Promise<void> {
-    const result = await run(() =>
-        Promise.all([
-            rpc.call<{ settings: Settings }>("settings.get"),
-            rpc.call<{ modules: modulesView }>("modules.list"),
-        ]),
-    );
+    // Right after a (re)start the device link to the server is flapping and
+    // the first fetch can time out; retry a few times before giving up.
+    let result:
+        | [{ settings: Settings }, { modules: modulesView }]
+        | undefined;
+    for (let attempt = 0; attempt < 5; attempt++) {
+        if (attempt > 0) await new Promise((r) => setTimeout(r, 1500));
+        result = await run(() =>
+            Promise.all([
+                rpc.call<{ settings: Settings }>("settings.get"),
+                rpc.call<{ modules: modulesView }>("modules.list"),
+            ]),
+        );
+        if (result) break;
+    }
     if (!result) return;
     const [settings, modules] = result;
     state.settings = settings.settings;
