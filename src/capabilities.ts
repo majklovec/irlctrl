@@ -50,6 +50,7 @@ import type {
     EncoderConfig,
     EncoderState,
     ModemInfo,
+    Pipeline,
     SrtlaState,
 } from "../public/types";
 import type { SrtlaOptions, SrtlaOptionsResult, SrtlaTarget } from "./state";
@@ -69,7 +70,7 @@ export interface EncoderServices {
         validate(cfg: EncoderConfig): void;
     };
     loadEncoder(): unknown;
-    listPipelines(): Promise<string[]>;
+    listPipelines(): Promise<Pipeline[]>;
     listAudioSources(): Promise<string[]>;
     ceracoderConfig(): CeraConfig | null;
     AUDIO_CODECS: readonly ("aac" | "opus")[];

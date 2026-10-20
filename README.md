@@ -102,7 +102,9 @@ Pipelines are the belacoder GStreamer files under `--pipelines`, grouped by subd
 
 Every pipeline file must contain a non-empty GStreamer launch string — empty or whitespace-only files are rejected before belacoder starts (select another pipeline, or restore the file, if the UI reports `Pipeline is empty`). The selected pipeline must also match the available hardware and GStreamer plugins on the device; for example the Rockchip pipelines use `mpph265enc`, which is not available on a generic x86 host.
 
-The settings page can also manage **GitHub pipeline repositories** in `author/repository` format. Files below the repository's `pipeline/` directory are imported recursively into `PIPELINES_DIR/author/repository/`. **Update all** refreshes every configured repository, replacing its local files so deleted upstream pipelines are removed too.
+The settings page can also manage **GitHub pipeline repositories** in `author/repository` format. Files below the repository's `pipeline/` directory are imported recursively into `PIPELINES_DIR/author/repository/`. Each configured repository shows a **pipeline count** badge, and can be **updated** in place (refreshing just that repository) or **removed** — removing a repository also deletes its imported pipeline files. **Update all** refreshes every configured repository, replacing its local files so deleted upstream pipelines are removed too.
+
+Below the repository list is a **pipeline manager** for the files on disk: it lists every pipeline grouped by subdirectory and lets you **create** a new pipeline file, **edit** its GStreamer launch string, or **delete** it. New files are written under `PIPELINES_DIR` at the path you choose; a file must contain a non-empty GStreamer launch string (with at least one `!` between elements) to be saved.
 
 ### Autostart
 

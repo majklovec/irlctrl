@@ -43,11 +43,22 @@ export interface ModuleContext {
 export interface ModuleDef {
     /** Module id, matches the server's modules list (e.g. "encoder"). */
     id: string;
-    /** i18n key for the card title. */
+    /** i18n key for the card title (ignored when `selfCards` is true). */
     titleKey: string;
+    /**
+     * When true, `render` returns the module's own <Card> element(s) and is
+     * not wrapped in the framework's single titled card. Use for modules
+     * that want several cards of their own (e.g. encoder: repositories +
+     * pipelines).
+     */
+    selfCards?: boolean;
     /** Whether the card is shown for the current role/module state. */
     visible: (ctx: ModuleContext) => boolean;
-    /** Card body: the module's own form fields and action buttons. */
+    /**
+     * Card body: the module's own form fields and action buttons. When
+     * `selfCards` is set, the returned vnodes must be (a list of) Card
+     * elements with keys.
+     */
     render: (ctx: ModuleContext) => m.Children;
     /** Re-seed the module's local state from fresh server data. */
     refresh?: (ctx: ModuleContext) => void;
@@ -170,12 +181,23 @@ export function renderModuleCards(): Array<m.Vnode | null> {
     if (device.rpc === undefined || device.settings === undefined) {
         return [];
     }
-    return registered.map((def) => {
+    return registered.flatMap((def) => {
         const ctx = contextFor(def);
         if (!def.visible(ctx)) {
-            return null;
+            return [];
         }
-        return (
+        if (def.selfCards) {
+            // The module renders its own titled Card elements.
+            return [
+                def.render(ctx),
+                ctx.message === "" ? null : (
+                    <p class="muted" role="status">
+                        {ctx.message}
+                    </p>
+                ),
+            ] as unknown as (m.Vnode | null)[];
+        }
+        return [
             <Card title={t(def.titleKey)}>
                 {def.render(ctx)}
                 {ctx.message === "" ? null : (
@@ -183,7 +205,7 @@ export function renderModuleCards(): Array<m.Vnode | null> {
                         {ctx.message}
                     </p>
                 )}
-            </Card>
-        );
+            </Card>,
+        ];
     });
 }

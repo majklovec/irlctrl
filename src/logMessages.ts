@@ -125,6 +125,35 @@ const METHOD_LOG: Record<string, MethodLog> = {
     "modules.configure": log("Modules", "Configuration", (p) =>
         translate("mlog.done.module_configured", p.id),
     ),
+    "pipelines.create": log("Pipelines", "Create", (p) =>
+        translate("mlog.done.pipeline_created", p.id),
+    ),
+    "pipelines.update": log("Pipelines", "Update", (p) =>
+        translate("mlog.done.pipeline_updated", p.id),
+    ),
+    "pipelines.delete": log("Pipelines", "Delete", (p) =>
+        translate("mlog.done.pipeline_deleted", p.id),
+    ),
+    "pipelines.repositories.add": log(
+        "Pipelines",
+        "Import repository",
+        (p) => translate("mlog.done.repo_imported", p.repository),
+    ),
+    "pipelines.repositories.update": log(
+        "Pipelines",
+        "Import repository",
+        (p) => translate("mlog.done.repo_imported", p.repository),
+    ),
+    "pipelines.repositories.remove": log(
+        "Pipelines",
+        "Delete repository",
+        (p) => translate("mlog.done.repo_removed", p.repository),
+    ),
+    "pipelines.repositories.updateAll": log(
+        "Pipelines",
+        "Import all repositories",
+        () => translate("mlog.done.repos_imported"),
+    ),
 };
 
 /** Whether the device records this method in its event log. */

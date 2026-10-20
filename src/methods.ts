@@ -25,9 +25,11 @@
  *   srtla.status, srtla.start {listenPort, remoteHost, remotePort}, srtla.stop, srtla.reload
  *   srtla.stats   latest per-link telemetry from srtla_send's control socket
  *   srtla.options {mode? ("classic"|"enhanced"), quality? (bool)}   applied live when possible
- *   pipelines.list
- *   pipelines.repositories.add {repository}, pipelines.repositories.remove {repository}
- *   pipelines.repositories.updateAll
+ *   pipelines.list   (also `repositoryCounts`: per-repo pipeline counts)
+ *   pipelines.get {id}, pipelines.create {id, content},
+ *   pipelines.update {id, content}, pipelines.delete {id}
+ *   pipelines.repositories.add {repository}, pipelines.repositories.remove {repository},
+ *   pipelines.repositories.update {repository}, pipelines.repositories.updateAll
  *   encoder.status, encoder.start {pipeline, host, port, minBitrate?, maxBitrate?, latency?, delay?,
  *                                  streamid?, audioSource?, audioCodec? ("aac"|"opus"), bitrateOverlay?},
  *   encoder.stop, encoder.bitrate {maxBitrate?, minBitrate?}   (at least one; applied live)
@@ -88,6 +90,14 @@ import {
     removePipelineRepository,
     syncPipelineRepository,
 } from "./pipelineRepos";
+import {
+    countPipelineFiles,
+    createPipelineFile,
+    deletePipelineFile,
+    pipelinesByPrefix,
+    readPipelineFile,
+    updatePipelineFile,
+} from "./pipelines";
 import { applyRemoteSettings } from "./remote";
 import {
     detectInterfaces,
@@ -477,6 +487,22 @@ const manual =
         return fn(p);
     };
 
+/**
+ * Fresh pipeline list plus per-repository file counts — returned by every
+ * `pipelines.*` response so the settings card can re-render from one payload.
+ * `repositoryCounts[owner/repo]` (0 for a repo whose mirror is gone).
+ */
+async function pipelinesPayload() {
+    const pipelines = await encoderServices.listPipelines();
+    return {
+        pipelines,
+        repositoryCounts: pipelinesByPrefix(
+            pipelines.map((p) => p.id),
+            state.settings.pipelineRepositories ?? [],
+        ),
+    };
+}
+
 const methods: Record<string, Method> = {
     status: buildStatus,
 
@@ -621,8 +647,31 @@ const methods: Record<string, Method> = {
 
     "pipelines.list": async () => ({
         dir: PIPELINES_DIR,
-        pipelines: await encoderServices.listPipelines(),
+        ...(await pipelinesPayload()),
     }),
+
+    "pipelines.get": async (p) => {
+        const id = requireString(p, "id").trim();
+        return { id, content: await readPipelineFile(id, PIPELINES_DIR) };
+    },
+
+    "pipelines.create": async (p) => {
+        const id = requireString(p, "id").trim();
+        await createPipelineFile(id, requireString(p, "content"), PIPELINES_DIR);
+        return { id, ...(await pipelinesPayload()) };
+    },
+
+    "pipelines.update": async (p) => {
+        const id = requireString(p, "id").trim();
+        await updatePipelineFile(id, requireString(p, "content"), PIPELINES_DIR);
+        return { id, ...(await pipelinesPayload()) };
+    },
+
+    "pipelines.delete": async (p) => {
+        const id = requireString(p, "id").trim();
+        await deletePipelineFile(id, PIPELINES_DIR);
+        return { id, ...(await pipelinesPayload()) };
+    },
 
     "pipelines.repositories.add": async (p) => {
         const repository = requireString(p, "repository").trim();
@@ -635,7 +684,11 @@ const methods: Record<string, Method> = {
             pipelineRepositories: [...repositories].sort(),
         };
         await saveState();
-        return { repositories: state.settings.pipelineRepositories, result };
+        return {
+            repositories: state.settings.pipelineRepositories,
+            result,
+            ...(await pipelinesPayload()),
+        };
     },
 
     "pipelines.repositories.remove": async (p) => {
@@ -646,7 +699,19 @@ const methods: Record<string, Method> = {
         ).filter((r) => r !== repository);
         state.settings = { ...state.settings, pipelineRepositories };
         await saveState();
-        return { repositories: pipelineRepositories };
+        return {
+            repositories: pipelineRepositories,
+            ...(await pipelinesPayload()),
+        };
+    },
+
+    "pipelines.repositories.update": async (p) => {
+        const repository = requireString(p, "repository").trim();
+        const repositories = state.settings.pipelineRepositories ?? [];
+        if (!repositories.includes(repository))
+            throw new ApiError(`Repository not configured: ${repository}`, 404);
+        const result = await syncPipelineRepository(repository, PIPELINES_DIR);
+        return { repositories, result, ...(await pipelinesPayload()) };
     },
 
     "pipelines.repositories.updateAll": async () => {
@@ -656,7 +721,7 @@ const methods: Record<string, Method> = {
             results.push(
                 await syncPipelineRepository(repository, PIPELINES_DIR),
             );
-        return { repositories, results };
+        return { repositories, results, ...(await pipelinesPayload()) };
     },
 
     "encoder.status": () => ({ encoder: encoderServices.encoder().status() }),
@@ -859,7 +924,7 @@ function methodAllowed(name: string): boolean {
     if (
         name.startsWith("encoder.") ||
         name.startsWith("ceracoder.") ||
-        name === "pipelines.list"
+        name.startsWith("pipelines.")
     )
         return role !== "relay";
     if (
