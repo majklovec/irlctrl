@@ -1,0 +1,2 @@
+-   remove tCount, use t only
+-   do not use interpolate, use object-based translation - make sure to pass an object with named keys instead of positional arguments, make it fully i18next compatible

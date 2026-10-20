@@ -666,7 +666,7 @@ export function createObsPanel({
                     (ui.lastAttempt + ui.previewInterval - Date.now()) / 1000,
                 ),
             );
-            return t("obs.next", remaining);
+            return t("obs.next", { seconds: remaining });
         };
 
         return (

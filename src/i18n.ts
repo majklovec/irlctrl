@@ -25,10 +25,9 @@
 // starts — including the synchronous `--help` path, where i18next is already
 // initialized (initGate) and no catalog is loaded at all.
 //
-// t()/translate() keep their historical signatures: `{0}`, `{1}`, ... in the
-// catalogs are replaced by the positional arguments (i18next interpolation
-// configured accordingly). Missing keys fall back to English, then to the
-// raw key — the same behavior the PO implementation had.
+// t()/translate() use i18next's options-object API with named interpolation
+// values. Missing keys fall back to English, then to the raw key — the same
+// behavior the PO implementation had.
 
 import i18next, { type TOptions } from "i18next";
 import {
@@ -72,9 +71,7 @@ const initGate: Promise<void> = (async () => {
         // Keys are flat strings that may contain dots, so no path splitting.
         keySeparator: false,
         nsSeparator: false,
-        // Positional placeholders: {0}, {1}, ... (escapeValue off — values are
-        // plain text, never HTML-escaped by i18next).
-        interpolation: { prefix: "{", suffix: "}", escapeValue: false },
+        interpolation: { escapeValue: false },
         returnNull: false,
     });
 })();
@@ -141,35 +138,21 @@ export function setCurrentLanguage(lang: unknown): void {
         );
 }
 
-/** Maps t(key, a, b) onto i18next's `{0}`, `{1}` interpolation data. */
-function interpolate(
-    key: string,
-    args: readonly unknown[],
-    lng?: Language,
-): string {
-    const data: Record<string, unknown> = {};
-    args.forEach((arg, i) => {
-        data[String(i)] = arg ?? "";
-    });
-    return i18n.t(key, { ...(data as object), lng } as TOptions) as string;
-}
-
 /**
  * Translate a catalog key into a specific language. Unknown languages fall
  * back to English, unknown keys fall back to English, then to the raw key.
- * `{0}`, `{1}`, ... are replaced by the corresponding arguments.
  */
 export function translate(
     lang: unknown,
     key: string,
-    ...args: unknown[]
+    options?: TOptions,
 ): string {
-    return interpolate(key, args, asLanguage(lang));
+    return i18n.t(key, { ...options, lng: asLanguage(lang) }) as string;
 }
 
 /** Translate using the current language. */
-export function t(key: string, ...args: unknown[]): string {
-    return interpolate(key, args, current);
+export function t(key: string, options?: TOptions): string {
+    return i18n.t(key, { ...options, lng: current }) as string;
 }
 
 // The log wording (src/logMessages) localizes through the installed translator.

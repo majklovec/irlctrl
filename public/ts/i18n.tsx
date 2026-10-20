@@ -51,9 +51,7 @@ const initPromise = i18n.use(httpBackend).init({
     // Keys are flat strings that may contain dots, so no path splitting.
     keySeparator: false,
     nsSeparator: false,
-    // Positional placeholders: {0}, {1}, ... (escapeValue off — the values
-    // are plain text and must not be HTML-escaped).
-    interpolation: { prefix: "{", suffix: "}", escapeValue: false },
+    interpolation: { escapeValue: false },
     returnNull: false,
 });
 
@@ -73,25 +71,13 @@ export const i18nReady: Promise<void> = initPromise
     )
     .then(() => undefined);
 
-/** Translate using the current UI language; positional args fill {0}, {1}, ... */
-export function t(
-    key: string,
-    ...args: (string | number | undefined)[]
-): string {
-    const data: Record<string, unknown> = {};
-    args.forEach((arg, i) => (data[String(i)] = arg ?? ""));
-    return i18n.t(key, data as TOptions) as string;
-}
-
-/** Translate a pluralized key using i18next's locale-aware count rules. */
-export function tCount(key: string, count: number): string {
-    return i18n.t(key, { count } as TOptions) as string;
+/** Translate using the current UI language and standard i18next options. */
+export function t(key: string, options?: TOptions): string {
+    return i18n.t(key, options) as string;
 }
 
 // The shared log wording (src/logMessages) localizes through the installed translator.
-setLogTranslator((key, ...args) =>
-    t(key, ...(args as (string | number | undefined)[])),
-);
+setLogTranslator(t);
 
 /** "🇨🇿 Čeština": flag and native name, the same whatever the UI language. */
 export const languageLabel = (l: Language): string => {

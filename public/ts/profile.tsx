@@ -328,7 +328,7 @@ const App: m.Component = {
                                     const status = used
                                         ? t(
                                               "invitations.statusUsed",
-                                              inv.used_by ?? "",
+                                              { user: inv.used_by ?? "" },
                                           )
                                         : expired
                                           ? t("invitations.statusExpired")

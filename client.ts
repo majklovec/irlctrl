@@ -95,7 +95,7 @@ async function main(): Promise<void> {
     const shutdown = async (signal: string) => {
         console.log(`\nReceived ${signal}, shutting down...`);
         // Before stopRemote so the control server still receives it
-        logEvent("info", "Service", t("log.stopped_signal", signal));
+        logEvent("info", "Service", t("log.stopped_signal", { signal }));
         stopRemote();
         stopRegistryModules(); // modules/<id>/backend.ts stop()s (no-ops for modules that never started)
         await stopInterfaceMonitor();
@@ -103,7 +103,7 @@ async function main(): Promise<void> {
         process.exit(0);
     };
 
-    logEvent("info", "Service", t("log.started", ROLE));
+    logEvent("info", "Service", t("log.started", { role: ROLE }));
 
     // Modules bind their `core` bag at start, and every module capability
     // (srtla/encoder) reads it — so start them before any service call below.
@@ -121,7 +121,7 @@ async function main(): Promise<void> {
             logEvent(
                 "error",
                 "Interfaces",
-                t("log.reconfigure_failed", result.error),
+                t("log.reconfigure_failed", { error: result.error }),
             );
             await flushLog();
             process.exit(1);

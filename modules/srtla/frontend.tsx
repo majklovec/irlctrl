@@ -105,9 +105,11 @@ export function srtlaCardBody(host: DeviceCard, status: Status): m.Vnode {
                         t("dev.reloads"),
                         t(
                             "dev.reloads_detail",
-                            s.reloadCount ?? 0,
-                            since(s.lastReloadAt),
-                            status.monitor.reloadMode,
+                            {
+                                reloads: s.reloadCount ?? 0,
+                                last: since(s.lastReloadAt),
+                                mode: status.monitor.reloadMode,
+                            },
                         ),
                     ],
                     [
@@ -314,8 +316,10 @@ function linkCells(l: SrtlaLinkStats | undefined, total: number): m.Vnode[] {
                     value={share}
                     title={t(
                         "dev.link_share_title",
-                        Math.round(share * 100),
-                        Math.round(l.rtt_min_ms),
+                        {
+                            percentage: Math.round(share * 100),
+                            rtt: Math.round(l.rtt_min_ms),
+                        },
                     )}
                 />
                 {formatBitrate(l.bitrate_bytes_per_sec)}
@@ -325,7 +329,7 @@ function linkCells(l: SrtlaLinkStats | undefined, total: number): m.Vnode[] {
         cell(
             l.connected ? `${Math.round(l.rtt_ms)} ms` : "—",
             "num",
-            t("dev.link_min_rtt", Math.round(l.rtt_min_ms)),
+            t("dev.link_min_rtt", { rtt: Math.round(l.rtt_min_ms) }),
         ),
         cell(`${l.in_flight} / ${l.window}`, "num"),
         cell(l.nak_count, "num"),
@@ -335,7 +339,9 @@ function linkCells(l: SrtlaLinkStats | undefined, total: number): m.Vnode[] {
                 ? `×${l.quality_multiplier.toFixed(2)}`
                 : "—",
             "num",
-            l.base_score !== undefined ? t("dev.link_score", l.base_score) : "",
+            l.base_score !== undefined
+                ? t("dev.link_score", { score: l.base_score })
+                : "",
         ),
     ];
 }
@@ -383,7 +389,7 @@ function interfacesCard(host: DeviceCard, status: Status): m.Vnode {
         const sub = [
             i.cidr,
             i.modemIndex !== undefined
-                ? t("dev.iface_modem", i.modemIndex)
+                ? t("dev.iface_modem", { index: i.modemIndex })
                 : null,
         ]
             .filter(Boolean)
@@ -430,7 +436,9 @@ function interfacesCard(host: DeviceCard, status: Status): m.Vnode {
             headActions={[
                 stale && (
                     <Badge
-                        text={t("dev.stale", since(host.st.statsAt))}
+                        text={t("dev.stale", {
+                            time: since(host.st.statsAt),
+                        })}
                         kind="warn"
                     />
                 ),
@@ -459,7 +467,10 @@ function interfacesCard(host: DeviceCard, status: Status): m.Vnode {
 // ----------------------------------------------------------------- modem panels
 
 function modemAction(host: DeviceCard, method: string, index: number): void {
-    if (method === "modems.reset" && !confirm(t("dev.reset_confirm", index)))
+    if (
+        method === "modems.reset" &&
+        !confirm(t("dev.reset_confirm", { index }))
+    )
         return;
     void host.act(`modem:${method}:${index}`, method, { index });
 }

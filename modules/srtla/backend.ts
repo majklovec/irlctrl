@@ -197,7 +197,10 @@ function onSrtlaExit(code: number | null): void {
     core.logEvent(
         "warn",
         "SRTLA",
-        core.t("log.srtla_exited", code, RESTART_DELAY_MS / 1000),
+        core.t("log.srtla_exited", {
+            code,
+            delay: RESTART_DELAY_MS / 1000,
+        }),
     );
     supervisorRef().scheduleRestart();
 }

@@ -45,8 +45,10 @@ function connBadge(): m.Vnode {
         <Badge
             text={t(
                 "dev.badge.online_count",
-                online,
-                state.devices?.length ?? 0,
+                {
+                    online,
+                    total: state.devices?.length ?? 0,
+                },
             )}
             kind={online ? "on" : "warn"}
         />
@@ -77,7 +79,9 @@ function bitrate(d: DeviceSummary): Child {
         d.online && d.bitrate !== undefined ? formatBitrate(d.bitrate) : null;
     const max =
         d.maxBitrate !== undefined
-            ? t("dev.max_value", formatBitrate(d.maxBitrate * 125))
+            ? t("dev.max_value", {
+                  value: formatBitrate(d.maxBitrate * 125),
+              })
             : null;
     if (live && max)
         return (
@@ -127,7 +131,7 @@ function row(d: DeviceSummary): m.Vnode {
             <td>
                 {d.online
                     ? since(d.connectedAt)
-                    : t("mgmt.last_seen", since(d.lastSeen))}
+                    : t("mgmt.last_seen", { time: since(d.lastSeen) })}
             </td>
             <td>{streamState(d)}</td>
             <td>{bitrate(d)}</td>

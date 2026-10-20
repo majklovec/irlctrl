@@ -24,7 +24,7 @@ import {
     Input,
 } from "../../public/ts/components/ui";
 import { actionIcon, chevronIcon } from "../../public/ts/components/icons";
-import { t, tCount } from "../../public/ts/i18n";
+import { t } from "../../public/ts/i18n";
 import type { ModuleContext, ModuleDef } from "../../public/ts/modules";
 import type { Pipeline } from "../../public/types";
 
@@ -87,7 +87,7 @@ async function loadPipelines(ctx: ModuleContext): Promise<void> {
 async function addRepository(ctx: ModuleContext): Promise<void> {
     const repository = state.repository.trim();
     if (!repository) return;
-    ctx.note(t("set.repo_importing", repository));
+    ctx.note(t("set.repo_importing", { repository }));
     const response = await ctx.run(() =>
         ctx.rpc.call<
             PipelinesPayload & {
@@ -100,14 +100,14 @@ async function addRepository(ctx: ModuleContext): Promise<void> {
     state.repository = "";
     loadSeq++;
     applyPayload(response);
-    ctx.note(t("set.repo_imported", response.result.files));
+    ctx.note(t("set.repo_imported", { files: response.result.files }));
 }
 
 async function removeRepository(
     ctx: ModuleContext,
     repository: string,
 ): Promise<void> {
-    ctx.note(t("set.repo_removing", repository));
+    ctx.note(t("set.repo_removing", { repository }));
     const response = await ctx.run(() =>
         ctx.rpc.call<PipelinesPayload & { repositories: string[] }>(
             "pipelines.repositories.remove",
@@ -117,14 +117,14 @@ async function removeRepository(
     state.repositories = response.repositories;
     loadSeq++;
     applyPayload(response);
-    ctx.note(t("set.repo_removed", repository));
+    ctx.note(t("set.repo_removed", { repository }));
 }
 
 async function updateRepository(
     ctx: ModuleContext,
     repository: string,
 ): Promise<void> {
-    ctx.note(t("set.repo_updating", repository));
+    ctx.note(t("set.repo_updating", { repository }));
     const response = await ctx.run(() =>
         ctx.rpc.call<PipelinesPayload & { result: { files: number } }>(
             "pipelines.repositories.update",
@@ -133,7 +133,12 @@ async function updateRepository(
     );
     loadSeq++;
     applyPayload(response);
-    ctx.note(t("set.repo_updated", repository, response.result.files));
+    ctx.note(
+        t("set.repo_updated", {
+            repository,
+            files: response.result.files,
+        }),
+    );
 }
 
 async function updateAllRepositories(ctx: ModuleContext): Promise<void> {
@@ -148,7 +153,12 @@ async function updateAllRepositories(ctx: ModuleContext): Promise<void> {
     loadSeq++;
     applyPayload(response);
     const files = response.results.reduce((total, r) => total + r.files, 0);
-    ctx.note(t("set.repo_updated_all", response.results.length, files));
+    ctx.note(
+        t("set.repo_updated_all", {
+            repositories: response.results.length,
+            files,
+        }),
+    );
 }
 
 function toggleGroup(group: string): void {
@@ -199,7 +209,9 @@ async function savePipeline(ctx: ModuleContext): Promise<void> {
     applyPayload(response);
     closeEditor();
     ctx.note(
-        isNew ? t("set.pipeline_created", id) : t("set.pipeline_updated", id),
+        isNew
+            ? t("set.pipeline_created", { id })
+            : t("set.pipeline_updated", { id }),
     );
 }
 
@@ -207,7 +219,8 @@ async function deletePipeline(
     ctx: ModuleContext,
     pipeline: Pipeline,
 ): Promise<void> {
-    if (!window.confirm(t("set.pipeline_delete_confirm", pipeline.id))) return;
+    if (!window.confirm(t("set.pipeline_delete_confirm", { id: pipeline.id })))
+        return;
     const response = await ctx.run(() =>
         ctx.rpc.call<PipelinesPayload>("pipelines.delete", {
             id: pipeline.id,
@@ -215,7 +228,7 @@ async function deletePipeline(
     );
     loadSeq++;
     applyPayload(response);
-    ctx.note(t("set.pipeline_deleted", pipeline.id));
+    ctx.note(t("set.pipeline_deleted", { id: pipeline.id }));
 }
 
 export const def: ModuleDef = {
@@ -285,10 +298,9 @@ export const def: ModuleDef = {
                                           {group}
                                       </span>
                                       <Badge
-                                          text={tCount(
-                                              "set.pipeline_count",
-                                              pipelines.length,
-                                          )}
+                                          text={t("set.pipeline_count", {
+                                              count: pipelines.length,
+                                          })}
                                       />
                                   </button>
                                   {expanded
@@ -362,10 +374,9 @@ export const def: ModuleDef = {
                       <code>{repository}</code>
                       <div class={"dash-row-actions"}>
                           <Badge
-                              text={tCount(
-                                  "set.pipeline_count",
-                                  state.counts[repository] ?? 0,
-                              )}
+                              text={t("set.pipeline_count", {
+                                  count: state.counts[repository] ?? 0,
+                              })}
                           />
                           <Button
                               label={actionIcon("sync")}
@@ -431,7 +442,9 @@ export const def: ModuleDef = {
                 <div class={"pipeline-editor-head"}>
                     <span class={"pipeline-editor-title"}>
                         {state.editingId
-                            ? t("set.pipeline_editing", state.editingId)
+                            ? t("set.pipeline_editing", {
+                                  id: state.editingId,
+                              })
                             : t("set.pipeline_new")}
                     </span>
                     <code class={"pipeline-editor-id"}>

@@ -55,9 +55,9 @@ export const inRange = (v: string, min: number, max: number): boolean => {
 export const since = (ts?: number) => {
     if (!ts) return "—";
     const s = Math.round((Date.now() - ts) / 1000);
-    if (s < 60) return t("time.s_ago", s);
-    if (s < 3600) return t("time.m_ago", Math.floor(s / 60));
-    return `${t("time.h_ago", Math.floor(s / 3600))} ${t("time.m_ago", Math.floor((s % 3600) / 60))}`;
+    if (s < 60) return t("time.s_ago", { count: s });
+    if (s < 3600) return t("time.m_ago", { count: Math.floor(s / 60) });
+    return `${t("time.h_ago", { count: Math.floor(s / 3600) })} ${t("time.m_ago", { count: Math.floor((s % 3600) / 60) })}`;
 };
 
 export function formatBitrate(bytesPerSec: number): string {
@@ -69,7 +69,9 @@ export function formatBitrate(bytesPerSec: number): string {
 
 /** Link speed in Mb/s → "100 Mb/s" / "2.5 Gb/s". */
 export const formatSpeed = (mbps: number): string =>
-    mbps >= 1000 ? t("dev.unit_gbs", mbps / 1000) : t("dev.unit_mbs", mbps);
+    mbps >= 1000
+        ? t("dev.unit_gbs", { value: mbps / 1000 })
+        : t("dev.unit_mbs", { value: mbps });
 
 /** A message starting with @username is a DM — render it muted. */
 export const DM_RE = /^\s*@[A-Za-z0-9_-]+/;

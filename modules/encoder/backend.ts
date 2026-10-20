@@ -385,7 +385,10 @@ abstract class Encoder {
         core.logEvent(
             "warn",
             "Encoder",
-            core.t("log.encoder_exited", code, RESTART_DELAY_MS / 1000),
+            core.t("log.encoder_exited", {
+                code,
+                delay: RESTART_DELAY_MS / 1000,
+            }),
         );
         core.state.encoder.restarts = (core.state.encoder.restarts ?? 0) + 1;
         core.state.encoder.lastError ??= `${this.name} exited with code ${code}`;

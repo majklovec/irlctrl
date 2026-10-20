@@ -1774,7 +1774,9 @@ const server = Bun.serve({
                 addServerLog(
                     d,
                     "info",
-                    translate(d.language, "srv.online", data.address),
+                    translate(d.language, "srv.online", {
+                        address: data.address,
+                    }),
                 );
                 publishDeviceList(true);
                 return;
@@ -1813,7 +1815,11 @@ const server = Bun.serve({
             console.log(`[device ${d.id}] disconnected (${why})`);
             failPending((p) => p.deviceId === d.id, "device disconnected", 503);
             publish(d, deviceEvent(d));
-            addServerLog(d, "warn", translate(d.language, "srv.offline", why));
+            addServerLog(
+                d,
+                "warn",
+                translate(d.language, "srv.offline", { reason: why }),
+            );
             publishDeviceList(true);
         },
     },

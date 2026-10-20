@@ -203,7 +203,7 @@ function pipelineOptions(host: DeviceCard): m.Children {
                 value={""}
                 disabled={
                     true
-                }>{`${t("dev.no_pipelines", host.st.pipelineDir)} ${t("dev.no_pipelines_hint")}`}</option>
+                }>{`${t("dev.no_pipelines", { directory: host.st.pipelineDir })} ${t("dev.no_pipelines_hint")}`}</option>
         );
     return [...groups].map(([group, list]) => {
         const opts = (
@@ -244,15 +244,22 @@ function statusRows(host: DeviceCard, status: Status): [string, Child][] {
             cfg &&
                 t(
                     "dev.minmax_kbps",
-                    cfg.minBitrate ??
-                        status.ceracoder?.minBitrate ??
-                        BITRATE_KBPS.min,
-                    cfg.maxBitrate,
+                    {
+                        min:
+                            cfg.minBitrate ??
+                            status.ceracoder?.minBitrate ??
+                            BITRATE_KBPS.min,
+                        max: cfg.maxBitrate,
+                    },
                 ),
         ],
         [
             t("dev.row.latency"),
-            cfg && t("dev.latency_audio", cfg.latency, cfg.delay),
+            cfg &&
+                t("dev.latency_audio", {
+                    latency: cfg.latency,
+                    audioDelay: cfg.delay,
+                }),
         ],
         [
             t("dev.row.audio"),

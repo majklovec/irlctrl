@@ -11,9 +11,11 @@
  */
 
 /** Translator injected by whichever runtime uses the log wording (see above). */
-let translate: (key: string, ...args: unknown[]) => string = (key) => key;
+let translate: (key: string, options?: Record<string, unknown>) => string = (
+    key,
+) => key;
 export const setLogTranslator = (
-    fn: (key: string, ...args: unknown[]) => string,
+    fn: (key: string, options?: Record<string, unknown>) => string,
 ): void => {
     translate = fn;
 };
@@ -64,7 +66,10 @@ const METHOD_LOG: Record<string, MethodLog> = {
     "encoder.start": log("Encoder", "Start", "mlog.done.started"),
     "encoder.stop": log("Encoder", "Stop", "mlog.done.stopped"),
     "encoder.bitrate": log("Encoder", "Bitrate change", (p) =>
-        translate("mlog.done.bitrate", p.minBitrate, p.maxBitrate),
+        translate("mlog.done.bitrate", {
+            minBitrate: p.minBitrate,
+            maxBitrate: p.maxBitrate,
+        }),
     ),
     "ceracoder.set": log(
         "Encoder",
@@ -78,7 +83,8 @@ const METHOD_LOG: Record<string, MethodLog> = {
     "srtla.reload": log("SRTLA", "Reload", "mlog.done.reloaded"),
     "srtla.options": log("SRTLA", "Options update", (p) =>
         [
-            p.mode !== undefined && translate("mlog.done.mode", p.mode),
+            p.mode !== undefined &&
+                translate("mlog.done.mode", { mode: p.mode }),
             p.quality !== undefined &&
                 translate(
                     p.quality
@@ -95,59 +101,66 @@ const METHOD_LOG: Record<string, MethodLog> = {
         "mlog.done.bond_updated",
     ),
     "modems.toggle": log("Interfaces", "Bond toggle", (p) =>
-        translate("mlog.done.bond_toggled", p.iface),
+        translate("mlog.done.bond_toggled", { iface: p.iface }),
     ),
     reconfigure: log("Interfaces", "Reconfigure", "mlog.done.reconfigured"),
     "modems.enable": log("Modems", "Enable", (p) =>
-        translate("mlog.done.modem_enabled", p.index),
+        translate("mlog.done.modem_enabled", { index: p.index }),
     ),
     "modems.disable": log("Modems", "Disable", (p) =>
-        translate("mlog.done.modem_disabled", p.index),
+        translate("mlog.done.modem_disabled", { index: p.index }),
     ),
     "modems.connect": log("Modems", "Connect", (p) =>
-        translate("mlog.done.modem_connected", p.index),
+        translate("mlog.done.modem_connected", { index: p.index }),
     ),
     "modems.disconnect": log("Modems", "Disconnect", (p) =>
-        translate("mlog.done.modem_disconnected", p.index),
+        translate("mlog.done.modem_disconnected", { index: p.index }),
     ),
     "modems.reset": log("Modems", "Reset", (p) =>
-        translate("mlog.done.modem_reset", p.index),
+        translate("mlog.done.modem_reset", { index: p.index }),
     ),
     "autostart.set": log("Autostart", "Update", (p) =>
         translate(p.enabled ? "mlog.done.enabled" : "mlog.done.disabled"),
     ),
     "modules.enable": log("Modules", "Enable", (p) =>
-        translate("mlog.done.module_enabled", p.id),
+        translate("mlog.done.module_enabled", { id: p.id }),
     ),
     "modules.disable": log("Modules", "Disable", (p) =>
-        translate("mlog.done.module_disabled", p.id),
+        translate("mlog.done.module_disabled", { id: p.id }),
     ),
     "modules.configure": log("Modules", "Configuration", (p) =>
-        translate("mlog.done.module_configured", p.id),
+        translate("mlog.done.module_configured", { id: p.id }),
     ),
     "pipelines.create": log("Pipelines", "Create", (p) =>
-        translate("mlog.done.pipeline_created", p.id),
+        translate("mlog.done.pipeline_created", { id: p.id }),
     ),
     "pipelines.update": log("Pipelines", "Update", (p) =>
-        translate("mlog.done.pipeline_updated", p.id),
+        translate("mlog.done.pipeline_updated", { id: p.id }),
     ),
     "pipelines.delete": log("Pipelines", "Delete", (p) =>
-        translate("mlog.done.pipeline_deleted", p.id),
+        translate("mlog.done.pipeline_deleted", { id: p.id }),
     ),
     "pipelines.repositories.add": log(
         "Pipelines",
         "Import repository",
-        (p) => translate("mlog.done.repo_imported", p.repository),
+        (p) =>
+            translate("mlog.done.repo_imported", {
+                repository: p.repository,
+            }),
     ),
     "pipelines.repositories.update": log(
         "Pipelines",
         "Import repository",
-        (p) => translate("mlog.done.repo_imported", p.repository),
+        (p) =>
+            translate("mlog.done.repo_imported", {
+                repository: p.repository,
+            }),
     ),
     "pipelines.repositories.remove": log(
         "Pipelines",
         "Delete repository",
-        (p) => translate("mlog.done.repo_removed", p.repository),
+        (p) =>
+            translate("mlog.done.repo_removed", { repository: p.repository }),
     ),
     "pipelines.repositories.updateAll": log(
         "Pipelines",
@@ -188,7 +201,7 @@ export function methodLog(method: string): MethodLog {
         own(METHOD_LOG) ??
         own(READ_LOG) ??
         log(SECTIONS[method.split(".")[0]] ?? method, method, () =>
-            translate("mlog.done.generic", method),
+            translate("mlog.done.generic", { method }),
         )
     );
 }

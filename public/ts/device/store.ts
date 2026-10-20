@@ -165,7 +165,10 @@ export function createCardHost(opts: {
                 logFn(
                     "error",
                     section,
-                    t("mlog.failed", label(action), errorMessage(err)),
+                    t("mlog.failed", {
+                        action: label(action),
+                        reason: errorMessage(err),
+                    }),
                 );
             }
             return undefined;

@@ -67,7 +67,10 @@ async function toggleFullscreen(): Promise<void> {
         toastMsg(
             t(
                 "dash.fullscreen_error",
-                err instanceof Error ? err.message : String(err),
+                {
+                    error:
+                        err instanceof Error ? err.message : String(err),
+                },
             ),
         );
     }
@@ -238,7 +241,7 @@ function renameDashboard(): void {
 async function deleteDashboard(): Promise<void> {
     const dash = state.dash;
     if (!dash) return;
-    if (!window.confirm(t("dash.delete_confirm", dash.name))) return;
+    if (!window.confirm(t("dash.delete_confirm", { name: dash.name }))) return;
     state.dashMenu = false;
     const res = await fetch(`/api/dashboards/${encodeURIComponent(dash.id)}`, {
         method: "DELETE",

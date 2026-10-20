@@ -134,7 +134,10 @@ export function runAutostart(): void {
             logEvent(
                 "warn",
                 "Autostart",
-                t("log.stream_start_retry", AUTOSTART_RETRY_MS / 1000, msg),
+                t("log.stream_start_retry", {
+                    delay: AUTOSTART_RETRY_MS / 1000,
+                    error: msg,
+                }),
             );
             if (state.autostart)
                 retryTimer = setTimeout(

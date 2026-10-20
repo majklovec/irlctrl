@@ -447,12 +447,18 @@ async function updateSettings(p: Params): Promise<object> {
             "info",
             "Settings",
             remoteUrl
-                ? t("log.settings_saved_reconnect", scrubUrl(remoteUrl))
+                ? t("log.settings_saved_reconnect", {
+                      url: scrubUrl(remoteUrl),
+                  })
                 : t("mlog.done.remote_disabled"),
         );
     } else if (renamed && remoteUrl) {
         applyRemoteSettings(remoteUrl, remoteToken);
-        logEvent("info", "Settings", t("log.settings_saved_renamed", hostname));
+        logEvent(
+            "info",
+            "Settings",
+            t("log.settings_saved_renamed", { hostname }),
+        );
     } else {
         logEvent("info", "Settings", t("mlog.done.settings_saved"));
     }
@@ -999,7 +1005,10 @@ export async function handleRequest(
             logEvent(
                 "error",
                 section,
-                t("mlog.failed", action, errorMessage(err)),
+                t("mlog.failed", {
+                    action,
+                    reason: errorMessage(err),
+                }),
             );
         }
         return JSON.stringify({

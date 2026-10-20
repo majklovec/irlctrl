@@ -82,7 +82,11 @@ export class Supervisor {
                 (err: unknown) => {
                     const msg = errorMessage(err);
                     console.error(`${this.name} restart failed:`, msg);
-                    logEvent("error", this.name, t("log.restart_failed", msg));
+                    logEvent(
+                        "error",
+                        this.name,
+                        t("log.restart_failed", { error: msg }),
+                    );
                     this.scheduleRestart();
                 },
             );

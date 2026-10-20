@@ -88,7 +88,7 @@ export interface EncoderCore {
         section: string,
         message: string,
     ): void;
-    t(key: string, ...args: unknown[]): string;
+    t(key: string, options?: Record<string, unknown>): string;
     writeFileAtomic(path: string, data: string): Promise<void>;
     Supervisor: new (
         name: string,

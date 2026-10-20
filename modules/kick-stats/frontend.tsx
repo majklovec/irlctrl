@@ -7,7 +7,7 @@
 // biome-ignore lint/style/useImportType: used in JSX
 import m from "mithril";
 import { Badge } from "../../public/ts/components/ui";
-import { t, tCount } from "../../public/ts/i18n";
+import { t } from "../../public/ts/i18n";
 import type { ServerDashboardWidget } from "../../public/types";
 import { KICK_STATS_CONFIG_FIELDS } from "./backend";
 import { LineChart } from "./graph-linechart";
@@ -84,7 +84,7 @@ function body(_w: ServerDashboardWidget, ctx: WidgetContext): m.Children {
                                 <span class={"kick-viewers"}>
                                     {(s.viewers ?? 0).toLocaleString()}
                                 </span>,
-                                ` ${tCount("kickstats.viewers", s.viewers ?? 0)}`,
+                                ` ${t("kickstats.viewers", { count: s.viewers ?? 0 })}`,
                             ]}
                         </span>,
                         s.isLive ? (

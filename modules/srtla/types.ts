@@ -89,7 +89,7 @@ export interface SrtlaCore {
         section: string,
         message: string,
     ): void;
-    t(key: string, ...args: unknown[]): string;
+    t(key: string, options?: Record<string, unknown>): string;
     Supervisor: new (
         name: string,
         delayMs: number,
