@@ -19,7 +19,7 @@ import {
 } from "./components/ui";
 import { t } from "./i18n";
 import { RpcClient, socketUrl } from "./services/rpc";
-import { mountPage } from "./util";
+import { mountPage, setHeaderColor } from "./util";
 import { errorMessage } from "../../src/util";
 
 /** HTML `pattern` for a pipeline id (src/pipelines PIPELINE_ID_RE). */
@@ -48,7 +48,10 @@ const parsed: { mode: Mode; id: string } = (() => {
     }
     if (decoded.startsWith("edit/"))
         // strip the route's trailing slash: /pipelines/edit/<id>/
-        return { mode: "edit", id: decoded.slice("edit/".length).replace(/\/+$/, "") };
+        return {
+            mode: "edit",
+            id: decoded.slice("edit/".length).replace(/\/+$/, ""),
+        };
     return { mode: "new", id: "" };
 })();
 
@@ -104,7 +107,7 @@ const CATEGORIES: Record<
     },
     filter: {
         label: "filter",
-        color: "#8b949e",
+        color: "#9f2121",
         tip: "Processing element (identity, queue, volume…)",
     },
     other: {
@@ -132,47 +135,40 @@ const PIPE_COLORS = {
     link: "#39c5cf",
 };
 
-/** Map a GStreamer element name to a highlight category. */
-function classifyElement(name: string): string {
+const RULES = {
+    decoder: [/^avdec_/, /decoder$|dec$/],
+    encoder: [/^avenc_/, /enc$/],
+    demuxer: [/demux$/, /(rtp|rtcp).*depay$/],
+    muxer: [/mux$/, /(rtp|rtcp).*pay$/],
+    parser: [/parse$/],
+    source: [/src$/],
+    sink: [/sink$/],
+    converter: [
+        /convert$/,
+        /conv$/,
+        /resample$/,
+        /scale$/,
+        /deinterlace$/,
+        /videorate$/,
+        /audiorate$/,
+    ],
+    filter: [
+        /compositor$/,
+        /mix$/,
+        /overlay$/,
+        /^(identity|queue|volume|tee|valve|capssetter|textoverlay|videobox|imagefreeze|clockoverlay)$/,
+    ],
+} as const satisfies Record<string, readonly RegExp[]>;
+
+type ElementType = keyof typeof RULES | "other";
+
+function classifyElement(name: string): ElementType {
     const n = String(name).toLowerCase();
-
-    if (/^avdec_/.test(n)) return "decoder";
-    if (/^avenc_/.test(n)) return "encoder";
-
-    if (/decoder$/.test(n) || /dec$/.test(n)) return "decoder";
-    if (/enc$/.test(n)) return "encoder";
-
-    if (/demux$/.test(n)) return "demuxer";
-    if (/mux$/.test(n)) return "muxer";
-    if (/parse$/.test(n)) return "parser";
-
-    if (/src$/.test(n)) return "source";
-    if (/sink$/.test(n)) return "sink";
-
-    if (
-        /convert$/.test(n) ||
-        /conv$/.test(n) ||
-        /resample$/.test(n) ||
-        /scale$/.test(n) ||
-        /deinterlace$/.test(n) ||
-        /videorate$/.test(n) ||
-        /audiorate$/.test(n)
-    )
-        return "converter";
-
-    if (/(rtp|rtcp).*depay$/.test(n)) return "demuxer";
-    if (/(rtp|rtcp).*pay$/.test(n)) return "muxer";
-
-    if (/compositor$/.test(n) || /mix$/.test(n) || /overlay$/.test(n))
-        return "filter";
-
-    if (
-        /^(identity|queue|volume|tee|valve|capssetter|textoverlay|videobox|imagefreeze|clockoverlay)$/.test(
-            n,
-        )
-    )
-        return "filter";
-
+    for (const type in RULES) {
+        for (const pattern of RULES[type as keyof typeof RULES]) {
+            if (pattern.test(n)) return type as ElementType;
+        }
+    }
     return "other";
 }
 
@@ -276,17 +272,14 @@ async function load(): Promise<void> {
 function editorLegend() {
     return (
         <div class={"pipe-legend-box"}>
-            <div class={"pipe-legend-title"}>
-                {t("set.pipeline_legend")}
-            </div>
+            <div class={"pipe-legend-title"}>{t("set.pipeline_legend")}</div>
             <div class={"pipe-legend"}>
                 {CATEGORY_ORDER.map((cat) => (
                     <span
                         key={cat}
                         class={"pipe-legend-item"}
                         style={`--swatch: ${CATEGORIES[cat].color}`}
-                        title={CATEGORIES[cat].tip}
-                    >
+                        title={CATEGORIES[cat].tip}>
                         <span class={"pipe-legend-swatch"} />
                         {CATEGORIES[cat].label}
                     </span>
@@ -294,16 +287,14 @@ function editorLegend() {
                 <span
                     class={"pipe-legend-item"}
                     style={`--swatch: ${PIPE_COLORS.caps}`}
-                    title="Caps negotiation (e.g. video/x-raw)"
-                >
+                    title="Caps negotiation (e.g. video/x-raw)">
                     <span class={"pipe-legend-swatch"} />
                     caps
                 </span>
                 <span
                     class={"pipe-legend-item"}
                     style={`--swatch: ${PIPE_COLORS.link}`}
-                    title="Element property (.prop=value)"
-                >
+                    title="Element property (.prop=value)">
                     <span class={"pipe-legend-swatch"} />
                     property
                 </span>
@@ -312,8 +303,20 @@ function editorLegend() {
     );
 }
 
+/** Tint the page with the device's configured header colour (same as the
+ * device store does on its pages). */
+function loadAppearance(): void {
+    void rpc
+        .call<{ settings: { color: string } }>("settings.get")
+        .then((result) => {
+            if (result) setHeaderColor(result.settings.color);
+        })
+        .catch(() => undefined);
+}
+
 rpc.on("open", () => {
     state.connected = true;
+    loadAppearance();
     m.redraw();
     // Load once; a (re)connect must not clobber unsaved edits.
     if (state.mode === "edit" && !state.loaded && !state.notFound) void load();
@@ -357,18 +360,21 @@ const App: m.Component = {
             return (
                 <Page
                     title={pageTitle()}
-                    headerRight={<ConnectionBadge connected={state.connected} />}>
-                    <p
-                        class={"muted"}
-                        role={"alert"}
-                    >{t("set.pipeline_not_found", { id: state.id })}</p>
+                    headerRight={
+                        <ConnectionBadge connected={state.connected} />
+                    }>
+                    <p class={"muted"} role={"alert"}>
+                        {t("set.pipeline_not_found", { id: state.id })}
+                    </p>
                 </Page>
             );
         if (state.loading)
             return (
                 <Page
                     title={pageTitle()}
-                    headerRight={<ConnectionBadge connected={state.connected} />}>
+                    headerRight={
+                        <ConnectionBadge connected={state.connected} />
+                    }>
                     <p class={"muted"}>{t("mgmt.loading")}</p>
                 </Page>
             );
@@ -401,9 +407,7 @@ const App: m.Component = {
                             <span class={"pipeline-editor-head-label"}>
                                 {t("set.pipeline_path")}
                             </span>
-                            <code class={"pipeline-editor-id"}>
-                                {state.id}
-                            </code>
+                            <code class={"pipeline-editor-id"}>{state.id}</code>
                         </div>
                     )}
                     <Field
