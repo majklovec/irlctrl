@@ -375,6 +375,20 @@ export type WidgetConfigField =
     | { name: string; type: "select"; options: readonly string[] }
     | { name: string; type: "hidden" };
 
+export type VisibleWidgetConfigField = Exclude<
+    WidgetConfigField,
+    { name: string; type: "hidden" }
+>;
+
+/** Remove retained-but-hidden config entries before creating keyed field vnodes. */
+export const visibleWidgetConfigFields = (
+    fields: readonly WidgetConfigField[],
+): VisibleWidgetConfigField[] =>
+    fields.filter(
+        (field): field is VisibleWidgetConfigField =>
+            typeof field === "string" || field.type !== "hidden",
+    );
+
 /** The parameter name a config field writes to the widget's `config` record. */
 export const configFieldName = (f: WidgetConfigField): string =>
     typeof f === "string" ? f : f.name;

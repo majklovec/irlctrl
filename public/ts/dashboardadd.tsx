@@ -12,7 +12,7 @@ import type {
     ServerDashboardWidget,
     WidgetType,
 } from "../types";
-import { configFieldName } from "../types";
+import { configFieldName, visibleWidgetConfigFields } from "../types";
 import { Button, Field, Input, Page, ServerNav } from "./components/ui";
 import {
     devices,
@@ -292,13 +292,11 @@ const App: m.Component = {
                                 />,
                                 ...(type
                                     ? (
-                                          widgetModule(type)?.configFields ?? []
-                                      ).map((f) => {
-                                          if (
-                                              typeof f !== "string" &&
-                                              f.type === "hidden"
+                                          visibleWidgetConfigFields(
+                                              widgetModule(type)?.configFields ??
+                                                  [],
                                           )
-                                              return null;
+                                      ).map((f) => {
                                           const name = configFieldName(f);
                                           return typeof f !== "string" &&
                                               f.type === "select" ? (

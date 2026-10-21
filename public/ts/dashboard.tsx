@@ -34,7 +34,10 @@ import type {
     SwitcherStatus,
     WidgetType,
 } from "../types";
-import { configFieldName } from "../types";
+import {
+    configFieldName,
+    visibleWidgetConfigFields,
+} from "../types";
 import { Badge, Button } from "./components/ui";
 import { createCardHost, type DeviceCard } from "./device/store";
 import { t } from "./i18n";
@@ -548,13 +551,12 @@ function configEditorForm(w: ServerDashboardWidget): m.Vnode {
         editing: true,
         values: { ...(w.config ?? {}) },
     };
+    const visibleFields = visibleWidgetConfigFields(fields);
     return (
         <div class={"dash-config-form"}>
             {[
-                ...fields.map((field) => {
+                ...visibleFields.map((field) => {
                     const name = configFieldName(field);
-                    if (typeof field !== "string" && field.type === "hidden")
-                        return null;
                     const isSelect =
                         typeof field !== "string" && field.type === "select";
                     return (

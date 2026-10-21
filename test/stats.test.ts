@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import m from "mithril";
+import { visibleWidgetConfigFields } from "../public/types";
 import {
     parseStatsSpec,
     STATS_EDITOR_FIELDS,
@@ -8,6 +10,16 @@ import { currentViewerTotal, mergeViewerSeries } from "../modules/stats/series";
 import type { StatsLive } from "../modules/stats/types";
 
 describe("stats channel configuration", () => {
+    test("stats editor fields render without keyed-fragment holes", () => {
+        const fields = visibleWidgetConfigFields(STATS_EDITOR_FIELDS);
+        const children = fields.map((field) => {
+            const name = typeof field === "string" ? field : field.name;
+            return m("label", { key: name }, m("input"));
+        });
+        expect(() => m("div", children)).not.toThrow();
+        expect(fields).toEqual(["youtube", "twitch", "kick"]);
+    });
+
     test("exposes Kick, YouTube, and Twitch in both widget config editors", () => {
         expect(STATS_EDITOR_FIELDS.slice(0, 3)).toEqual([
             "youtube",
