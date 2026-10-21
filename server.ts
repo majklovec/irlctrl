@@ -153,6 +153,9 @@ const REQUEST_TIMEOUT_MS = 20_000;
 const ID_RE = /^[\w.-]{1,64}$/;
 // /d/<id>, /d/<id>/, /d/<id>/ws, /d/<id>/settings[/], /d/<id>/setup[/]
 const DEVICE_PATH_RE = /^\/d\/([^/]+)(?:(\/)(?:(ws)|(settings|setup)(\/)?)?)?$/;
+// /d/<id>/pipelines/new/ and /d/<id>/pipelines/edit/<encoded-id>/ — the
+// dedicated pipeline editor page (the id is %-encoded, slashes included).
+const PIPELINE_EDIT_RE = /^\/d\/([^/]+)\/pipelines\/(new|edit\/[^/]+)\/?$/;
 const WIDGET_TYPES: WidgetType[] = [
     "obs",
     "relay",
@@ -712,6 +715,7 @@ const PAGES = [
     "dashboards",
     "dashboardview",
     "dashboardadd",
+    "pipelineedit",
 ] as const;
 type PageName = (typeof PAGES)[number];
 const pages = {} as Record<PageName, string>;
@@ -1736,6 +1740,15 @@ const server = Bun.serve({
         if (path.startsWith("/dashboards/add/")) {
             // The dedicated "add widget" page for a single dashboard.
             return htmlResponse("dashboardadd");
+        }
+        const pm = path.match(PIPELINE_EDIT_RE);
+        if (pm) {
+            // The dedicated pipeline editor page (new / edit) for a device.
+            const id = decodeURIComponent(pm[1]);
+            if (!ID_RE.test(id)) return text("Invalid device id", 400);
+            const d = devices.get(id);
+            if (!d || (d.owner ?? LOCAL_USER) !== user) return notFound();
+            return htmlResponse("pipelineedit");
         }
         const m = path.match(DEVICE_PATH_RE);
         if (m) return devicePath(req, url, srv, m, user);

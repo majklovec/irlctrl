@@ -77,7 +77,7 @@ sudo CONTROL_SERVER_TOKEN=token \
 
 | Option                    | Env                    | Default                          | Notes                                                                                                       |
 | ------------------------- | ---------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `--role`                  | `BELABOX_ROLE`         | `relay`                          | `relay`, `encoder`, `combined`                                                                              |
+| `--role`                  | `ROLE`                 | `relay`                          | `relay`, `encoder`, `combined`                                                                              |
 | `--host`, `--port`        |                        | `127.0.0.1`, `8085`              | Local web UI and WebSocket API (`/ws`), always on                                                           |
 | `--allow-origin`          |                        |                                  | Extra browser origins for `/ws` (comma-separated, `*` = any)                                                |
 | `--config`                |                        | `$TMPDIR/config.json`            | Device config — settings, encoder, srtla target, autostart, modems. **Use a persistent path in production** |
@@ -86,15 +86,21 @@ sudo CONTROL_SERVER_TOKEN=token \
 | `--srtla-reload`          |                        | `signal`                         | `signal` (SIGHUP) or `restart`                                                                              |
 | `--srtla-socket`          | `SRTLA_CONTROL_SOCKET` | `$TMPDIR/srtla_send.sock`        | `srtla_send` control socket (link stats, mode/quality); `""` disables it                                    |
 | `--debounce-ms`           |                        | `1500`                           | Interface-event debounce                                                                                    |
-| `--pipelines`             | `BELACODER_PIPELINES`  | `/usr/share/belacoder/pipelines` | Pipeline files, including subdirectories                                                                    |
-| `--belacoder`             | `ENCODER_BIN`          | `belacoder`                      |                                                                                                             |
+| `--pipelines`             | `PIPELINES_DIR`        | `/usr/share/belacoder/pipelines` | Pipeline files, including subdirectories                                                                    |
+| `--encoder`               | `ENCODER_BIN`          | `belacoder`                      | Encoder binary; `ceracoder` is detected by name and switches the encoder module to INI-config mode          |
 |                           | `SRTLA_SEND_BIN`       | `srtla_send`                     |                                                                                                             |
 | `--bitrate-file`          |                        | `$TMPDIR/belacoder_br`           | belacoder bitrate file (re-read on SIGHUP)                                                                  |
+| `--ceracoder-conf`        |                        | `$TMPDIR/ceracoder.conf`         | ceracoder INI config (balancer + tuning), applied live by the encoder module                                |
+| `--log-file`              |                        | `$TMPDIR/srtla_log.json`         | Persistent event log shown in the web UI                                                                    |
 | `--remote`                | `CONTROL_SERVER_URL`   |                                  | Control server, e.g. `wss://ctl.example.com/device`                                                         |
 | `--remote-token`          | `CONTROL_SERVER_TOKEN` |                                  | Prefer the env var (keeps it out of `ps`)                                                                   |
 | `--remote-interval`       |                        | `30`                             | Periodic status push in seconds (`0` = only on change)                                                      |
 | `--remote-stats-interval` |                        | `2`                              | `srtla_send` link-stats push to the control server in seconds (`0` = off)                                   |
 | `--dry-run`               |                        |                                  | Print `ip`/process actions instead of running them                                                          |
+
+### First-run setup wizard
+
+A fresh device (no `--config` file yet) opens on a **setup wizard** instead of the regular UI: language, role, identity (hostname + header color), control-server connection (URL + token), encoder settings (pipeline, bitrate, audio) and — for relay/combined — the SRTLA target and scheduler options. Saving (`setup.complete`) validates everything, writes the initial config file, dials the control server, and brings the role up. From then on the normal UI is shown, and the wizard is never offered again.
 
 ### Encoder pipelines
 
@@ -112,7 +118,7 @@ Tick **Autostart** in the UI (or call `autostart.set`) to resume the last stream
 
 ## Control server
 
-`server.ts` lists all devices and serves the same web UI for each one at `/d/<id>/`, relaying commands to the device over its outbound connection — so devices behind NAT or on mobile networks can be managed. It also hosts per-user **dashboards** that compose modules from any device owned by that user.
+`server.ts` lists all devices and serves the same web UI for each one at `/d/<id>/`, relaying commands to the device over its outbound connection — so devices behind NAT or on mobile networks can be managed. It also hosts per-user **dashboards**: gridstack grids composed of widgets from any device owned by that user, with dedicated add / edit / view pages. Widgets are of two kinds — **device widgets** (a live status card per device: `relay`, `encoder`, `combined`, or `obs`, depending on the device's role and enabled modules) and **channel widgets** (device-independent modules, one hub per kind serves all widgets of that kind). Dashboards are persisted to the `--dashboards` file, and a shared live feed (`/dashboards/ws`) streams widget data to every open view.
 
 ### Authentication
 
@@ -121,8 +127,8 @@ The server replaces HTTP Basic auth with per-user profiles stored in a local **S
 -   **Users** live in the SQLite database (default `users.db`, see `--db`). Passwords are stored as **scrypt hashes** — the plaintext never touches disk.
 -   **Devices** authenticate with `Authorization: Bearer <token>` when they open their `ws://<server>/device` connection. The server resolves the token to a user and assigns the device to that user — devices are therefore owned by the profile whose token presented them.
 -   **Browsers** sign in at `/login` with the username and password. A successful login sets an `HttpOnly` session cookie; all device lists, device pages, and dashboards are then scoped to that user. Only devices owned by the signed-in user are visible, and only that user can open a device's page/WS or edit its dashboards.
--   **`/register`** creates a new account (self-service). New profiles start with no device tokens — add them on the profile page after signing in.
--   **`/profile/`** (reached from the username menu in the header) changes the login password and lists/manages the user's device tokens — adding new ones and removing old ones.
+-   **`/register`** creates a new account. The **first** account is bootstrapped as admin without an invite code; every account after that needs a valid, single-use **invitation code** (optionally expiring) minted by an admin. New profiles start with no device tokens — add them on the profile page after signing in.
+-   **`/profile/`** (reached from the username menu in the header) changes the login password and lists/manages the user's device tokens — adding new ones and removing old ones. Admins additionally get an **invitations panel** to mint fresh invite codes and review the code history.
 -   `--no-auth` maps everything to a single local profile for local testing (no database needed).
 
 ```sh
@@ -150,19 +156,34 @@ open http://ctl.example.com/  # redirects to /login; enter the username + passwo
 
 ### systemd
 
-```sh
-sudo cp -r . /opt/srtla_relay
-sudo cp deploy/srtla-relay.service /etc/systemd/system/
-sudo cp deploy/srtla-relay.env /etc/default/srtla-relay   # set BELABOX_ROLE etc.
-sudo systemctl enable --now srtla-relay
+Run the compiled binaries (`bun run build:client` / `bun run build:server`) as a service. Example device unit (`/etc/systemd/system/belabox-duo.service`):
 
-# control-server host
-sudo cp deploy/srtla-control.service /etc/systemd/system/
-sudo cp deploy/srtla-control.env /etc/default/srtla-control
-sudo systemctl enable --now srtla-control
+```ini
+[Unit]
+Description=Belabox Duo device
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/bun /opt/belabox-duo/client --config /var/lib/belabox-duo/config.json
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-The units expect Bun at `/usr/local/bin/bun`. The device unit keeps its state in `/var/lib/srtla-relay/`, which autostart needs to survive a reboot.
+The control server is the same with `server` in place of `client` (no `root` needed). Put role, control-server URL/token, and binary overrides in the config file (`--config`) or an `EnvironmentFile`; the device keeps its state in the `--config` path, which autostart needs to survive a reboot.
+
+### Armbian image (Orange Pi 5 Plus)
+
+[`armbian/`](armbian/) builds a ready-to-stream **Armbian** image natively on the host:
+
+-   `setup-host.sh` — one-time install of the build dependencies (run as root)
+-   `build.sh [config]` — clones the Armbian build framework, links the bundled `userpatches/`, and compiles the image (default config `orangepi5-plus`)
+-   `build-all.sh` — builds both variants: the SD-card image and the **eMMC auto-install** image (`orangepi5-plus-emmc`), which copies itself to eMMC on first boot via a one-shot `belabox-emmc-install.service`
+
+The image ships with the whole streaming chain — GStreamer (incl. `gstreamer1.0-rockchip1`), CERALIVE's SRT, [ceracoder](https://github.com/CERALIVE/ceracoder) (built from source), [srtla_send](https://github.com/irlserver/srtla_send) (prebuilt arm64 .deb), and udev rules for belaUI audio — so `client.ts --role combined` runs out of the box.
 
 ### Docker
 
@@ -189,7 +210,7 @@ The local `/ws` endpoint and the control server speak the same JSON protocol:
 
 The method list lives at the top of [`src/methods.ts`](src/methods.ts). Methods that do not apply to the device's role are rejected with code 409.
 
-The cog in the device header opens a settings page. It uses `settings.get` / `settings.update` for the persistent device UUID, hostname, role, control-server URL, remote token, and header color. The UUID is the device's fixed identity on the control server — auto-assigned once, saved in the config file, and never changed (it survives hostname changes). Saving settings re-dials the control server, so the device re-registers with its new URL, token, hostname, and role without a service restart. Stream settings (pipeline, bitrate, audio, targets, scheduler) are saved automatically whenever they change.
+The cog in the device header opens a settings page. It uses `settings.get` / `settings.update` for the persistent device UUID, hostname, role, control-server URL, remote token, header color, and UI language. The UUID is the device's fixed identity on the control server — auto-assigned once, saved in the config file, and never changed (it survives hostname changes). Saving settings re-dials the control server, so the device re-registers with its new URL, token, hostname, and role without a service restart. Stream settings (pipeline, bitrate, audio, targets, scheduler) are saved automatically whenever they change.
 
 ## Modules
 
@@ -256,11 +277,12 @@ bun run dev
 bun test
 
 # compiled single-file binaries
-bun run build:client   # → dist/client
-bun run build:server   # → dist/server
+bun run build:client     # → dist/client
+bun run build:server     # → dist/server
+bun run build:obs-client # → dist/obs-client
 ```
 
-Modules are discovered by a runtime scan of `modules/`; the manifests in `modules/.generated.*.ts` are produced by `scripts/gen-modules.ts` (wired into `predev`/`pretest`/`prebuild:*`). The UI is localized via the JSON catalogs in `i18n/` (12 languages), served to the browser on demand from `/i18n/<lang>.json`.
+Modules are discovered by a runtime scan of `modules/`; the manifests in `modules/.generated.*.ts` are produced by `scripts/gen-modules.ts` (wired into `predev`/`pretest`/`prebuild:*`). The UI is localized via the JSON catalogs in `i18n/` (12 languages), served to the browser on demand from `/i18n/<lang>.json`. The language is chosen in the first-run wizard and can be switched at any time from the header select; the device persists the choice in its config file.
 
 ## Credits
 

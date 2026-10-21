@@ -1,12 +1,14 @@
 /*
  * Local HTTP / WebSocket server: the web UI from public/ at `/` (the setup wizard
- * while the device has no config file), `/settings/`, `/setup/`, and the
- * WebSocket API at ws://<host>:<port>/ws (protocol and methods: methods.ts).
+ * while the device has no config file), `/settings/`, `/setup/`, the pipeline
+ * editor at `/pipelines/…`, and the WebSocket API at ws://<host>:<port>/ws
+ * (protocol and methods: methods.ts).
  *
  * The same protocol is spoken over the outbound remote connection (see remote.ts).
  */
 import type { BunRequest, Server } from "bun";
 import index from "../public/index.html";
+import pipelineedit from "../public/pipelineedit.html";
 import settings from "../public/settings.html";
 import setup from "../public/setup.html";
 import { ALLOWED_ORIGINS, API_HOST, API_PORT } from "./config";
@@ -32,6 +34,9 @@ import { errorMessage } from "./util";
 
 const WS_PATH = "/ws";
 const STATUS_TOPIC = "status";
+// /pipelines/new/ and /pipelines/edit/<encoded-id>/ — the dedicated pipeline
+// editor page (the id is %-encoded, slashes included).
+const PIPELINE_EDIT_RE = /^\/pipelines\/(new|edit\/[^/]+)\/?$/;
 
 // Web UI from public/ — Bun bundles the HTML's scripts and styles on the fly
 const routes = () => ({
@@ -47,6 +52,13 @@ async function fetch(
     const path = new URL(req.url).pathname;
     if (path === "/settings" || path === "/setup")
         return Response.redirect(`${path}/`, 308);
+    const pipe = path.match(PIPELINE_EDIT_RE);
+    if (pipe)
+        return path.endsWith("/")
+            ? new Response(pipelineedit.index, {
+                  headers: { "content-type": "text/html; charset=utf-8" },
+              })
+            : Response.redirect(`${path}/`, 308);
     if (path.startsWith("/i18n/")) return await i18nResponse(path, catalog);
     const image = await imageResponse(path);
     if (image) return image;

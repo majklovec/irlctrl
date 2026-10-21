@@ -1344,34 +1344,6 @@ td.num {
     background: color-mix(in srgb, var(--bad) 10%, transparent);
 }
 
-/* Foldable pipeline groups (encoder settings) */
-.pipe-group {
-    margin-bottom: 0.25rem;
-}
-.pipe-group-toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.35rem 0.25rem;
-    border: none;
-    border-radius: var(--radius-sm);
-    background: none;
-    color: var(--text);
-    font: inherit;
-    font-weight: 600;
-    text-align: left;
-}
-.pipe-group-toggle:hover {
-    background: color-mix(in srgb, var(--accent) 10%, transparent);
-}
-.pipe-group-toggle svg {
-    flex: none;
-    transition: transform var(--t);
-}
-.pipe-group-toggle.open svg {
-    transform: rotate(90deg);
-}
 .dash-toolbar {
     display: flex;
     gap: 16px;
@@ -1436,8 +1408,14 @@ p.message {
     box-shadow: none;
 }
 
-/* Pipeline editor panel (encoder settings) */
+/* Pipeline editor panel — every block (id, editor, legend, actions) on its
+ * own full-width row. */
 .pipeline-editor {
+    flex-direction: column;
+    /* the global `form` rule sets flex-wrap: wrap; in a wrapping column
+     * flex `align-content: flex-start` would suppress cross-axis stretch,
+     * so rows must not wrap (each row is full-width by design) */
+    flex-wrap: nowrap;
     margin: 0.5rem 0 0.75rem;
     padding: 0.75rem;
     border: 1px solid var(--border);
@@ -1447,33 +1425,146 @@ p.message {
 .pipeline-editor-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
+    gap: 0.75rem;
     flex-wrap: wrap;
-    margin-bottom: 0.5rem;
+}
+.pipeline-editor-head-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--muted);
 }
 .pipeline-editor-title {
     font-weight: 600;
 }
 .pipeline-editor-id {
-    color: var(--muted);
+    padding: 0.25rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--card-subtle);
+    color: var(--text);
+    font-size: 0.9rem;
     word-break: break-all;
 }
 .pipeline-editor-text {
     width: 100%;
     min-height: 14rem;
     resize: vertical;
-    font-family:
-        ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas,
-        monospace;
+    font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo,
+        Consolas, monospace;
     font-size: 0.9em;
     line-height: 1.5;
     tab-size: 4;
 }
+/* Stays on its own row, pushed to the bottom when the form fills main */
 .pipeline-editor-actions {
+    align-self: stretch;
     display: flex;
     gap: 0.5rem;
-    margin-top: 0.5rem;
+    margin-top: auto;
+}
+
+/* Highlighted pipeline editor: a <pre> underlay beneath a transparent
+ * textarea. Both must share every text-metric so the layers line up. */
+.pipe-code-wrap {
+    position: relative;
+}
+.pipe-code-wrap .pipeline-editor-text {
+    position: relative;
+    z-index: 1;
+    background: transparent;
+    border-color: transparent;
+    /* the <pre> carries the visible text; the textarea only shows the caret */
+    color: transparent;
+    caret-color: var(--text);
+}
+.pipe-code {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--bg) 80%, var(--card-solid));
+    font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo,
+        Consolas, monospace;
+    font-size: 0.9em;
+    line-height: 1.5;
+    tab-size: 4;
+    white-space: pre;
+    overflow: hidden;
+    color: var(--text);
+}
+.pipe-code .hl-source {
+    color: #3fb950;
+}
+.pipe-code .hl-sink {
+    color: #f85149;
+}
+.pipe-code .hl-parser {
+    color: #a371f7;
+}
+.pipe-code .hl-demuxer {
+    color: #bc8cff;
+}
+.pipe-code .hl-muxer {
+    color: #58a6ff;
+}
+.pipe-code .hl-decoder {
+    color: #f0883e;
+}
+.pipe-code .hl-encoder {
+    color: #db61a2;
+}
+.pipe-code .hl-converter {
+    color: #79c0ff;
+}
+.pipe-code .hl-filter {
+    color: #8b949e;
+}
+.pipe-code .hl-other {
+    color: #6e7681;
+}
+.pipe-code .hl-caps {
+    color: #d29922;
+}
+.pipe-code .hl-link {
+    color: #39c5cf;
+}
+
+/* Colour legend below the editor: titled box, swatches in even grid rows */
+.pipe-legend-box {
+    padding: 0.5rem 0.75rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--bg) 60%, transparent);
+}
+.pipe-legend-title {
+    margin-bottom: 0.45rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--muted);
+}
+.pipe-legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+    gap: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+    color: var(--muted);
+}
+.pipe-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+}
+.pipe-legend-swatch {
+    flex: none;
+    inline-size: 0.65rem;
+    block-size: 0.65rem;
+    border-radius: 2px;
+    background: var(--swatch, var(--muted));
 }
 
 /* ──────────────────────────────────────────────────────────

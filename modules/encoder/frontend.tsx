@@ -26,6 +26,7 @@ import { t } from "../../public/ts/i18n";
 import { optionalNumber, since } from "../../public/ts/util";
 import { card, type DeviceCard } from "../../public/ts/device/store";
 import type { BridgedModule } from "./types";
+import "./styles.css";
 
 // ----------------------------------------------------------------------
 // Stream control (owns the encoder + stream start logic, shared with SRTLA)
@@ -207,7 +208,10 @@ function pipelineOptions(host: DeviceCard): m.Children {
         );
     return [...groups].map(([group, list]) => {
         const opts = (
-            <Options key={group || "ungrouped"} pairs={list.map((p) => [p.id, p.name])} />
+            <Options
+                key={group || "ungrouped"}
+                pairs={list.map((p) => [p.id, p.name])}
+            />
         );
         return group ? (
             <optgroup key={group} label={group}>
@@ -242,16 +246,13 @@ function statusRows(host: DeviceCard, status: Status): [string, Child][] {
         [
             t("dev.row.bitrate"),
             cfg &&
-                t(
-                    "dev.minmax_kbps",
-                    {
-                        min:
-                            cfg.minBitrate ??
-                            status.ceracoder?.minBitrate ??
-                            BITRATE_KBPS.min,
-                        max: cfg.maxBitrate,
-                    },
-                ),
+                t("dev.minmax_kbps", {
+                    min:
+                        cfg.minBitrate ??
+                        status.ceracoder?.minBitrate ??
+                        BITRATE_KBPS.min,
+                    max: cfg.maxBitrate,
+                }),
         ],
         [
             t("dev.row.latency"),
