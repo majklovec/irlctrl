@@ -1532,6 +1532,9 @@ p.message {
 .pipe-code .hl-link {
     color: #39c5cf;
 }
+.pipe-code .hl-value {
+    color: #c9d1d9;
+}
 
 /* Colour legend below the editor: titled box, swatches in even grid rows */
 .pipe-legend-box {

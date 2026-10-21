@@ -376,7 +376,7 @@
     "set.pipeline_editing": "Upravuje sa {{id}}",
     "set.pipeline_new": "Nová pipeline",
     "set.pipeline_not_found": "Pipeline {{id}} nebola nájdená.",
-    "set.pipeline_path": "Cesta k pipeline",
+    "set.pipeline_path": "Názov pipeline",
     "set.pipeline_path_ph": "skupina/názov",
     "set.pipeline_save_hint": "Uložiť (Ctrl+S)",
     "set.pipeline_updated": "Pipeline {{id}} bola uložená.",

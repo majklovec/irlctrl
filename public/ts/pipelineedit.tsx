@@ -56,9 +56,13 @@ const parsed: { mode: Mode; id: string } = (() => {
 })();
 
 /* ── GStreamer syntax highlighting ─────────────────────────────────
- * Element names are coloured by category, caps links (!) and property
- * links (.prop=value) get their own colour. The palette is the
- * blockly.html reference adapted to the dark theme.
+ * Element names are coloured by category, caps filters and `!` get the
+ * caps colour. `name=value` properties, `pad::prop=value` ghost-pad
+ * props and `.pad` / `.prop=value` element chains are coloured: the
+ * key (everything up to and including `=`, or the whole `.pad` when
+ * no `=` is present) gets the link colour, the value gets the value
+ * colour. The palette is the blockly.html reference adapted to the
+ * dark theme.
  * ─────────────────────────────────────────────────────────────────── */
 
 const CATEGORIES: Record<
@@ -83,7 +87,7 @@ const CATEGORIES: Record<
     demuxer: {
         label: "demuxer",
         color: "#bc8cff",
-        tip: "Splits streams (e.g. flvdemux, qtdemux)",
+        tip: "Splits streams or dynamically builds sub-pipelines (e.g. flvdemux, decodebin)",
     },
     muxer: {
         label: "muxer",
@@ -133,12 +137,14 @@ const CATEGORY_ORDER = [
 const PIPE_COLORS = {
     caps: "#d29922",
     link: "#39c5cf",
+    value: "#c9d1d9",
 };
 
 const RULES = {
     decoder: [/^avdec_/, /decoder$|dec$/],
     encoder: [/^avenc_/, /enc$/],
-    demuxer: [/demux$/, /(rtp|rtcp).*depay$/],
+    // `decodebin`, `parsebin`, `dynbin`… split / build streams like demuxers.
+    demuxer: [/demux$/, /(rtp|rtcp).*depay$/, /bin$/],
     muxer: [/mux$/, /(rtp|rtcp).*pay$/],
     parser: [/parse$/],
     source: [/src$/],
@@ -151,10 +157,11 @@ const RULES = {
         /deinterlace$/,
         /videorate$/,
         /audiorate$/,
+        /postproc$/, // e.g. vapostproc
     ],
     filter: [
-        /compositor$/,
-        /mix$/,
+        /compositor$/, // e.g. nvcompositor, glvideocompositor
+        /mix$/, // e.g. audiochannelmix
         /overlay$/,
         /^(identity|queue|volume|tee|valve|capssetter|textoverlay|videobox|imagefreeze|clockoverlay)$/,
     ],
@@ -176,30 +183,71 @@ function escapeHtml(s: string): string {
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-/** Tokenize a GStreamer launch string into highlighted HTML. Element
- * names → category colour, `!` → caps, `.prop=value` chains → link colour. */
+/** A double- or single-quoted string (with backslash escapes). */
+const QUOTED = String.raw`"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'`;
+/** A property value: quoted, or a bare run up to whitespace / `!`. */
+const VALUE = String.raw`(?:${QUOTED}|[^\s!]+)`;
+
+/** One token of a GStreamer launch string. Alternatives, in order:
+ *  - caps filter: `video/x-raw[(features)][,field=value…]`
+ *  - `!` link
+ *  - property:    `name=value`, `pad::prop=value`
+ *  - pad chain:   `.pad`, `.prop=value`, or bare `.`
+ *  - element:     bare identifier
+ *  - anything else (whitespace, punctuation, `=`, numbers…)
+ *
+ *  Caps and props are tried before the element alternative so their `/`
+ *  and `=` never get shredded into fake element names. */
+const TOKEN_RE = new RegExp(
+    [
+        String.raw`(?<caps>[a-z][a-z0-9_.-]*\/[a-z0-9_.-]+(?:\([^)]*\))?(?:\s*,\s*[A-Za-z_][A-Za-z0-9_.-]*=[^\s!,;]+)*)`,
+        String.raw`!`,
+        String.raw`(?<prop>[A-Za-z_][A-Za-z0-9_-]*(?:::[A-Za-z_][A-Za-z0-9_-]*)?=${VALUE})`,
+        String.raw`(?<dot>\.(?:[A-Za-z_][A-Za-z0-9_-]*)?(?:=${VALUE})?)`,
+        String.raw`(?<elem>[A-Za-z_][A-Za-z0-9_-]*)`,
+        String.raw`[^A-Za-z_!.]+`,
+    ].join("|"),
+    "y",
+);
+
+/** Render an `=` assignment (`key=value`, `pad::prop=value`,
+ * `.prop=value`, or bare `.pad`) with the key in the link colour and the
+ * value in the value colour. Splitting on the first `=` is unambiguous:
+ * keys cannot contain `=`, and any `=` in the value is preserved. */
+function htmlAssignment(s: string): string {
+    const eq = s.indexOf("=");
+    if (eq < 0) return `<span class="hl-link">${escapeHtml(s)}</span>`;
+    return (
+        `<span class="hl-link">${escapeHtml(s.slice(0, eq + 1))}</span>` +
+        `<span class="hl-value">${escapeHtml(s.slice(eq + 1))}</span>`
+    );
+}
+
+/** Tokenize a GStreamer launch string into highlighted HTML. */
 function highlightPipeline(text: string): string {
-    // name (element) + optional .prop=value chain | ! | anything else
-    const token =
-        /([A-Za-z_][A-Za-z0-9_-]*)(\.[A-Za-z_][A-Za-z0-9_-]*(?:=[^!?\s]+)?)?|!|[^A-Za-z_!]+/y;
     let html = "";
     let i = 0;
     while (i < text.length) {
-        token.lastIndex = i;
-        const m = token.exec(text);
+        TOKEN_RE.lastIndex = i;
+        const m = TOKEN_RE.exec(text);
         if (!m) break;
-        if (m[0] === "!") {
-            html += `<span class="hl-caps">!</span>`;
-        } else if (m[1] !== undefined) {
-            html += `<span class="hl-${classifyElement(m[1])}">${escapeHtml(
-                m[1],
+        const g = m.groups ?? {};
+        if (g.caps !== undefined) {
+            html += `<span class="hl-caps">${escapeHtml(g.caps)}</span>`;
+        } else if (g.prop !== undefined) {
+            html += htmlAssignment(g.prop);
+        } else if (g.dot !== undefined) {
+            html += htmlAssignment(g.dot);
+        } else if (g.elem !== undefined) {
+            html += `<span class="hl-${classifyElement(g.elem)}">${escapeHtml(
+                g.elem,
             )}</span>`;
-            if (m[2])
-                html += `<span class="hl-link">${escapeHtml(m[2])}</span>`;
+        } else if (m[0] === "!") {
+            html += `<span class="hl-caps">!</span>`;
         } else {
             html += escapeHtml(m[0]);
         }
-        i = token.lastIndex;
+        i = TOKEN_RE.lastIndex;
     }
     // Trailing newline: <pre> doesn't render the caret line of a textarea
     // that ends in \n without it.
@@ -287,16 +335,23 @@ function editorLegend() {
                 <span
                     class={"pipe-legend-item"}
                     style={`--swatch: ${PIPE_COLORS.caps}`}
-                    title="Caps negotiation (e.g. video/x-raw)">
+                    title="Caps negotiation or link (e.g. video/x-raw, !)">
                     <span class={"pipe-legend-swatch"} />
                     caps
                 </span>
                 <span
                     class={"pipe-legend-item"}
                     style={`--swatch: ${PIPE_COLORS.link}`}
-                    title="Element property (.prop=value)">
+                    title="Property key or pad reference (name=, elem.pad, pad::prop=)">
                     <span class={"pipe-legend-swatch"} />
-                    property
+                    key / pad
+                </span>
+                <span
+                    class={"pipe-legend-item"}
+                    style={`--swatch: ${PIPE_COLORS.value}`}
+                    title="Property value (name=value, elem.prop=value)">
+                    <span class={"pipe-legend-swatch"} />
+                    value
                 </span>
             </div>
         </div>
