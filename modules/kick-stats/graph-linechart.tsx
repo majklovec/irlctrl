@@ -7,23 +7,30 @@ import type { StatsSample } from "./types";
 //
 // SVG line chart for the viewer series, modeled on
 // mithril-components/mithril-node-linechart: dashed grid, axis legends and
-// circle + polyline per series. The viewBox is fitted to the container's
-// aspect ratio (via ResizeObserver) so the plot scales uniformly and fills
-// the whole card — no letterbox gaps — and the fixed unit margins are only
-// as wide as the axis legends need. The Y scale spans the series min→max
-// (not 0→max) so small variations aren't squashed at the bottom.
+// circle + polyline per series. The viewBox tracks the container's pixel
+// size 1:1 (via ResizeObserver), so the chart is drawn directly in screen
+// pixels: resizing a card only prolongs the axes (longer lines, more grid
+// rows/columns) — text size, grid spacing, margins and line thickness stay
+// constant. The Y scale spans the series min→max (not 0→max) so small
+// variations aren't squashed at the bottom.
 // ---------------------------------------------------------------------------
 
-/** Fixed unit scale: the viewBox width is always 100 units. */
-const W = 100;
-/** Margins (viewBox units) — just enough room for the axis legends. */
-const M = { left: 10, right: 5, top: 2, bottom: 6.5 } as const;
-/** Fallback viewBox height (units) until the first size measurement lands. */
-const H_FALLBACK = 55;
-const GRID_V = 10;
+/** Fallback pixel size until the first size measurement lands. */
+const W_FALLBACK = 260;
+const H_FALLBACK = 110;
+/** Margins (px, constant at any card size) — just room for the legends. */
+const M = { left: 30, right: 10, top: 12, bottom: 20 } as const;
+/** Target grid line spacing (px). */
+const GRID_SPACING = 28;
+/** Minimum horizontal room (px) per X legend label (HH:MM / MM-DD). */
+const TICK_MIN_WIDTH = 56;
 
 type Pt = [number, number];
-type State = { aspect: number | null; observer: ResizeObserver };
+type State = {
+    width: number | null;
+    height: number | null;
+    observer: ResizeObserver;
+};
 
 function gridLines(
     vertical: number,
@@ -60,18 +67,21 @@ function timeLabel(t: number): string {
 export const LineChart = {
     oncreate(vnode) {
         const el = vnode.dom as SVGElement;
-        vnode.state.aspect = null;
+        vnode.state.width = null;
+        vnode.state.height = null;
         vnode.state.observer = new ResizeObserver(() => {
             const r = el.getBoundingClientRect();
-            const aspect = r.height > 0 ? r.width / r.height : null;
-            if (
-                aspect &&
-                (vnode.state.aspect === null ||
-                    Math.abs(aspect - vnode.state.aspect) > 0.01)
-            ) {
-                vnode.state.aspect = aspect;
-                void m.redraw();
-            }
+            const widthChanged =
+                r.width > 0 &&
+                (vnode.state.width === null ||
+                    Math.abs(r.width - vnode.state.width) > 0.5);
+            const heightChanged =
+                r.height > 0 &&
+                (vnode.state.height === null ||
+                    Math.abs(r.height - vnode.state.height) > 0.5);
+            if (widthChanged) vnode.state.width = r.width;
+            if (heightChanged) vnode.state.height = r.height;
+            if (widthChanged || heightChanged) void m.redraw();
         });
         vnode.state.observer.observe(el);
     },
@@ -84,16 +94,20 @@ export const LineChart = {
             return <svg class={"spark"} role={"img"} aria-hidden={"true"} />;
         const n = points.length;
 
-        // Fit the viewBox height to the container aspect so the chart scales
-        // uniformly and fills the space; the horizontal grid row count follows.
-        const aspect = vnode.state?.aspect ?? null;
-        const h =
-            aspect && aspect >= 0.2 && aspect <= 10 ? W / aspect : H_FALLBACK;
+        // 1:1 pixel viewBox (coordinates are screen px): resizing a card only
+        // prolongs the axes — the grid gains rows/columns, while text, spacing
+        // and strokes keep their constant size. Legend text simply inherits the
+        // widget's font size, like the rest of the design.
+        const w = Math.round(vnode.state?.width ?? W_FALLBACK);
+        const h = Math.round(vnode.state?.height ?? H_FALLBACK);
         const x0 = M.left,
-            x1 = W - M.right;
+            x1 = w - M.right;
         const y0 = M.top,
-            y1 = Math.max(y0 + 8, h - M.bottom);
-        const gridH = Math.max(2, Math.min(12, Math.round((y1 - y0) / 9)));
+            y1 = h - M.bottom;
+        if (x1 - x0 < 20 || y1 - y0 < 20)
+            return <svg class={"spark"} role={"img"} aria-hidden={"true"} />;
+        const gridV = Math.max(2, Math.round((x1 - x0) / GRID_SPACING));
+        const gridH = Math.max(2, Math.round((y1 - y0) / GRID_SPACING));
 
         // Y scale: series min→max (min 1 value so an all-zero series still renders).
         const min = Math.min(...points.map((p) => p.v));
@@ -107,8 +121,11 @@ export const LineChart = {
         const fmt = (v: number) =>
             Number.isInteger(v) ? String(v) : v.toFixed(1);
 
-        // X legends: up to 5 evenly placed ticks (start, end, …).
-        const tickCount = n < 2 ? 1 : Math.min(5, n);
+        // X legends: evenly placed ticks, as many as the card width allows.
+        const tickCount =
+            n < 2
+                ? 1
+                : Math.max(2, Math.min(5, n, Math.floor((x1 - x0) / TICK_MIN_WIDTH)));
         const xTicks: m.Children[] = [];
         for (let i = 0; i < tickCount; i++) {
             const idx =
@@ -120,9 +137,8 @@ export const LineChart = {
                 <text
                     key={`x${i}`}
                     x={x}
-                    y={y1 + 5}
-                    text-anchor={"middle"}
-                    font-size={3}>
+                    y={y1 + M.bottom - 5}
+                    text-anchor={"middle"}>
                     {timeLabel(points[idx]?.t)}
                 </text>,
             );
@@ -131,32 +147,21 @@ export const LineChart = {
         return (
             <svg
                 class={"spark"}
-                viewBox={`0 0 ${W} ${h}`}
-                preserveAspectRatio={"xMidYMid meet"}
+                viewBox={`0 0 ${w} ${h}`}
                 role={"img"}
                 aria-label={vnode.attrs.title}>
                 {[
                     // Grid (mirrors the reference's dashed grid).
                     <g class={"spark-grid"}>
-                        {gridLines(GRID_V, gridH, x0, x1, y0, y1)}
+                        {gridLines(gridV, gridH, x0, x1, y0, y1)}
                     </g>,
                     // Y legends: min / max of the visible series.
                     <g class={"spark-axis"}>
                         {[
-                            <text
-                                key={"max"}
-                                x={x0 - 1}
-                                y={y0 + 1}
-                                text-anchor={"end"}
-                                font-size={3}>
+                            <text key={"max"} x={x0 - 5} y={y0 + 3.5} text-anchor={"end"}>
                                 {fmt(max)}
                             </text>,
-                            <text
-                                key={"min"}
-                                x={x0 - 1}
-                                y={y1 + 1}
-                                text-anchor={"end"}
-                                font-size={3}>
+                            <text key={"min"} x={x0 - 5} y={y1 + 3.5} text-anchor={"end"}>
                                 {fmt(min)}
                             </text>,
                         ]}

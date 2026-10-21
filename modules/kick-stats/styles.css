@@ -51,8 +51,9 @@
 .dash-widget-body svg.spark .spark-grid line {
     stroke: var(--border);
     opacity: 0.6;
-    stroke-width: 0.3;
+    stroke-width: 0.75;
     stroke-dasharray: 1, 1;
+    vector-effect: non-scaling-stroke;
 }
 .dash-widget-body svg.spark .spark-axis text {
     fill: var(--muted);
