@@ -138,7 +138,7 @@ export interface StatsSample {
     v: number;
 }
 
-/** Latest kick.stats sample (the server's Kick channel stats poll). */
+/** Legacy Kick stats sample retained for older device wire consumers. */
 export interface StatsLive {
     viewers?: number;
     followers?: number;
@@ -367,12 +367,13 @@ export type WidgetType =
 /**
  * A channel widget's config parameter, declared by its module in editor order.
  * A bare string is a free-text field (its value is the parameter name);
- * `{name, type:"select", options}` is a fixed-choice field rendered as a
- * dropdown (the stored value is one of `options`).
+ * `{name, type:"select", options}` is a dropdown; `{name, type:"hidden"}` is
+ * retained in config but not shown in the editor.
  */
 export type WidgetConfigField =
     | string
-    | { name: string; type: "select"; options: readonly string[] };
+    | { name: string; type: "select"; options: readonly string[] }
+    | { name: string; type: "hidden" };
 
 /** The parameter name a config field writes to the widget's `config` record. */
 export const configFieldName = (f: WidgetConfigField): string =>
@@ -418,7 +419,7 @@ export interface GridSize {
     w: number;
     h: number;
 }
-/** Latest kick.stats event / one Chat Kick message — wire shapes owned by the
+/** Legacy kick.stats event / one Chat Kick message — wire shapes owned by the
  * widget module contract (the hub delivers them over the dashboard websocket). */
 export type KickStats = StatsLive;
 export type KickChatMessage = ChatLive;

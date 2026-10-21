@@ -1,64 +1,59 @@
-// stats frontend — the dashboard widget for the stats channel module.
-// Self-contained: owns its per-channel live map, fed by the dashboard
-// websocket frames it cares about (`widget.snapshot`, `kick.stats`): current
-// stream info plus a line chart of viewer counts from the server-side poller.
-// The core only forwards frames (`onFrame`).
+// Stats dashboard widget for YouTube, Twitch, and Kick channel references.
 
 // biome-ignore lint/style/useImportType: used in JSX
 import m from "mithril";
 import { Badge } from "../../public/ts/components/ui";
 import { t } from "../../public/ts/i18n";
 import type { ServerDashboardWidget } from "../../public/types";
-import { STATS_CONFIG_FIELDS } from "./backend";
+import {
+    parseStatsSpec,
+    STATS_EDITOR_FIELDS,
+    statsSpecsFromConfig,
+} from "./config";
 import { LineChart } from "./graph-linechart";
 import type {
-    ChannelLive,
     ChannelWidgetModule,
     StatsLive,
     WidgetContext,
 } from "./types";
+import { currentViewerTotal, mergeViewerSeries } from "./series";
 import "./styles.css";
 
-/** Live stats data per channel, accumulated from the dashboard websocket. */
-const live = new Map<string, ChannelLive>();
-const liveFor = (channel: string): ChannelLive => {
-    let l = live.get(channel);
-    if (!l) {
-        l = {};
-        live.set(channel, l);
-    }
-    return l;
-};
+const live = new Map<string, StatsLive>();
 
-/** Fold one dashboard-websocket frame into this module's live state; the stats
- * frames only — the chat channels' frames are ignored here. */
 function onFrame(event: string, data: unknown): void {
     if (event === "widget.snapshot") {
-        const snap = data as { stats?: Record<string, StatsLive | null> };
-        for (const [channel, stats] of Object.entries(snap.stats ?? {}))
-            liveFor(channel).stats = stats;
-    } else if (event === "kick.stats") {
-        const e = data as { channel?: string; stats?: StatsLive };
-        if (e.channel && e.stats) liveFor(e.channel).stats = e.stats;
+        const snapshot = data as {
+            stats?: Record<string, StatsLive | null>;
+        };
+        for (const [spec, stats] of Object.entries(snapshot.stats ?? [])) {
+            if (stats) live.set(spec, stats);
+            else live.delete(spec);
+        }
+    } else if (event === "stats.update") {
+        const frame = data as { channel?: string; stats?: StatsLive };
+        if (frame.channel && frame.stats) live.set(frame.channel, frame.stats);
     }
 }
 
-/** Card head: the stream badge (not configured, waiting, else streaming/offline). */
-function badge(_w: ServerDashboardWidget, ctx: WidgetContext): m.Vnode {
-    const channel = ctx.channel;
-    if (!channel)
-        return <Badge text={t("dash.widget_not_configured")} kind="warn" />;
-    const s = live.get(channel)?.stats;
-    if (!s) return <Badge text={t("dash.widget_waiting")} kind="warn" />;
-    return (
-        <Badge
-            text={s.isLive ? t("dev.badge.online") : t("dev.badge.offline")}
-            kind={s.isLive ? "on" : "off"}
-        />
+function configuredSpecs(w: ServerDashboardWidget): string[] {
+    return statsSpecsFromConfig(w.config).filter(
+        (spec): spec is string => spec !== null,
     );
 }
 
-/** Stream duration, whole minutes ("1 h 23 min"). */
+function badge(w: ServerDashboardWidget, _ctx: WidgetContext): m.Vnode {
+    const specs = configuredSpecs(w);
+    if (specs.length === 0)
+        return <Badge text={t("dash.widget_not_configured")} kind="warn" />;
+    const samples = specs.map((spec) => live.get(spec));
+    if (samples.some((sample) => sample?.isLive))
+        return <Badge text={t("dev.badge.online")} kind="on" />;
+    if (samples.every((sample) => sample !== undefined))
+        return <Badge text={t("dev.badge.offline")} kind="off" />;
+    return <Badge text={t("dash.widget_waiting")} kind="warn" />;
+}
+
 function durationMinutes(fromMs: number, toMs: number): string {
     const mins = Math.max(0, Math.floor((toMs - fromMs) / 60_000));
     const h = Math.floor(mins / 60);
@@ -66,68 +61,103 @@ function durationMinutes(fromMs: number, toMs: number): string {
     return h > 0 ? `${h} h ${m} min` : `${m} min`;
 }
 
-/** The card body: stream info on top, the viewers line chart below. */
-function body(_w: ServerDashboardWidget, ctx: WidgetContext): m.Children {
-    const channel = ctx.channel;
-    if (!channel)
+function body(w: ServerDashboardWidget, _ctx: WidgetContext): m.Children {
+    const specs = configuredSpecs(w);
+    if (specs.length === 0)
         return <p class={"muted"}>{t("dash.widget_not_configured")}</p>;
-    const s = live.get(channel)?.stats;
-    if (!s) return <p class={"muted"}>{t("stats.waiting")}</p>;
-    const now = s.at;
+
+    const samples = specs.map((spec) => live.get(spec) ?? null);
+    if (samples.every((sample) => sample === null))
+        return <p class={"muted"}>{t("stats.waiting")}</p>;
+
+    const currentTotal = currentViewerTotal(samples);
+    const chartSeries = mergeViewerSeries(
+        specs.flatMap((spec, index) => {
+            const parsed = parseStatsSpec(spec);
+            const sample = samples[index];
+            return parsed && sample
+                ? [
+                      {
+                          key: parsed.platform,
+                          label: t(`stats.${parsed.platform}`),
+                          points: sample.series,
+                      },
+                  ]
+                : [];
+        }),
+        t("stats.total"),
+        samples.every((sample) => sample !== null),
+    );
+    const kick = samples.find((sample) => sample?.platform === "kick");
+    const now = Math.max(0, ...samples.map((sample) => sample?.at ?? 0));
+
     return (
         <div class={"stats"}>
-            {[
-                <div class={"stats-top"}>
-                    {[
-                        <span class={"big"}>
-                            {[
-                                <span class={"stats-viewers"}>
-                                    {(s.viewers ?? 0).toLocaleString()}
-                                </span>,
-                                ` ${t("stats.viewers", { count: s.viewers ?? 0 })}`,
-                            ]}
-                        </span>,
-                        s.isLive ? (
-                            <Badge text={t("stats.live")} kind="on" />
-                        ) : (
-                            <Badge text={t("stats.offline")} kind="off" />
-                        ),
-                    ]}
-                </div>,
-                s.title ? <p class={"stats-title"}>{s.title}</p> : null,
+            <div class={"stats-current"}>
+                {specs.map((spec, index) => {
+                    const parsed = parseStatsSpec(spec);
+                    if (!parsed) return null;
+                    const sample = samples[index];
+                    const viewers = sample
+                        ? sample.isLive
+                            ? sample.viewers
+                            : 0
+                        : null;
+                    return (
+                        <div
+                            class={`stats-current-row stats-current-${parsed.platform}`}
+                            key={spec}>
+                            <span class={"stats-current-label"}>
+                                {t(`stats.${parsed.platform}`)}
+                            </span>
+                            <span class={"stats-current-value"}>
+                                {viewers === null
+                                    ? "—"
+                                    : `${viewers.toLocaleString()} ${t("stats.viewers", { count: viewers })}`}
+                            </span>
+                        </div>
+                    );
+                })}
+                <div class={"stats-current-row stats-current-total"}>
+                    <span class={"stats-current-label"}>
+                        {t("stats.total")}
+                    </span>
+                    <span class={"stats-current-value"}>
+                        {currentTotal === null
+                            ? "—"
+                            : `${currentTotal.toLocaleString()} ${t("stats.viewers", { count: currentTotal })}`}
+                    </span>
+                </div>
+            </div>
+            {kick?.title ? <p class={"stats-title"}>{kick.title}</p> : null}
+            {kick ? (
                 <div class={"stats-meta"}>
                     {[
-                        s.category ? <span>{s.category}</span> : null,
-                        s.startTime ? (
-                            <span
-                                class={
-                                    "muted"
-                                }>{`${t("stats.start")} ${new Date(s.startTime).toLocaleString()}`}</span>
-                        ) : null,
-                        s.isLive && s.startTime ? (
-                            <span
-                                class={
-                                    "muted"
-                                }>{`${t("stats.duration")} ${durationMinutes(s.startTime, now)}`}</span>
-                        ) : null,
-                    ]}
-                </div>,
-                <div class={"stats-spark"}>
-                    {[
-                        s.series && s.series.length >= 2 ? (
-                            <LineChart
-                                points={s.series}
-                                title={`${channel} — ${t("stats.chart")}`}
-                                key={`c${s.series.length}`}
-                            />
-                        ) : (
+                        kick.category ? <span>{kick.category}</span> : null,
+                        kick.startTime ? (
                             <span class={"muted"}>
-                                {t("stats.spark_pending")}
+                                {`${t("stats.start")} ${new Date(kick.startTime).toLocaleString()}`}
                             </span>
-                        ),
+                        ) : null,
+                        kick.isLive && kick.startTime ? (
+                            <span class={"muted"}>
+                                {`${t("stats.duration")} ${durationMinutes(kick.startTime, now)}`}
+                            </span>
+                        ) : null,
                     ]}
-                </div>,
-            ]}
+                </div>
+            ) : null}
+            <div class={"stats-spark"}>
+                {chartSeries.some((line) => line.points.length >= 2) ? (
+                    <LineChart
+                        series={chartSeries}
+                        title={t("stats.chart")}
+                        key={`s${chartSeries.map((line) => line.points.length).join("-")}`}
+                    />
+                ) : (
+                    <span class={"muted"}>{t("stats.spark_pending")}</span>
+                )}
+            </div>
         </div>
     );
 }
@@ -136,8 +166,8 @@ const statsModule: ChannelWidgetModule<ServerDashboardWidget> = {
     id: "stats",
     kind: "widget",
     widgetTypes: ["stats"],
-    defaultSize: { w: 3, h: 2 },
-    configFields: STATS_CONFIG_FIELDS,
+    defaultSize: { w: 3, h: 3 },
+    configFields: STATS_EDITOR_FIELDS,
     body,
     badge,
     onFrame,

@@ -2,30 +2,14 @@ import m from "mithril";
 import type { MithrilJSXComponent } from "../../public/ts/jsx";
 import type { StatsSample } from "./types";
 
-// ---------------------------------------------------------------------------
-// Line chart
-//
-// SVG line chart for the viewer series, modeled on
-// mithril-components/mithril-node-linechart: dashed grid, axis legends and
-// circle + polyline per series. The viewBox tracks the container's pixel
-// size 1:1 (via ResizeObserver), so the chart is drawn directly in screen
-// pixels: resizing a card only prolongs the axes (longer lines, more grid
-// rows/columns) — text size, grid spacing, margins and line thickness stay
-// constant. The Y scale spans the series min→max (not 0→max) so small
-// variations aren't squashed at the bottom.
-// ---------------------------------------------------------------------------
-
-/** Fallback pixel size until the first size measurement lands. */
 const W_FALLBACK = 260;
 const H_FALLBACK = 110;
-/** Margins (px, constant at any card size) — just room for the legends. */
-const M = { left: 30, right: 10, top: 12, bottom: 20 } as const;
-/** Target grid line spacing (px). */
+const M = { left: 34, right: 10, top: 12, bottom: 20 } as const;
 const GRID_SPACING = 28;
-/** Minimum horizontal room (px) per X legend label (HH:MM / MM-DD). */
 const TICK_MIN_WIDTH = 56;
 
 type Pt = [number, number];
+type ChartSeries = { key: string; label: string; points: StatsSample[] };
 type State = {
     width: number | null;
     height: number | null;
@@ -52,18 +36,16 @@ function gridLines(
     return lines;
 }
 
-/** Compact time label: HH:MM for the current day, otherwise MM-DD. */
 function timeLabel(t: number): string {
     const d = new Date(t);
-    const now = new Date();
-    const sameDay = d.toDateString() === now.toDateString();
+    const sameDay = d.toDateString() === new Date().toDateString();
     const pad = (n: number) => String(n).padStart(2, "0");
     return sameDay
         ? `${pad(d.getHours())}:${pad(d.getMinutes())}`
         : `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/** The line chart: `points` oldest first; Y spans the series min→max. */
+/** Multi-platform viewer chart; every series shares the same time axis. */
 export const LineChart = {
     oncreate(vnode) {
         const el = vnode.dom as SVGElement;
@@ -89,15 +71,13 @@ export const LineChart = {
         vnode.state.observer.disconnect();
     },
     view: (vnode) => {
-        const { points } = vnode.attrs;
+        const { series } = vnode.attrs;
+        const points = series.flatMap((line) => line.points);
         if (!points.length)
             return <svg class={"spark"} role={"img"} aria-hidden={"true"} />;
-        const n = points.length;
+        const timeline = series[0]?.points ?? [];
+        const n = timeline.length;
 
-        // 1:1 pixel viewBox (coordinates are screen px): resizing a card only
-        // prolongs the axes — the grid gains rows/columns, while text, spacing
-        // and strokes keep their constant size. Legend text simply inherits the
-        // widget's font size, like the rest of the design.
         const w = Math.round(vnode.state?.width ?? W_FALLBACK);
         const h = Math.round(vnode.state?.height ?? H_FALLBACK);
         const x0 = M.left,
@@ -108,38 +88,33 @@ export const LineChart = {
             return <svg class={"spark"} role={"img"} aria-hidden={"true"} />;
         const gridV = Math.max(2, Math.round((x1 - x0) / GRID_SPACING));
         const gridH = Math.max(2, Math.round((y1 - y0) / GRID_SPACING));
-
-        // Y scale: series min→max (min 1 value so an all-zero series still renders).
-        const min = Math.min(...points.map((p) => p.v));
+        const min = 0;
         const max = Math.max(1, ...points.map((p) => p.v));
-        const span = max - min;
         const xs = (i: number) =>
-            n === 1 ? (x0 + x1) / 2 : x0 + (i * (x1 - x0)) / (n - 1);
-        const ys = (v: number) =>
-            span <= 0 ? (y0 + y1) / 2 : y1 - ((v - min) / span) * (y1 - y0);
-        const pt = (i: number): Pt => [xs(i), ys(points[i]!.v)];
-        const fmt = (v: number) =>
-            Number.isInteger(v) ? String(v) : v.toFixed(1);
-
-        // X legends: evenly placed ticks, as many as the card width allows.
+            n <= 1 ? (x0 + x1) / 2 : x0 + (i * (x1 - x0)) / (n - 1);
+        const ys = (v: number) => y1 - ((v - min) / (max - min)) * (y1 - y0);
+        const fmt = (v: number) => Math.round(v).toLocaleString();
         const tickCount =
             n < 2
                 ? 1
-                : Math.max(2, Math.min(5, n, Math.floor((x1 - x0) / TICK_MIN_WIDTH)));
+                : Math.max(
+                      2,
+                      Math.min(5, n, Math.floor((x1 - x0) / TICK_MIN_WIDTH)),
+                  );
         const xTicks: m.Children[] = [];
         for (let i = 0; i < tickCount; i++) {
             const idx =
                 tickCount === 1
                     ? 0
                     : Math.round((i * (n - 1)) / (tickCount - 1));
-            const [x] = pt(idx);
+            const x = xs(idx);
             xTicks.push(
                 <text
                     key={`x${i}`}
                     x={x}
                     y={y1 + M.bottom - 5}
                     text-anchor={"middle"}>
-                    {timeLabel(points[idx]?.t)}
+                    {timeLabel(timeline[idx]?.t ?? 0)}
                 </text>,
             );
         }
@@ -151,11 +126,9 @@ export const LineChart = {
                 role={"img"}
                 aria-label={vnode.attrs.title}>
                 {[
-                    // Grid (mirrors the reference's dashed grid).
                     <g class={"spark-grid"}>
                         {gridLines(gridV, gridH, x0, x1, y0, y1)}
                     </g>,
-                    // Y legends: min / max of the visible series.
                     <g class={"spark-axis"}>
                         {[
                             <text key={"max"} x={x0 - 5} y={y0 + 3.5} text-anchor={"end"}>
@@ -166,18 +139,22 @@ export const LineChart = {
                             </text>,
                         ]}
                     </g>,
-                    // X legends.
                     <g class={"spark-axis"}>{xTicks}</g>,
-                    // The line itself.
                     <g class={"spark-line"}>
-                        <polyline
-                            points={points
-                                .map((_, i) => pt(i).join(","))
-                                .join(" ")}
-                        />
+                        {series.map((line) => (
+                            <polyline
+                                key={line.key}
+                                class={`stats-line stats-line-${line.key}`}
+                                points={line.points
+                                    .map((point, index) =>
+                                        [xs(index), ys(point.v)].join(","),
+                                    )
+                                    .join(" ")}
+                            />
+                        ))}
                     </g>,
                 ]}
             </svg>
         );
     },
-} as MithrilJSXComponent<{ points: StatsSample[]; title?: string }, State>;
+} as MithrilJSXComponent<{ series: ChartSeries[]; title?: string }, State>;

@@ -1,10 +1,14 @@
 /*
- * stats backend — one half of the server-side Kick channel hub. The stats
- * dashboard widgets are device-independent, so the control server polls
- * Kick's public channel API here for every configured channel and pushes
- * `kick.stats` events (tagged with the channel) to dashboard websocket
- * subscribers. One instance serves all stats widgets.
+ * stats backend — one server-side hub for all configured YouTube, Twitch,
+ * and Kick channel references. Each source is polled independently and
+ * published as a platform-tagged `stats.update` event.
  */
+import {
+    parseStatsSpec,
+    STATS_CONFIG_FIELDS,
+    statsSpecsFromConfig,
+} from "./config";
+import { fetchPlatformStats } from "./providers";
 import {
     type ChannelSpecs,
     eventFrame,
@@ -13,30 +17,18 @@ import {
     type StatsSample,
 } from "./types";
 
+export { STATS_CONFIG_FIELDS, statsSpecsFromConfig } from "./config";
+
 export const STATS_POLL_MS = 30_000;
-
-/** stats widget's configurable parameters (single source for the server
- * validation and the frontend editor). */
-export const STATS_CONFIG_FIELDS = ["channel"] as const;
-
-/** Channel-hub specs from one widget's config (stats carries a single
- * channel; the hub contract lists one spec per source, null when unconfigured). */
-export function statsSpecsFromConfig(
-    config: Record<string, string> | undefined,
-): readonly (string | null)[] {
-    const name = (config?.channel ?? "").trim().toLowerCase();
-    return [name || null];
-}
-/** Per-channel latest stats sample, for the merged hub snapshot. */
-export interface StatsSnapshot {
-    [channel: string]: StatsLive | null;
-}
-const FETCH_TIMEOUT_MS = 10_000;
-const KICK_API = "https://kick.com/api/v1";
-/** Viewer samples kept per channel for the line chart (30s × 120 = 1 h window). */
+const HUB_CONFIG_FIELDS = [...STATS_CONFIG_FIELDS, "channel"] as const;
 const SERIES_CAP = 120;
 
+/** Per-platform-channel latest stats sample for the merged hub snapshot. */
+export type StatsSnapshot = Record<string, StatsLive | null>;
+
 type StatsChannelState = {
+    spec: string;
+    platform: NonNullable<ReturnType<typeof parseStatsSpec>>["platform"];
     channel: string;
     stats: StatsLive | null;
     series: StatsSample[];
@@ -44,17 +36,6 @@ type StatsChannelState = {
     timer: ReturnType<typeof setInterval> | null;
 };
 
-/** Kick's `start_time` strings are UTC without an offset ("2026-10-06 19:26:57"). */
-function parseKickTime(value: string | undefined): number | undefined {
-    if (!value) return undefined;
-    const ms = Date.parse(`${value.replace(" ", "T")}Z`);
-    return Number.isNaN(ms) ? undefined : ms;
-}
-
-/**
- * State manager for stats channels. `sync(specs)` starts pollers for
- * channels not yet attached and stops the removed ones.
- */
 export class StatsChannelManager {
     #channels = new Map<string, StatsChannelState>();
     #publish: PublishFn;
@@ -63,40 +44,39 @@ export class StatsChannelManager {
         this.#publish = publish;
     }
 
-    start(name: string): void {
-        const key = name.trim().toLowerCase();
-        if (!key) return;
-        this.stop(key);
+    start(spec: string): void {
+        if (this.#channels.has(spec)) return;
+        const parsed = parseStatsSpec(spec);
+        if (!parsed) {
+            console.warn(`[stats] ignoring invalid channel spec: ${spec}`);
+            return;
+        }
         const state: StatsChannelState = {
-            channel: key,
+            spec,
+            ...parsed,
             stats: null,
             series: [],
             polling: false,
             timer: null,
         };
-        this.#channels.set(key, state);
+        this.#channels.set(spec, state);
         void this.#poll(state);
-        state.timer = setInterval(
-            () => void this.#poll(state),
-            STATS_POLL_MS,
-        );
+        state.timer = setInterval(() => void this.#poll(state), STATS_POLL_MS);
     }
 
-    stop(channel: string): void {
-        const key = channel.trim().toLowerCase();
-        const state = this.#channels.get(key);
+    stop(spec: string): void {
+        const state = this.#channels.get(spec);
         if (!state) return;
         if (state.timer) clearInterval(state.timer);
-        this.#channels.delete(key);
+        this.#channels.delete(spec);
     }
 
     sync(specs: ChannelSpecs): void {
-        for (const name of specs) {
-            const key = name.trim().toLowerCase();
-            if (key && !this.#channels.has(key)) this.start(key);
+        for (const spec of specs) {
+            if (spec && !this.#channels.has(spec)) this.start(spec);
         }
-        for (const key of [...this.#channels.keys()]) {
-            if (!specs.has(key)) this.stop(key);
+        for (const spec of [...this.#channels.keys()]) {
+            if (!specs.has(spec)) this.stop(spec);
         }
     }
 
@@ -104,63 +84,47 @@ export class StatsChannelManager {
         return [...this.#channels.keys()];
     }
 
-    /** Latest sample per channel (null until the first poll lands). */
     snapshot(): StatsSnapshot {
         const out: StatsSnapshot = {};
-        for (const [key, state] of this.#channels) out[key] = state.stats;
+        for (const [spec, state] of this.#channels) out[spec] = state.stats;
         return out;
     }
 
     destroy(): void {
-        for (const key of this.startedChannels()) this.stop(key);
+        for (const spec of this.startedChannels()) this.stop(spec);
     }
 
     async #poll(state: StatsChannelState): Promise<void> {
         if (state.polling) return;
         state.polling = true;
         try {
-            const res = await fetch(
-                `${KICK_API}/channels/${encodeURIComponent(state.channel)}`,
-                {
-                    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-                    headers: { accept: "application/json" },
-                },
+            const sample = await fetchPlatformStats(
+                state.platform,
+                state.channel,
             );
-            if (!res.ok) throw new Error(`kick stats HTTP ${res.status}`);
-            const payload = (await res.json()) as {
-                followersCount?: number;
-                livestream?: {
-                    viewers?: number;
-                    is_live?: boolean;
-                    session_title?: string;
-                    start_time?: string;
-                    categories?: { name?: string }[];
-                } | null;
-            };
-            const stream = payload.livestream ?? null;
+            if (this.#channels.get(state.spec) !== state) return;
             const at = Date.now();
-            // Offline polls record 0, so the chart shows the dip (as the reference page does).
-            state.series.push({ t: at, v: stream?.viewers ?? 0 });
-            if (state.series.length > SERIES_CAP) state.series.shift();
+            state.series = [
+                ...state.series,
+                { t: at, v: sample.isLive ? sample.viewers ?? 0 : 0 },
+            ].slice(-SERIES_CAP);
             state.stats = {
-                viewers: stream?.viewers,
-                followers: payload.followersCount,
-                isLive: Boolean(stream?.is_live),
-                title: stream?.session_title,
-                category: stream?.categories?.[0]?.name,
-                startTime: parseKickTime(stream?.start_time),
+                platform: state.platform,
+                channel: state.channel,
+                ...sample,
+                viewers: sample.isLive ? sample.viewers ?? 0 : 0,
                 at,
                 series: [...state.series],
             };
             this.#publish(
-                eventFrame("kick.stats", {
-                    channel: state.channel,
+                eventFrame("stats.update", {
+                    channel: state.spec,
                     stats: state.stats,
                 }),
             );
         } catch (err: unknown) {
             console.warn(
-                `[stats ${state.channel}] poll failed: ${err instanceof Error ? err.message : String(err)}`,
+                `[stats ${state.spec}] poll failed: ${err instanceof Error ? err.message : String(err)}`,
             );
         } finally {
             state.polling = false;
@@ -168,10 +132,6 @@ export class StatsChannelManager {
     }
 }
 
-/**
- * Widget registration (the backend registry's hub wiring). The core reaches
- * this module only through it; no per-module imports in the core.
- */
 export default {
     id: "stats",
     kind: "widget" as const,
@@ -179,7 +139,7 @@ export default {
     hub: {
         widgetType: "stats",
         snapshotKey: "stats",
-        configFields: STATS_CONFIG_FIELDS,
+        configFields: HUB_CONFIG_FIELDS,
         channelSpec: statsSpecsFromConfig,
         create: (publish: PublishFn): StatsChannelManager =>
             new StatsChannelManager(publish),

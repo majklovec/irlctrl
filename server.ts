@@ -47,7 +47,7 @@ import {
  *   POST /api/invitations  mint a fresh single-use invite (admin only)
  *   WS   /device           device connections (Authorization: Bearer <token>, x-device-id: <id>,
  *                          x-device-role: relay|encoder|combined)
- *   WS   /dashboards/ws    the shared live feed: widget data (kick.stats /
+ *   WS   /dashboards/ws    the shared live feed: widget data (stats.update /
  *                          kick.chat / tiktok.chat / twitch.chat / youtube.chat
  *                          events, widget.snapshot on connect) for the channel
  *                          chat widgets (the server follows each widget
@@ -1203,8 +1203,8 @@ function parseWidgets(raw: unknown, owner: string): ServerDashboardWidget[] {
         if (independent) {
             // Channel widgets are device-independent: they carry their own data
             // source parameters, declared by the widget module (the dashboard
-            // API owns their hub). Values may be missing/empty — a new widget
-            // is added first and its config filled in via the widget editor.
+            // API owns their hub). Values may be missing/empty — they can be
+            // set in the add form and edited later in the widget config editor.
             const cfg = (
                 item.config && typeof item.config === "object"
                     ? item.config

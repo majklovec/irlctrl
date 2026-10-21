@@ -2,8 +2,8 @@
  * "Add widget" button links here; picking a type (per device group or an
  * independent kick widget) and an optional name replaces the old in-page
  * dropdown. The device is carried by the option itself (its group), and
- * type-specific config (e.g. the kick channel) is set through the widget's
- * own config editor after it lands on the grid. The widget lands on the next
+ * type-specific config is set in this form and can be edited later from the
+ * widget's config button. The widget lands on the next
  * free grid slot and the page returns to the (live) dashboard view. A 409
  * conflict reloads the server copy; the widget is not added twice. */
 import m from "mithril";
@@ -294,6 +294,11 @@ const App: m.Component = {
                                     ? (
                                           widgetModule(type)?.configFields ?? []
                                       ).map((f) => {
+                                          if (
+                                              typeof f !== "string" &&
+                                              f.type === "hidden"
+                                          )
+                                              return null;
                                           const name = configFieldName(f);
                                           return typeof f !== "string" &&
                                               f.type === "select" ? (

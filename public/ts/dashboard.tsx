@@ -553,6 +553,8 @@ function configEditorForm(w: ServerDashboardWidget): m.Vnode {
             {[
                 ...fields.map((field) => {
                     const name = configFieldName(field);
+                    if (typeof field !== "string" && field.type === "hidden")
+                        return null;
                     const isSelect =
                         typeof field !== "string" && field.type === "select";
                     return (

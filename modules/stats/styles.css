@@ -4,22 +4,51 @@
 .dash-widget-body .stats {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
     height: 100%;
 }
-.dash-widget-body .stats-top {
+.dash-widget-body .stats-current {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 4px 12px;
+}
+.dash-widget-body .stats-current-row {
     display: flex;
     align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+    font-size: 0.85rem;
 }
-.dash-widget-body .stats-top .big {
-    font-size: 1.8rem;
+.dash-widget-body .stats-current-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+}
+.dash-widget-body .stats-current-label::before {
+    content: "";
+    width: 9px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--accent);
+}
+.dash-widget-body .stats-current-youtube .stats-current-label::before {
+    background: #ff0000;
+}
+.dash-widget-body .stats-current-twitch .stats-current-label::before {
+    background: #9146ff;
+}
+.dash-widget-body .stats-current-kick .stats-current-label::before {
+    background: #53fc18;
+}
+.dash-widget-body .stats-current-total {
+    border-top: 1px solid var(--border);
+    padding-top: 4px;
     font-weight: 700;
-    line-height: 1;
 }
-.dash-widget-body .stats-top .stats-viewers {
-    color: var(--accent-hover);
+.dash-widget-body .stats-current-total .stats-current-label::before {
+    background: var(--accent-hover);
 }
 .dash-widget-body .stats-title {
     font-size: 0.9rem;
@@ -69,4 +98,17 @@
     stroke-linejoin: round;
     stroke-linecap: round;
     vector-effect: non-scaling-stroke;
+}
+.dash-widget-body svg.spark .spark-line .stats-line-youtube {
+    stroke: #ff0000;
+}
+.dash-widget-body svg.spark .spark-line .stats-line-twitch {
+    stroke: #9146ff;
+}
+.dash-widget-body svg.spark .spark-line .stats-line-kick {
+    stroke: #53fc18;
+}
+.dash-widget-body svg.spark .spark-line .stats-line-total {
+    stroke: var(--accent-hover);
+    stroke-width: 1.75;
 }
