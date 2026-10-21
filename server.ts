@@ -87,8 +87,8 @@ import {
  *   --no-auth disables auth (local testing only; everything maps to "local").
  *
  * Dashboards are a per-user feature: the dashboards page composes them from the
- * modules of the user's devices and persists them to --dashboards (default
- * dashboards.json, created on the first change).
+ * modules of the user's devices and persists them to the SQLite database
+ * (the `dashboards` table of --db).
  *
  * Usage:
  *   bun server.ts --port 8090
@@ -140,8 +140,8 @@ const PORT = intArg("--port", 8090, 1, 65535);
 const HOST = arg("--host", "0.0.0.0");
 
 const NO_AUTH = flag("--no-auth");
-const DASHBOARDS_FILE = arg("--dashboards", "dashboards.json");
-// SQLite database: user logins (hashed passwords) and their device tokens
+// SQLite database: user logins (hashed passwords), their device tokens and
+// the per-user dashboards
 const DB_FILE = arg("--db", process.env.SRTLA_DB ?? "users.db");
 
 const STALE_DEVICE_MS = 5 * 60 * 1000;
@@ -239,6 +239,16 @@ CREATE TABLE IF NOT EXISTS invitations (
 	used_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
 	used_at DATETIME,
 	expires_at DATETIME
+);
+CREATE TABLE IF NOT EXISTS dashboards (
+	id TEXT PRIMARY KEY,
+	owner TEXT NOT NULL,
+	name TEXT NOT NULL,
+	version INTEGER NOT NULL DEFAULT 1,
+	"columns" INTEGER NOT NULL DEFAULT 12,
+	widgets TEXT NOT NULL DEFAULT '[]',
+	position INTEGER NOT NULL DEFAULT 0,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 `);
 
@@ -1127,10 +1137,17 @@ function onViewerMessage(
 
 // ----------------------------------------------------------------------
 // Server dashboards: composed from the modules of connected devices, persisted
-// to DASHBOARDS_FILE (created on the first change)
+// to the `dashboards` table of the SQLite database (one row per dashboard,
+// widgets stored as a JSON array).
 // ----------------------------------------------------------------------
-interface DashboardsFile {
-    dashboards: ServerDashboard[];
+interface DashboardRow {
+    id: string;
+    owner: string;
+    name: string;
+    version: number;
+    columns: number;
+    widgets: string;
+    position: number;
 }
 
 /** Read `{x, y, w, h}` from an inbound widget payload (missing fields fall back to the type default). */
@@ -1237,97 +1254,63 @@ function parseWidgets(raw: unknown, owner: string): ServerDashboardWidget[] {
     });
 }
 
-/** Coerce a raw stored dashboard into the normalized shape, filling in missing
- * ids, names and grid coordinates with per-type defaults. */
-function normalizeDashboard(
-    raw: Record<string, unknown>,
-    index: number,
-): ServerDashboard {
-    const id = typeof raw.id === "string" && raw.id ? raw.id : randomUUID();
-    const name =
-        typeof raw.name === "string" && raw.name
-            ? raw.name
-            : `Dashboard ${index + 1}`;
-    const columns =
-        Number.isFinite(Number(raw.columns)) && Number(raw.columns) > 0
-            ? Number(raw.columns)
-            : DASH_COLUMNS;
-    const widgetsRaw = Array.isArray(raw.widgets) ? raw.widgets : [];
-    const widgets: ServerDashboardWidget[] = widgetsRaw.map((rr) => {
-        const item = (rr && typeof rr === "object" ? rr : {}) as Record<
-            string,
-            unknown
-        >;
-        const type = String(item.type);
-        const size = WIDGET_SIZE[type as WidgetType] ?? { w: 4, h: 4 };
-        const x = Number(item.x) || 0;
-        const y = Number(item.y) || 0;
-        const w = Number(item.w) || size.w;
-        const h = Number(item.h) || size.h;
-        const independent = INDEPENDENT_WIDGETS.has(type as WidgetType);
-        const cfgRaw = (
-            item.config && typeof item.config === "object" ? item.config : {}
-        ) as Record<string, unknown>;
-        // Only the widget module's declared parameters count; keep the config
-        // only when it carries at least one.
-        let config: Record<string, string> | undefined;
-        if (independent) {
-            const kept: Record<string, string> = {};
-            for (const name of widgetConfigFields(type).map(configFieldName)) {
-                if (typeof cfgRaw[name] === "string") kept[name] = cfgRaw[name];
-            }
-            if (Object.keys(kept).length > 0) config = kept;
-        }
-        return {
-            id: typeof item.id === "string" && item.id ? item.id : randomUUID(),
-            deviceId: typeof item.deviceId === "string" ? item.deviceId : "",
-            type: type as WidgetType,
-            name: typeof item.name === "string" && item.name ? item.name : type,
-            x,
-            y,
-            w,
-            h,
-            visible: item.visible !== false,
-            ...(config ? { config } : {}),
-        };
-    });
-    const storedVersion = Number(raw.version);
-    const version = Number.isInteger(storedVersion) ? storedVersion : 1;
-    return {
-        id,
-        ...(typeof raw.owner === "string" && raw.owner
-            ? { owner: raw.owner }
-            : {}),
-        name,
-        version,
-        widgets,
-        columns,
-    };
-}
-
 let dashboards: ServerDashboard[] = [];
-// biome-ignore lint/complexity/noUselessLoneBlockStatements: <explanation>
-{
-    try {
-        const loaded = (await Bun.file(
-            DASHBOARDS_FILE,
-        ).json()) as DashboardsFile;
-        if (loaded && Array.isArray(loaded.dashboards)) {
-            dashboards = loaded.dashboards.map((d, i) =>
-                normalizeDashboard(d as unknown as Record<string, unknown>, i),
+
+/** The in-memory dashboards reloaded from the database, in stored order. */
+function loadDashboards(): ServerDashboard[] {
+    if (!db) return [];
+    const rows = db
+        .prepare("SELECT * FROM dashboards ORDER BY position")
+        .all() as DashboardRow[];
+    return rows.map((row) => {
+        let widgets: ServerDashboardWidget[] = [];
+        try {
+            widgets = JSON.parse(row.widgets) as ServerDashboardWidget[];
+        } catch {
+            // Corrupt row: keep the dashboard shell, drop its widgets
+            console.warn(
+                `[dashboards] ${row.id}: dropping widgets — the stored JSON is unparsable`,
             );
         }
-    } catch {
-        // No file yet: start empty
+        return {
+            id: row.id,
+            owner: row.owner,
+            name: row.name,
+            version: row.version,
+            widgets,
+            columns: row.columns,
+        };
+    });
+}
+
+/** Persist the whole in-memory list (dashboards are small; a full rewrite in
+ * one transaction is simplest and always leaves the table consistent). */
+function saveDashboards(): void {
+    if (!db) return;
+    try {
+        db.transaction(() => {
+            db.prepare("DELETE FROM dashboards").run();
+            const ins = db.prepare(
+                'INSERT INTO dashboards (id, owner, name, version, "columns", widgets, position) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            );
+            dashboards.forEach((d, i) =>
+                ins.run(
+                    d.id,
+                    d.owner ?? LOCAL_USER,
+                    d.name,
+                    d.version,
+                    d.columns,
+                    JSON.stringify(d.widgets),
+                    i,
+                ),
+            );
+        })();
+    } catch (err: unknown) {
+        console.error(`[dashboards] persist ${DB_FILE}:`, err);
     }
 }
 
-function saveDashboards(): void {
-    const file = Bun.file(DASHBOARDS_FILE);
-    file.write(JSON.stringify({ dashboards }, null, 2)).catch((err: unknown) =>
-        console.error(`[dashboards] persist ${DASHBOARDS_FILE}:`, err),
-    );
-}
+dashboards = loadDashboards();
 
 /** Kick channel widgets needed by the persisted dashboards; fans out to dashboard viewers. */
 initWidgetHub((msg) => server.publish(WIDGET_HUB_TOPIC, msg));

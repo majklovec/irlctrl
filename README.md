@@ -118,7 +118,7 @@ Tick **Autostart** in the UI (or call `autostart.set`) to resume the last stream
 
 ## Control server
 
-`server.ts` lists all devices and serves the same web UI for each one at `/d/<id>/`, relaying commands to the device over its outbound connection — so devices behind NAT or on mobile networks can be managed. It also hosts per-user **dashboards**: gridstack grids composed of widgets from any device owned by that user, with dedicated add / edit / view pages. Widgets are of two kinds — **device widgets** (a live status card per device: `relay`, `encoder`, `combined`, or `obs`, depending on the device's role and enabled modules) and **channel widgets** (device-independent modules, one hub per kind serves all widgets of that kind). Dashboards are persisted to the `--dashboards` file, and a shared live feed (`/dashboards/ws`) streams widget data to every open view.
+`server.ts` lists all devices and serves the same web UI for each one at `/d/<id>/`, relaying commands to the device over its outbound connection — so devices behind NAT or on mobile networks can be managed. It also hosts per-user **dashboards**: gridstack grids composed of widgets from any device owned by that user, with dedicated add / edit / view pages. Widgets are of two kinds — **device widgets** (a live status card per device: `relay`, `encoder`, `combined`, or `obs`, depending on the device's role and enabled modules) and **channel widgets** (device-independent modules, one hub per kind serves all widgets of that kind). Dashboards are persisted to the SQLite database (`dashboards` table of `--db`), and a shared live feed (`/dashboards/ws`) streams widget data to every open view.
 
 ### Authentication
 
@@ -129,7 +129,7 @@ The server replaces HTTP Basic auth with per-user profiles stored in a local **S
 -   **Browsers** sign in at `/login` with the username and password. A successful login sets an `HttpOnly` session cookie; all device lists, device pages, and dashboards are then scoped to that user. Only devices owned by the signed-in user are visible, and only that user can open a device's page/WS or edit its dashboards.
 -   **`/register`** creates a new account. The **first** account is bootstrapped as admin without an invite code; every account after that needs a valid, single-use **invitation code** (optionally expiring) minted by an admin. New profiles start with no device tokens — add them on the profile page after signing in.
 -   **`/profile/`** (reached from the username menu in the header) changes the login password and lists/manages the user's device tokens — adding new ones and removing old ones. Admins additionally get an **invitations panel** to mint fresh invite codes and review the code history.
--   `--no-auth` maps everything to a single local profile for local testing (no database needed).
+-   `--no-auth` maps everything to a single local profile for local testing (no database needed; dashboards are kept in memory only).
 
 ```sh
 # control server — the first account is created at /register
@@ -145,9 +145,8 @@ open http://ctl.example.com/  # redirects to /login; enter the username + passwo
 | Option             | Env        | Notes                                                             |
 | ------------------ | ---------- | ----------------------------------------------------------------- |
 | `--host`, `--port` |            | Default `0.0.0.0:8090`                                            |
-| `--db`             | `SRTLA_DB` | SQLite user database file (default `users.db`)                    |
-| `--dashboards`     |            | JSON file persisting the (per-user) dashboards                    |
-| `--no-auth`        |            | Local testing only — one shared `local` profile, no tokens needed |
+| `--db`             | `SRTLA_DB` | SQLite database: users, device tokens, dashboards (default `users.db`) |
+| `--no-auth`        |            | Local testing only — one shared `local` profile, no tokens needed (no database; dashboards are kept in memory only) |
 
 > [!IMPORTANT]
 > Run the server behind a TLS reverse proxy — device tokens and the session cookie need `wss://`/`https://`.

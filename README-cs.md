@@ -133,7 +133,7 @@ Widgety jsou dvojího druhu:
 -   **Widgety zařízení** — živá stavová karta pro každé zařízení: `relay`, `encoder`, `combined` nebo `obs`, podle jeho role a povolených modulů.
 -   **Widgety kanálů** — na zařízení nezávislé moduly. Jeden centrální hub pro každý typ modulu obsluhuje všechny widgety daného typu.
 
-Nástěnky se ukládají do souboru `--dashboards` a společný živý datový tok (`/dashboards/ws`) průběžně předává data widgetů do všech otevřených zobrazení.
+Nástěnky se ukládají do databáze SQLite (tabulka `dashboards` v souboru `--db`) a společný živý datový tok (`/dashboards/ws`) průběžně předává data widgetů do všech otevřených zobrazení.
 
 ### Ověřování uživatelů
 
@@ -144,7 +144,7 @@ Server nahrazuje HTTP Basic autentizaci uživatelskými profily uloženými v m�
 -   **Prohlížeče** se přihlašují na `/login` pomocí uživatelského jména a hesla. Po úspěšném přihlášení server nastaví relační cookie `HttpOnly`. Seznamy zařízení, stránky zařízení i nástěnky jsou následně omezeny na daného uživatele. Uživatel vidí pouze svá zařízení a pouze on může otevřít jejich stránku či WebSocket a upravovat své nástěnky.
 -   **`/register`** vytváří nový účet. První účet se automaticky vytvoří jako administrátorský, bez pozvánkového kódu. Každý další účet vyžaduje platný jednorázový **pozvánkový kód**, který může mít datum vypršení platnosti a který vytvoří administrátor. Nové profily nemají žádné tokeny zařízení — přidávají se na stránce profilu po přihlášení.
 -   **`/profile/`** (dostupná z nabídky uživatelského jména v záhlaví) umožňuje změnit přihlašovací heslo a spravovat tokeny zařízení — přidávat nové a odstraňovat staré. Administrátoři mají navíc panel pro vytváření nových pozvánek a prohlížení historie kódů.
--   **`--no-auth`** přesměruje všechny operace na jeden místní profil pro testování. Není potřeba databáze.
+-   **`--no-auth`** přesměruje všechny operace na jeden místní profil pro testování. Není potřeba databáze (nástěnky zůstávají pouze v paměti).
 
 ```sh
 # Řídicí server — první účet se vytvoří na /register
@@ -160,9 +160,8 @@ open http://ctl.example.com/  # přesměruje na /login; zadejte uživatelské jm
 | Parametr           | Proměnná prostředí | Poznámka                                                                       |
 | ------------------ | ------------------ | ------------------------------------------------------------------------------ |
 | `--host`, `--port` |                    | Výchozí hodnota `0.0.0.0:8090`                                                 |
-| `--db`             | `SRTLA_DB`         | Soubor databáze uživatelů SQLite (výchozí `users.db`)                          |
-| `--dashboards`     |                    | JSON soubor pro ukládání nástěnek jednotlivých uživatelů                       |
-| `--no-auth`        |                    | Pouze pro místní testování — jeden sdílený profil `local`, bez nutnosti tokenů |
+| `--db`             | `SRTLA_DB`         | Databáze SQLite: uživatelé, tokeny zařízení, nástěnky (výchozí `users.db`)     |
+| `--no-auth`        |                    | Pouze pro místní testování — jeden sdílený profil `local`, bez nutnosti tokenů (databáze se nevyužívá; nástěnky zůstávají pouze v paměti) |
 
 > [!IMPORTANT]
 > Server provozujte za reverzní TLS proxy — tokeny zařízení a relační cookie vyžadují `wss://` a `https://`.
