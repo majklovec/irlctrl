@@ -148,6 +148,7 @@ function onTypeChange(value: string): void {
             state.device = deviceId;
             state.type = ty;
             state.config = {};
+            m.redraw();
             return;
         }
     }
@@ -157,6 +158,7 @@ function onTypeChange(value: string): void {
             ? (value as WidgetType | "")
             : "";
     state.config = {};
+    m.redraw();
 }
 
 // ---------------------------------------------------------------------- save
@@ -252,6 +254,7 @@ const App: m.Component = {
                             }}>
                             {[
                                 <Field
+                                    key="type"
                                     label={t("dash.widget_type")}
                                     control={
                                         <select
@@ -352,6 +355,7 @@ const App: m.Component = {
                                       })
                                     : []),
                                 <div
+                                    key="actions"
                                     class={
                                         "dash-config-actions dash-add-actions"
                                     }>
