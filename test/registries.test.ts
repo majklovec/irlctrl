@@ -15,7 +15,7 @@ import { safeModules } from "../src/module-core";
  */
 const DEVICE_ORDER = ["encoder", "modems", "obs-controller", "srtla"];
 /** The channel widget modules (device-independent dashboard widgets). */
-const WIDGET_IDS = ["kick-stats", "chat"];
+const WIDGET_IDS = ["stats", "chat"];
 
 /**
  * The frontend registry cannot be imported outside the browser graph (it

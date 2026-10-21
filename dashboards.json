@@ -38,7 +38,7 @@
                 {
                     "id": "d2bc1f8d-9bbe-4c65-a1d1-7ee490bb8c92",
                     "deviceId": "",
-                    "type": "kick-stats",
+                    "type": "stats",
                     "name": "Stats Kick",
                     "x": 4,
                     "y": 18,

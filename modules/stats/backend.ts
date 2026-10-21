@@ -1,8 +1,8 @@
 /*
- * kick-stats backend — one half of the server-side Kick channel hub. The
- * kick-stats dashboard widgets are device-independent, so the control server
- * polls Kick's public channel API here for every configured channel and
- * pushes `kick.stats` events (tagged with the channel) to dashboard websocket
+ * stats backend — one half of the server-side Kick channel hub. The stats
+ * dashboard widgets are device-independent, so the control server polls
+ * Kick's public channel API here for every configured channel and pushes
+ * `kick.stats` events (tagged with the channel) to dashboard websocket
  * subscribers. One instance serves all stats widgets.
  */
 import {
@@ -13,13 +13,13 @@ import {
     type StatsSample,
 } from "./types";
 
-export const KICK_STATS_POLL_MS = 30_000;
+export const STATS_POLL_MS = 30_000;
 
-/** kick-stats widget's configurable parameters (single source for the server
+/** stats widget's configurable parameters (single source for the server
  * validation and the frontend editor). */
-export const KICK_STATS_CONFIG_FIELDS = ["channel"] as const;
+export const STATS_CONFIG_FIELDS = ["channel"] as const;
 
-/** Channel-hub specs from one widget's config (kick-stats carries a single
+/** Channel-hub specs from one widget's config (stats carries a single
  * channel; the hub contract lists one spec per source, null when unconfigured). */
 export function statsSpecsFromConfig(
     config: Record<string, string> | undefined,
@@ -52,7 +52,7 @@ function parseKickTime(value: string | undefined): number | undefined {
 }
 
 /**
- * State manager for kick-stats channels. `sync(specs)` starts pollers for
+ * State manager for stats channels. `sync(specs)` starts pollers for
  * channels not yet attached and stops the removed ones.
  */
 export class StatsChannelManager {
@@ -78,7 +78,7 @@ export class StatsChannelManager {
         void this.#poll(state);
         state.timer = setInterval(
             () => void this.#poll(state),
-            KICK_STATS_POLL_MS,
+            STATS_POLL_MS,
         );
     }
 
@@ -160,7 +160,7 @@ export class StatsChannelManager {
             );
         } catch (err: unknown) {
             console.warn(
-                `[kick-stats ${state.channel}] poll failed: ${err instanceof Error ? err.message : String(err)}`,
+                `[stats ${state.channel}] poll failed: ${err instanceof Error ? err.message : String(err)}`,
             );
         } finally {
             state.polling = false;
@@ -173,13 +173,13 @@ export class StatsChannelManager {
  * this module only through it; no per-module imports in the core.
  */
 export default {
-    id: "kick-stats",
+    id: "stats",
     kind: "widget" as const,
-    title: "Kick Stats",
+    title: "Stats",
     hub: {
-        widgetType: "kick-stats",
+        widgetType: "stats",
         snapshotKey: "stats",
-        configFields: KICK_STATS_CONFIG_FIELDS,
+        configFields: STATS_CONFIG_FIELDS,
         channelSpec: statsSpecsFromConfig,
         create: (publish: PublishFn): StatsChannelManager =>
             new StatsChannelManager(publish),

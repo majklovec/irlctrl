@@ -1,5 +1,5 @@
 /**
- * kick-stats widget — local wire/state types. The module is self-contained:
+ * stats widget — local wire/state types. The module is self-contained:
  * it declares the shapes it exchanges over the dashboard websocket and the
  * hub/manager contract it implements. The core reaches this module only
  * structurally (the registry validates the shape), so no type crosses a

@@ -19,7 +19,7 @@ modules/
   srtla/
   modems/
   obs-controller/
-  kick-stats/  chat/                                                  # channel widget modules
+  stats/     chat/                                                  # channel widget modules
 ```
 
 Each module ships exactly:
@@ -33,7 +33,7 @@ Each module ships exactly:
 -   `styles.css` — scoped under `.mod-<id>` (device card) or `.dash-card`
     (dashboard widget).
 -   any number of plain helpers for its own use (e.g. obs-controller's
-    `switcher-engine.ts`, kick-stats' `graph-linechart.tsx`)
+    `switcher-engine.ts`, stats' `graph-linechart.tsx`)
 
 There is no shared `modules/types.ts`, no `modules/widgets.ts`, no
 `modules/registry.*.ts` — the old aggregate layer is gone. The only thing in

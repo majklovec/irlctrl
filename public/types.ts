@@ -118,7 +118,7 @@ export interface SrtlaState {
 }
 
 // ----------------------------------------------------------------------
-// Channel widget wire shapes (chat + kick-stats modules).
+// Channel widget wire shapes (chat + stats modules).
 //
 // Device-independent dashboard widgets: state lives in the dashboards API,
 // one backend instance per module serves all widgets of that type, and the
@@ -127,10 +127,10 @@ export interface SrtlaState {
 // ----------------------------------------------------------------------
 
 /** Widget module ids (the merged `chat` widget covers all platforms). */
-export const WIDGET_MODULE_IDS = ["kick-stats", "chat"] as const;
+export const WIDGET_MODULE_IDS = ["stats", "chat"] as const;
 export type WidgetModuleId = (typeof WIDGET_MODULE_IDS)[number];
 
-/** One viewer-count sample for the kick-stats line chart (oldest first). */
+/** One viewer-count sample for the stats line chart (oldest first). */
 export interface StatsSample {
     /** Poll time (epoch ms) */
     t: number;
@@ -361,7 +361,7 @@ export type WidgetType =
     | "relay"
     | "encoder"
     | "combined"
-    | "kick-stats"
+    | "stats"
     | "chat";
 
 /**
@@ -385,7 +385,7 @@ export const configFieldName = (f: WidgetConfigField): string =>
 export interface ServerDashboardWidget {
     /** Stable widget id, assigned by the server */
     id: string;
-    /** The device this widget's module data comes from ("" for kick widgets) */
+    /** The device this widget's module data comes from ("" for channel widgets) */
     deviceId: string;
     type: WidgetType;
     name: string;

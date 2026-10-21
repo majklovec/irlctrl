@@ -414,7 +414,7 @@ function obsWidget(
 }
 
 /** The status badge shown next to the widget title in the card head. Widget
- * module types (stats / kick-stats / the chats) render their own badge; the
+ * module types (stats / the chats) render their own badge; the
  * core keeps only the device-card and status badge logic. */
 function widgetBadge(w: ServerDashboardWidget): m.Vnode {
     switch (w.type) {

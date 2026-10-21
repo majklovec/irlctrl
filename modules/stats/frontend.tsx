@@ -1,5 +1,5 @@
-// kick-stats frontend — the dashboard widget for the kick-stats channel
-// module. Self-contained: owns its per-channel live map, fed by the dashboard
+// stats frontend — the dashboard widget for the stats channel module.
+// Self-contained: owns its per-channel live map, fed by the dashboard
 // websocket frames it cares about (`widget.snapshot`, `kick.stats`): current
 // stream info plus a line chart of viewer counts from the server-side poller.
 // The core only forwards frames (`onFrame`).
@@ -9,7 +9,7 @@ import m from "mithril";
 import { Badge } from "../../public/ts/components/ui";
 import { t } from "../../public/ts/i18n";
 import type { ServerDashboardWidget } from "../../public/types";
-import { KICK_STATS_CONFIG_FIELDS } from "./backend";
+import { STATS_CONFIG_FIELDS } from "./backend";
 import { LineChart } from "./graph-linechart";
 import type {
     ChannelLive,
@@ -19,7 +19,7 @@ import type {
 } from "./types";
 import "./styles.css";
 
-/** Live kick-stats data per channel, accumulated from the dashboard websocket. */
+/** Live stats data per channel, accumulated from the dashboard websocket. */
 const live = new Map<string, ChannelLive>();
 const liveFor = (channel: string): ChannelLive => {
     let l = live.get(channel);
@@ -30,8 +30,8 @@ const liveFor = (channel: string): ChannelLive => {
     return l;
 };
 
-/** Fold one dashboard-websocket frame into this module's live state; the kick
- * stats frames only — the chat channels' frames are ignored here. */
+/** Fold one dashboard-websocket frame into this module's live state; the stats
+ * frames only — the chat channels' frames are ignored here. */
 function onFrame(event: string, data: unknown): void {
     if (event === "widget.snapshot") {
         const snap = data as { stats?: Record<string, StatsLive | null> };
@@ -72,57 +72,57 @@ function body(_w: ServerDashboardWidget, ctx: WidgetContext): m.Children {
     if (!channel)
         return <p class={"muted"}>{t("dash.widget_not_configured")}</p>;
     const s = live.get(channel)?.stats;
-    if (!s) return <p class={"muted"}>{t("kickstats.waiting")}</p>;
+    if (!s) return <p class={"muted"}>{t("stats.waiting")}</p>;
     const now = s.at;
     return (
-        <div class={"kick-stats"}>
+        <div class={"stats"}>
             {[
-                <div class={"kick-stats-top"}>
+                <div class={"stats-top"}>
                     {[
                         <span class={"big"}>
                             {[
-                                <span class={"kick-viewers"}>
+                                <span class={"stats-viewers"}>
                                     {(s.viewers ?? 0).toLocaleString()}
                                 </span>,
-                                ` ${t("kickstats.viewers", { count: s.viewers ?? 0 })}`,
+                                ` ${t("stats.viewers", { count: s.viewers ?? 0 })}`,
                             ]}
                         </span>,
                         s.isLive ? (
-                            <Badge text={t("kickstats.live")} kind="on" />
+                            <Badge text={t("stats.live")} kind="on" />
                         ) : (
-                            <Badge text={t("kickstats.offline")} kind="off" />
+                            <Badge text={t("stats.offline")} kind="off" />
                         ),
                     ]}
                 </div>,
-                s.title ? <p class={"kick-title"}>{s.title}</p> : null,
-                <div class={"kick-stats-meta"}>
+                s.title ? <p class={"stats-title"}>{s.title}</p> : null,
+                <div class={"stats-meta"}>
                     {[
                         s.category ? <span>{s.category}</span> : null,
                         s.startTime ? (
                             <span
                                 class={
                                     "muted"
-                                }>{`${t("kickstats.start")} ${new Date(s.startTime).toLocaleString()}`}</span>
+                                }>{`${t("stats.start")} ${new Date(s.startTime).toLocaleString()}`}</span>
                         ) : null,
                         s.isLive && s.startTime ? (
                             <span
                                 class={
                                     "muted"
-                                }>{`${t("kickstats.duration")} ${durationMinutes(s.startTime, now)}`}</span>
+                                }>{`${t("stats.duration")} ${durationMinutes(s.startTime, now)}`}</span>
                         ) : null,
                     ]}
                 </div>,
-                <div class={"kick-spark"}>
+                <div class={"stats-spark"}>
                     {[
                         s.series && s.series.length >= 2 ? (
                             <LineChart
                                 points={s.series}
-                                title={`${channel} — ${t("kickstats.chart")}`}
+                                title={`${channel} — ${t("stats.chart")}`}
                                 key={`c${s.series.length}`}
                             />
                         ) : (
                             <span class={"muted"}>
-                                {t("kickstats.spark_pending")}
+                                {t("stats.spark_pending")}
                             </span>
                         ),
                     ]}
@@ -132,15 +132,15 @@ function body(_w: ServerDashboardWidget, ctx: WidgetContext): m.Children {
     );
 }
 
-const kickStatsModule: ChannelWidgetModule<ServerDashboardWidget> = {
-    id: "kick-stats",
+const statsModule: ChannelWidgetModule<ServerDashboardWidget> = {
+    id: "stats",
     kind: "widget",
-    widgetTypes: ["kick-stats"],
+    widgetTypes: ["stats"],
     defaultSize: { w: 3, h: 2 },
-    configFields: KICK_STATS_CONFIG_FIELDS,
+    configFields: STATS_CONFIG_FIELDS,
     body,
     badge,
     onFrame,
 };
 
-export default kickStatsModule;
+export default statsModule;

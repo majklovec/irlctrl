@@ -1,34 +1,34 @@
-/* kick-stats widget body — scoped to the dashboard card (.dash-widget-body) */
+/* stats widget body — scoped to the dashboard card (.dash-widget-body) */
 
-/* Stats Kick card */
-.dash-widget-body .kick-stats {
+/* Stats card */
+.dash-widget-body .stats {
     display: flex;
     flex-direction: column;
     gap: 6px;
     height: 100%;
 }
-.dash-widget-body .kick-stats-top {
+.dash-widget-body .stats-top {
     display: flex;
     align-items: center;
     gap: 12px;
     flex-wrap: wrap;
 }
-.dash-widget-body .kick-stats-top .big {
+.dash-widget-body .stats-top .big {
     font-size: 1.8rem;
     font-weight: 700;
     line-height: 1;
 }
-.dash-widget-body .kick-stats-top .kick-viewers {
+.dash-widget-body .stats-top .stats-viewers {
     color: var(--accent-hover);
 }
-.dash-widget-body .kick-title {
+.dash-widget-body .stats-title {
     font-size: 0.9rem;
     margin: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.dash-widget-body .kick-stats-meta {
+.dash-widget-body .stats-meta {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
@@ -37,7 +37,7 @@
 }
 
 /* Viewers line chart (svg.spark) */
-.dash-widget-body .kick-spark {
+.dash-widget-body .stats-spark {
     flex: 1;
     min-height: 0;
     display: flex;

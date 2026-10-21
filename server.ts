@@ -161,7 +161,7 @@ const WIDGET_TYPES: WidgetType[] = [
     "relay",
     "encoder",
     "combined",
-    "kick-stats",
+    "stats",
     "chat",
 ];
 const DASH_PATH_RE = /^\/api\/dashboards(?:\/([\w.-]{1,64}))?$/;
@@ -174,7 +174,7 @@ const devicesTopic = (user: string) => `devices:${user}`;
 const WIDGET_HUB_TOPIC = "widgets:hub";
 const LOCAL_USER = "local";
 const INDEPENDENT_WIDGETS: ReadonlySet<WidgetType> = new Set([
-    "kick-stats",
+    "stats",
     "chat",
 ]);
 const DASH_COLUMNS = 12;
@@ -184,7 +184,7 @@ const WIDGET_SIZE: Record<WidgetType, { w: number; h: number }> = {
     relay: { w: 4, h: 4 },
     encoder: { w: 6, h: 5 },
     combined: { w: 6, h: 10 },
-    "kick-stats": { w: 3, h: 3 },
+    stats: { w: 3, h: 3 },
     chat: { w: 3, h: 8 },
 };
 
@@ -1242,7 +1242,7 @@ function parseWidgets(raw: unknown, owner: string): ServerDashboardWidget[] {
         if (!bound || (bound.owner ?? LOCAL_USER) !== owner)
             throw new ApiError(`Device not available: ${deviceId}`);
         if (item.config !== undefined)
-            throw new ApiError("Only kick widgets accept a config");
+            throw new ApiError("Only channel widgets accept a config");
         return {
             id,
             deviceId,
