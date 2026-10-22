@@ -28,6 +28,7 @@ import { pushModuleEvent } from "./push";
 import { MODULE_CONFIG_KEYS, type PersistentState, state } from "./state";
 import { buildModuleCore, type ModuleStatus } from "./module-core";
 import { provideCapability } from "./capabilities";
+import { isCompiledBinary } from "./util";
 import type { ServerDashboard, WidgetConfigField } from "../public/types";
 
 const MODULES_DIR = fileURLToPath(new URL("../modules", import.meta.url));
@@ -179,10 +180,7 @@ function validate(
  * points inside Bun's virtual /$bunfs (or ~BUN) filesystem, where the modules
  * directory does not exist on disk.
  */
-const IS_COMPILED_BINARY =
-    import.meta.url.includes("$bunfs") ||
-    import.meta.url.includes("~BUN") ||
-    import.meta.url.includes("%7EBUN");
+const IS_COMPILED_BINARY = isCompiledBinary();
 
 /** Load and validate one registration (shared by both discovery modes). */
 function acceptRegistration(mod: unknown, file: string): ModuleRegistration {

@@ -282,25 +282,41 @@ const connectionFor = (deviceId: string): Connection | undefined =>
 
 // ---------------------------------------------------------------------- widgets
 
+/** Shared availability handling for device-backed widget cards. */
+function deviceWidget(
+    deviceId: string,
+    conn: Connection | undefined,
+    render: (conn: Connection, status: Status) => m.Children,
+): m.Children {
+    if (!deviceById(deviceId))
+        return <p class={"muted"}>{t("dash.widget_missing")}</p>;
+    if (!conn) return <p class={"muted"}>{t("dev.badge.offline")}</p>;
+    const status = conn.card.st.status;
+    if (!status)
+        return <p class={"muted"}>{t("dash.widget_waiting")}</p>;
+    return render(conn, status);
+}
+
 /** Card widgets render the full interactive module card (same as the device page);
  * the wrapper keeps the module's CSS scope. */
+function deviceModuleCard(
+    moduleId: "encoder" | "srtla",
+    conn: Connection,
+    status: Status,
+): m.Vnode {
+    return (
+        <div class={`mod-${moduleId}`}>
+            {deviceCardBody(moduleId, conn.card, status)}
+        </div>
+    );
+}
+
 function relayWidget(
     deviceId: string,
     conn: Connection | undefined,
 ): m.Children {
-    const status = conn?.card.st.status;
-    if (!deviceById(deviceId))
-        return <p class={"muted"}>{t("dash.widget_missing")}</p>;
-    if (!status)
-        return (
-            <p class={"muted"}>
-                {conn ? t("dash.widget_waiting") : t("dev.badge.offline")}
-            </p>
-        );
-    return (
-        <div class={"mod-srtla"}>
-            {deviceCardBody("srtla", conn!.card, status)}
-        </div>
+    return deviceWidget(deviceId, conn, (active, status) =>
+        deviceModuleCard("srtla", active, status),
     );
 }
 
@@ -308,19 +324,8 @@ function encoderWidget(
     deviceId: string,
     conn: Connection | undefined,
 ): m.Children {
-    const status = conn?.card.st.status;
-    if (!deviceById(deviceId))
-        return <p class={"muted"}>{t("dash.widget_missing")}</p>;
-    if (!status)
-        return (
-            <p class={"muted"}>
-                {conn ? t("dash.widget_waiting") : t("dev.badge.offline")}
-            </p>
-        );
-    return (
-        <div class={"mod-encoder"}>
-            {deviceCardBody("encoder", conn!.card, status)}
-        </div>
+    return deviceWidget(deviceId, conn, (active, status) =>
+        deviceModuleCard("encoder", active, status),
     );
 }
 
@@ -329,27 +334,14 @@ function combinedWidget(
     deviceId: string,
     conn: Connection | undefined,
 ): m.Children {
-    const status = conn?.card.st.status;
-    if (!deviceById(deviceId))
-        return <p class={"muted"}>{t("dash.widget_missing")}</p>;
-    if (!status)
-        return (
-            <p class={"muted"}>
-                {conn ? t("dash.widget_waiting") : t("dev.badge.offline")}
-            </p>
-        );
-    return (
+    return deviceWidget(deviceId, conn, (active, status) => (
         <div class={"mod-combined"}>
             {[
-                <div class={"mod-encoder"}>
-                    {deviceCardBody("encoder", conn!.card, status)}
-                </div>,
-                <div class={"mod-srtla"}>
-                    {deviceCardBody("srtla", conn!.card, status)}
-                </div>,
+                deviceModuleCard("encoder", active, status),
+                deviceModuleCard("srtla", active, status),
             ]}
         </div>
-    );
+    ));
 }
 
 /** One panel instance per obs widget (its own timers, VU canvas, pending guards). */

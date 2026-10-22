@@ -7,6 +7,15 @@ export function errorMessage(err: unknown): string {
     return err instanceof Error ? err.message : String(err);
 }
 
+/** Whether this module is running from Bun's compiled virtual filesystem. */
+export function isCompiledBinary(url = import.meta.url): boolean {
+    return (
+        url.includes("$bunfs") ||
+        url.includes("~BUN") ||
+        url.includes("%7EBUN")
+    );
+}
+
 /** Text of a WebSocket / stream message that may arrive as a string already. */
 export function textOf(data: unknown): string {
     return typeof data === "string"

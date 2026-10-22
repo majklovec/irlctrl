@@ -11,5 +11,6 @@ pipeline/majklovec
 modules/.generated.frontend.ts
 modules/.generated.backend.ts
 modules/.generated.settings.ts
+src/control-server/.generated.frontend-assets.ts
 dist/*
 users.db

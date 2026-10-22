@@ -283,6 +283,25 @@ bun run build:obs-client # → dist/obs-client
 
 Modules are discovered by a runtime scan of `modules/`; the manifests in `modules/.generated.*.ts` are produced by `scripts/gen-modules.ts` (wired into `predev`/`pretest`/`prebuild:*`). The UI is localized via the JSON catalogs in `i18n/` (12 languages), served to the browser on demand from `/i18n/<lang>.json`. The language is chosen in the first-run wizard and can be switched at any time from the header select; the device persists the choice in its config file.
 
+The control-server build hook bundles the browser pages and embeds their generated assets in the standalone server binary; source-mode startup continues to bundle the UI from `public/`.
+
+### Control-server code
+
+[`server.ts`](./server.ts) remains the CLI entrypoint. Its implementation lives in
+[`src/control-server/`](./src/control-server/):
+
+- [`auth.ts`](./src/control-server/auth.ts) owns SQLite initialization, passwords, sessions, profiles, device tokens and invitations.
+- [`devices.ts`](./src/control-server/devices.ts) owns the device registry, request forwarding, cached telemetry/logs and device-list broadcasts.
+- [`dashboards.ts`](./src/control-server/dashboards.ts) owns dashboard validation, persistence, API responses and widget-hub synchronization.
+- [`frontend.ts`](./src/control-server/frontend.ts) bundles the UI at startup in source mode; compiled server builds serve the matching pages and assets embedded by [`gen-control-server-assets.ts`](./scripts/gen-control-server-assets.ts).
+- [`server.ts`](./src/control-server/server.ts) composes the domains, HTTP routes, WebSocket handlers and maintenance timers.
+- [`contracts.ts`](./src/control-server/contracts.ts) holds shared socket data, topics and event framing.
+
+The domains receive their dependencies explicitly: authentication resolves device
+tokens, the registry supplies device ownership checks to dashboards, and the
+composition layer supplies publishing. Domain modules do not import the entrypoint
+or each other.
+
 ## Credits
 
 -   [BELABOX](https://github.com/BELABOX) / [belabox.net](https://belabox.net/) by rationalirl — the bonded-protocol project this builds on. [Support the effort](https://github.com/sponsors/rationalirl)
