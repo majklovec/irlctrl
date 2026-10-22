@@ -4,7 +4,7 @@ import type { StatsSample } from "./types";
 
 const W_FALLBACK = 260;
 const H_FALLBACK = 110;
-const M = { left: 34, right: 10, top: 12, bottom: 20 } as const;
+const M = { left: 44, right: 10, top: 12, bottom: 20 } as const;
 const GRID_SPACING = 28;
 const TICK_MIN_WIDTH = 56;
 
@@ -131,10 +131,10 @@ export const LineChart = {
                     </g>,
                     <g class={"spark-axis"}>
                         {[
-                            <text key={"max"} x={x0 - 5} y={y0 + 3.5} text-anchor={"end"}>
+                            <text key={"max"} x={5} y={y0 + 3.5}>
                                 {fmt(max)}
                             </text>,
-                            <text key={"min"} x={x0 - 5} y={y1 + 3.5} text-anchor={"end"}>
+                            <text key={"min"} x={5} y={y1 + 3.5}>
                                 {fmt(min)}
                             </text>,
                         ]}

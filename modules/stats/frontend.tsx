@@ -88,15 +88,13 @@ function body(w: ServerDashboardWidget, _ctx: WidgetContext): m.Children {
         t("stats.total"),
         samples.every((sample) => sample !== null),
     );
-    const kick = samples.find((sample) => sample?.platform === "kick");
     const now = Math.max(0, ...samples.map((sample) => sample?.at ?? 0));
-
     return (
         <div class={"stats"}>
-            <div class={"stats-current"}>
+            <div class={"stats-table"}>
                 {specs.map((spec, index) => {
                     const parsed = parseStatsSpec(spec);
-                    if (!parsed) return null;
+                    if (!parsed) return <span key={spec} />;
                     const sample = samples[index];
                     const viewers = sample
                         ? sample.isLive
@@ -105,55 +103,49 @@ function body(w: ServerDashboardWidget, _ctx: WidgetContext): m.Children {
                         : null;
                     return (
                         <div
-                            class={`stats-current-row stats-current-${parsed.platform}`}
+                            class={`stats-row stats-row-${parsed.platform}`}
                             key={spec}>
-                            <span class={"stats-current-label"}>
+                            <span class={"stats-row-label"}>
                                 {t(`stats.${parsed.platform}`)}
                             </span>
-                            <span class={"stats-current-value"}>
+                            <span
+                                class="stats-row-title"
+                                title={sample?.title ?? undefined}>
+                                {sample?.title ?? "—"}
+                            </span>
+                            <span
+                                class="stats-row-category"
+                                title={sample?.category ?? undefined}>
+                                {sample?.category ?? "—"}
+                            </span>
+                            <span class={"stats-row-duration"}>
+                                {sample?.startTime
+                                    ? durationMinutes(sample.startTime, now)
+                                    : "—"}
+                            </span>
+                            <span class={"stats-row-value"}>
                                 {viewers === null
                                     ? "—"
-                                    : `${viewers.toLocaleString()} ${t("stats.viewers", { count: viewers })}`}
+                                    : viewers.toLocaleString()}
                             </span>
                         </div>
                     );
                 })}
-                <div class={"stats-current-row stats-current-total"}>
-                    <span class={"stats-current-label"}>
-                        {t("stats.total")}
-                    </span>
-                    <span class={"stats-current-value"}>
+                <div class={"stats-row stats-row-total"}>
+                    <span class={"stats-row-label"}>{t("stats.total")}</span>
+                    <span class={"stats-row-title"} />
+                    <span class={"stats-row-category"} />
+                    <span class={"stats-row-duration"} />
+                    <span class={"stats-row-value"}>
                         {currentTotal === null
                             ? "—"
-                            : `${currentTotal.toLocaleString()} ${t("stats.viewers", { count: currentTotal })}`}
+                            : currentTotal.toLocaleString()}
                     </span>
                 </div>
             </div>
-            {kick?.title ? <p class={"stats-title"}>{kick.title}</p> : null}
-            {kick ? (
-                <div class={"stats-meta"}>
-                    {[
-                        kick.category ? <span>{kick.category}</span> : null,
-                        kick.startTime ? (
-                            <span class={"muted"}>
-                                {`${t("stats.start")} ${new Date(kick.startTime).toLocaleString()}`}
-                            </span>
-                        ) : null,
-                        kick.isLive && kick.startTime ? (
-                            <span class={"muted"}>
-                                {`${t("stats.duration")} ${durationMinutes(kick.startTime, now)}`}
-                            </span>
-                        ) : null,
-                    ]}
-                </div>
-            ) : null}
             <div class={"stats-spark"}>
                 {chartSeries.some((line) => line.points.length >= 2) ? (
-                    <LineChart
-                        series={chartSeries}
-                        title={t("stats.chart")}
-                        key={`s${chartSeries.map((line) => line.points.length).join("-")}`}
-                    />
+                    <LineChart series={chartSeries} title={t("stats.chart")} />
                 ) : (
                     <span class={"muted"}>{t("stats.spark_pending")}</span>
                 )}
@@ -166,7 +158,7 @@ const statsModule: ChannelWidgetModule<ServerDashboardWidget> = {
     id: "stats",
     kind: "widget",
     widgetTypes: ["stats"],
-    defaultSize: { w: 3, h: 3 },
+    defaultSize: { w: 4, h: 3 },
     configFields: STATS_EDITOR_FIELDS,
     body,
     badge,

@@ -7,62 +7,73 @@
     gap: 8px;
     height: 100%;
 }
-.dash-widget-body .stats-current {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 4px 12px;
-}
-.dash-widget-body .stats-current-row {
+/* Concise per-platform table: name | title | category | duration | viewers */
+.dash-widget-body .stats-table {
     display: flex;
+    flex-direction: column;
+}
+.dash-widget-body .stats-row {
+    display: grid;
+    grid-template-columns:
+        minmax(72px, auto) minmax(0, 1fr) minmax(0, auto) auto auto;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
+    gap: 10px;
     min-width: 0;
+    padding: 2px 0;
     font-size: 0.85rem;
 }
-.dash-widget-body .stats-current-label {
+.dash-widget-body .stats-row-label {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    white-space: nowrap;
     color: var(--muted);
 }
-.dash-widget-body .stats-current-label::before {
+.dash-widget-body .stats-row-label::before {
     content: "";
     width: 9px;
     height: 3px;
     border-radius: 2px;
     background: var(--accent);
 }
-.dash-widget-body .stats-current-youtube .stats-current-label::before {
+.dash-widget-body .stats-row-youtube .stats-row-label::before {
     background: #ff0000;
 }
-.dash-widget-body .stats-current-twitch .stats-current-label::before {
+.dash-widget-body .stats-row-twitch .stats-row-label::before {
     background: #9146ff;
 }
-.dash-widget-body .stats-current-kick .stats-current-label::before {
+.dash-widget-body .stats-row-kick .stats-row-label::before {
     background: #53fc18;
 }
-.dash-widget-body .stats-current-total {
-    border-top: 1px solid var(--border);
-    padding-top: 4px;
-    font-weight: 700;
-}
-.dash-widget-body .stats-current-total .stats-current-label::before {
-    background: var(--accent-hover);
-}
-.dash-widget-body .stats-title {
-    font-size: 0.9rem;
-    margin: 0;
+.dash-widget-body .stats-row-title {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.dash-widget-body .stats-meta {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    font-size: 0.75rem;
+.dash-widget-body .stats-row-category {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     color: var(--muted);
+}
+.dash-widget-body .stats-row-duration {
+    white-space: nowrap;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+}
+.dash-widget-body .stats-row-value {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.dash-widget-body .stats-row-total {
+    border-top: 1px solid var(--border);
+    margin-top: 2px;
+    padding-top: 4px;
+    font-weight: 700;
+}
+.dash-widget-body .stats-row-total .stats-row-label::before {
+    background: var(--accent-hover);
 }
 
 /* Viewers line chart (svg.spark) */
@@ -87,6 +98,7 @@
 .dash-widget-body svg.spark .spark-axis text {
     fill: var(--muted);
     font-family: inherit;
+    font-size: 0.9rem;
 }
 .dash-widget-body svg.spark .spark-points circle {
     fill: var(--accent);
