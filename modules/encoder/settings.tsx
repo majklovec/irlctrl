@@ -14,6 +14,7 @@
  *     pipeline editor page (/pipelines/…).
  */
 import m from "mithril";
+import { actionIcon, chevronIcon } from "../../frontend/ts/components/icons";
 import {
     Actions,
     Badge,
@@ -24,7 +25,6 @@ import {
     Form,
     Input,
 } from "../../frontend/ts/components/ui";
-import { actionIcon, chevronIcon } from "../../frontend/ts/components/icons";
 import { t } from "../../frontend/ts/i18n";
 import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
 import type { Pipeline } from "../../shared/types";
@@ -55,11 +55,19 @@ const PIPELINE_NEW_URL = "../pipelines/new/";
 const pipelineEditUrl = (id: string) =>
     `../pipelines/edit/${encodeURIComponent(id)}/`;
 
-function applyPayload(payload: PipelinesPayload): void {
-    state.pipelines = payload.pipelines;
-    state.counts = payload.repositoryCounts;
+// The device answering may run an older build whose payload lacks these
+// fields; normalise so render never iterates a non-array (the dashboard's
+// own pipelines.list consumer guards the same way).
+function applyPayload(payload: Partial<PipelinesPayload> | undefined): void {
+    state.pipelines = Array.isArray(payload?.pipelines)
+        ? payload.pipelines
+        : [];
+    state.counts = payload?.repositoryCounts ?? {};
     m.redraw();
 }
+
+const repositoryList = (value: unknown): string[] =>
+    Array.isArray(value) ? value.filter((r) => typeof r === "string") : [];
 
 // Guards against an older, slower `pipelines.list` response clobbering
 // the state a newer load (or create/update/delete) has already applied.
@@ -95,11 +103,11 @@ async function addRepository(ctx: ModuleContext): Promise<void> {
             }
         >("pipelines.repositories.add", { repository }),
     );
-    state.repositories = response.repositories;
+    state.repositories = repositoryList(response.repositories);
     state.repository = "";
     loadSeq++;
     applyPayload(response);
-    ctx.note(t("set.repo_imported", { files: response.result.files }));
+    ctx.note(t("set.repo_imported", { files: response.result?.files ?? 0 }));
 }
 
 async function removeRepository(
@@ -113,7 +121,7 @@ async function removeRepository(
             { repository },
         ),
     );
-    state.repositories = response.repositories;
+    state.repositories = repositoryList(response.repositories);
     loadSeq++;
     applyPayload(response);
     ctx.note(t("set.repo_removed", { repository }));
@@ -135,7 +143,7 @@ async function updateRepository(
     ctx.note(
         t("set.repo_updated", {
             repository,
-            files: response.result.files,
+            files: response.result?.files ?? 0,
         }),
     );
 }
@@ -151,10 +159,11 @@ async function updateAllRepositories(ctx: ModuleContext): Promise<void> {
     );
     loadSeq++;
     applyPayload(response);
-    const files = response.results.reduce((total, r) => total + r.files, 0);
+    const results = Array.isArray(response.results) ? response.results : [];
+    const files = results.reduce((total, r) => total + r.files, 0);
     ctx.note(
         t("set.repo_updated_all", {
-            repositories: response.results.length,
+            repositories: results.length,
             files,
         }),
     );
@@ -193,7 +202,7 @@ export const def: ModuleDef = {
         ctx.role === "combined" ||
         (ctx.role === "custom" && ctx.modules.encoder.enabled === true),
     refresh: (ctx) => {
-        state.repositories = ctx.settings.pipelineRepositories ?? [];
+        state.repositories = repositoryList(ctx.settings.pipelineRepositories);
         void loadPipelines(ctx);
     },
     render: (ctx) => {
@@ -261,8 +270,7 @@ export const def: ModuleDef = {
                                                         )}
                                                         aria-label={t(
                                                             "set.pipeline_edit",
-                                                        )}
-                                                    >
+                                                        )}>
                                                         {actionIcon("edit")}
                                                     </a>
                                                     <Button
@@ -327,7 +335,7 @@ export const def: ModuleDef = {
                       </div>
                   </div>
               ))
-            : [t("set.no_repos")];
+            : [<p></p>];
         const repositoriesChildren: m.Children[] = [
             <p class={"muted"}>{t("set.repos_desc")}</p>,
             <Form onSubmit={() => void addRepository(ctx)}>
@@ -362,10 +370,7 @@ export const def: ModuleDef = {
         ];
         const addPipelineElement: m.Children = (
             <Actions>
-                <a
-                    href={PIPELINE_NEW_URL}
-                    class={"link-button secondary"}
-                >
+                <a href={PIPELINE_NEW_URL} class={"link-button secondary"}>
                     {t("set.pipeline_new")}
                 </a>
             </Actions>

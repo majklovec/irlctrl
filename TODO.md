@@ -1,0 +1,1 @@
+- vzdy pri zmene page at se zepta backendu

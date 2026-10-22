@@ -82,15 +82,25 @@ jobs:
         shell: bash
         run: bun run gen:modules
 
+      # The client embeds the control-server web UI (shared/frontend.ts →
+      # generated/frontend-assets.ts); bundle it before the compiled build.
+      - name: Generate control-server assets
+        shell: bash
+        run: bun scripts/gen-control-server-assets.ts
+
       - name: Build profiling binaries (native only)
         if: matrix.native == true
         shell: bash
         run: |
           for app in obs-client client; do
+            case $app in
+              client)     ENTRY=./backend/client/client.ts ;;
+              obs-client) ENTRY=./backend/obs-client/obs-client.ts ;;
+            esac
             bun build --compile --minify --sourcemap \
               --target=${{ matrix.target }} \
               --asset i18n \
-              ./${app}.ts \
+              ${ENTRY} \
               --outfile ${app}-prof${{ matrix.ext }}
           done
 
@@ -106,14 +116,20 @@ jobs:
         run: |
           for app in obs-client client; do
             case $app in
-              client) OUTIF=${{ matrix.client-artifact }} ;;
-              *)      OUTIF=${{ matrix.artifact }} ;;
+              client)
+                OUTIF=${{ matrix.client-artifact }}
+                ENTRY=./backend/client/client.ts
+                ;;
+              *)
+                OUTIF=${{ matrix.artifact }}
+                ENTRY=./backend/obs-client/obs-client.ts
+                ;;
             esac
 
             ARGS="--compile --minify --sourcemap --format=esm --bytecode \
               --target=${{ matrix.target }} \
               --asset i18n \
-              ./${app}.ts \
+              ${ENTRY} \
               --outfile ${OUTIF}${{ matrix.ext }}"
 
             if [ -f ${app}.order ]; then
