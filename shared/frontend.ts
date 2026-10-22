@@ -13,7 +13,7 @@ export interface FrontendPageEntry {
 export function frontendPageEntries(frontendDirectory: URL): FrontendPageEntry[] {
     const entries: FrontendPageEntry[] = PAGES.map((name) => ({
         name,
-        path: new URL(`${name}.html`, frontendDirectory).pathname,
+        path: fileURLToPath(new URL(`${name}.html`, frontendDirectory)),
     }));
     const modulesDirectory = fileURLToPath(
         new URL("../modules/", import.meta.url),
