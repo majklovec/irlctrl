@@ -16,11 +16,12 @@ import {
     Form,
     Input,
     Page,
-} from "./components/ui";
-import { t } from "./i18n";
-import { RpcClient, socketUrl } from "./services/rpc";
-import { mountPage, setHeaderColor } from "./util";
+} from "../../public/ts/components/ui";
+import { t } from "../../public/ts/i18n";
+import { RpcClient, socketUrl } from "../../public/ts/services/rpc";
+import { mountPage, setHeaderColor } from "../../public/ts/util";
 import { errorMessage } from "../../src/util";
+import "./pipeline-editor.css";
 
 /** HTML `pattern` for a pipeline id (src/pipelines PIPELINE_ID_RE). */
 const PIPELINE_PATH_PATTERN = "[A-Za-z0-9_.\\-]+(\\/[A-Za-z0-9_.\\-]+)*";

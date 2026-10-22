@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { allModules } from "../src/registry";
 import { defaultModules, state } from "../src/state";
@@ -207,20 +207,8 @@ describe("module registries", () => {
     });
 
     /**
-     * REFACTOR-modules.md §7 — the core never names a module by id. Core files
-     * (src/ + public/ts/) may only reach modules through the sanctioned doors:
-     * the dynamic scan in registry.ts (no static import) and the generated
-     * manifest in registry.frontend.ts (`.generated.frontend`, which lists paths
-     * the core's own code does not mention). Per-device widget cards go through
-     * `deviceCardBody(id, …)` (manifest), not a direct import.
-     *
-     * One documented seam remains: `dashboard.ts` imports `modules/obs-controller/frontend`
-     * for the stateful obs panel and the switcher card it carries (the
-     * low-bitrate switcher no longer has its own frontend entry point). Its
-     * through a generic `Panel` signature without the core re-declaring module types
-     * (§6 forbids shared types) — so they are allow-listed here, not ban-able. Any
-     * other `modules/<id>/…` import is an offence.
-     *
+     * Core files may only discover frontend modules through the generated
+     * manifest. Module-specific UI is provided through generic contributions.
      * The test itself sits at the project root, so it is not in scope and its
      * own expectations never trip the scan.
      */
@@ -228,11 +216,8 @@ describe("module registries", () => {
         const moduleIds = new Set<string>();
         for (const dir of readdirSync(modulesDir, { withFileTypes: true }))
             if (dir.isDirectory()) moduleIds.add(dir.name);
-        /** The sanctioned core→module seams (path suffixes). */
-        const allow = new Set<string>([
-            ".generated",
-            "modules/obs-controller/frontend",
-        ]);
+        /** The generated frontend/backend manifests are the only sanctioned paths. */
+        const allow = new Set<string>([".generated"]);
         const walk = (dir: string): string[] =>
             readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
                 e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)],
@@ -274,6 +259,74 @@ describe("module registries", () => {
             offenders,
             `core names module ids:\n${offenders.join("\n")}`,
         ).toEqual([]);
+    });
+
+    test("core frontend pages compose module contributions without feature branches", () => {
+        const readPage = (name: string) =>
+            readFileSync(
+                join(import.meta.dir, "..", "public", "ts", name),
+                "utf8",
+            );
+        const app = readPage("app.tsx");
+        const dashboard = readPage("dashboard.tsx");
+        const setup = readPage("setup.tsx");
+        const devices = readPage("devices.tsx");
+
+        expect(app).not.toMatch(/moduleCard\(["'](encoder|srtla|obs-controller)/);
+        expect(app).not.toMatch(/status\.role\s*[!=]|status\.modules/);
+        expect(dashboard).not.toMatch(/ROLE_WIDGET_TYPES|CARD_MODULE/);
+        expect(dashboard).not.toMatch(/case ["'](encoder|srtla|relay|combined|obs)["']/);
+        expect(dashboard).not.toContain("modules/obs-controller");
+        expect(setup).not.toMatch(/encoderHost|srtlaRemoteHost|setup\.step\.encoder/);
+        expect(devices).not.toMatch(/hasEncoder|\.encoder\b|\.srtla\b/);
+    });
+
+    test("device modules declare their frontend contributions", () => {
+        const frontend = (id: string) =>
+            readFileSync(join(modulesDir, id, "frontend.tsx"), "utf8");
+        const encoder = frontend("encoder");
+        const srtla = frontend("srtla");
+        const obs = frontend("obs-controller");
+
+        for (const source of [encoder, srtla]) {
+            expect(source).toContain("available:");
+            expect(source).toContain("dashboardWidgets:");
+            expect(source).toContain("setupSteps:");
+            expect(source).toContain("deviceSummaryColumns:");
+        }
+        expect(obs).toContain("available:");
+        expect(obs).toContain("dashboardWidgets:");
+        expect(obs).not.toContain("st.obs");
+    });
+
+    test("frontend modules do not import one another", () => {
+        const moduleIds = new Set(
+            readdirSync(modulesDir, { withFileTypes: true })
+                .filter(
+                    (entry) =>
+                        entry.isDirectory() &&
+                        existsSync(join(modulesDir, entry.name, "frontend.tsx")),
+                )
+                .map((entry) => entry.name),
+        );
+        const offenders: string[] = [];
+        for (const id of moduleIds) {
+            const source = readFileSync(
+                join(modulesDir, id, "frontend.tsx"),
+                "utf8",
+            );
+            source.split("\n").forEach((line, index) => {
+                const specifier = line.match(/from\s+["']([^"']+)["']/)?.[1];
+                const importedModule = specifier?.match(/^\.\.\/([^/]+)/)?.[1];
+                if (
+                    importedModule &&
+                    importedModule !== id &&
+                    moduleIds.has(importedModule)
+                )
+                    offenders.push(`${id}/frontend.tsx:${index + 1}`);
+            });
+        }
+        expect(offenders).toEqual([]);
     });
 });
 

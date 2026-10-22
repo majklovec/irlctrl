@@ -58,7 +58,7 @@ export interface Mctx {
 
 /** A browser-side module registration (frontend). Local copy so a module never
  * imports across boundaries; the frontend registry narrows it. */
-export interface BridgedModule {
+export interface BridgedModule extends FrontendModuleContributions {
     id: string;
     title: string;
     icon?: string;
@@ -67,5 +67,5 @@ export interface BridgedModule {
     defaultSize: { w: number; h: number };
     minSize: { w: number; h: number };
     maxSize?: { w: number; h: number };
-    handleEvent?(event: string, data: unknown): void;
 }
+import type { FrontendModuleContributions } from "../../public/ts/module-contracts";

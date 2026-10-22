@@ -5,7 +5,15 @@
  * same content. */
 import "./styles.css";
 import m from "mithril";
-import type { ModemInfo, SrtlaLinkStats, Status } from "../../public/types";
+import type {
+    ModemInfo,
+    DeviceSummary,
+    SetupInfo,
+    SrtlaLinkStats,
+    SrtlaStats,
+    SrtlaStatsEvent,
+    Status,
+} from "../../public/types";
 import {
     Actions,
     Badge,
@@ -13,24 +21,216 @@ import {
     Button,
     Card,
     type Child,
+    Checkbox,
     CheckField,
     DefinitionList,
     Field,
     FieldGroup,
     Form,
     Input,
+    numberAttrs,
     Options,
+    Select,
 } from "../../public/ts/components/ui";
-import { formatBitrate, formatSpeed, since } from "../../public/ts/util";
+import { icon } from "../../public/ts/components/icons";
+import {
+    formatBitrate,
+    formatSpeed,
+    inRange,
+    since,
+} from "../../public/ts/util";
 import { t } from "../../public/ts/i18n";
 import { card, type DeviceCard } from "../../public/ts/device/store";
-import { encoderStart, streamButtons } from "../encoder/frontend";
+import type { DeviceDashboardWidget } from "../../public/ts/module-contracts";
 import type { BridgedModule } from "./types";
 
 type SrtlaOptions = Status["state"]["srtlaOptions"];
+type EncoderStart = (
+    host: DeviceCard,
+    target: { remoteHost: string; remotePort: string },
+) => void;
+type EncoderStreamButtons = (
+    host: DeviceCard,
+    stopMethod: string,
+) => m.Children;
+
+function startCombinedStream(host: DeviceCard): void {
+    const start = host.getCapability<EncoderStart>("encoder.start");
+    if (!start)
+        throw new Error("Encoder module did not provide its start capability");
+    start(host, srtlaState(host).fields);
+}
+
+function combinedStreamButtons(
+    host: DeviceCard,
+    stopMethod: string,
+): m.Children {
+    const render = host.getCapability<EncoderStreamButtons>(
+        "encoder.streamButtons",
+    );
+    if (!render)
+        throw new Error("Encoder module did not provide its stream controls");
+    return render(host, stopMethod);
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null;
+
+function isSrtlaStats(value: unknown): value is SrtlaStats {
+    return (
+        isRecord(value) &&
+        typeof value.active_links === "number" &&
+        typeof value.total_links === "number" &&
+        typeof value.total_in_flight === "number" &&
+        typeof value.total_window === "number" &&
+        Array.isArray(value.links)
+    );
+}
+
+function isSrtlaStatsEvent(value: unknown): value is SrtlaStatsEvent {
+    return (
+        isRecord(value) &&
+        typeof value.at === "number" &&
+        (value.stats === null || isSrtlaStats(value.stats))
+    );
+}
+
+const statsFrame = (host: DeviceCard) => {
+    const entry = host.st.events.get("srtla.stats");
+    return entry && isSrtlaStatsEvent(entry.data)
+        ? { ...entry, value: entry.data }
+        : undefined;
+};
+
+const setupFields = {
+    listenPort: "6000",
+    srtlaRemoteHost: "",
+    srtlaRemotePort: "5000",
+    srtlaMode: "enhanced",
+    srtlaQuality: true,
+};
+
+interface SrtlaCardState {
+    fields: {
+        listenPort: string;
+        remoteHost: string;
+        remotePort: string;
+    };
+}
+
+const srtlaStates = new WeakMap<DeviceCard, SrtlaCardState>();
+
+function srtlaState(host: DeviceCard): SrtlaCardState {
+    let state = srtlaStates.get(host);
+    if (!state) {
+        state = {
+            fields: { listenPort: "", remoteHost: "", remotePort: "" },
+        };
+        srtlaStates.set(host, state);
+    }
+    return state;
+}
+
+function prefillString(current: string, value: unknown, field: string): string {
+    if (current || value == null || value === "") return current;
+    if ((document.activeElement as HTMLInputElement | null)?.name === field)
+        return current;
+    return String(value);
+}
+
+function syncSrtlaForm(host: DeviceCard, status: Status): void {
+    status.state.srtla ??= { running: false };
+    const { fields } = srtlaState(host);
+    const combined = status.role === "combined";
+    for (const key of ["listenPort", "remoteHost", "remotePort"] as const)
+        fields[key] = prefillString(
+            fields[key],
+            status.state.srtla[key] ??
+                (combined ? status.state.srtlaTarget?.[key] : undefined),
+            key,
+        );
+}
+
+const srtlaDashboardWidgets: DeviceDashboardWidget[] = [
+    {
+        type: "relay",
+        available: (device) =>
+            device.role === "relay" ||
+            device.role === "custom" ||
+            device.role === undefined,
+        defaultSize: { w: 4, h: 4 },
+        minSize: { w: 3, h: 3 },
+        body: ({ card: host, status }) =>
+            status ? srtlaComposite(host, status) : null,
+        badge: ({ status }) => (
+            <Badge
+                text={status ? t("dev.badge.online") : t("dev.badge.offline")}
+                kind={status ? "on" : "off"}
+            />
+        ),
+    },
+    {
+        type: "combined",
+        available: (device) =>
+            device.role === "combined" ||
+            device.role === "custom" ||
+            device.role === undefined,
+        defaultSize: { w: 6, h: 10 },
+        minSize: { w: 4, h: 8 },
+        body: ({ card: host, status }) =>
+            status ? srtlaComposite(host, status) : null,
+    },
+];
+
+const srtlaSummaryColumns = [
+    {
+        id: "stream",
+        order: 0,
+        available: (device: DeviceSummary) =>
+            device.role !== "encoder" &&
+            device.role !== "combined",
+        header: () => t("mgmt.th.stream"),
+        cell: (device: DeviceSummary) => {
+            if (!device.online) return "—";
+            if (!device.srtla?.running)
+                return <Badge text={t("dev.badge.stopped")} kind="off" />;
+            if (device.activeLinks === 0)
+                return <Badge text={t("dev.badge.no_links")} kind="warn" />;
+            return <Badge text={t("dev.badge.live")} kind="on" />;
+        },
+    },
+    {
+        id: "links",
+        order: 20,
+        available: () => true,
+        header: () => t("mgmt.th.links"),
+        cell: (device: DeviceSummary) =>
+            device.online && device.totalLinks !== undefined
+                ? `${device.activeLinks ?? 0}/${device.totalLinks}`
+                : "—",
+    },
+    {
+        id: "relay",
+        order: 40,
+        available: (device: DeviceSummary) => device.role !== "encoder",
+        header: () => [icon("relay"), ` ${t("setup.step.relay")}`],
+        cell: (device: DeviceSummary) => {
+            const srtla = device.srtla;
+            if (!srtla) return "—";
+            return srtla.running ? (
+                <Badge
+                    text={`→ ${srtla.remoteHost}:${srtla.remotePort}`}
+                    kind="on"
+                />
+            ) : (
+                <Badge text={t("dev.badge.stopped")} kind="warn" />
+            );
+        },
+    },
+];
 
 function srtlaStart(host: DeviceCard): void {
-    const { fields } = host;
+    const { fields } = srtlaState(host);
     if (!fields.listenPort || !fields.remoteHost || !fields.remotePort) return;
     host.press("srtla-start", "srtla.start", {
         listenPort: fields.listenPort,
@@ -56,7 +256,7 @@ async function setOption(
 
 // Scheduler options: the saved settings, else what the running srtla_send reports, else its defaults
 const liveStats = (host: DeviceCard) =>
-    host.st.status?.state.srtla.running ? host.st.stats : null;
+    host.st.status?.state.srtla.running ? (statsFrame(host)?.value.stats ?? null) : null;
 const modeValue = (host: DeviceCard): string =>
     host.st.status?.state.srtlaOptions?.mode ??
     liveStats(host)?.mode ??
@@ -79,7 +279,8 @@ function controlBadge(status: Status): Child {
 }
 
 export function srtlaCardBody(host: DeviceCard, status: Status): m.Vnode {
-    const { fields, busy } = host;
+    const { fields } = srtlaState(host);
+    const { busy } = host;
     const s = status.state.srtla;
     const combined = status.role === "combined";
     return (
@@ -128,7 +329,9 @@ export function srtlaCardBody(host: DeviceCard, status: Status): m.Vnode {
             />
             <Form
                 onSubmit={
-                    combined ? () => encoderStart(host) : () => srtlaStart(host)
+                    combined
+                            ? () => startCombinedStream(host)
+                        : () => srtlaStart(host)
                 }>
                 <FieldGroup legend={t("dev.group.connection")}>
                     {!combined && (
@@ -220,25 +423,31 @@ export function srtlaCardBody(host: DeviceCard, status: Status): m.Vnode {
                 </FieldGroup>
                 <Break />
                 {combined ? (
-                    streamButtons(host, "stream.stop")
+                    combinedStreamButtons(host, "stream.stop")
                 ) : (
                     <Actions>
                         <Button
                             label={t("ui.start")}
                             type={"submit"}
-                            disabled={!host.enabled("srtla-start")}
+                            disabled={
+                                s.running || host.pending("srtla-start")
+                            }
                         />
                         <Button
                             label={t("ui.stop")}
                             class={"danger"}
-                            disabled={!host.enabled("srtla-stop")}
+                            disabled={
+                                !s.running || host.pending("srtla-stop")
+                            }
                             onclick={() =>
                                 host.press("srtla-stop", "srtla.stop")
                             }
                         />
                         <Button
                             label={t("ui.reload")}
-                            disabled={!host.enabled("srtla-reload")}
+                            disabled={
+                                !s.running || host.pending("srtla-reload")
+                            }
                             onclick={() =>
                                 host.press("srtla-reload", "srtla.reload")
                             }
@@ -373,11 +582,12 @@ function linkHeader(): m.Vnode {
 
 function interfacesCard(host: DeviceCard, status: Status): m.Vnode {
     const selected = new Set(status.selected.map((i) => i.iface));
-    const live = host.st.stats;
+    const frame = statsFrame(host);
+    const live = frame?.value.stats ?? null;
     const stale =
         !!live &&
-        !!host.st.statsAt &&
-        Date.now() - host.st.statsAt > STATS_STALE_MS;
+        !!frame?.at &&
+        Date.now() - frame.at > STATS_STALE_MS;
     const links = new Map((live?.links ?? []).map((l) => [l.ip, l]));
     const total =
         live?.links.reduce(
@@ -437,7 +647,7 @@ function interfacesCard(host: DeviceCard, status: Status): m.Vnode {
                 stale && (
                     <Badge
                         text={t("dev.stale", {
-                            time: since(host.st.statsAt),
+                            time: since(frame?.at ?? 0),
                         })}
                         kind="warn"
                     />
@@ -557,11 +767,113 @@ const srtlaModule: BridgedModule = {
     id: "srtla",
     kind: "device-card",
     title: "SRTLA",
+    order: 20,
+    available: (status) => status.role !== "encoder" && status.role !== "obs",
+    dashboardWidgets: srtlaDashboardWidgets,
+    deviceSummaryColumns: srtlaSummaryColumns,
+    setupSteps: [
+        {
+            id: "relay",
+            title: "setup.step.relay",
+            subtitle: "setup.step.relay_sub",
+            roles: ["relay", "combined"],
+            isValid() {
+                const {
+                    listenPort,
+                    srtlaRemoteHost,
+                    srtlaRemotePort,
+                } = setupFields;
+                return (
+                    inRange(listenPort, 1, 65535) &&
+                    !!srtlaRemoteHost &&
+                    inRange(srtlaRemotePort, 1, 65535)
+                );
+            },
+            render(_role, _info: SetupInfo) {
+                return (
+                    <>
+                        <Field
+                            label={t("dev.field.srt_listen_port")}
+                            control={
+                                <Input
+                                    target={setupFields}
+                                    prop="listenPort"
+                                    {...numberAttrs(1, 65535)}
+                                    required={true}
+                                />
+                            }
+                        />
+                        <Field
+                            label={t("dev.field.remote_host")}
+                            control={
+                                <Input
+                                    target={setupFields}
+                                    prop="srtlaRemoteHost"
+                                    placeholder={"rec.example.com"}
+                                    required={_role !== "encoder"}
+                                />
+                            }
+                        />
+                        <Field
+                            label={t("dev.field.remote_port")}
+                            control={
+                                <Input
+                                    target={setupFields}
+                                    prop="srtlaRemotePort"
+                                    {...numberAttrs(1, 65535)}
+                                    required={_role !== "encoder"}
+                                />
+                            }
+                        />
+                        <Field
+                            label={t("dev.scheduler")}
+                            control={
+                                <Select target={setupFields} prop="srtlaMode">
+                                    <Options
+                                        pairs={[
+                                            [
+                                                "enhanced",
+                                                t("dev.scheduler_enhanced"),
+                                            ],
+                                            [
+                                                "classic",
+                                                t("dev.scheduler_classic"),
+                                            ],
+                                        ]}
+                                    />
+                                </Select>
+                            }
+                        />
+                        <CheckField
+                            label={t("dev.quality_scoring")}
+                            control={
+                                <Checkbox
+                                    target={setupFields}
+                                    prop="srtlaQuality"
+                                />
+                            }
+                        />
+                    </>
+                );
+            },
+            config() {
+                return {
+                    listenPort: Number(setupFields.listenPort),
+                    srtlaRemoteHost: setupFields.srtlaRemoteHost,
+                    srtlaRemotePort: Number(setupFields.srtlaRemotePort),
+                    srtlaMode: setupFields.srtlaMode,
+                    srtlaQuality: setupFields.srtlaQuality,
+                };
+            },
+        },
+    ],
     defaultSize: { w: 4, h: 4 },
     minSize: { w: 3, h: 3 },
     component: (status: Status) => srtlaComposite(card, status),
-    cardBody: (host, status) =>
-        srtlaComposite(host as DeviceCard, status as Status),
+    handleEvent(event, _data, host) {
+        if (event === "status" && host?.st.status)
+            syncSrtlaForm(host, host.st.status);
+    },
 };
 
 export default srtlaModule;

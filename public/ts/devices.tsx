@@ -2,19 +2,15 @@
  * list (devices.snapshot / devices.changed over the shared feed websocket). */
 import m from "mithril";
 import type { DeviceSummary } from "../types";
-import { icon, roleTag } from "./components/icons";
+import { roleTag } from "./components/icons";
+import { Badge, Card, Page, ServerNav } from "./components/ui";
 import {
-    Badge,
-    Card,
-    type Child,
-    EncoderIssueBadge,
-    hasEncoderIssue,
-    Page,
-    ServerNav,
-} from "./components/ui";
+    deviceSummaryColumnDefinitions,
+    deviceSummaryColumnsFor,
+} from "../../src/registry.frontend";
 import { i18nReady, t } from "./i18n";
 import { serverLive } from "./services/serverws";
-import { formatBitrate, mountPage, since } from "./util";
+import { mountPage, since } from "./util";
 
 const state = {
     connected: false,
@@ -55,50 +51,12 @@ function connBadge(): m.Vnode {
     );
 }
 
-const hasEncoder = (d: DeviceSummary) =>
-    d.role === "encoder" || d.role === "combined";
-
-/** Live stream state, mirroring the device page's encoder / srtla_send badges. */
-function streamState(d: DeviceSummary): Child {
-    if (!d.online) return "—";
-    const { srtla: s, encoder: e } = d;
-    if (hasEncoder(d)) {
-        if (!e) return "—";
-        if (hasEncoderIssue(d.role, e, s))
-            return <EncoderIssueBadge role={d.role} e={e} srtla={s} />;
-    } else if (!s?.running) {
-        return <Badge text={t("dev.badge.stopped")} kind="off" />;
-    }
-    if (d.activeLinks === 0)
-        return <Badge text={t("dev.badge.no_links")} kind="warn" />;
-    return <Badge text={t("dev.badge.live")} kind="on" />;
-}
-
-function bitrate(d: DeviceSummary): Child {
-    const live =
-        d.online && d.bitrate !== undefined ? formatBitrate(d.bitrate) : null;
-    const max =
-        d.maxBitrate !== undefined
-            ? t("dev.max_value", {
-                  value: formatBitrate(d.maxBitrate * 125),
-              })
-            : null;
-    if (live && max)
-        return (
-            <span>
-                {live}
-                {" / "}
-                <span class={"muted"}>{max}</span>
-            </span>
-        );
-    return live ?? max ?? "—";
-}
-
-function row(d: DeviceSummary): m.Vnode {
-    const { srtla: s, encoder: e } = d;
-    // A new vnode per cell: mithril cannot patch one vnode object into two slots
-    const stoppedBadge = () => (
-        <Badge text={t("dev.badge.stopped")} kind="warn" />
+function row(
+    d: DeviceSummary,
+    columns: ReturnType<typeof deviceSummaryColumnDefinitions>,
+): m.Vnode {
+    const available = new Map(
+        deviceSummaryColumnsFor(d).map((column) => [column.id, column]),
     );
     return (
         <tr key={d.id}>
@@ -133,62 +91,27 @@ function row(d: DeviceSummary): m.Vnode {
                     ? since(d.connectedAt)
                     : t("mgmt.last_seen", { time: since(d.lastSeen) })}
             </td>
-            <td>{streamState(d)}</td>
-            <td>{bitrate(d)}</td>
-            <td>
-                {d.online && d.totalLinks !== undefined
-                    ? `${d.activeLinks ?? 0}/${d.totalLinks}`
-                    : "—"}
-            </td>
-            <td>
-                {hasEncoder(d) && e ? (
-                    e.running ? (
-                        <Badge
-                            text={
-                                e.config?.pipeline ?? t("dev.badge.streaming")
-                            }
-                            kind="on"
-                        />
-                    ) : (
-                        stoppedBadge()
-                    )
-                ) : (
-                    "—"
-                )}
-            </td>
-            <td>
-                {d.role !== "encoder" && s ? (
-                    s.running ? (
-                        <Badge
-                            text={`→ ${s.remoteHost}:${s.remotePort}`}
-                            kind="on"
-                        />
-                    ) : (
-                        stoppedBadge()
-                    )
-                ) : (
-                    "—"
-                )}
-            </td>
+            {columns.map((column) => (
+                <td>{available.get(column.id)?.cell(d) ?? "—"}</td>
+            ))}
         </tr>
     );
 }
 
-const columnHeaders = (): m.Children[] => [
+const columnHeaders = (
+    columns: ReturnType<typeof deviceSummaryColumnDefinitions>,
+): m.Children[] => [
     t("mgmt.th.device"),
     t("mgmt.th.role"),
     t("mgmt.th.status"),
     t("mgmt.th.connected"),
-    t("mgmt.th.stream"),
-    t("mgmt.th_bitrate"),
-    t("mgmt.th.links"),
-    [icon("encoder"), ` ${t("setup.step.encoder")}`],
-    [icon("relay"), ` ${t("setup.step.relay")}`],
+    ...columns.map((column) => column.header()),
 ];
 
 const App: m.Component = {
     view: () => {
-        const headers = columnHeaders();
+        const columns = deviceSummaryColumnDefinitions();
+        const headers = columnHeaders(columns);
         return (
             <Page
                 title={t("mgmt.title")}
@@ -205,7 +128,9 @@ const App: m.Component = {
                         </thead>
                         <tbody>
                             {state.devices?.length ? (
-                                state.devices.map(row)
+                                state.devices.map((device) =>
+                                    row(device, columns),
+                                )
                             ) : (
                                 <tr>
                                     <td

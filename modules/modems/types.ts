@@ -42,5 +42,4 @@ export interface BridgedModule {
     defaultSize: { w: number; h: number };
     minSize: { w: number; h: number };
     maxSize?: { w: number; h: number };
-    handleEvent?(event: string, data: unknown): void;
 }

@@ -1,7 +1,6 @@
 /* Shared building blocks (header, cards, badges, definition lists, bound form controls)
  * for Mithril JSX views. These helpers keep markup consistent between pages. */
 import m from "mithril";
-import type { EncoderState, Role, SrtlaState } from "../../types";
 import { LanguageSelect, t } from "../i18n";
 import type { MithrilJSXComponent } from "../jsx";
 import type { Child } from "../util";
@@ -211,37 +210,6 @@ export const ConnectionBadge = {
             <Badge text={t("dev.disconnected")} kind={"off"} />
         ),
 } as MithrilJSXComponent<{ connected: boolean }>;
-
-/** Encoder state badge when it is not simply streaming: stopped, srtla_send down (combined), restarting. */
-export const EncoderIssueBadge = {
-    view: ({ attrs: { role, e, srtla } }) => {
-        if (!e.running)
-            return <Badge text={t("dev.badge.stopped")} kind={"off"} />;
-        if (role === "combined" && !srtla?.running)
-            return (
-                <Badge text={t("dev.badge.srtla_send_down")} kind={"warn"} />
-            );
-        if (!e.pid && e.restarts)
-            return <Badge text={t("dev.badge.restarting")} kind={"warn"} />;
-        return null;
-    },
-} as MithrilJSXComponent<{
-    role: Role | undefined;
-    e: EncoderState;
-    srtla: SrtlaState | undefined;
-}>;
-
-/** Whether `EncoderIssueBadge` would render a badge for this state (i.e. there is an issue). */
-export function hasEncoderIssue(
-    role: Role | undefined,
-    e: EncoderState,
-    srtla: SrtlaState | undefined,
-): boolean {
-    if (!e.running) return true;
-    if (role === "combined" && !srtla?.running) return true;
-    if (!e.pid && e.restarts) return true;
-    return false;
-}
 
 // -- Definition lists / tables -----------------------------------------------------
 

@@ -1,9 +1,9 @@
-/* First-run setup wizard — a Mithril view: stepper, one fieldset per step,
- * Back / Next / Save controls, all driven by a single state object. */
+/* First-run setup wizard — shared language, identity and control steps plus
+ * setup contributions registered by the device modules. */
 import m from "mithril";
 import { errorMessage } from "../../src/util";
-import { BITRATE_KBPS, DEFAULT_COLOR, HOSTNAME_RE } from "../../src/validate";
-import type { AudioSource, Pipeline, Role } from "../types";
+import { DEFAULT_COLOR, HOSTNAME_RE } from "../../src/validate";
+import type { Role, SetupInfo } from "../types";
 import { roleCardIcon } from "./components/icons";
 import {
     Actions,
@@ -15,73 +15,56 @@ import {
     Field,
     Form,
     Input,
-    numberAttrs,
-    Options,
     Page,
     Select,
 } from "./components/ui";
+import { setupStepsForRole } from "../../src/registry.frontend";
 import { languageOptions, setLanguage, t } from "./i18n";
 import { RpcClient, socketUrl } from "./services/rpc";
+import type { ModuleSetupStep } from "./module-contracts";
 import {
     HOSTNAME_PATTERN,
-    inRange,
     mountPage,
     setHeaderColor,
-    toNumber,
 } from "./util";
 
-interface SetupInfo {
-    required: boolean;
-    hostname: string;
-    color: string;
-    language: string;
-    pipelines: Pipeline[];
-    audioSources: AudioSource[];
+interface WizardStep {
+    id: string;
+    title: string;
+    subtitle: string;
+    valid(): boolean;
+    render(): m.Children;
 }
 
-type StepKey =
-    | "language"
-    | "role"
-    | "identity"
-    | "control"
-    | "encoder"
-    | "relay"
-    | "finish";
+interface CoreStep {
+    id: "language" | "role" | "identity" | "control" | "finish";
+    title: string;
+    subtitle: string;
+}
 
-/** Stepper entries: translation keys of each step's title and subtitle. */
-const STEPS: { key: StepKey; title: string; sub: string }[] = [
+const CORE_STEPS: CoreStep[] = [
     {
-        key: "language",
+        id: "language",
         title: "ui.language_label",
-        sub: "setup.step.language_sub",
+        subtitle: "setup.step.language_sub",
     },
-    { key: "role", title: "set.role", sub: "setup.step.role_sub" },
+    { id: "role", title: "set.role", subtitle: "setup.step.role_sub" },
     {
-        key: "identity",
+        id: "identity",
         title: "setup.step.identity",
-        sub: "setup.step.identity_sub",
+        subtitle: "setup.step.identity_sub",
     },
     {
-        key: "control",
+        id: "control",
         title: "setup.step.control",
-        sub: "setup.step.control_sub",
+        subtitle: "setup.step.control_sub",
     },
-    {
-        key: "encoder",
-        title: "setup.step.encoder",
-        sub: "setup.step.encoder_sub",
-    },
-    { key: "relay", title: "setup.step.relay", sub: "setup.step.relay_sub" },
-    { key: "finish", title: "setup.step.review", sub: "setup.save" },
 ];
-
-const PORT = numberAttrs(1, 65535);
-const BITRATE = {
-    ...numberAttrs(BITRATE_KBPS.min, BITRATE_KBPS.max, undefined, 100),
-    required: true,
+const FINISH_STEP: CoreStep = {
+    id: "finish",
+    title: "setup.step.review",
+    subtitle: "setup.save",
 };
-const bitrateValid = (v: string) =>
-    inRange(v, BITRATE_KBPS.min, BITRATE_KBPS.max);
 
 const state = {
     connected: false,
@@ -89,11 +72,9 @@ const state = {
     current: 0,
     message: "",
     saving: false,
-    pipelines: [] as Pipeline[],
-    audioSources: [] as AudioSource[],
+    info: null as SetupInfo | null,
 };
 
-/** The answers, sent as-is (numbers converted) to `setup.complete`. */
 const f = {
     language: "en",
     role: undefined as Role | undefined,
@@ -101,181 +82,18 @@ const f = {
     color: DEFAULT_COLOR,
     remoteUrl: "",
     remoteToken: "",
-    // encoder / combined
-    pipeline: "",
-    minBitrate: String(BITRATE_KBPS.min),
-    maxBitrate: "5000",
-    audioSource: "",
-    audioCodec: "aac",
-    delay: "0",
-    encoderHost: "",
-    encoderPort: "6000",
-    latency: "2000",
-    streamid: "",
-    bitrateOverlay: false,
-    // relay / combined
-    listenPort: "6000",
-    srtlaRemoteHost: "",
-    srtlaRemotePort: "5000",
-    srtlaMode: "enhanced",
-    srtlaQuality: true,
     autostart: false,
 };
 
-// A step applies only for roles where it makes sense
-const visibleSteps = () =>
-    STEPS.filter(({ key }) =>
-        key === "encoder"
-            ? f.role !== "relay"
-            : key === "relay"
-              ? f.role !== "encoder"
-              : true,
-    );
-
-/** A step passes when every mandatory field in it is satisfied (the same rules as the
- * native `required`/min/max constraints on its inputs). */
-function stepValid(key: StepKey): boolean {
-    switch (key) {
-        case "role":
-            return !!f.role;
-        case "identity":
-            return HOSTNAME_RE.test(f.hostname);
-        case "encoder":
-            return (
-                !!f.pipeline &&
-                !!f.audioSource &&
-                bitrateValid(f.minBitrate) &&
-                bitrateValid(f.maxBitrate) &&
-                Number(f.minBitrate) <= Number(f.maxBitrate) &&
-                inRange(f.latency, 100, 10000) &&
-                (f.role !== "encoder" ||
-                    (!!f.encoderHost && inRange(f.encoderPort, 1, 65535)))
-            );
-        case "relay":
-            return (
-                inRange(f.listenPort, 1, 65535) &&
-                (f.role === "encoder" ||
-                    (!!f.srtlaRemoteHost &&
-                        inRange(f.srtlaRemotePort, 1, 65535)))
-            );
-        default:
-            return true;
-    }
-}
-
-const currentIndex = () => Math.min(state.current, visibleSteps().length - 1);
-
-function goNext(): void {
-    const steps = visibleSteps();
-    const current = currentIndex();
-    if (stepValid(steps[current].key))
-        state.current = Math.min(current + 1, steps.length - 1);
-}
-
-function goPrev(): void {
-    state.current = Math.max(currentIndex() - 1, 0);
-}
-
-// The wizard is served at /d/<id>/, so the viewer socket is "ws" relative to it (settings uses "../ws").
-const rpc = new RpcClient(() => socketUrl("ws"));
-rpc.on("open", async () => {
-    state.connected = true;
-    m.redraw();
-    try {
-        const info = await rpc.call<SetupInfo>("setup.get");
-        if (!info.required) {
-            // device is already configured — the same URL now serves the device page
-            location.replace("./");
-            return;
-        }
-        Object.assign(f, {
-            hostname: info.hostname,
-            color: info.color,
-            language: info.language,
-        });
-        setLanguage(info.language);
-        setHeaderColor(info.color);
-        state.pipelines = info.pipelines;
-        state.audioSources = info.audioSources;
-        state.loaded = true;
-    } catch (error: unknown) {
-        state.message = errorMessage(error);
-    }
-    m.redraw();
-});
-rpc.on("close", () => {
-    state.connected = false;
-    m.redraw();
-});
-
-async function complete(): Promise<void> {
-    state.saving = true;
-    state.message = "";
-    const {
-        language,
-        role,
-        hostname,
-        color,
-        remoteUrl,
-        remoteToken,
-        autostart,
-    } = f;
-    const payload: Record<string, unknown> = {
-        language,
-        role,
-        hostname,
-        color,
-        remoteUrl,
-        remoteToken,
-        autostart,
-    };
-    if (role !== "relay") {
-        Object.assign(payload, {
-            pipeline: f.pipeline,
-            minBitrate: toNumber(f.minBitrate),
-            maxBitrate: toNumber(f.maxBitrate),
-            audioSource: f.audioSource,
-            audioCodec: f.audioCodec,
-            delay: toNumber(f.delay),
-            encoderHost: f.encoderHost,
-            encoderPort: toNumber(f.encoderPort),
-            latency: toNumber(f.latency),
-            streamid: f.streamid,
-            bitrateOverlay: f.bitrateOverlay,
-        });
-    }
-    if (role !== "encoder") {
-        Object.assign(payload, {
-            listenPort: toNumber(f.listenPort),
-            srtlaRemoteHost: f.srtlaRemoteHost,
-            srtlaRemotePort: toNumber(f.srtlaRemotePort),
-            srtlaMode: f.srtlaMode,
-            srtlaQuality: f.srtlaQuality,
-        });
-    }
-    try {
-        await rpc.call("setup.complete", payload);
-        state.message = `${t("setup.saved")} ${t("setup.restart_required")}`;
-        // Reconnect: setup.get then reports the device configured and the page moves on to the device UI
-        rpc.reconnect();
-    } catch (error: unknown) {
-        state.message = errorMessage(error);
-    } finally {
-        state.saving = false;
-        m.redraw();
-    }
-}
-
-// -- One fieldset per step -----------------------------------------------------
-const step = (
-    key: StepKey,
+const stepFrame = (
+    id: string,
     heading: string,
-    desc: string,
+    subtitle: string,
     ...children: m.Children[]
 ) => (
-    <fieldset class={"wizard-step"} data-step={key}>
+    <fieldset class={"wizard-step"} data-step={id}>
         <h2 class={"wiz-heading"}>{heading}</h2>
-        <p class={"wiz-desc"}>{desc}</p>
+        <p class={"wiz-desc"}>{subtitle}</p>
         {children}
     </fieldset>
 );
@@ -297,282 +115,230 @@ const roleCard = (value: Role, name: string, tagline: string): m.Vnode => (
     </label>
 );
 
-const check = (
-    key: "bitrateOverlay" | "srtlaQuality" | "autostart",
-    label: string,
-) => <CheckField label={label} control={<Checkbox target={f} prop={key} />} />;
+function moduleStep(step: ModuleSetupStep, role: Role): WizardStep {
+    return {
+        id: step.id,
+        title: step.title,
+        subtitle: step.subtitle,
+        valid: () => step.isValid(role),
+        render: () => {
+            const info = state.info;
+            if (!info) throw new Error("Setup data is not available");
+            return stepFrame(
+                step.id,
+                t(step.title),
+                t(step.subtitle),
+                step.render(role, info),
+            );
+        },
+    };
+}
 
-function stepBody(key: StepKey): m.Vnode {
-    switch (key) {
-        case "language":
-            return step(
-                key,
-                t("ui.language_label"),
-                t("setup.language_desc"),
-                <Field
-                    label={t("ui.language_label")}
-                    control={
-                        <Select
-                            target={f}
-                            prop="language"
-                            onChange={(v) => setLanguage(v)}>
-                            {languageOptions()}
-                        </Select>
-                    }
-                />,
-            );
-        case "role":
-            return step(
-                key,
-                t("set.role"),
-                t("setup.step.role_sub"),
-                roleCard(
-                    "encoder",
-                    t("setup.role.encoder"),
-                    t("setup.role.encoder_tag"),
-                ),
-                roleCard(
-                    "relay",
-                    t("setup.step.relay"),
-                    t("setup.role.relay_tag"),
-                ),
-                roleCard(
-                    "combined",
-                    t("setup.role.combined"),
-                    t("setup.role.combined_tag"),
-                ),
-            );
-        case "identity":
-            return step(
-                key,
-                t("setup.identity"),
-                t("setup.identity_desc"),
-                <Field
-                    label={t("setup.hostname")}
-                    control={
-                        <Input
-                            target={f}
-                            prop="hostname"
-                            required={true}
-                            pattern={HOSTNAME_PATTERN}
-                            title={t("setup.hostname_title")}
-                        />
-                    }
-                />,
-                <Field
-                    label={t("set.color")}
-                    control={
-                        <Input
-                            target={f}
-                            prop="color"
-                            type={"color"}
-                            onChange={(v) => setHeaderColor(v)}
-                        />
-                    }
-                />,
-            );
-        case "control":
-            return step(
-                key,
-                t("setup.step.control"),
-                t("setup.control_desc"),
-                <Field
-                    label={t("set.remote_url")}
-                    control={
-                        <Input
-                            target={f}
-                            prop="remoteUrl"
-                            placeholder={"wss://control.example/device"}
-                        />
-                    }
-                />,
-                <Field
-                    label={t("setup.control_token")}
-                    control={
-                        <Input
-                            target={f}
-                            prop="remoteToken"
-                            type={"password"}
-                            autocomplete={"off"}
-                        />
-                    }
-                />,
-            );
-        case "encoder": {
-            const standalone = f.role === "encoder";
-            return step(
-                key,
-                t("setup.step.encoder"),
-                t("setup.encoder_desc"),
-                <Field
-                    label={t("dev.row.pipeline")}
-                    control={
-                        <Select target={f} prop="pipeline" required={true}>
-                            <Options
-                                pairs={state.pipelines.map((p) => [p.id, p.id])}
-                            />
-                        </Select>
-                    }
-                />,
-                <Field
-                    label={t("dev.field.min_bitrate")}
-                    control={
-                        <Input target={f} prop="minBitrate" {...BITRATE} />
-                    }
-                />,
-                <Field
-                    label={t("dev.field.max_bitrate")}
-                    control={
-                        <Input target={f} prop="maxBitrate" {...BITRATE} />
-                    }
-                />,
-                <Field
-                    label={t("dev.field.audio_source")}
-                    control={
-                        <Select target={f} prop="audioSource" required={true}>
-                            <Options
-                                pairs={state.audioSources.map((a) => [
-                                    a.id,
-                                    a.name,
-                                ])}
-                            />
-                        </Select>
-                    }
-                />,
-                <Field
-                    label={t("dev.field.audio_codec")}
-                    control={
-                        <Select target={f} prop="audioCodec">
-                            <Options
-                                pairs={[
-                                    ["aac", "AAC"],
-                                    ["opus", "Opus"],
-                                ]}
-                            />
-                        </Select>
-                    }
-                />,
-                <Field
-                    label={t("dev.field.audio_delay")}
-                    control={
-                        <Input
-                            target={f}
-                            prop="delay"
-                            {...numberAttrs(-2000, 2000)}
-                        />
-                    }
-                />,
-                // Combined devices stream into their own srtla_send: no target to configure
-                standalone && [
-                    <Field
-                        label={t("dev.field.stream_host")}
-                        control={
-                            <Input
-                                target={f}
-                                prop="encoderHost"
-                                placeholder={"192.168.1.10"}
-                                required={true}
-                            />
-                        }
-                    />,
-                    <Field
-                        label={t("dev.field.stream_srt_port")}
-                        control={
-                            <Input
-                                target={f}
-                                prop="encoderPort"
-                                {...PORT}
-                                required={true}
-                            />
-                        }
-                    />,
-                ],
-                <Field
-                    label={t("dev.field.srt_latency")}
-                    control={
-                        <Input
-                            target={f}
-                            prop="latency"
-                            {...numberAttrs(100, 10000, undefined, 100)}
-                            required={true}
-                        />
-                    }
-                />,
-                <Field
-                    label={t("dev.field.stream_id")}
-                    control={
-                        <Input
-                            target={f}
-                            prop="streamid"
-                            placeholder={t("ui.optional")}
-                        />
-                    }
-                />,
-                check("bitrateOverlay", t("dev.field.bitrate_overlay")),
-            );
+function coreStep(step: CoreStep): WizardStep {
+    return {
+        ...step,
+        valid: () => {
+            switch (step.id) {
+                case "role":
+                    return !!f.role;
+                case "identity":
+                    return HOSTNAME_RE.test(f.hostname);
+                default:
+                    return true;
+            }
+        },
+        render: () => {
+            switch (step.id) {
+                case "language":
+                    return stepFrame(
+                        step.id,
+                        t("ui.language_label"),
+                        t("setup.language_desc"),
+                        <Field
+                            label={t("ui.language_label")}
+                            control={
+                                <Select
+                                    target={f}
+                                    prop="language"
+                                    onChange={(v) => setLanguage(v)}>
+                                    {languageOptions()}
+                                </Select>
+                            }
+                        />,
+                    );
+                case "role":
+                    return stepFrame(
+                        step.id,
+                        t("set.role"),
+                        t("setup.step.role_sub"),
+                        roleCard(
+                            "encoder",
+                            t("setup.role.encoder"),
+                            t("setup.role.encoder_tag"),
+                        ),
+                        roleCard(
+                            "relay",
+                            t("setup.step.relay"),
+                            t("setup.role.relay_tag"),
+                        ),
+                        roleCard(
+                            "combined",
+                            t("setup.role.combined"),
+                            t("setup.role.combined_tag"),
+                        ),
+                    );
+                case "identity":
+                    return stepFrame(
+                        step.id,
+                        t("setup.identity"),
+                        t("setup.identity_desc"),
+                        <Field
+                            label={t("setup.hostname")}
+                            control={
+                                <Input
+                                    target={f}
+                                    prop="hostname"
+                                    required={true}
+                                    pattern={HOSTNAME_PATTERN}
+                                    title={t("setup.hostname_title")}
+                                />
+                            }
+                        />,
+                        <Field
+                            label={t("set.color")}
+                            control={
+                                <Input
+                                    target={f}
+                                    prop="color"
+                                    type={"color"}
+                                    onChange={(v) => setHeaderColor(v)}
+                                />
+                            }
+                        />,
+                    );
+                case "control":
+                    return stepFrame(
+                        step.id,
+                        t("setup.step.control"),
+                        t("setup.control_desc"),
+                        <Field
+                            label={t("set.remote_url")}
+                            control={
+                                <Input
+                                    target={f}
+                                    prop="remoteUrl"
+                                    placeholder={"wss://control.example/device"}
+                                />
+                            }
+                        />,
+                        <Field
+                            label={t("setup.control_token")}
+                            control={
+                                <Input
+                                    target={f}
+                                    prop="remoteToken"
+                                    type={"password"}
+                                    autocomplete={"off"}
+                                />
+                            }
+                        />,
+                    );
+                case "finish":
+                    return stepFrame(
+                        step.id,
+                        t("setup.step.review"),
+                        t("setup.review_desc"),
+                        <CheckField
+                            label={t("setup.autostart")}
+                            control={<Checkbox target={f} prop="autostart" />}
+                        />,
+                    );
+            }
+        },
+    };
+}
+
+function visibleSteps(): WizardStep[] {
+    const role = f.role;
+    const modules = role ? setupStepsForRole(role).map((s) => moduleStep(s, role)) : [];
+    return [
+        ...CORE_STEPS.map(coreStep),
+        ...modules,
+        coreStep(FINISH_STEP),
+    ];
+}
+
+const currentIndex = () =>
+    Math.min(state.current, visibleSteps().length - 1);
+
+function goNext(): void {
+    const steps = visibleSteps();
+    const current = currentIndex();
+    if (steps[current]?.valid())
+        state.current = Math.min(current + 1, steps.length - 1);
+}
+
+function goPrev(): void {
+    state.current = Math.max(currentIndex() - 1, 0);
+}
+
+const rpc = new RpcClient(() => socketUrl("ws"));
+rpc.on("open", async () => {
+    state.connected = true;
+    m.redraw();
+    try {
+        const info = await rpc.call<SetupInfo>("setup.get");
+        if (!info.required) {
+            location.replace("./");
+            return;
         }
-        case "relay": {
-            const needsReceiver = f.role !== "encoder";
-            return step(
-                key,
-                t("setup.step.relay"),
-                t("setup.relay_desc"),
-                <Field
-                    label={t("dev.field.srt_listen_port")}
-                    control={
-                        <Input
-                            target={f}
-                            prop="listenPort"
-                            {...PORT}
-                            required={true}
-                        />
-                    }
-                />,
-                <Field
-                    label={t("dev.field.remote_host")}
-                    control={
-                        <Input
-                            target={f}
-                            prop="srtlaRemoteHost"
-                            placeholder={"rec.example.com"}
-                            required={needsReceiver}
-                        />
-                    }
-                />,
-                <Field
-                    label={t("dev.field.remote_port")}
-                    control={
-                        <Input
-                            target={f}
-                            prop="srtlaRemotePort"
-                            {...PORT}
-                            required={needsReceiver}
-                        />
-                    }
-                />,
-                <Field
-                    label={t("dev.scheduler")}
-                    control={
-                        <Select target={f} prop="srtlaMode">
-                            <Options
-                                pairs={[
-                                    ["enhanced", t("dev.scheduler_enhanced")],
-                                    ["classic", t("dev.scheduler_classic")],
-                                ]}
-                            />
-                        </Select>
-                    }
-                />,
-                check("srtlaQuality", t("dev.quality_scoring")),
-            );
-        }
-        case "finish":
-            return step(
-                key,
-                t("setup.step.review"),
-                t("setup.review_desc"),
-                check("autostart", t("setup.autostart")),
-            );
+        state.info = info;
+        Object.assign(f, {
+            hostname: info.hostname,
+            color: info.color,
+            language: info.language,
+        });
+        setLanguage(info.language);
+        setHeaderColor(info.color);
+        state.loaded = true;
+    } catch (error: unknown) {
+        state.message = errorMessage(error);
+    }
+    m.redraw();
+});
+rpc.on("close", () => {
+    state.connected = false;
+    m.redraw();
+});
+
+async function complete(): Promise<void> {
+    const role = f.role;
+    if (!role) {
+        state.message = t("setup.step.role_sub");
+        return;
+    }
+    state.saving = true;
+    state.message = "";
+    const payload: Record<string, unknown> = {
+        language: f.language,
+        role,
+        hostname: f.hostname,
+        color: f.color,
+        remoteUrl: f.remoteUrl,
+        remoteToken: f.remoteToken,
+        autostart: f.autostart,
+    };
+    for (const setupStep of setupStepsForRole(role))
+        Object.assign(payload, setupStep.config(role));
+    try {
+        await rpc.call("setup.complete", payload);
+        state.message = `${t("setup.saved")} ${t("setup.restart_required")}`;
+        rpc.reconnect();
+    } catch (error: unknown) {
+        state.message = errorMessage(error);
+    } finally {
+        state.saving = false;
+        m.redraw();
     }
 }
 
@@ -586,19 +352,19 @@ function wizard(): m.Children {
         <ol class={"wizard-stepper"}>
             {steps.map((s, i) => (
                 <li
-                    key={s.key}
+                    key={s.id}
                     class={`wiz-item ${stage(i)}`}
-                    data-step={s.key}>
+                    data-step={s.id}>
                     <span class={"wiz-dot"}>
                         {i < current ? "✓" : String(i + 1)}
                     </span>
                     <span class={"wiz-title"}>{t(s.title)}</span>
-                    <span class={"wiz-sub"}>{t(s.sub)}</span>
+                    <span class={"wiz-sub"}>{t(s.subtitle)}</span>
                 </li>
             ))}
         </ol>,
         <Form id={"setup-form"} onSubmit={() => void complete()}>
-            {stepBody(steps[current].key)}
+            {steps[current].render()}
             <Break />
             <Actions>
                 <Button

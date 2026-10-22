@@ -3,35 +3,24 @@
  * pushed live over the shared feed websocket, and live widget data flows over the
  * control server's per-device viewer websockets (d/<id>/ws). */
 import m from "mithril";
-/* REFACTOR-modules.md §7: the core names no module by id. Per-device cards
- * (encoder / srtla) are reached through the generated manifest
- * (`deviceCardBody`). The obs panel is the one documented exception: its
- * transport types are module-owned and irreducible to a generic `Panel`
- * signature without the core re-declaring them (§6 "no shared types"). */
 import {
-    createObsPanel,
-    type ObsEvent,
-    type ObsPanel,
-    type ObsRequestResult,
-} from "../../modules/obs-controller/frontend";
-import {
-    deviceCardBody,
     dispatchWidgetFrame,
-    getFrontendModule,
+    deviceWidgetForType,
+    deviceWidgetTypesFor,
+    deviceWidgetsForType,
+    destroyDeviceWidget,
     type WidgetContext,
     widgetModuleForType,
     widgetModuleTypes,
+    widgetConfigFieldsForType,
 } from "../../src/registry.frontend";
 import type {
     DeviceInfo,
     DeviceSummary,
     GridSize,
-    Role,
     ServerDashboard,
     ServerDashboardWidget,
-    SrtlaStatsEvent,
     Status,
-    SwitcherStatus,
     WidgetType,
 } from "../types";
 import {
@@ -43,7 +32,7 @@ import { createCardHost, type DeviceCard } from "./device/store";
 import { t } from "./i18n";
 import { RpcClient, socketUrl } from "./services/rpc";
 import { serverLive } from "./services/serverws";
-import { uuid } from "./util";
+import type { DeviceDashboardContext } from "./module-contracts";
 
 /** Device-independent widget types: their data (the widget's channel, fetched
  * by the control server) is not tied to any device connection. The widget
@@ -58,18 +47,10 @@ export const isIndependent = (type: WidgetType): boolean =>
 interface DeviceLive {
     device?: DeviceInfo;
     status?: Status;
-    /** The low-bitrate switcher's live state (pushed as `lowBitrateSwitcher.state`). */
-    switcher?: SwitcherStatus | null;
-    obsConnected: boolean;
-    obsScene?: string;
-    obsStreaming: boolean;
-    obsRecording: boolean;
 }
 interface Connection {
     rpc: RpcClient;
     live: DeviceLive;
-    /** The module card host: feeds the encoder / relay / combined widgets,
-     * which run the same interactive card as the device page. */
     card: DeviceCard;
 }
 
@@ -158,22 +139,9 @@ export const deviceLabel = (d: DeviceSummary): string => d.hostname || d.id;
 export const typeLabel = (type: WidgetType): string =>
     t(`wtype.${type.replace("-", "_")}`);
 
-/** Widget types a role may place on a dashboard. */
-const ROLE_WIDGET_TYPES: Record<Role, WidgetType[]> = {
-    relay: ["relay"],
-    encoder: ["encoder"],
-    combined: ["combined"],
-    obs: ["obs"],
-    custom: ["relay", "encoder", "combined", "obs"],
-};
-
-/** Widget types a specific device offers, from its role + enabled modules. */
+/** Widget types a device offers, declared by its frontend modules. */
 export function widgetTypesFor(d: DeviceSummary): WidgetType[] {
-    const types =
-        ROLE_WIDGET_TYPES[d.role ?? "custom"] ?? ROLE_WIDGET_TYPES.custom;
-    return types.filter(
-        (type) => type !== "obs" || d.modules?.["obs-controller"]?.enabled,
-    );
+    return deviceWidgetTypesFor(d);
 }
 
 /** Widget types that are not tied to a device: always offered; their data
@@ -191,9 +159,20 @@ export function effectiveDeviceId(w: ServerDashboardWidget): string {
 // ------------------------------------------------------------------- connections
 
 const connections = new Map<string, Connection>();
+const activeDeviceWidgets = new Map<string, string>();
 
 /** One viewer websocket per device referenced by the dashboard's widgets. */
 export function syncConnectionsFor(dash: ServerDashboard | undefined): void {
+    const nextWidgets = new Map(
+        (dash?.widgets ?? [])
+            .filter((w) => !isIndependent(w.type))
+            .map((w) => [widgetKey(w), w.type]),
+    );
+    for (const [id, type] of activeDeviceWidgets)
+        if (nextWidgets.get(id) !== type) destroyDeviceWidget(type, id);
+    activeDeviceWidgets.clear();
+    for (const [id, type] of nextWidgets) activeDeviceWidgets.set(id, type);
+
     const wanted = new Set(
         (dash?.widgets ?? []).map((w) => effectiveDeviceId(w)),
     );
@@ -205,11 +184,7 @@ export function syncConnectionsFor(dash: ServerDashboard | undefined): void {
     }
     for (const id of wanted) {
         if (!id || connections.has(id)) continue;
-        const live: DeviceLive = {
-            obsConnected: false,
-            obsStreaming: false,
-            obsRecording: false,
-        };
+        const live: DeviceLive = {};
         const rpc = new RpcClient(() =>
             socketUrl(`/d/${encodeURIComponent(id)}/ws`),
         );
@@ -217,59 +192,24 @@ export function syncConnectionsFor(dash: ServerDashboard | undefined): void {
         connections.set(id, conn);
         rpc.on("device", (data) => {
             const info = data as DeviceInfo;
-            if (live.device?.online === false && info.online)
-                conn.card.onReconnect();
             live.device = info;
+            if (!info.online) conn.card.clearEvents();
         });
         rpc.on("status", (data) => {
             live.status = data as Status;
             conn.card.applyStatus(live.status!);
         });
-        rpc.on("srtla.stats", (data) => {
-            const e = data as SrtlaStatsEvent;
-            conn.card.handleStats(e);
-        });
-        rpc.on("lowBitrateSwitcher.state", (data) => {
-            live.switcher = (data as SwitcherStatus | null) ?? null;
+        rpc.onAny((event, data) => {
+            if (event !== "status" && event !== "open" && event !== "close")
+                conn.card.handleEvent(event, data);
             m.redraw();
         });
-        rpc.on("obs.event", (data) => {
-            const e = data as {
-                eventType: string;
-                eventData?: Record<string, unknown>;
-            };
-            if (e.eventType === "CurrentProgramSceneChanged") {
-                live.obsConnected = true;
-                live.obsScene = String(
-                    e.eventData?.outputName ?? e.eventData?.sceneName ?? "",
-                );
-            } else if (e.eventType === "StreamStateChanged") {
-                live.obsConnected = true;
-                live.obsStreaming = Boolean(e.eventData?.outputActive);
-            } else if (e.eventType === "RecordStateChanged") {
-                live.obsConnected = true;
-                live.obsRecording = Boolean(e.eventData?.outputActive);
-            } else if (e.eventType === "ObsDisconnected") {
-                live.obsConnected = false;
-                live.obsStreaming = false;
-                live.obsRecording = false;
-            }
-            m.redraw();
-        });
+        rpc.on("close", () => conn.card.clearEvents());
         // Warm start: pull last snapshots once the socket is open (a 409 means the
         // module is not enabled there). `call` rejects before the socket is OPEN, so
         // this must run from the "open" event — initial connect and every reconnect.
         rpc.on("open", () => {
-            conn.card.onReconnect();
-            const kinds = (dash?.widgets ?? []).map((w) => w.type);
-            if (kinds.includes("obs")) {
-                rpc.call("obs.request", { requestType: "GetVersion" })
-                    .then(() => {
-                        live.obsConnected = true;
-                        m.redraw();
-                    })
-                    .catch(() => undefined);
-            }
+            conn.card.handleEvent("open", undefined);
             void rpc.call("status").catch(() => undefined);
         });
     }
@@ -282,204 +222,60 @@ const connectionFor = (deviceId: string): Connection | undefined =>
 
 // ---------------------------------------------------------------------- widgets
 
-/** Shared availability handling for device-backed widget cards. */
-function deviceWidget(
-    deviceId: string,
-    conn: Connection | undefined,
-    render: (conn: Connection, status: Status) => m.Children,
-): m.Children {
-    if (!deviceById(deviceId))
-        return <p class={"muted"}>{t("dash.widget_missing")}</p>;
-    if (!conn) return <p class={"muted"}>{t("dev.badge.offline")}</p>;
-    const status = conn.card.st.status;
-    if (!status)
-        return <p class={"muted"}>{t("dash.widget_waiting")}</p>;
-    return render(conn, status);
-}
-
-/** Card widgets render the full interactive module card (same as the device page);
- * the wrapper keeps the module's CSS scope. */
-function deviceModuleCard(
-    moduleId: "encoder" | "srtla",
-    conn: Connection,
-    status: Status,
-): m.Vnode {
-    return (
-        <div class={`mod-${moduleId}`}>
-            {deviceCardBody(moduleId, conn.card, status)}
-        </div>
-    );
-}
-
-function relayWidget(
-    deviceId: string,
-    conn: Connection | undefined,
-): m.Children {
-    return deviceWidget(deviceId, conn, (active, status) =>
-        deviceModuleCard("srtla", active, status),
-    );
-}
-
-function encoderWidget(
-    deviceId: string,
-    conn: Connection | undefined,
-): m.Children {
-    return deviceWidget(deviceId, conn, (active, status) =>
-        deviceModuleCard("encoder", active, status),
-    );
-}
-
-/** Combined device: encoder card stacked over its SRTLA receiver card. */
-function combinedWidget(
-    deviceId: string,
-    conn: Connection | undefined,
-): m.Children {
-    return deviceWidget(deviceId, conn, (active, status) => (
-        <div class={"mod-combined"}>
-            {[
-                deviceModuleCard("encoder", active, status),
-                deviceModuleCard("srtla", active, status),
-            ]}
-        </div>
-    ));
-}
-
-/** One panel instance per obs widget (its own timers, VU canvas, pending guards). */
-const obsPanels = new Map<string, { panel: ObsPanel; conn: Connection }>();
-
-/** Get or create the widget's obs panel. The panel caches `conn.rpc`; if
- * syncConnectionsFor replaced the device's connection (dashboard edited,
- * device swapped), rebind to the live one. */
-function obsPanelFor(w: ServerDashboardWidget, conn: Connection): ObsPanel {
-    const entry = obsPanels.get(w.id);
-    if (entry && entry.conn !== conn) {
-        entry.panel.destroy();
-        obsPanels.delete(w.id);
-    }
-    let panel = obsPanels.get(w.id)?.panel;
-    if (!panel) {
-        panel = createObsPanel({
-            send: <T = Record<string, unknown>,>(
-                type: string,
-                data?: Record<string, unknown>,
-            ) =>
-                conn.rpc.call<ObsRequestResult<T> | undefined>("obs.request", {
-                    requestType: type,
-                    requestId: uuid(),
-                    requestData: data ?? {},
-                }),
-            onEvent: (h) =>
-                conn.rpc.on("obs.event", (data) => h(data as ObsEvent)),
-            mirror: (s) => {
-                conn.live.obsConnected = s.connected;
-                conn.live.obsStreaming = s.streaming;
-                conn.live.obsRecording = s.recording;
-                if (s.scene) conn.live.obsScene = s.scene;
-            },
-            startConnected: () => conn.live.obsConnected,
-            onDestroy: () => obsPanels.delete(w.id),
-        });
-        obsPanels.set(w.id, { panel, conn });
-    }
-    return panel;
-}
-
-/** The OBS controls, including the switcher section when enabled. */
-function obsWidget(
+function deviceWidgetContext(
     w: ServerDashboardWidget,
-    conn: Connection | undefined,
-): m.Children {
-    const d = deviceById(w.deviceId);
-    if (!conn || !d?.online)
-        return <p class={"muted"}>{t("dev.badge.offline")}</p>;
-    const status = conn.card.st.status;
-    return (
-        <div class={"mod-obs-controller"}>
-            {obsPanelFor(w, conn).component(
-                status
-                    ? {
-                          host: conn.card,
-                          status,
-                          live: conn.live.switcher ?? null,
-                      }
-                    : undefined,
-            )}
-        </div>
-    );
+    device: DeviceSummary,
+): DeviceDashboardContext | undefined {
+    const conn = connectionFor(device.id);
+    if (!conn) return undefined;
+    return {
+        widget: w,
+        device,
+        status: conn.card.st.status ?? undefined,
+        card: conn.card,
+        rpc: conn.rpc,
+    };
 }
 
-/** The status badge shown next to the widget title in the card head. Widget
- * module types (stats / the chats) render their own badge; the
- * core keeps only the device-card and status badge logic. */
-function widgetBadge(w: ServerDashboardWidget): m.Vnode {
-    switch (w.type) {
-        case "relay": {
-            const st = connectionFor(effectiveDeviceId(w))?.live.status?.state;
-            const offline = !st;
-            return (
-                <Badge
-                    text={
-                        offline ? t("dev.badge.offline") : t("dev.badge.online")
-                    }
-                    kind={offline ? "off" : "on"}
-                />
-            );
-        }
-        case "combined":
-        case "encoder": {
-            const deviceId = effectiveDeviceId(w);
-            const conn = connectionFor(deviceId);
-            const e =
-                deviceById(deviceId)?.encoder ??
-                conn?.live.status?.state?.encoder;
-            if (!e)
-                return (
-                    <Badge
-                        text={
-                            conn
-                                ? t("dash.widget_waiting")
-                                : t("dev.badge.offline")
-                        }
-                        kind={conn ? "" : "off"}
-                    />
-                );
-            return (
-                <Badge
-                    text={
-                        e.running
-                            ? t("dev.badge.online")
-                            : t("dev.badge.stopped")
-                    }
-                    kind={e.running ? "on" : "warn"}
-                />
-            );
-        }
-        case "obs": {
-            const d = deviceById(w.deviceId);
-            const conn = connectionFor(effectiveDeviceId(w));
-            if (!conn || !d?.online)
-                return <Badge text={t("dev.badge.offline")} kind="off" />;
-            // p.head() is [connected/offline badge, refresh button]; the refresh stays in the panel.
-            return obsPanelFor(w, conn).head()[0];
-        }
-        default: {
-            const mod = widgetModuleForType(w.type);
-            if (mod) return mod.badge(w, widgetCtx(w)) as m.Vnode;
-            const d = deviceById(effectiveDeviceId(w));
-            if (!d)
-                return <Badge text={t("dash.widget_missing")} kind="warn" />;
-            return (
-                <Badge
-                    text={
-                        d.online
-                            ? t("dev.badge.online")
-                            : t("dev.badge.offline")
-                    }
-                    kind={d.online ? "on" : "off"}
-                />
-            );
-        }
-    }
+function deviceWidget(w: ServerDashboardWidget): m.Children {
+    const device = deviceById(w.deviceId);
+    if (!device) return <p class={"muted"}>{t("dash.widget_missing")}</p>;
+    const conn = connectionFor(device.id);
+    if (!conn) return <p class={"muted"}>{t("dev.badge.offline")}</p>;
+    if (!conn.card.st.status)
+        return <p class={"muted"}>{t("dash.widget_waiting")}</p>;
+    const context = deviceWidgetContext(w, device);
+    const contributions = deviceWidgetsForType(w.type, device);
+    if (!context || contributions.length === 0)
+        return <p class={"muted"}>{t("dash.widget_missing")}</p>;
+    const bodies = contributions.map(({ module, widget }) => (
+        <div class={`mod-${module.id}`}>{widget.body(context)}</div>
+    ));
+    return bodies.length === 1 ? bodies[0] : <div>{bodies}</div>;
+}
+
+/** Widget modules own their badges; otherwise the shell shows device presence. */
+function widgetBadge(w: ServerDashboardWidget): m.Children {
+    const channelModule = widgetModuleForType(w.type);
+    if (channelModule)
+        return channelModule.badge(w, widgetCtx(w)) as m.Children;
+
+    const device = deviceById(w.deviceId);
+    if (!device) return <Badge text={t("dash.widget_missing")} kind="warn" />;
+    const context = deviceWidgetContext(w, device);
+    const contribution = deviceWidgetsForType(w.type, device)[0];
+    if (context && contribution?.widget.badge)
+        return contribution.widget.badge(context);
+    return (
+        <Badge
+            text={
+                device.online
+                    ? t("dev.badge.online")
+                    : t("dev.badge.offline")
+            }
+            kind={device.online ? "on" : "off"}
+        />
+    );
 }
 
 /** Per-widget state of the inline config editor (pencil icon). The field
@@ -537,7 +333,7 @@ export function onDashboardsChanged(data: unknown): void {
  * One field per parameter in the widget module's `configFields` (labels and
  * placeholders come from `dash.widget_<name>` i18n keys). */
 function configEditorForm(w: ServerDashboardWidget): m.Vnode {
-    const fields = widgetModuleForType(w.type)?.configFields ?? [];
+    const fields = widgetConfigFieldsForType(w.type);
     const key = widgetKey(w);
     const s = widgetConfigState.get(key) ?? {
         editing: true,
@@ -671,37 +467,12 @@ function widgetVersion(w: ServerDashboardWidget): m.Vnode | null {
     ) : null;
 }
 
-/** Live body for a widget, given its device connection. Widget module types
- * render their own body; the core keeps only the device-card and status ones. */
+/** Live body for an independent widget or a module-contributed device widget. */
 function bodyFor(w: ServerDashboardWidget): m.Children {
-    const deviceId = effectiveDeviceId(w);
-    const conn = connectionFor(deviceId);
-    switch (w.type) {
-        case "relay":
-            return relayWidget(deviceId, conn);
-        case "encoder":
-            return encoderWidget(deviceId, conn);
-        case "combined":
-            return combinedWidget(deviceId, conn);
-        case "obs":
-            return obsWidget(w, conn);
-        default: {
-            const mod = widgetModuleForType(w.type);
-            if (mod) return mod.body(w, widgetCtx(w)) as m.Children;
-            return <p class={"muted"}>{t("dash.widget_missing")}</p>;
-        }
-    }
+    const mod = widgetModuleForType(w.type);
+    if (mod) return mod.body(w, widgetCtx(w)) as m.Children;
+    return deviceWidget(w);
 }
-
-/** Device-card widget types (the ones whose body embeds a module's
- * device-card) → the frontend module that defines their grid size. Widget
- * module types declare their own sizes in the module; everything else falls
- * back to the core default. */
-const CARD_MODULE: Record<string, string> = {
-    obs: "obs-controller",
-    encoder: "encoder",
-    relay: "srtla",
-};
 
 /** Default/min/max `{w, h}` for a widget type — the module's own grid
  * contract, used when adding a widget or constraining a resize. */
@@ -712,13 +483,13 @@ export function widgetSize(type: WidgetType): {
 } {
     const wm = widgetModuleForType(type);
     if (wm) return { default: wm.defaultSize, min: wm.defaultSize };
-    const mod = CARD_MODULE[type]
-        ? getFrontendModule(CARD_MODULE[type])
-        : undefined;
-    if (mod)
-        return { default: mod.defaultSize, min: mod.minSize, max: mod.maxSize };
-    if (type === "combined")
-        return { default: { w: 6, h: 10 }, min: { w: 4, h: 8 } };
+    const widget = deviceWidgetForType(type);
+    if (widget)
+        return {
+            default: widget.defaultSize,
+            min: widget.minSize,
+            max: widget.maxSize,
+        };
     return { default: { w: 4, h: 4 }, min: { w: 3, h: 3 } };
 }
 
@@ -736,9 +507,9 @@ export function widgetInner(
     actions: WidgetActions,
 ): m.Vnode {
     const key = widgetKey(w);
-    const independent = isIndependent(w.type);
+    const configurable = widgetConfigFieldsForType(w.type).length > 0;
     const editing =
-        independent &&
+        configurable &&
         editMode &&
         (widgetConfigState.get(key)?.editing ?? false);
     return (
@@ -772,7 +543,7 @@ export function widgetInner(
                         editMode ? (
                             <span class={"dash-widget-actions"}>
                                 {[
-                                    independent ? (
+                                    configurable ? (
                                         <button
                                             class={
                                                 "icon-btn dash-widget-config"

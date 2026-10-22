@@ -71,13 +71,16 @@ Default-exports an object the registry validates structurally:
 Default-exports an object the generated manifest re-exports and the frontend
 registry bridges:
 
-| field                                 | purpose                                                                                                                   |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `kind`, `id`, `title`, `configSchema` | identity + config form (mirrors backend)                                                                                  |
-| `component?`                          | a dashboard-widget component (channel widgets render via `WIDGET_MODULES`)                                                |
-| `cardBody?(host, status)`             | a device-card body `(DeviceCard, Status) => Vnode` — registered so the core renders the card by capability, not by import |
-| `configFields?`                       | config fields that require a device reload (widgets)                                                                      |
-| `createHub?(publish)`, `eventSink?`   | widget hub factory / event sink                                                                                           |
+| field                   | purpose                                                                                       |
+| ----------------------- | --------------------------------------------------------------------------------------------- |
+| `kind`, `id`, `title`   | identify the device-card or independent-widget registration                                   |
+| `available?(status)`    | decide whether a device card is applicable to the current status                              |
+| `component`            | render a device card                                                                       |
+| `dashboardWidgets?`     | declare opaque device-widget types, eligibility, sizing, rendering, badges, and cleanup       |
+| `setupSteps?`           | declare setup ordering, eligible roles, validation, rendering, and payload contribution       |
+| `deviceSummaryColumns?` | declare device-list columns, ordering, eligibility, and cell rendering                        |
+| `configFields?`         | declare independent-widget editor fields                                                      |
+| `onFrame?`, `handleEvent?` | receive generic server or device events and update module-owned state                       |
 
 ## Discovery (the core names no module)
 
@@ -100,23 +103,70 @@ be marked auto-generated.
 
 -   `src/methods.ts` routes RPC methods via the registry's method-owner map
     (built from each module's `methods` array) — it does not import any module.
--   `src/registry.frontend.ts` exposes accessors the UI calls: `moduleCard(id)`,
-    `deviceCardBody(id, host, status)`, `getFrontendModule(id)`, and
-    `WIDGET_MODULES`.
+-   `src/registry.frontend.ts` exposes accessors the UI calls: `moduleCards(status)`,
+    dashboard/setup/summary contribution accessors,
+    `getFrontendModule(id)`, and `WIDGET_MODULES`.
 -   **Capability bus** — a module that exposes a service registers it under a
     dotted name (`stream.encoder`, `stream.srtla`) in `services.capabilities`;
     consumers look it up by name through `src/capabilities.ts` rather than
-    importing the providing module.
--   The **only** core→module import allowed in the browser is the documented
-    exception `public/ts/dashboard.ts → modules/obs-controller/frontend`
-    (`createObsPanel` + transport types): the obs panel is stateful and its event
-    types are module-owned, so a generic `Panel` signature would force the core
-    to re-declare obs types (§6 violation). It is allow-listed in the ban test.
+    importing the providing module. Frontend modules use the per-connection
+    `DeviceCard` capability API for the same purpose; the core stores and
+    forwards capabilities without knowing their names or signatures.
+-   The browser core has no direct imports from `modules/<id>/`. The generic,
+    type-only contribution interfaces live in `public/ts/module-contracts.ts`;
+    module implementations and event types remain module-owned.
 
 Each module's `frontend.tsx` side-effect-imports its own `styles.css`
 (`import "./styles.css"`); Bun's bundler emits it into the page (see
 `css.d.ts`), so the core never pulls module CSS by id. Components use mithril +
 CSS classes.
+
+## Self-contained frontend contract
+
+Device modules describe their UI through generic contributions, keeping
+module-owned behavior inside `modules/<id>/`:
+
+- **Device cards** declare their eligibility from the shared status and own
+  their component and dashboard-card rendering.
+- **Dashboard widgets** declare opaque widget types, eligibility, configuration
+  fields, rendering, badges, and any module-owned live state. Core supplies
+  generic device connection and layout context; it does not interpret a
+  widget type or import a module component.
+- **Setup steps** declare their order, visibility, validation, rendering, and
+  the configuration values they contribute. The shared wizard retains generic
+  language, identity, and control-server steps and combines module values for
+  `setup.complete`.
+- **Device summaries** contribute their own columns and cell renderers. The
+  shared device list retains generic identity, connection, and layout behavior.
+
+The shared `Role` vocabulary remains an application configuration/wire
+contract. UI eligibility and behavior for a role belong in module
+contributions, not role-specific branches in core pages. Widget type strings
+are opaque registry keys. Stateful panels (including OBS controls) are created,
+updated, and destroyed by their owning module; the core passes a generic device
+context and RPC capability.
+
+Core pages compose and invoke contributions, but do not contain module-owned
+status-field logic, widget-type switches, or direct imports from `modules/*`.
+Module-specific pages, such as the encoder pipeline editor, live inside their
+owning module. Frontend modules communicate through generic per-connection
+capabilities, not direct imports from one another. The structural contribution
+contract is defined in `public/ts/module-contracts.ts`; modules may import it
+by type only, but do not import the core registry.
+
+## Elysia server target
+
+Both server entry points use Elysia app factories. The centralized control
+server composes plugins by route domain: public pages/assets, authentication
+and profile, device connections/viewers, and dashboards/widgets. The
+device-local API composes page/assets and WebSocket RPC plugins. Each plugin
+owns its routes and socket lifecycle and receives domain services through its
+factory options.
+
+The RPC method handlers remain transport-agnostic and shared by the local
+device socket and outbound remote connection. Elysia changes server
+composition, not the HTTP response contracts, authorization rules, WebSocket
+frame shapes, dashboard persistence, or compiled-server asset behavior.
 
 ## Ordering
 
@@ -131,9 +181,9 @@ No module currently declares `dependencies`, so the order is the id sort.
 1. `mkdir modules/<id>`; write `backend.ts` (default-export registration
    above), `frontend.tsx` (default-export registration), `types.ts`,
    `styles.css`.
-2. Device module: register the card as `cardBody` in `frontend.tsx`.
-   Channel widget: register `component` + `createHub`/`hub` so it appears in
-   `WIDGET_MODULES`.
+2. Device module: register its dashboard, setup, and summary contributions as
+   needed. Channel widget: register `body`/`badge` and config fields so it
+   appears in `WIDGET_MODULES`.
 3. If it must start after another module, add `dependencies: ["<id>", ...]`.
 4. **No core edits needed** for discovery — the backend scan picks it up and
    `predev` regenerates the frontend manifest. The only core touch is `src/`

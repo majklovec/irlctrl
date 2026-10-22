@@ -16,10 +16,19 @@
  */
 import m from "mithril";
 import type {
+    DeviceSummary,
+    Role,
     ServerDashboardWidget,
     Status,
     WidgetConfigField,
 } from "../public/types";
+import type {
+    DeviceDashboardContext,
+    DeviceDashboardWidget,
+    DeviceSummaryColumn,
+    FrontendModuleContributions,
+    ModuleSetupStep,
+} from "../public/ts/module-contracts";
 import {
     setFrontendEventSink,
     type DeviceCard,
@@ -65,20 +74,16 @@ interface ChannelWidgetModule<TWidget = unknown> {
 
 /** A browser-side module registration (device card). Local copy: the core
  * names the shape, modules never import across boundaries. */
-export interface FrontendModule {
+export interface FrontendModule extends FrontendModuleContributions {
     id: string;
     title: string;
     icon?: string;
     kind: "device-card";
+    order?: number;
     component: (status: Status) => m.Vnode;
-    /** Optional card body rendered inside a dashboard widget (the device page
-     * always uses `component`). Lets the core compose per-device widgets without
-     * importing the module directly (REFACTOR-modules.md §5). */
-    cardBody?(host: DeviceCard, status: Status): m.Vnode;
     defaultSize: { w: number; h: number };
     minSize: { w: number; h: number };
     maxSize?: { w: number; h: number };
-    handleEvent?(event: string, data: unknown): void;
 }
 
 type FrontendRegistration =
@@ -106,12 +111,82 @@ export const FRONTEND_MODULES: FrontendModule[] = FRONTS.filter(
     (mod): mod is FrontendModule => mod.kind === "device-card",
 ) as FrontendModule[];
 
-export function getFrontendModule(id: string): FrontendModule | undefined {
-    return FRONTEND_MODULES.find((mod) => mod.id === id);
+export function frontendModulesForStatus(status: Status): FrontendModule[] {
+    return FRONTEND_MODULES.filter(
+        (mod) => mod.available?.(status) ?? true,
+    );
 }
 
-export function frontendModuleIds(): string[] {
-    return FRONTEND_MODULES.map((mod) => mod.id);
+export interface RegisteredDeviceWidget {
+    module: FrontendModule;
+    widget: DeviceDashboardWidget;
+}
+
+export function deviceWidgetsForType(
+    type: string,
+    device: DeviceSummary,
+): RegisteredDeviceWidget[] {
+    return FRONTEND_MODULES.flatMap((module) =>
+        (module.dashboardWidgets ?? [])
+            .filter(
+                (widget) =>
+                    widget.type === type && widget.available(device),
+            )
+            .map((widget) => ({ module, widget })),
+    );
+}
+
+export function deviceWidgetForType(
+    type: string,
+): DeviceDashboardWidget | undefined {
+    return FRONTEND_MODULES.flatMap((module) => module.dashboardWidgets ?? [])
+        .find((widget) => widget.type === type);
+}
+
+export function destroyDeviceWidget(
+    type: string,
+    widgetId: string,
+): void {
+    for (const module of FRONTEND_MODULES)
+        for (const widget of module.dashboardWidgets ?? [])
+            if (widget.type === type) widget.destroy?.(widgetId);
+}
+
+export function deviceWidgetTypesFor(device: DeviceSummary): string[] {
+    return [
+        ...new Set(
+            FRONTEND_MODULES.flatMap((module) =>
+                (module.dashboardWidgets ?? [])
+                    .filter((widget) => widget.available(device))
+                    .map((widget) => widget.type),
+            ),
+        ),
+    ];
+}
+
+export function setupStepsForRole(role: Role): ModuleSetupStep[] {
+    return FRONTEND_MODULES.flatMap((module) =>
+        (module.setupSteps ?? []).filter((step) => step.roles.includes(role)),
+    );
+}
+
+export function deviceSummaryColumnsFor(
+    device: DeviceSummary,
+): DeviceSummaryColumn[] {
+    const columns = new Map<string, DeviceSummaryColumn>();
+    for (const module of FRONTEND_MODULES)
+        for (const column of module.deviceSummaryColumns ?? [])
+            if (column.available(device) && !columns.has(column.id))
+                columns.set(column.id, column);
+    return [...columns.values()].sort((left, right) => left.order - right.order);
+}
+
+export function deviceSummaryColumnDefinitions(): DeviceSummaryColumn[] {
+    const columns = new Map<string, DeviceSummaryColumn>();
+    for (const module of FRONTEND_MODULES)
+        for (const column of module.deviceSummaryColumns ?? [])
+            if (!columns.has(column.id)) columns.set(column.id, column);
+    return [...columns.values()].sort((left, right) => left.order - right.order);
 }
 
 export const WIDGET_MODULES = FRONTS.filter(
@@ -147,6 +222,18 @@ export function widgetModuleTypes(): string[] {
     return [...WIDGET_TYPE_TO_MODULE.keys()];
 }
 
+export function widgetConfigFieldsForType(
+    type: string,
+): readonly WidgetConfigField[] {
+    const channelFields = widgetModuleForType(type)?.configFields;
+    if (channelFields) return channelFields;
+    return (
+        FRONTEND_MODULES.flatMap((module) => module.dashboardWidgets ?? []).find(
+            (widget) => widget.type === type,
+        )?.configFields ?? []
+    );
+}
+
 /** Forward one dashboard-websocket frame to every widget module's `onFrame`.
  * Each module folds the frames it cares into its own live state and ignores the
  * rest, so the core stays free of per-platform frame parsing. */
@@ -154,27 +241,20 @@ export function dispatchWidgetFrame(event: string, data: unknown): void {
     for (const wm of WIDGET_MODULES) wm.onFrame?.(event, data);
 }
 
-export function moduleCard(id: string, status: Status): m.Vnode | null {
-    const mod = getFrontendModule(id);
-    if (!mod) return null;
-    return mod.component(status);
-}
-
-/** A device module's dashboard-widget card body (the device page uses
- * `component` instead; `cardBody` is the widget variant). Modules that have
- * no separate widget body return null and the dashboard falls back. */
-export function deviceCardBody(
-    id: string,
-    host: DeviceCard,
-    status: Status,
-): m.Vnode | null {
-    const mod = getFrontendModule(id);
-    return mod?.cardBody?.(host, status) ?? null;
+export function moduleCards(status: Status): m.Vnode[] {
+    return frontendModulesForStatus(status)
+        .sort((left, right) => (left.order ?? 0) - (right.order ?? 0))
+        .map((mod) => mod.component(status));
 }
 
 // Dispatch a pushed event to every frontend module that handles it.
-export function dispatchFrontendEvent(event: string, data: unknown): void {
-    for (const mod of FRONTEND_MODULES) mod.handleEvent?.(event, data);
+export function dispatchFrontendEvent(
+    event: string,
+    data: unknown,
+    host?: DeviceCard,
+): void {
+    for (const mod of FRONTEND_MODULES)
+        mod.handleEvent?.(event, data, host);
 }
 
 // Register this dispatcher with the device store. The store is imported from

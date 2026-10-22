@@ -51,6 +51,16 @@ export interface AudioSource {
     name: string;
 }
 
+/** Shared first-run response; modules consume the resources they own. */
+export interface SetupInfo {
+    required: boolean;
+    hostname: string;
+    color: string;
+    language: string;
+    pipelines: Pipeline[];
+    audioSources: AudioSource[];
+}
+
 /** Complete encoder start / restart configuration (drafts kept in state). */
 export interface EncoderConfig {
     pipeline: string;
@@ -355,14 +365,8 @@ export interface Settings {
     color: string;
     pipelineRepositories: string[];
 }
-/** A dashboard widget type, backed by (or showing) one of a device's modules. */
-export type WidgetType =
-    | "obs"
-    | "relay"
-    | "encoder"
-    | "combined"
-    | "stats"
-    | "chat";
+/** Opaque dashboard widget key declared by a frontend module. */
+export type WidgetType = string;
 
 /**
  * A channel widget's config parameter, declared by its module in editor order.

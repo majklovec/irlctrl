@@ -1,7 +1,7 @@
 /* Device page — a Mithril view over the device store (device/store.ts): header, one card per
  * role-specific function, and the event log. The WebSocket client mutates state and redraws. */
 import m from "mithril";
-import { moduleCard } from "../../src/registry.frontend";
+import { moduleCards } from "../../src/registry.frontend";
 import { gearIcon, roleTag } from "./components/icons";
 import { Badge, Page, TitleWithBack } from "./components/ui";
 import { LogCard } from "./device/log";
@@ -64,19 +64,7 @@ function headerRight(): m.Children[] {
 const App: m.Component = {
     view: () => {
         const status = st.status;
-        const role = status?.role;
-        const hasEncoder = !!status && role !== "relay";
-        const hasRelay = !!status && role !== "encoder";
-        // A dedicated OBS box (role "obs") is a preview/scene deck only — the
-        // SRT/streaming cards would be inactive there.
-        const obsOnly = !!status && role === "obs";
-        const obsOn = status?.modules["obs-controller"]?.enabled === true;
-        const children = [
-            !obsOnly && hasEncoder && moduleCard("encoder", status),
-            !obsOnly && hasRelay && moduleCard("srtla", status),
-            // The OBS card carries the low-bitrate switcher inside it (one card).
-            obsOn && moduleCard("obs-controller", status),
-        ];
+        const children = status ? moduleCards(status) : [];
         return (
             <Page
                 title={
@@ -103,7 +91,7 @@ const App: m.Component = {
 
 // Refresh relative times ("12s ago") and stats staleness without waiting for a push
 setInterval(() => {
-    if (st.status || st.stats) m.redraw();
+    if (st.status || st.events.size) m.redraw();
 }, 5_000);
 
 void mountPage(() => t("dev.title"), App);

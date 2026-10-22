@@ -4,10 +4,7 @@
  * `obs.event` pushes (InputVolumeMeters feeds the VU meter, scene/stream/record
  * events keep the buttons honest).
  *
- * Rendered on two surfaces: the device page (module registry below — one instance
- * on the page, state mirrored onto st.obs) and the dashboard's "obs" widget
- * (one instance per widget, fed by that device's viewer websocket via
- * `createObsPanel` below).
+ * Rendered on the device page and in one stateful dashboard instance per widget.
  */
 import "./styles.css";
 import m from "mithril";
@@ -31,12 +28,14 @@ import {
 import {
     card,
     type DeviceCard,
-    obsRequest,
-    st,
 } from "../../public/ts/device/store";
 import { t } from "../../public/ts/i18n";
 import type { MithrilJSXComponent } from "../../public/ts/jsx";
-import { since } from "../../public/ts/util";
+import type {
+    DeviceDashboardContext,
+    DeviceDashboardWidget,
+} from "../../public/ts/module-contracts";
+import { since, uuid } from "../../public/ts/util";
 import type { ObsModuleView, Status, SwitcherStatus } from "../../public/types";
 import type { BridgedModule } from "./types";
 
@@ -66,6 +65,17 @@ export interface ObsRequestResult<T> {
     requestStatus?: { result: boolean; code?: number; comment?: string };
     responseData?: T;
 }
+
+function obsRequest<T = Record<string, unknown>>(
+    requestType: string,
+    requestData: Record<string, unknown> = {},
+): Promise<ObsRequestResult<T> | undefined> {
+    return card.act(null, "obs.request", {
+        requestType,
+        requestId: uuid(),
+        requestData,
+    });
+}
 /** One push of a forwarded OBS event (or the synthetic disconnect drop). */
 export interface ObsEvent {
     eventType?: string;
@@ -80,7 +90,7 @@ export interface ObsPanelDeps {
     ) => Promise<ObsRequestResult<T> | undefined>;
     /** Subscribe to `obs.event` pushes; returns an unsubscribe. */
     onEvent: (handler: (ev: ObsEvent) => void) => () => void;
-    /** Mirror shared state to the surface's own store (device st.obs, dashboard live). */
+    /** Mirror state to the module-owned view model. */
     mirror?: (s: ObsPanelState) => void;
     /** The surface already knows OBS is up (dashboard warm start) — skip the first ping. */
     startConnected?: () => boolean;
@@ -309,7 +319,7 @@ export function createObsPanel({
         await syncAllMute();
         ui.loading = false;
         ui.loaded = true;
-        // Mirror the seeded state to the surface store (st.obs / dashboard live).
+        // Mirror the seeded state to the surface's view model.
         pushState();
         m.redraw();
     }
@@ -1228,22 +1238,110 @@ const StateBadge = {
 // ----------------------------------------------------------------------
 // Device page binding — the module registry renders this one instance
 // ----------------------------------------------------------------------
+interface DashboardPanel {
+    panel: ObsPanel;
+    rpc: DeviceDashboardContext["rpc"];
+    switcher: SwitcherStatus | null;
+}
+
+const dashboardPanels = new Map<string, DashboardPanel>();
+
+function dashboardPanel(context: DeviceDashboardContext): DashboardPanel {
+    const { widget, rpc, status } = context;
+    const existing = dashboardPanels.get(widget.id);
+    if (existing && existing.rpc !== rpc) {
+        existing.panel.destroy();
+        dashboardPanels.delete(widget.id);
+    }
+    const current = dashboardPanels.get(widget.id);
+    if (current) {
+        current.switcher = status?.lowBitrateSwitcher ?? current.switcher;
+        return current;
+    }
+
+    let unsubscribeSwitcher = () => {};
+    let panel: ObsPanel;
+    panel = createObsPanel({
+        send: <T = Record<string, unknown>,>(
+            requestType: string,
+            requestData?: Record<string, unknown>,
+        ) =>
+            rpc.call<ObsRequestResult<T> | undefined>("obs.request", {
+                requestType,
+                requestId: crypto.randomUUID(),
+                requestData: requestData ?? {},
+            }),
+        onEvent: (handler) =>
+            rpc.on("obs.event", (data) => handler(data as ObsEvent)),
+        mirror: () => m.redraw(),
+        onDestroy: () => {
+            unsubscribeSwitcher();
+            if (dashboardPanels.get(widget.id)?.panel === panel)
+                dashboardPanels.delete(widget.id);
+        },
+    });
+    const entry: DashboardPanel = {
+        panel,
+        rpc,
+        switcher: status?.lowBitrateSwitcher ?? null,
+    };
+    unsubscribeSwitcher = rpc.on("lowBitrateSwitcher.state", (data) => {
+        entry.switcher = (data as SwitcherStatus | null) ?? null;
+        m.redraw();
+    });
+    dashboardPanels.set(widget.id, entry);
+    return entry;
+}
+
+const obsDashboardWidgets: DeviceDashboardWidget[] = [
+    {
+        type: "obs",
+        available: (device) =>
+            (device.role === "obs" ||
+                device.role === "custom" ||
+                device.role === undefined) &&
+            device.modules?.["obs-controller"]?.enabled === true,
+        defaultSize: { w: 6, h: 13 },
+        minSize: { w: 4, h: 4 },
+        body(context) {
+            if (!context.device.online)
+                return <p class={"muted"}>{t("dev.badge.offline")}</p>;
+            if (!context.status)
+                return <p class={"muted"}>{t("dash.widget_waiting")}</p>;
+            const { panel, switcher } = dashboardPanel(context);
+            return panel.component({
+                host: context.card,
+                status: context.status,
+                live: switcher,
+            });
+        },
+        badge(context) {
+            if (!context.device.online || !context.rpc.open)
+                return <Badge text={t("dev.badge.offline")} kind="off" />;
+            if (!context.status)
+                return <Badge text={t("dash.widget_waiting")} kind="warn" />;
+            return dashboardPanel(context).panel.head()[0];
+        },
+        destroy(widgetId) {
+            dashboardPanels.get(widgetId)?.panel.destroy();
+        },
+    },
+];
+
 const obsControllerModule: BridgedModule = (() => {
     const panel = createObsPanel({
         send: obsRequest,
         onEvent: () => () => {}, // the registry routes obs.event through handleEvent
-        mirror: (s) => {
-            st.obs.connected = s.connected;
-            st.obs.streaming = s.streaming;
-            st.obs.recording = s.recording;
-            st.obs.scene = s.scene;
-        },
     });
 
     return {
         id: "obs-controller",
         kind: "device-card",
         title: "OBS",
+        order: 30,
+        available: (status) =>
+            status.modules["obs-controller"]?.enabled === true,
+        dashboardWidgets: obsDashboardWidgets,
         defaultSize: { w: 6, h: 13 },
         minSize: { w: 4, h: 4 },
         component: (status?: Status) => (
@@ -1256,7 +1354,8 @@ const obsControllerModule: BridgedModule = (() => {
                 )}
             </Card>
         ),
-        handleEvent: (event, data) => {
+        handleEvent: (event, data, host) => {
+            if (host && host !== card) return;
             panel.handleEvent(event, data);
         },
     };
