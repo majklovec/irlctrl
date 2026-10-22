@@ -1,4 +1,3 @@
-import type { ServerWebSocket } from "bun";
 import type { Role } from "../validate";
 
 export const LOCAL_USER = "local";
@@ -15,7 +14,13 @@ export type WsData =
     | { kind: "viewer"; id: string; user: string }
     | { kind: "dashboards"; user: string };
 
-export type Socket = ServerWebSocket<WsData>;
+export interface Socket {
+    data: WsData;
+    readonly readyState: number;
+    send(message: string): number;
+    close(code?: number, reason?: string): void;
+    subscribe(topic: string): void;
+}
 export type Publish = (topic: string, message: string) => void;
 
 export const viewersTopic = (id: string) => `viewers:${id}`;

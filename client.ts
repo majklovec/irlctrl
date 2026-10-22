@@ -136,7 +136,7 @@ async function main(): Promise<void> {
     }
 
     // 4. Start the local API and, if configured, the remote control link
-    startApiServer();
+    await startApiServer();
     if (REMOTE_URL) startRemote();
 
     // 5. Resume the last stream if autostart is enabled (retries until it succeeds)

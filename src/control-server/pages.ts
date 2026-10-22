@@ -9,7 +9,6 @@ export const PAGES = [
     "dashboards",
     "dashboardview",
     "dashboardadd",
-    "pipelineedit",
 ] as const;
 
 export type PageName = (typeof PAGES)[number];

@@ -5,7 +5,7 @@ import type {
     SrtlaStatsEvent,
     Status,
 } from "../../public/types";
-import { text, upgradeRequired } from "../http";
+import { text } from "../http";
 import { isLanguage, translate, type Language } from "../i18n";
 import {
     LOG_MAX,
@@ -230,7 +230,7 @@ export function createDevices({
         return changed;
     }
 
-    function onDeviceMessage(d: Device, raw: string | Buffer): void {
+    function onDeviceMessage(d: Device, raw: unknown): void {
         d.lastSeen = Date.now();
         const text = textOf(raw);
         const msg = parseJsonObject(text);
@@ -366,7 +366,7 @@ export function createDevices({
         ws: Socket,
         deviceId: string,
         _user: string,
-        raw: string | Buffer,
+        raw: unknown,
     ): void {
         const msg = parseJsonObject(textOf(raw));
         if (!msg) {
@@ -484,18 +484,17 @@ export function createDevices({
             publishDeviceListNow();
     }
 
-    /** Device connection (`/device`): authenticate by uuid + token, then upgrade. */
-    function deviceUpgrade(
+    /** Device connection (`/device`): authenticate and describe the socket context. */
+    function deviceConnection(
         req: Request,
         url: URL,
-        srv: Bun.Server<WsData>,
-    ): Response | undefined {
+        address: string,
+    ): WsData | Response {
         const id =
             req.headers.get("x-device-id") ?? url.searchParams.get("id") ?? "";
         const token =
             req.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1] ??
             "";
-        const address = srv.requestIP(req)?.address ?? "";
         if (!ID_RE.test(id)) return text("Missing or invalid x-device-id", 400);
         // The connect token assigns the device to the presenting user
         const user = userForToken(token);
@@ -513,19 +512,13 @@ export function createDevices({
             return text("Forbidden", 403);
         }
         const role = req.headers.get("x-device-role");
-        if (
-            srv.upgrade(req, {
-                data: {
-                    kind: "device",
-                    id,
-                    address,
-                    owner: user,
-                    role: isRole(role) ? role : undefined,
-                },
-            })
-        )
-            return undefined;
-        return upgradeRequired();
+        return {
+            kind: "device",
+            id,
+            address,
+            owner: user,
+            role: isRole(role) ? role : undefined,
+        };
     }
 
     function open(ws: Socket): void {
@@ -560,7 +553,7 @@ export function createDevices({
         if (d.statsMsg) ws.send(d.statsMsg);
     }
 
-    function message(ws: Socket, raw: string | Buffer): void {
+    function message(ws: Socket, raw: unknown): void {
         const { data } = ws;
         if (data.kind === "dashboards") return;
         if (data.kind === "viewer")
@@ -626,7 +619,7 @@ export function createDevices({
             return !!d && (d.owner ?? LOCAL_USER) === user;
         },
         summaries,
-        deviceUpgrade,
+        deviceConnection,
         open,
         message,
         close,

@@ -192,6 +192,37 @@ describe("control server HTTP contracts", () => {
                 ok: true,
                 user: username,
             });
+            const deviceList = await fetch(`${baseUrl}/api/devices`, {
+                headers: { cookie },
+            });
+            expect(await deviceList.json()).toEqual([]);
+
+            const dashboardSocket = await connectSocket(
+                `${baseUrl.replace(/^http/, "ws")}/dashboards/ws`,
+                { cookie },
+            );
+            try {
+                const widgets = await nextFrame(
+                    dashboardSocket,
+                    (frame) => frame.event === "widget.snapshot",
+                );
+                const dashboardSnapshot = await nextFrame(
+                    dashboardSocket,
+                    (frame) => frame.event === "dashboards.snapshot",
+                );
+                const devicesSnapshot = await nextFrame(
+                    dashboardSocket,
+                    (frame) => frame.event === "devices.snapshot",
+                );
+                expect(widgets.type).toBe("event");
+                expect(dashboardSnapshot.type).toBe("event");
+                expect(devicesSnapshot).toMatchObject({
+                    type: "event",
+                    data: [],
+                });
+            } finally {
+                dashboardSocket.close();
+            }
 
             const tokenResponse = await fetch(`${baseUrl}/api/profile/tokens`, {
                 method: "POST",
@@ -210,6 +241,15 @@ describe("control server HTTP contracts", () => {
                 { cookie },
             );
             try {
+                const pipelineEditor = await fetch(
+                    `${baseUrl}/d/${deviceId}/pipelines/new/`,
+                    { headers: { cookie } },
+                );
+                expect(pipelineEditor.status).toBe(200);
+                expect(pipelineEditor.headers.get("content-type")).toContain(
+                    "text/html",
+                );
+
                 const forwardedFrame = nextFrame(
                     device,
                     (frame) => frame.method === "probe",

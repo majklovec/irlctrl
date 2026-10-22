@@ -328,6 +328,22 @@ describe("module registries", () => {
         }
         expect(offenders).toEqual([]);
     });
+
+    test("the encoder owns its dedicated pipeline editor page", () => {
+        const modulePage = join(
+            modulesDir,
+            "encoder",
+            "pages",
+            "pipelineedit.html",
+        );
+        expect(existsSync(modulePage)).toBe(true);
+        expect(readFileSync(modulePage, "utf8")).toContain(
+            "../pipeline-editor.tsx",
+        );
+        expect(
+            existsSync(join(import.meta.dir, "..", "public", "pipelineedit.html")),
+        ).toBe(false);
+    });
 });
 
 // modems feeds routing's detectInterfaces, so it must be enabled wherever

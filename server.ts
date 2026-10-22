@@ -13,7 +13,7 @@ const HOST = arg("--host", "0.0.0.0");
 const NO_AUTH = flag("--no-auth");
 const DB_FILE = arg("--db", process.env.SRTLA_DB ?? "users.db");
 
-const server = await createControlServer({
+const app = await createControlServer({
     hostname: HOST,
     port: PORT,
     noAuth: NO_AUTH,
@@ -21,9 +21,11 @@ const server = await createControlServer({
     publicDirectory: new URL("./public/", import.meta.url),
 });
 
-console.log(`SRTLA control server on http://${HOST}:${server.port}/`);
+const port = app.server?.port;
+if (port === undefined) throw new Error("Elysia failed to start the control server");
+console.log(`SRTLA control server on http://${HOST}:${port}/`);
 console.log(
-    `Relays connect with: --remote ws://<this-host>:${server.port}/device`,
+    `Relays connect with: --remote ws://<this-host>:${port}/device`,
 );
 if (NO_AUTH)
     console.warn(

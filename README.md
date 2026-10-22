@@ -293,7 +293,7 @@ The control-server build hook bundles the browser pages and embeds their generat
 - [`auth.ts`](./src/control-server/auth.ts) owns SQLite initialization, passwords, sessions, profiles, device tokens and invitations.
 - [`devices.ts`](./src/control-server/devices.ts) owns the device registry, request forwarding, cached telemetry/logs and device-list broadcasts.
 - [`dashboards.ts`](./src/control-server/dashboards.ts) owns dashboard validation, persistence, API responses and widget-hub synchronization.
-- [`frontend.ts`](./src/control-server/frontend.ts) bundles the UI at startup in source mode; compiled server builds serve the matching pages and assets embedded by [`gen-control-server-assets.ts`](./scripts/gen-control-server-assets.ts).
+- [`frontend.ts`](./src/frontend.ts) bundles the UI at startup in source mode; compiled builds serve the matching pages and assets embedded by [`gen-control-server-assets.ts`](./scripts/gen-control-server-assets.ts).
 - [`server.ts`](./src/control-server/server.ts) composes the domains, HTTP routes, WebSocket handlers and maintenance timers.
 - [`contracts.ts`](./src/control-server/contracts.ts) holds shared socket data, topics and event framing.
 

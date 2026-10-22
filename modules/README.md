@@ -32,6 +32,8 @@ Each module ships exactly:
     fragment, capability types, hub/widget types. Core-free.
 -   `styles.css` — scoped under `.mod-<id>` (device card) or `.dash-card`
     (dashboard widget).
+-   `pages/*.html` — optional module-owned page entry points, discovered and
+    bundled with the shared frontend assets.
 -   any number of plain helpers for its own use (e.g. obs-controller's
     `switcher-engine.ts`, stats' `graph-linechart.tsx`)
 
@@ -154,14 +156,13 @@ capabilities, not direct imports from one another. The structural contribution
 contract is defined in `public/ts/module-contracts.ts`; modules may import it
 by type only, but do not import the core registry.
 
-## Elysia server target
+## Elysia server composition
 
 Both server entry points use Elysia app factories. The centralized control
-server composes plugins by route domain: public pages/assets, authentication
-and profile, device connections/viewers, and dashboards/widgets. The
-device-local API composes page/assets and WebSocket RPC plugins. Each plugin
-owns its routes and socket lifecycle and receives domain services through its
-factory options.
+server composes plugins by route domain: public pages/assets, accounts and
+profile, devices and viewers, images, and dashboards/widgets. The device-local
+API composes page/assets and WebSocket RPC plugins. Each plugin owns its routes
+and socket lifecycle and receives domain services through its factory options.
 
 The RPC method handlers remain transport-agnostic and shared by the local
 device socket and outbound remote connection. Elysia changes server
