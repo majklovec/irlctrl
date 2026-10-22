@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { createDeviceApiApp } from "../src/api";
+import { createDeviceApiApp } from "../backend/client/api";
 
 const BunWebSocket = WebSocket as unknown as new (
     url: string,

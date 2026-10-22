@@ -1,18 +1,21 @@
 // Build and embed the control-server browser UI for the compiled binary.
 import { Buffer } from "node:buffer";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { frontendPageEntries } from "../src/frontend";
+import { frontendPageEntries } from "../shared/frontend";
 
 const outputFile = fileURLToPath(
     new URL(
-        "../src/control-server/.generated.frontend-assets.ts",
+        "../generated/frontend-assets.ts",
         import.meta.url,
     ),
 );
+await mkdir(new URL("../generated/", import.meta.url), { recursive: true });
 
 await Bun.$`bun scripts/gen-modules.ts`.quiet();
-const pagesToBuild = frontendPageEntries(new URL("../public/", import.meta.url));
+const pagesToBuild = frontendPageEntries(
+    new URL("../frontend/", import.meta.url),
+);
 
 const result = await Bun.build({
     entrypoints: pagesToBuild.map((entry) => entry.path),

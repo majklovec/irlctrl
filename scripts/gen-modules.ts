@@ -5,14 +5,14 @@
 // Each file lists paths only — it never imports a module — so a broken module
 // cannot break the generator:
 //
-//   modules/.generated.frontend.ts — one import per modules/<id>/frontend.tsx;
+//   generated/modules.frontend.ts — one import per modules/<id>/frontend.tsx;
 //   the browser bundle statically resolves every import (no runtime Glob).
-//   modules/.generated.settings.ts — one import per modules/<id>/settings.tsx;
-//   the settings framework (public/ts/modules.tsx) registers each module's
+//   generated/modules.settings.ts — one import per modules/<id>/settings.tsx;
+//   the settings framework (frontend/ts/modules.tsx) registers each module's
 //   settings card from this manifest.
-//   modules/.generated.backend.ts  — one import per modules/<id>/backend.ts;
+//   generated/modules.backend.ts  — one import per modules/<id>/backend.ts;
 //   used by the compiled binaries (bun build --compile), where the runtime
-//   directory scan in src/registry.ts cannot reach disk (import.meta.url
+//   directory scan in shared/registry.ts cannot reach disk (import.meta.url
 //   lives in Bun's virtual /$bunfs mount).
 //
 // Runs in Bun (not the browser) and is re-invoked by server.ts before it
@@ -20,12 +20,16 @@
 // workflow before the compiled builds. Regenerated on demand; only rewrites a
 // file when the output actually changes so watch loops don't churn it.
 import { fileURLToPath } from "node:url";
-import { writeFile, readFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { sep } from "node:path";
 
 // scripts/ lives next to modules/ — the app dir is the scan base so the
 // relative patterns below resolve the same way regardless of the CWD.
 const baseDir = fileURLToPath(new URL("..", import.meta.url));
+const generatedDir = fileURLToPath(
+    new URL("../generated/", import.meta.url),
+);
+await mkdir(generatedDir, { recursive: true });
 
 interface ManifestSpec {
     outFile: string; // fileURLToPath'ed output path
@@ -49,11 +53,11 @@ async function buildManifest(spec: ManifestSpec): Promise<void> {
     ];
 
     matches.forEach((path, i) => {
-        // path = <modulesDir>/<id>/frontend.tsx  →  import "./<id>/frontend"
+        // Generated files live outside modules/, so imports step back into it.
         const parts = path.split(sep);
         const moduleId = parts[parts.length - 2];
         lines.push(
-            `import ${spec.variable}${i} from "./${moduleId}/${spec.importSuffix}";`,
+            `import ${spec.variable}${i} from "../modules/${moduleId}/${spec.importSuffix}";`,
         );
     });
 
@@ -81,7 +85,7 @@ async function buildManifest(spec: ManifestSpec): Promise<void> {
 await Promise.all([
     buildManifest({
         outFile: fileURLToPath(
-            new URL("../modules/.generated.frontend.ts", import.meta.url),
+            new URL("../generated/modules.frontend.ts", import.meta.url),
         ),
         pattern: "modules/*/frontend.tsx",
         variable: "m",
@@ -91,7 +95,7 @@ await Promise.all([
     }),
     buildManifest({
         outFile: fileURLToPath(
-            new URL("../modules/.generated.settings.ts", import.meta.url),
+            new URL("../generated/modules.settings.ts", import.meta.url),
         ),
         pattern: "modules/*/settings.tsx",
         variable: "s",
@@ -101,7 +105,7 @@ await Promise.all([
     }),
     buildManifest({
         outFile: fileURLToPath(
-            new URL("../modules/.generated.backend.ts", import.meta.url),
+            new URL("../generated/modules.backend.ts", import.meta.url),
         ),
         pattern: "modules/*/backend.ts",
         variable: "b",

@@ -1,7 +1,7 @@
 /*
  * Local types for the obs-controller module (never imported by the core or
  * other modules): structural copies of the core bag and the frontend
- * registration. Wire types live in public/types.ts (the documented wire
+ * registration. Wire types live in shared/types.ts (the documented wire
  * vocabulary).
  */
 
@@ -68,4 +68,4 @@ export interface BridgedModule extends FrontendModuleContributions {
     minSize: { w: number; h: number };
     maxSize?: { w: number; h: number };
 }
-import type { FrontendModuleContributions } from "../../public/ts/module-contracts";
+import type { FrontendModuleContributions } from "../../frontend/ts/module-contracts";

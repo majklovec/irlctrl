@@ -24,19 +24,19 @@ import {
     NumberField,
     Options,
     Select,
-} from "../../public/ts/components/ui";
+} from "../../frontend/ts/components/ui";
 import {
     card,
     type DeviceCard,
-} from "../../public/ts/device/store";
-import { t } from "../../public/ts/i18n";
-import type { MithrilJSXComponent } from "../../public/ts/jsx";
+} from "../../frontend/ts/device/store";
+import { t } from "../../frontend/ts/i18n";
+import type { MithrilJSXComponent } from "../../frontend/ts/jsx";
 import type {
     DeviceDashboardContext,
     DeviceDashboardWidget,
-} from "../../public/ts/module-contracts";
-import { since, uuid } from "../../public/ts/util";
-import type { ObsModuleView, Status, SwitcherStatus } from "../../public/types";
+} from "../../frontend/ts/module-contracts";
+import { since, uuid } from "../../frontend/ts/util";
+import type { ObsModuleView, Status, SwitcherStatus } from "../../shared/types";
 import type { BridgedModule } from "./types";
 
 const SWITCHER_NUMBER_FIELDS = [

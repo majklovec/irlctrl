@@ -14,7 +14,7 @@ Bun-based controller for [BELABOX](https://belabox.net/)-style bonded streaming.
 > Development in progress — do not run in a production stream.
 
 <p align="center">
-  <img src="public/img/relay.svg" alt="Relay device — encoder streams over SRT into a relay, which bonds the stream out over all uplinks" width="900" />
+  <img src="frontend/img/relay.svg" alt="Relay device — encoder streams over SRT into a relay, which bonds the stream out over all uplinks" width="900" />
 </p>
 
 ## Roles
@@ -45,16 +45,16 @@ combined ─────────SRTLA (bonded)─────────▶
 
 ```sh
 # Relay: local web UI + API on :8085, watches interfaces, reloads srtla_send
-sudo bun client.ts --host 0.0.0.0
+sudo bun backend/client/client.ts --host 0.0.0.0
 
 # Encoder: pick a pipeline and the relay's SRT port in the UI
-bun client.ts --role encoder --pipelines /usr/share/belacoder/pipelines
+bun backend/client/client.ts --role encoder --pipelines /usr/share/belacoder/pipelines
 
 # Combined
-sudo bun client.ts --role combined --pipelines /usr/share/belacoder/pipelines
+sudo bun backend/client/client.ts --role combined --pipelines /usr/share/belacoder/pipelines
 
 # Relay: also start srtla_send immediately on startup
-sudo bun client.ts --start-srtla 6000 rec.example.com 5000
+sudo bun backend/client/client.ts --start-srtla 6000 rec.example.com 5000
 ```
 
 Open `http://<device>:8085/`. The UI shows only what applies to the role.
@@ -65,7 +65,7 @@ For a local checkout with the bundled binaries, override their paths explicitly:
 sudo CONTROL_SERVER_TOKEN=token \
   ENCODER_BIN=./belacoder \
   SRTLA_SEND_BIN=./srtla_send \
-  bun client.ts --port 8085 \
+  bun backend/client/client.ts --port 8085 \
   --remote ws://127.0.0.1:8090/device \
   --role combined --pipelines ./pipeline
 ```
@@ -118,7 +118,7 @@ Tick **Autostart** in the UI (or call `autostart.set`) to resume the last stream
 
 ## Control server
 
-`server.ts` lists all devices and serves the same web UI for each one at `/d/<id>/`, relaying commands to the device over its outbound connection — so devices behind NAT or on mobile networks can be managed. It also hosts per-user **dashboards**: gridstack grids composed of widgets from any device owned by that user, with dedicated add / edit / view pages. Widgets are of two kinds — **device widgets** (a live status card per device: `relay`, `encoder`, `combined`, or `obs`, depending on the device's role and enabled modules) and **channel widgets** (device-independent modules, one hub per kind serves all widgets of that kind). Dashboards are persisted to the SQLite database (`dashboards` table of `--db`), and a shared live feed (`/dashboards/ws`) streams widget data to every open view.
+`backend/server/server.ts` lists all devices and serves the same web UI for each one at `/d/<id>/`, relaying commands to the device over its outbound connection — so devices behind NAT or on mobile networks can be managed. It also hosts per-user **dashboards**: gridstack grids composed of widgets from any device owned by that user, with dedicated add / edit / view pages. Widgets are of two kinds — **device widgets** (a live status card per device: `relay`, `encoder`, `combined`, or `obs`, depending on the device's role and enabled modules) and **channel widgets** (device-independent modules, one hub per kind serves all widgets of that kind). Dashboards are persisted to the SQLite database (`dashboards` table of `--db`), and a shared live feed (`/dashboards/ws`) streams widget data to every open view.
 
 ### Authentication
 
@@ -133,10 +133,10 @@ The server replaces HTTP Basic auth with per-user profiles stored in a local **S
 
 ```sh
 # control server — the first account is created at /register
-bun server.ts --port 8090
+bun backend/server/server.ts --port 8090
 
 # on each device — that device's owner token
-CONTROL_SERVER_TOKEN=tok-alice-1 bun client.ts --role encoder --remote wss://ctl.example.com/device
+CONTROL_SERVER_TOKEN=tok-alice-1 bun backend/client/client.ts --role encoder --remote wss://ctl.example.com/device
 
 # in a browser
 open http://ctl.example.com/  # redirects to /login; enter the username + password
@@ -182,7 +182,7 @@ The control server is the same with `server` in place of `client` (no `root` nee
 -   `build.sh [config]` — clones the Armbian build framework, links the bundled `userpatches/`, and compiles the image (default config `orangepi5-plus`)
 -   `build-all.sh` — builds both variants: the SD-card image and the **eMMC auto-install** image (`orangepi5-plus-emmc`), which copies itself to eMMC on first boot via a one-shot `belabox-emmc-install.service`
 
-The image ships with the whole streaming chain — GStreamer (incl. `gstreamer1.0-rockchip1`), CERALIVE's SRT, [ceracoder](https://github.com/CERALIVE/ceracoder) (built from source), [srtla_send](https://github.com/irlserver/srtla_send) (prebuilt arm64 .deb), and udev rules for belaUI audio — so `client.ts --role combined` runs out of the box.
+The image ships with the whole streaming chain — GStreamer (incl. `gstreamer1.0-rockchip1`), CERALIVE's SRT, [ceracoder](https://github.com/CERALIVE/ceracoder) (built from source), [srtla_send](https://github.com/irlserver/srtla_send) (prebuilt arm64 .deb), and udev rules for belaUI audio — so `backend/client/client.ts --role combined` runs out of the box.
 
 ### Docker
 
@@ -192,12 +192,12 @@ The image ships with the whole streaming chain — GStreamer (incl. `gstreamer1.
 docker compose up -d --build
 ```
 
--   **server** — `server.ts`, the control server (`Dockerfile`, image `majkl/belabox-duo-control`), UI on `:8090`.
--   **obs-client** — `obs-client.ts`, proxies a host's OBS Studio (`ws://host.docker.internal:4455`) into the server; reuses the control image with a different entrypoint.
--   **relay** — `client.ts --role relay`, bonds SRT out via `srtla_send` (`Dockerfile.device`, image `majkl/belabox-duo-device`).
--   **encoder** — `client.ts --role encoder`, runs `ceracoder`/GStreamer and sends SRT to the relay; same device image, different role + `ENCODER_BIN`.
+-   **server** — `backend/server/server.ts`, the control server (`Dockerfile`, image `majkl/belabox-duo-control`), UI on `:8090`.
+-   **obs-client** — `backend/obs-client/obs-client.ts`, proxies a host's OBS Studio (`ws://host.docker.internal:4455`) into the server; reuses the control image with a different entrypoint.
+-   **relay** — `backend/client/client.ts --role relay`, bonds SRT out via `srtla_send` (`Dockerfile.device`, image `majkl/belabox-duo-device`).
+-   **encoder** — `backend/client/client.ts --role encoder`, runs `ceracoder`/GStreamer and sends SRT to the relay; same device image, different role + `ENCODER_BIN`.
 
-The relay/encoder device image bundles `client.ts` plus the native `srtla_send`, `ceracoder`, `belacoder` binaries, the GStreamer pipeline definitions, and `iproute2`. The **relay** grants the `NET_ADMIN` capability (`cap_add`) because at startup it builds per-uplink policy routing (`ip rule add` + route tables) and watches interfaces with `ip monitor`; without it the relay logs `ip rule add … Operation not permitted` and exits. The encoder does not need the capability. On the default bridge network the relay's routing changes act on the container's own network namespace, not the host; for real bonded uplinks on the host's raw interfaces, run the relay with `network_mode: host`.
+The relay/encoder device image bundles `backend/client/client.ts` plus the native `srtla_send`, `ceracoder`, `belacoder` binaries, the GStreamer pipeline definitions, and `iproute2`. The **relay** grants the `NET_ADMIN` capability (`cap_add`) because at startup it builds per-uplink policy routing (`ip rule add` + route tables) and watches interfaces with `ip monitor`; without it the relay logs `ip rule add … Operation not permitted` and exits. The encoder does not need the capability. On the default bridge network the relay's routing changes act on the container's own network namespace, not the host; for real bonded uplinks on the host's raw interfaces, run the relay with `network_mode: host`.
 
 ## API
 
@@ -207,13 +207,19 @@ The local `/ws` endpoint and the control server speak the same JSON protocol:
 -   response — `{ "type": "response", "id", "ok", … }`
 -   push — `{ "type": "event", "event": "status" | "log" | "srtla.stats", "data": … }`
 
-The method list lives at the top of [`src/methods.ts`](src/methods.ts). Methods that do not apply to the device's role are rejected with code 409.
+The method list lives at the top of [`backend/client/methods.ts`](backend/client/methods.ts). Methods that do not apply to the device's role are rejected with code 409.
 
 The cog in the device header opens a settings page. It uses `settings.get` / `settings.update` for the persistent device UUID, hostname, role, control-server URL, remote token, header color, and UI language. The UUID is the device's fixed identity on the control server — auto-assigned once, saved in the config file, and never changed (it survives hostname changes). Saving settings re-dials the control server, so the device re-registers with its new URL, token, hostname, and role without a service restart. Stream settings (pipeline, bitrate, audio, targets, scheduler) are saved automatically whenever they change.
 
 ## Modules
 
-Every capability is a **self-contained module** under [`modules/`](modules/README.md) — a backend registration, a frontend card, local types, and styles. The core (`src/` + `public/`) never imports a module by id: it discovers, routes, and renders everything through the registries and the capability bus. The boundary is enforced by [`test/registries.test.ts`](test/registries.test.ts).
+Every capability is a **self-contained module** under [`modules/`](modules/README.md) — a backend registration, a frontend card, local types, and styles. The core (`backend/` + `frontend/`) never imports a module by id: it discovers, routes, and renders everything through the registries and the capability bus. The boundary is enforced by [`test/registries.test.ts`](test/registries.test.ts).
+
+The browser application lives in `frontend/`; service entrypoints are
+separated under `backend/client/`, `backend/obs-client/`, and `backend/server/`.
+Module directories stay together under `modules/<id>/` so each module's backend
+and frontend implementation remain co-located. Cross-layer wire types live in
+`shared/`.
 
 **Device modules** — run on the device, each shown as a card in the web UI:
 
@@ -238,15 +244,15 @@ Chat widgets keep rolling message history so reconnects don't re-send, and a `se
 Each `modules/<id>/` ships exactly four files:
 
 -   `backend.ts` — backend registration (runs in Bun on the host; no DOM)
--   `frontend.tsx` — frontend registration (mithril components; no `../../src` imports)
+-   `frontend.tsx` — frontend registration (mithril components; no backend imports)
 -   `types.ts` — this module's local types only (may import core types, never another module)
 -   `styles.css` — scoped under `.mod-<id>` (device card) or `.dash-card` (widget)
 
 The **registration contract** is structural: the backend declares its `id`, a `configSchema` the UI renders its config form from, `secretFields` to mask, the ordered `methods` it answers and `events` it emits, `start`/`stop`/`dispatch`, an optional `status()` fragment, an optional `services.capabilities` map, an optional widget `hub`, and `dependencies`. The frontend mirrors the identity and adds the widget `component`, the device `cardBody(host, status)`, and widget hub/sink hooks. Field-by-field tables are in [`modules/README.md`](modules/README.md).
 
-**Discovery** — the backend is a runtime `readdirSync` scan of `modules/*/` in [`src/registry.ts`](src/registry.ts): add a directory and it appears. The browser bundle cannot glob at runtime, so `scripts/gen-modules.ts` writes the gitignored `modules/.generated.frontend.ts` manifest from the same scan (wired into `predev`).
+**Discovery** — the backend is a runtime `readdirSync` scan of `modules/*/` in [`shared/registry.ts`](shared/registry.ts): add a directory and it appears. The browser bundle cannot glob at runtime, so `scripts/gen-modules.ts` writes the gitignored `generated/modules.frontend.ts` manifest from the same scan (wired into `predev`).
 
-**Core ↔ module** — RPC methods are routed through the registry's method-owner map (built from each module's `methods` array), the UI fetches cards and widgets through accessors in [`src/registry.frontend.ts`](src/registry.frontend.ts), and cross-module services go over the **capability bus**: a module registers a capability under a dotted name (`stream.encoder`, `stream.srtla`) and consumers look it up by name through [`src/capabilities.ts`](src/capabilities.ts) instead of importing it. Each module side-effect-imports its own `styles.css`, so the core never pulls module CSS by id.
+**Core ↔ module** — RPC methods are routed through the registry's method-owner map (built from each module's `methods` array), the UI fetches cards and widgets through accessors in [`frontend/ts/module-registry.ts`](frontend/ts/module-registry.ts), and cross-module services go over the **capability bus**: a module registers a capability under a dotted name (`stream.encoder`, `stream.srtla`) and consumers look it up by name through [`backend/client/capabilities.ts`](backend/client/capabilities.ts) instead of importing it. Each module side-effect-imports its own `styles.css`, so the core never pulls module CSS by id.
 
 **Ordering** — `resolveOrder` topologically sorts modules by their `dependencies` (cycle-safe, id-sorted when no edges); `startModules`/`stopModules`/`buildStatus` all iterate that order, never a hand-maintained list.
 
@@ -254,15 +260,15 @@ The **registration contract** is structural: the backend declares its `id`, a `c
 
 ### OBS client
 
-[`obs-client.ts`](obs-client.ts) is a **standalone device** for machines that run OBS Studio separately from the relay. It registers on the control server exactly like `client.ts` (stable UUID, `role: "obs"` in the hello) and proxies between the browser dashboards and OBS:
+[`backend/obs-client/obs-client.ts`](backend/obs-client/obs-client.ts) is a **standalone device** for machines that run OBS Studio separately from the relay. It registers on the control server exactly like `backend/client/client.ts` (stable UUID, `role: "obs"` in the hello) and proxies between the browser dashboards and OBS:
 
 ```sh
-bun obs-client.ts --obs ws://127.0.0.1:4455 \
+bun backend/obs-client/obs-client.ts --obs ws://127.0.0.1:4455 \
     --obs-password secret \
     --remote ws://10.0.0.5:8090/device --remote-token secret
 ```
 
-It speaks the full obs-websocket v5 handshake (Hello → Identify → Identified), forwards `Request`/`RequestBatch` verbatim from the server, resolves responses by request id, and republishes OBS events as `obs.event` frames so dashboards pick up scene/stream/record changes. It auto-reconnects with exponential backoff, emits a synthetic `ObsDisconnected` on drop, and replays a state snapshot as real-shaped events on reconnect. The same `ObsClient` library (`src/obs/client.ts`) powers the `obs-controller` module in-process, so a relay with a local OBS needs no second websocket.
+It speaks the full obs-websocket v5 handshake (Hello → Identify → Identified), forwards `Request`/`RequestBatch` verbatim from the server, resolves responses by request id, and republishes OBS events as `obs.event` frames so dashboards pick up scene/stream/record changes. It auto-reconnects with exponential backoff, emits a synthetic `ObsDisconnected` on drop, and replays a state snapshot as real-shaped events on reconnect. The same `ObsClient` library (`shared/obs/client.ts`) powers the `obs-controller` module in-process, so a relay with a local OBS needs no second websocket.
 
 ## Development
 
@@ -281,21 +287,21 @@ bun run build:server     # → dist/server
 bun run build:obs-client # → dist/obs-client
 ```
 
-Modules are discovered by a runtime scan of `modules/`; the manifests in `modules/.generated.*.ts` are produced by `scripts/gen-modules.ts` (wired into `predev`/`pretest`/`prebuild:*`). The UI is localized via the JSON catalogs in `i18n/` (12 languages), served to the browser on demand from `/i18n/<lang>.json`. The language is chosen in the first-run wizard and can be switched at any time from the header select; the device persists the choice in its config file.
+Modules are discovered by a runtime scan of `modules/`; generated manifests in `generated/` are produced by `scripts/gen-modules.ts` (wired into `predev`/`pretest`/`prebuild:*`). The UI is localized via the JSON catalogs in `i18n/` (12 languages), served to the browser on demand from `/i18n/<lang>.json`. The language is chosen in the first-run wizard and can be switched at any time from the header select; the device persists the choice in its config file.
 
-The control-server build hook bundles the browser pages and embeds their generated assets in the standalone server binary; source-mode startup continues to bundle the UI from `public/`.
+The control-server build hook bundles the browser pages and embeds their generated assets in the standalone server binary; source-mode startup continues to bundle the UI from `frontend/`.
 
 ### Control-server code
 
-[`server.ts`](./server.ts) remains the CLI entrypoint. Its implementation lives in
-[`src/control-server/`](./src/control-server/):
+[`backend/server/server.ts`](./backend/server/server.ts) remains the CLI entrypoint. Its implementation lives in
+[`backend/server/`](./backend/server/):
 
-- [`auth.ts`](./src/control-server/auth.ts) owns SQLite initialization, passwords, sessions, profiles, device tokens and invitations.
-- [`devices.ts`](./src/control-server/devices.ts) owns the device registry, request forwarding, cached telemetry/logs and device-list broadcasts.
-- [`dashboards.ts`](./src/control-server/dashboards.ts) owns dashboard validation, persistence, API responses and widget-hub synchronization.
-- [`frontend.ts`](./src/frontend.ts) bundles the UI at startup in source mode; compiled builds serve the matching pages and assets embedded by [`gen-control-server-assets.ts`](./scripts/gen-control-server-assets.ts).
-- [`server.ts`](./src/control-server/server.ts) composes the domains, HTTP routes, WebSocket handlers and maintenance timers.
-- [`contracts.ts`](./src/control-server/contracts.ts) holds shared socket data, topics and event framing.
+- [`auth.ts`](./backend/server/auth.ts) owns SQLite initialization, passwords, sessions, profiles, device tokens and invitations.
+- [`devices.ts`](./backend/server/devices.ts) owns the device registry, request forwarding, cached telemetry/logs and device-list broadcasts.
+- [`dashboards.ts`](./backend/server/dashboards.ts) owns dashboard validation, persistence, API responses and widget-hub synchronization.
+- [`shared/frontend.ts`](./shared/frontend.ts) bundles the UI at startup in source mode; compiled builds serve matching pages and embedded assets generated by [`gen-control-server-assets.ts`](./scripts/gen-control-server-assets.ts).
+- [`control-server.ts`](./backend/server/control-server.ts) composes the domains, HTTP routes, WebSocket handlers and maintenance timers.
+- [`contracts.ts`](./backend/server/contracts.ts) holds shared socket data, topics and event framing.
 
 The domains receive their dependencies explicitly: authentication resolves device
 tokens, the registry supplies device ownership checks to dashboards, and the

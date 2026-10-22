@@ -3,14 +3,14 @@
         "gen:modules": "bun scripts/gen-modules.ts",
         "predev": "bun scripts/gen-modules.ts",
         "pretest": "bun scripts/gen-control-server-assets.ts",
-        "dev": "bun server.ts",
+        "dev": "bun backend/server/server.ts",
         "test": "bun test",
         "prebuild:obs-client": "bun scripts/gen-modules.ts",
-        "build:obs-client": "bun build --compile --minify --sourcemap --format=esm --asset i18n ./obs-client.ts --outfile dist/obs-client",
+        "build:obs-client": "bun build --compile --minify --sourcemap --format=esm --asset i18n ./backend/obs-client/obs-client.ts --outfile dist/obs-client",
         "prebuild:client": "bun scripts/gen-control-server-assets.ts",
-        "build:client": "bun build --compile --minify --sourcemap --format=esm --bytecode --asset i18n ./client.ts --outfile dist/client",
+        "build:client": "bun build --compile --minify --sourcemap --format=esm --bytecode --asset i18n ./backend/client/client.ts --outfile dist/client",
         "prebuild:server": "bun scripts/gen-control-server-assets.ts",
-        "build:server": "bun build --compile --minify --sourcemap --format=esm --bytecode --asset i18n ./server.ts --outfile dist/server"
+        "build:server": "bun build --compile --minify --sourcemap --format=esm --bytecode --asset i18n ./backend/server/server.ts --outfile dist/server"
     },
     "devDependencies": {
         "@types/bun": "^1.4.2",

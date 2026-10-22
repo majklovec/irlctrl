@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import type { SwitcherConfig } from "../public/types";
+import type { SwitcherConfig } from "../shared/types";
 import {
     type DeviceConfig,
     type ModulesState,
     defaultModules,
     fromConfig,
-} from "../src/state";
+} from "../backend/client/state";
 
 /**
  * The switcher rides on the OBS module slice; `fromConfig` fills missing

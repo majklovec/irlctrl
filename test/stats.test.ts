@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import m from "mithril";
-import { visibleWidgetConfigFields } from "../public/types";
+import { visibleWidgetConfigFields } from "../shared/types";
 import {
     parseStatsSpec,
     STATS_EDITOR_FIELDS,

@@ -9,8 +9,8 @@ import type {
     SetupInfo,
     Status,
     SrtlaState,
-} from "../../public/types";
-import { BITRATE_KBPS } from "../../public/types";
+} from "../../shared/types";
+import { BITRATE_KBPS } from "../../shared/types";
 import {
     Actions,
     Badge,
@@ -28,21 +28,21 @@ import {
     numberAttrs,
     Options,
     Select,
-} from "../../public/ts/components/ui";
-import { icon } from "../../public/ts/components/icons";
-import { t } from "../../public/ts/i18n";
-import type { MithrilJSXComponent } from "../../public/ts/jsx";
+} from "../../frontend/ts/components/ui";
+import { icon } from "../../frontend/ts/components/icons";
+import { t } from "../../frontend/ts/i18n";
+import type { MithrilJSXComponent } from "../../frontend/ts/jsx";
 import {
     formatBitrate,
     inRange,
     optionalNumber,
     since,
-} from "../../public/ts/util";
-import { card, type DeviceCard } from "../../public/ts/device/store";
+} from "../../frontend/ts/util";
+import { card, type DeviceCard } from "../../frontend/ts/device/store";
 import type {
     DeviceDashboardWidget,
     ModuleSetupStep,
-} from "../../public/ts/module-contracts";
+} from "../../frontend/ts/module-contracts";
 import type { BridgedModule } from "./types";
 import "./styles.css";
 

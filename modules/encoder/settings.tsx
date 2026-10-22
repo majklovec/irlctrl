@@ -4,7 +4,7 @@
  * Visible for the encoder/combined roles, and for the custom role when the
  * server reports the encoder module as enabled. Default-exports its
  * ModuleDef; the settings framework registers it from the generated
- * manifest (modules/.generated.settings.ts) — no per-module imports.
+ * manifest (generated/modules.settings.ts) — no per-module imports.
  *
  * One card, two sections:
  *  1. Pipeline repositories — add / update / remove GitHub mirrors, with a
@@ -23,11 +23,11 @@ import {
     Field,
     Form,
     Input,
-} from "../../public/ts/components/ui";
-import { actionIcon, chevronIcon } from "../../public/ts/components/icons";
-import { t } from "../../public/ts/i18n";
-import type { ModuleContext, ModuleDef } from "../../public/ts/modules";
-import type { Pipeline } from "../../public/types";
+} from "../../frontend/ts/components/ui";
+import { actionIcon, chevronIcon } from "../../frontend/ts/components/icons";
+import { t } from "../../frontend/ts/i18n";
+import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
+import type { Pipeline } from "../../shared/types";
 import "./styles.css";
 
 const REPO_PATTERN = "[A-Za-z0-9_.\\-]+/[A-Za-z0-9_.\\-]+";

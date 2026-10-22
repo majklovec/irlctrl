@@ -2,9 +2,9 @@
 
 // biome-ignore lint/style/useImportType: used in JSX
 import m from "mithril";
-import { Badge } from "../../public/ts/components/ui";
-import { t } from "../../public/ts/i18n";
-import type { ServerDashboardWidget } from "../../public/types";
+import { Badge } from "../../frontend/ts/components/ui";
+import { t } from "../../frontend/ts/i18n";
+import type { ServerDashboardWidget } from "../../shared/types";
 import {
     parseStatsSpec,
     STATS_EDITOR_FIELDS,

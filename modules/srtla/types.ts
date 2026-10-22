@@ -136,4 +136,4 @@ export interface BridgedModule extends FrontendModuleContributions {
     minSize: { w: number; h: number };
     maxSize?: { w: number; h: number };
 }
-import type { FrontendModuleContributions } from "../../public/ts/module-contracts";
+import type { FrontendModuleContributions } from "../../frontend/ts/module-contracts";

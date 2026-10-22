@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type SwitcherConfig, type SwitcherMetrics } from "../public/types";
+import { type SwitcherConfig, type SwitcherMetrics } from "../shared/types";
 import {
     determineState,
     SwitcherEngine,

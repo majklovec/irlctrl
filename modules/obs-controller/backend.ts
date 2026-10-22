@@ -8,7 +8,7 @@
  * (the low-bitrate switcher drives scene changes through it — no second
  * OBS websocket).
  *
- * Self-contained: wire types live in public/types; the only core edge is the bag.
+ * Self-contained: wire types live in shared/types; the only core edge is the bag.
  */
 import { randomUUID } from "node:crypto";
 import { appendFile, mkdir } from "node:fs/promises";
@@ -22,8 +22,8 @@ import {
     type ObsEvent,
     type ObsRequest,
     type ObsRequestBatch,
-} from "../../src/obs/client";
-import type { SwitcherConfig, SwitcherMetrics } from "../../public/types";
+} from "../../shared/obs/client";
+import type { SwitcherConfig, SwitcherMetrics } from "../../shared/types";
 import { SwitcherEngine, type ObsSnapshot } from "./switcher-engine";
 import { collectSrtSample, type SrtBaseline } from "./srt-metrics";
 import type { MCore, Mctx } from "./types";
@@ -553,7 +553,7 @@ export default {
     services: {
         capabilities: {
             // The core consumes the OBS client through the "stream.obs" bus
-            // slot (src/services.ts) — obsServices must be provided under that
+            // slot (backend/client/services.ts) — obsServices must be provided under that
             // name or the settings page can't save the OBS connection info.
             "stream.obs": obsServices,
         },

@@ -4,10 +4,10 @@
 // frames it cares about; the core only forwards frames through onFrame().
 
 import m from "mithril";
-import { Badge } from "../../public/ts/components/ui";
-import { t } from "../../public/ts/i18n";
-import { decorateText } from "../../public/ts/util";
-import type { ServerDashboardWidget } from "../../public/types";
+import { Badge } from "../../frontend/ts/components/ui";
+import { t } from "../../frontend/ts/i18n";
+import { decorateText } from "../../frontend/ts/util";
+import type { ServerDashboardWidget } from "../../shared/types";
 import {
     CHAT_CONFIG_FIELDS,
     CHAT_PLATFORMS,

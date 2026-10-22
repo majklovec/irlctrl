@@ -10,7 +10,7 @@
 > Vývoj stále probíhá — nepoužívejte pro produkční streamování.
 
 <p align="center">
-  <img src="public/img/relay.svg" alt="Relé zařízení — enkodér odesílá stream přes SRT do relé, které jej distribuuje přes všechna dostupná připojení" width="900" />
+  <img src="frontend/img/relay.svg" alt="Relé zařízení — enkodér odesílá stream přes SRT do relé, které jej distribuuje přes všechna dostupná připojení" width="900" />
 </p>
 
 ## Role
@@ -41,16 +41,16 @@ combined ─────────SRTLA (agregovaný stream)──────
 
 ```sh
 # Relé: lokální webové rozhraní + API na portu 8085, sleduje síťová rozhraní a znovu načítá srtla_send
-sudo bun client.ts --host 0.0.0.0
+sudo bun backend/client/client.ts --host 0.0.0.0
 
 # Enkodér: vyberte pipeline a SRT port relé ve webovém rozhraní
-bun client.ts --role encoder --pipelines /usr/share/belacoder/pipelines
+bun backend/client/client.ts --role encoder --pipelines /usr/share/belacoder/pipelines
 
 # Kombinované zařízení
-sudo bun client.ts --role combined --pipelines /usr/share/belacoder/pipelines
+sudo bun backend/client/client.ts --role combined --pipelines /usr/share/belacoder/pipelines
 
 # Relé: spustí srtla_send ihned při startu
-sudo bun client.ts --start-srtla 6000 rec.example.com 5000
+sudo bun backend/client/client.ts --start-srtla 6000 rec.example.com 5000
 ```
 
 Otevřete `http://<device>:8085/`. Rozhraní zobrazuje pouze funkce relevantní pro zvolenou roli.
@@ -61,7 +61,7 @@ Pokud používáte lokální kopii projektu s přibalenými binárními soubory,
 sudo CONTROL_SERVER_TOKEN=token \
   ENCODER_BIN=./belacoder \
   SRTLA_SEND_BIN=./srtla_send \
-  bun client.ts --port 8085 \
+  bun backend/client/client.ts --port 8085 \
   --remote ws://127.0.0.1:8090/device \
   --role combined --pipelines ./pipeline
 ```
@@ -124,7 +124,7 @@ Pokud ještě není připravena snímací karta, uplinky nebo přijímač, aplik
 
 ## Řídicí server
 
-Soubor `server.ts` zobrazuje seznam všech zařízení a zpřístupňuje stejné webové rozhraní každému zařízení na adrese `/d/<id>/`. Příkazy přeposílá zařízení prostřednictvím jeho odchozího spojení, takže lze spravovat i zařízení za NAT nebo připojená přes mobilní síť.
+Soubor `backend/server/server.ts` zobrazuje seznam všech zařízení a zpřístupňuje stejné webové rozhraní každému zařízení na adrese `/d/<id>/`. Příkazy přeposílá zařízení prostřednictvím jeho odchozího spojení, takže lze spravovat i zařízení za NAT nebo připojená přes mobilní síť.
 
 Server rovněž poskytuje jednotlivým uživatelům vlastní **nástěnky (dashboards)**. Ty využívají mřížky Gridstack složené z widgetů libovolných zařízení vlastněných daným uživatelem a mají samostatné stránky pro přidávání, úpravy a zobrazení.
 
@@ -148,10 +148,10 @@ Server nahrazuje HTTP Basic autentizaci uživatelskými profily uloženými v m�
 
 ```sh
 # Řídicí server — první účet se vytvoří na /register
-bun server.ts --port 8090
+bun backend/server/server.ts --port 8090
 
 # Na každém zařízení — token vlastníka daného zařízení
-CONTROL_SERVER_TOKEN=tok-alice-1 bun client.ts --role encoder --remote wss://ctl.example.com/device
+CONTROL_SERVER_TOKEN=tok-alice-1 bun backend/client/client.ts --role encoder --remote wss://ctl.example.com/device
 
 # V prohlížeči
 open http://ctl.example.com/  # přesměruje na /login; zadejte uživatelské jméno a heslo
@@ -201,7 +201,7 @@ Adresář [`armbian/`](armbian/) obsahuje nástroje pro nativní sestavení při
 
 Obraz obsahuje celý řetězec pro streamování: GStreamer (včetně `gstreamer1.0-rockchip1`), SRT od CERALIVE, [ceracoder](https://github.com/CERALIVE/ceracoder) (sestavený ze zdrojových kódů), [srtla_send](https://github.com/irlserver/srtla_send) (předpřipravený balíček `.deb` pro arm64) a pravidla udev pro zvuk v belaUI.
 
-Díky tomu lze `client.ts --role combined` spustit bez další konfigurace.
+Díky tomu lze `backend/client/client.ts --role combined` spustit bez další konfigurace.
 
 ### Docker
 
@@ -211,12 +211,12 @@ Soubor `docker-compose.yaml` spouští celý systém — řídicí server, relé
 docker compose up -d --build
 ```
 
--   **server** — `server.ts`, řídicí server (`Dockerfile`, obraz `majkl/belabox-duo-control`), webové rozhraní na portu `8090`.
--   **obs-client** — `obs-client.ts`, zpřístupňuje OBS Studio hostitelského počítače (`ws://host.docker.internal:4455`) prostřednictvím serveru; používá stejný obraz jako řídicí server, ale jiný vstupní bod.
--   **relay** — `client.ts --role relay`, agreguje SRT stream pomocí `srtla_send` (`Dockerfile.device`, obraz `majkl/belabox-duo-device`).
--   **encoder** — `client.ts --role encoder`, spouští `ceracoder`/GStreamer a odesílá SRT do relé; používá stejný obraz zařízení, ale jinou roli a proměnnou `ENCODER_BIN`.
+-   **server** — `backend/server/server.ts`, řídicí server (`Dockerfile`, obraz `majkl/belabox-duo-control`), webové rozhraní na portu `8090`.
+-   **obs-client** — `backend/obs-client/obs-client.ts`, zpřístupňuje OBS Studio hostitelského počítače (`ws://host.docker.internal:4455`) prostřednictvím serveru; používá stejný obraz jako řídicí server, ale jiný vstupní bod.
+-   **relay** — `backend/client/client.ts --role relay`, agreguje SRT stream pomocí `srtla_send` (`Dockerfile.device`, obraz `majkl/belabox-duo-device`).
+-   **encoder** — `backend/client/client.ts --role encoder`, spouští `ceracoder`/GStreamer a odesílá SRT do relé; používá stejný obraz zařízení, ale jinou roli a proměnnou `ENCODER_BIN`.
 
-Obraz zařízení pro relé a enkodér obsahuje `client.ts`, nativní binární soubory `srtla_send`, `ceracoder` a `belacoder`, definice GStreamer pipeline a nástroje `iproute2`.
+Obraz zařízení pro relé a enkodér obsahuje `backend/client/client.ts`, nativní binární soubory `srtla_send`, `ceracoder` a `belacoder`, definice GStreamer pipeline a nástroje `iproute2`.
 
 **Relé** vyžaduje oprávnění `NET_ADMIN` nastavené pomocí `cap_add`, protože při startu vytváří pravidla směrování podle jednotlivých uplinků (`ip rule add` a směrovací tabulky) a sleduje síťová rozhraní pomocí `ip monitor`. Bez tohoto oprávnění relé zaznamená chybu `ip rule add … Operation not permitted` a skončí.
 
@@ -230,7 +230,7 @@ Lokální koncový bod `/ws` a řídicí server používají stejný JSON protok
 -   Odpověď — `{ "type": "response", "id", "ok", … }`
 -   Událost — `{ "type": "event", "event": "status" | "log" | "srtla.stats", "data": … }`
 
-Seznam metod je uveden na začátku souboru [`src/methods.ts`](src/methods.ts). Metody, které neodpovídají roli daného zařízení, jsou odmítnuty s kódem 409.
+Seznam metod je uveden na začátku souboru [`backend/client/methods.ts`](backend/client/methods.ts). Metody, které neodpovídají roli daného zařízení, jsou odmítnuty s kódem 409.
 
 Ikona ozubeného kola v záhlaví zařízení otevírá stránku nastavení. Ta používá `settings.get` a `settings.update` pro správu trvalého UUID zařízení, názvu hostitele, role, URL řídicího serveru, vzdáleného tokenu, barvy záhlaví a jazyka rozhraní.
 
@@ -244,7 +244,9 @@ Nastavení streamu (pipeline, datový tok, zvuk, cíle a plánovač) se ukládaj
 
 Každá funkce je implementována jako **samostatný modul** v adresáři [`modules/`](modules/README.md). Modul obsahuje registraci backendu, kartu frontendového rozhraní, vlastní typy a styly.
 
-Jádro aplikace (`src/` + `public/`) nikdy nenačítá modul přímo podle jeho identifikátoru. Moduly vyhledává, směruje a vykresluje prostřednictvím registrů a sběrnice schopností. Toto oddělení ověřuje test [`test/registries.test.ts`](test/registries.test.ts).
+Jádro aplikace (`backend/` + `frontend/`) nikdy nenačítá modul přímo podle jeho identifikátoru. Moduly vyhledává, směruje a vykresluje prostřednictvím registrů a sběrnice schopností. Toto oddělení ověřuje test [`test/registries.test.ts`](test/registries.test.ts).
+
+Webová aplikace je ve složce `frontend/`, spustitelné vstupní body jsou oddělené pod `backend/client/`, `backend/obs-client/` a `backend/server/`. Adresáře modulů zůstávají pohromadě v kořenové složce `modules/`; sdílené wire typy jsou ve `shared/`.
 
 ### Moduly zařízení
 
@@ -273,7 +275,7 @@ Widgety chatu uchovávají průběžnou historii zpráv, aby se při opětovném
 Každý adresář `modules/<id>/` obsahuje přesně čtyři soubory:
 
 -   `backend.ts` — registrace backendu (běží v Bun na hostiteli, bez DOM).
--   `frontend.tsx` — registrace frontendu (komponenty Mithril, bez importů z `../../src`).
+-   `frontend.tsx` — registrace frontendu (komponenty Mithril, bez importů z backendu).
 -   `types.ts` — pouze lokální typy daného modulu (může importovat typy jádra, nikdy však typy jiného modulu).
 -   `styles.css` — styly omezené na `.mod-<id>` (karta zařízení) nebo `.dash-card` (widget).
 
@@ -281,9 +283,9 @@ Každý adresář `modules/<id>/` obsahuje přesně čtyři soubory:
 
 Frontend používá stejnou identitu a navíc poskytuje komponentu widgetu `component`, obsah karty zařízení `cardBody(host, status)` a rozhraní pro připojení hubu a příjem dat widgetů. Podrobné tabulky jednotlivých polí jsou v [`modules/README.md`](modules/README.md).
 
-**Vyhledávání modulů** — backend při běhu prochází adresáře `modules/*/` pomocí `readdirSync` v souboru [`src/registry.ts`](src/registry.ts). Stačí přidat adresář a modul bude nalezen. Prohlížeč nemůže při běhu automaticky procházet soubory, proto `scripts/gen-modules.ts` vytváří manifest `modules/.generated.frontend.ts`, který je ignorován Gitem a vychází ze stejného seznamu. Generování je zapojeno do `predev`.
+**Vyhledávání modulů** — backend při běhu prochází adresáře `modules/*/` pomocí `readdirSync` v souboru [`shared/registry.ts`](shared/registry.ts). Stačí přidat adresář a modul bude nalezen. Prohlížeč nemůže při běhu automaticky procházet soubory, proto `scripts/gen-modules.ts` vytváří manifest `generated/modules.frontend.ts`, který je ignorován Gitem a vychází ze stejného seznamu. Generování je zapojeno do `predev`.
 
-**Propojení jádra a modulů** — RPC metody se směrují prostřednictvím mapy vlastníků metod v registru, která vzniká z pole `methods` každého modulu. Rozhraní načítá karty a widgety pomocí přístupových funkcí v [`src/registry.frontend.ts`](src/registry.frontend.ts). Služby mezi moduly komunikují přes **sběrnici schopností (capability bus)**: modul zaregistruje schopnost pod názvem s tečkovou notací, například `stream.encoder` nebo `stream.srtla`, a ostatní moduly ji vyhledají podle názvu prostřednictvím [`src/capabilities.ts`](src/capabilities.ts), místo aby ji přímo importovaly.
+**Propojení jádra a modulů** — RPC metody se směrují prostřednictvím mapy vlastníků metod v registru, která vzniká z pole `methods` každého modulu. Rozhraní načítá karty a widgety pomocí přístupových funkcí v [`frontend/ts/module-registry.ts`](frontend/ts/module-registry.ts). Služby mezi moduly komunikují přes **sběrnici schopností (capability bus)**: modul zaregistruje schopnost pod názvem s tečkovou notací, například `stream.encoder` nebo `stream.srtla`, a ostatní moduly ji vyhledají podle názvu prostřednictvím [`backend/client/capabilities.ts`](backend/client/capabilities.ts), místo aby ji přímo importovaly.
 
 Každý modul načítá svůj soubor `styles.css` jako vedlejší efekt importu, takže jádro nemusí vybírat CSS jednotlivých modulů podle jejich identifikátorů.
 
@@ -295,12 +297,12 @@ Názvy metod a událostí jsou pevně dané. Jejich přejmenování představuje
 
 ### Klient OBS
 
-Soubor [`obs-client.ts`](obs-client.ts) představuje **samostatné zařízení** určené pro počítače, na kterých běží OBS Studio odděleně od relé.
+Soubor [`backend/obs-client/obs-client.ts`](backend/obs-client/obs-client.ts) představuje **samostatné zařízení** určené pro počítače, na kterých běží OBS Studio odděleně od relé.
 
-Registruje se na řídicím serveru stejně jako `client.ts` (má stabilní UUID a v úvodní zprávě uvádí `role: "obs"`) a zprostředkovává komunikaci mezi webovými nástěnkami a OBS.
+Registruje se na řídicím serveru stejně jako `backend/client/client.ts` (má stabilní UUID a v úvodní zprávě uvádí `role: "obs"`) a zprostředkovává komunikaci mezi webovými nástěnkami a OBS.
 
 ```sh
-bun obs-client.ts --obs ws://127.0.0.1:4455 \
+bun backend/obs-client/obs-client.ts --obs ws://127.0.0.1:4455 \
   --obs-password secret \
   --remote ws://10.0.0.5:8090/device --remote-token secret
 ```
@@ -309,7 +311,7 @@ Klient implementuje kompletní úvodní komunikaci protokolu obs-websocket v5 (`
 
 Při výpadku se automaticky znovu připojuje s exponenciálně rostoucí prodlevou. Při odpojení emituje syntetickou událost `ObsDisconnected` a po opětovném připojení přehraje snímek stavu ve formě událostí odpovídajících skutečným zprávám OBS.
 
-Stejná knihovna `ObsClient` (`src/obs/client.ts`) se používá také přímo v modulu `obs-controller`, takže relé s lokálním OBS nepotřebuje druhé WebSocket spojení.
+Stejná knihovna `ObsClient` (`shared/obs/client.ts`) se používá také přímo v modulu `obs-controller`, takže relé s lokálním OBS nepotřebuje druhé WebSocket spojení.
 
 ## Vývoj
 
@@ -328,7 +330,7 @@ bun run build:server     # → dist/server
 bun run build:obs-client # → dist/obs-client
 ```
 
-Moduly se vyhledávají za běhu procházením adresáře `modules/`. Manifesty `modules/.generated.*.ts` generuje `scripts/gen-modules.ts`; tento krok je zapojen do `predev`, `pretest` a `prebuild:*`.
+Moduly se vyhledávají za běhu procházením adresáře `modules/`. Generované manifesty v `generated/` vytváří `scripts/gen-modules.ts`; tento krok je zapojen do `predev`, `pretest` a `prebuild:*`.
 
 Uživatelské rozhraní podporuje více jazyků prostřednictvím JSON katalogů v `i18n/` (12 jazyků). Překlady se podle potřeby poskytují prohlížeči z adresy `/i18n/<lang>.json`. Jazyk se nastavuje při prvním spuštění a lze jej kdykoli změnit pomocí výběru v záhlaví. Zařízení si volbu ukládá do konfiguračního souboru.
 

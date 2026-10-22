@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ObsClient, ObsOpCode } from "../src/obs/client";
+import { ObsClient, ObsOpCode } from "../shared/obs/client";
 
 /**
  * Stub that records constructed instances. Captures the "message" listener so

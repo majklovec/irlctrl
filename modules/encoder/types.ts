@@ -1,5 +1,5 @@
 /* Local types for the encoder module (never imported by the core or other modules). */
-import type { FrontendModuleContributions } from "../../public/ts/module-contracts";
+import type { FrontendModuleContributions } from "../../frontend/ts/module-contracts";
 
 /** One GStreamer pipeline file found under the pipelines dir. */
 export interface Pipeline {

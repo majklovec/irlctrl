@@ -5,7 +5,7 @@
  * Visible for the obs role, and for the custom role when the server
  * reports the obs-controller module as enabled. Default-exports its
  * ModuleDef; the settings framework registers it from the generated
- * manifest (modules/.generated.settings.ts) — no per-module imports.
+ * manifest (generated/modules.settings.ts) — no per-module imports.
  */
 import m from "mithril";
 import {
@@ -15,9 +15,9 @@ import {
     Form,
     Input,
     Break,
-} from "../../public/ts/components/ui";
-import { t } from "../../public/ts/i18n";
-import type { ModuleContext, ModuleDef } from "../../public/ts/modules";
+} from "../../frontend/ts/components/ui";
+import { t } from "../../frontend/ts/i18n";
+import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
 
 /**
  * Editable copy of the module's OBS connection; the password is write-only

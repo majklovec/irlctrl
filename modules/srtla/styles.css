@@ -1,5 +1,5 @@
 /* SRTLA module — the card composes the shared core components (Card, form,
- * fieldGroup…) so its look comes from public/css/style.css; the .mod-srtla
+ * fieldGroup…) so its look comes from frontend/css/style.css; the .mod-srtla
  * class on the card root exists for future scoping.
  *
  * The .mod-modems styles (merged in from the modems module, whose frontend

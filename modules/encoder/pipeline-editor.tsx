@@ -16,14 +16,14 @@ import {
     Form,
     Input,
     Page,
-} from "../../public/ts/components/ui";
-import { t } from "../../public/ts/i18n";
-import { RpcClient, socketUrl } from "../../public/ts/services/rpc";
-import { mountPage, setHeaderColor } from "../../public/ts/util";
-import { errorMessage } from "../../src/util";
+} from "../../frontend/ts/components/ui";
+import { t } from "../../frontend/ts/i18n";
+import { RpcClient, socketUrl } from "../../frontend/ts/services/rpc";
+import { mountPage, setHeaderColor } from "../../frontend/ts/util";
+import { errorMessage } from "../../shared/util";
 import "./pipeline-editor.css";
 
-/** HTML `pattern` for a pipeline id (src/pipelines PIPELINE_ID_RE). */
+/** HTML `pattern` for a pipeline id (backend/client/pipelines.ts PIPELINE_ID_RE). */
 const PIPELINE_PATH_PATTERN = "[A-Za-z0-9_.\\-]+(\\/[A-Za-z0-9_.\\-]+)*";
 
 type Mode = "new" | "edit";

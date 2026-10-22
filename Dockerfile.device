@@ -1,7 +1,7 @@
-# Device image — runs `client.ts` in the `relay` or `encoder` role.
+# Device image — runs `backend/client/client.ts` in the `relay` or `encoder` role.
 #
 # Unlike the control image (Dockerfile), this bundles the device runtime:
-#   - client.ts + src/ + modules/ (the relay/encoder client),
+#   - backend/client/ + shared/ + modules/ (the relay/encoder client),
 #   - the native streaming binaries (srtla_send, ceracoder, belacoder),
 #   - the GStreamer pipeline definitions (pipeline/),
 #   - GStreamer itself, since ceracoder/belacoder drive the encode pipeline.
@@ -70,19 +70,23 @@ RUN ln -s /usr/local/lib/libsrt.so.1.5.7 /usr/lib/x86_64-linux-gnu/libsrt.so.1 \
 WORKDIR /app
 
 # Copy only what is needed to run the device. The client runs unbundled
-# (`bun client.ts`): modules are discovered by a runtime scan of modules/ and
+# (`bun backend/client/client.ts`): modules are discovered by a runtime scan of modules/ and
 # dynamically imported, and the web UI is bundled at startup on the fly.
 COPY --from=builder /app/package.json /app/bun.lock ./
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/client.ts ./
-COPY --from=builder /app/src ./src
+COPY --from=builder /app/backend/client ./backend/client
 COPY --from=builder /app/modules ./modules
-COPY --from=builder /app/public ./public
+COPY --from=builder /app/frontend ./frontend
+COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/i18n ./i18n
 COPY --from=builder /app/scripts ./scripts
 # tsconfig.json drives the JSX transform at bundle time (jsxFactory "m" ->
 # Mithril). Without it Bun defaults to react/jsx-dev-runtime, which isn't a dep.
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
+
+# generated/ is gitignored and regenerated at startup (scripts/gen-modules.ts) —
+# create it writable by the runtime user (1000:1000).
+RUN mkdir -p /app/generated && chown 1000:1000 /app/generated
 
 # Native streaming binaries + GStreamer pipeline definitions (from the build
 # context, committed at the repo root).
@@ -94,5 +98,5 @@ RUN chmod +x ./srtla_send ./ceracoder ./belacoder
 EXPOSE 8085
 
 # Default entrypoint — override `command` in docker-compose to set the role.
-ENTRYPOINT ["bun", "client.ts"]
+ENTRYPOINT ["bun", "backend/client/client.ts"]
 CMD ["--host", "0.0.0.0", "--port", "8085", "--role", "relay", "--pipelines", "/app/pipeline"]

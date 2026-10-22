@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { createAuth } from "../src/control-server/auth";
-import { createDashboards } from "../src/control-server/dashboards";
-import { destroyWidgetHub } from "../src/registry";
+import { createAuth } from "../backend/server/auth";
+import { createDashboards } from "../backend/server/dashboards";
+import { destroyWidgetHub } from "../shared/registry";
 
 function request(path: string, body?: unknown, cookie?: string): Request {
     return new Request(`http://localhost${path}`, {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { LANGUAGES } from "../src/languages";
-import { i18nReady, translate } from "../src/i18n";
+import { LANGUAGES } from "../shared/languages";
+import { i18nReady, translate } from "../shared/i18n";
 
 describe("i18next translation options", () => {
     test("every locale matches the English keys and placeholders", async () => {

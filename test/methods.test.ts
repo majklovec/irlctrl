@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { handleRequest } from "../src/methods";
+import { handleRequest } from "../backend/client/methods";
 
 describe("device RPC response envelope", () => {
     test("returns a 400 response for invalid JSON", async () => {

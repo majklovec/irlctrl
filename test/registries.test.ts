@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { allModules } from "../src/registry";
-import { defaultModules, state } from "../src/state";
-import { modulesForRole } from "../src/validate";
-import { safeModules } from "../src/module-core";
+import { allModules } from "../shared/registry";
+import { defaultModules, state } from "../backend/client/state";
+import { modulesForRole } from "../shared/validate";
+import { safeModules } from "../backend/client/module-core";
 
 /**
  * Registry order of the device modules: the result of the registry's topological
@@ -155,53 +155,59 @@ describe("module registries", () => {
 
     test("frontend registry discovers via the generated manifest (no per-module imports, no Glob)", () => {
         const src = readFileSync(
-            join(import.meta.dir, "..", "src", "registry.frontend.ts"),
+            join(
+                import.meta.dir,
+                "..",
+                "frontend",
+                "ts",
+                "module-registry.ts",
+            ),
             "utf8",
         );
         expect(src).not.toMatch(/from "\.\.\/modules\/[\w-]+\/frontend/);
         expect(src).not.toMatch(
             /import\.meta\.glob|Bun\.Glob|from "bun\/glob"|modules\/\*\/frontend/,
         );
-        expect(src).toMatch(/from "\.\.\/modules\/\.generated\.frontend\*?";/);
-        const manifest = join(modulesDir, ".generated.frontend.ts");
+        expect(src).toMatch(/from "\.\.\/\.\.\/generated\/modules\.frontend\*?";/);
+        const manifest = join(import.meta.dir, "..", "generated", "modules.frontend.ts");
         expect(statSync(manifest).size).toBeGreaterThan(0);
         expect(readFileSync(manifest, "utf8")).toMatch(/AUTO-GENERATED/i);
     });
 
     test("settings framework discovers via the generated manifest (no per-module imports)", () => {
         const settings = readFileSync(
-            join(import.meta.dir, "..", "public", "ts", "settings.tsx"),
+            join(import.meta.dir, "..", "frontend", "ts", "settings.tsx"),
             "utf8",
         );
         expect(settings).not.toMatch(
             /from "\.\.\/\.\.\/modules\/[\w-]+\/settings/,
         );
         const framework = readFileSync(
-            join(import.meta.dir, "..", "public", "ts", "modules.tsx"),
+            join(import.meta.dir, "..", "frontend", "ts", "modules.tsx"),
             "utf8",
         );
         expect(framework).not.toMatch(
             /from "\.\.\/\.\.\/modules\/[\w-]+\/settings/,
         );
         expect(framework).toMatch(
-            /from "\.\.\/\.\.\/modules\/\.generated\.settings\*?"/,
+            /from "\.\.\/\.\.\/generated\/modules\.settings\*?"/,
         );
-        const manifest = join(modulesDir, ".generated.settings.ts");
+        const manifest = join(import.meta.dir, "..", "generated", "modules.settings.ts");
         expect(statSync(manifest).size).toBeGreaterThan(0);
         expect(readFileSync(manifest, "utf8")).toMatch(/AUTO-GENERATED/i);
     });
 
     test("backend registry discovers by directory scan + compiled-binary manifest, no per-module imports", () => {
         const src = readFileSync(
-            join(import.meta.dir, "..", "src", "registry.ts"),
+            join(import.meta.dir, "..", "shared", "registry.ts"),
             "utf8",
         );
         expect(src).not.toMatch(/from "\.\.\/modules\/[\w-]+\/backend/);
         expect(src).toMatch(/readdirSync\(MODULES_DIR\)/);
         // Compiled binaries (bun build --compile) cannot run the scan — they
         // fall back to the generated manifest, like the frontend registry.
-        expect(src).toMatch(/"\.\.\/modules\/\.generated\.backend"/);
-        const manifest = join(modulesDir, ".generated.backend.ts");
+        expect(src).toMatch(/"\.\.\/generated\/modules\.backend"/);
+        const manifest = join(import.meta.dir, "..", "generated", "modules.backend.ts");
         expect(statSync(manifest).size).toBeGreaterThan(0);
         expect(readFileSync(manifest, "utf8")).toMatch(/AUTO-GENERATED/i);
     });
@@ -212,7 +218,7 @@ describe("module registries", () => {
      * The test itself sits at the project root, so it is not in scope and its
      * own expectations never trip the scan.
      */
-    test("core (src/ + public/ts/) names no module by id", () => {
+    test("core (backend/ + frontend/ts/) names no module by id", () => {
         const moduleIds = new Set<string>();
         for (const dir of readdirSync(modulesDir, { withFileTypes: true }))
             if (dir.isDirectory()) moduleIds.add(dir.name);
@@ -226,8 +232,9 @@ describe("module registries", () => {
             walk(root).filter((f) => f.endsWith(".ts") || f.endsWith(".tsx"));
         const offenders: string[] = [];
         for (const root of [
-            join(import.meta.dir, "..", "src"),
-            join(import.meta.dir, "..", "public", "ts"),
+            join(import.meta.dir, "..", "backend", "client"),
+            join(import.meta.dir, "..", "backend", "server"),
+            join(import.meta.dir, "..", "frontend", "ts"),
         ]) {
             for (const file of filesOf(root)) {
                 readFileSync(file, "utf8")
@@ -264,7 +271,7 @@ describe("module registries", () => {
     test("core frontend pages compose module contributions without feature branches", () => {
         const readPage = (name: string) =>
             readFileSync(
-                join(import.meta.dir, "..", "public", "ts", name),
+                join(import.meta.dir, "..", "frontend", "ts", name),
                 "utf8",
             );
         const app = readPage("app.tsx");
@@ -341,7 +348,9 @@ describe("module registries", () => {
             "../pipeline-editor.tsx",
         );
         expect(
-            existsSync(join(import.meta.dir, "..", "public", "pipelineedit.html")),
+            existsSync(
+                join(import.meta.dir, "..", "frontend", "app", "pipelineedit.html"),
+            ),
         ).toBe(false);
     });
 });

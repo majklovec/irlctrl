@@ -1,20 +1,20 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
-import { buildStatus, handleRequest } from "../src/methods";
-import * as eventlog from "../src/eventlog";
-import { bondingMethods } from "../src/methods/bonding";
-import { parseBitrates, parseEncoderConfig } from "../src/methods/encoder-config";
-import { encoderStreamMethods } from "../src/methods/encoder-stream";
-import { moduleObsMethods } from "../src/methods/modules-obs";
-import { pipelineMethods } from "../src/methods/pipelines";
-import { setupSettingsStatusMethods } from "../src/methods/setup-settings-status";
-import { startChecked, type MethodContext } from "../src/methods/shared";
-import * as moduleCore from "../src/module-core";
-import type { Params } from "../src/params";
-import * as registry from "../src/registry";
-import * as routing from "../src/routing";
-import * as services from "../src/services";
-import { defaultModules, OBS_MODULE, state } from "../src/state";
-import * as stream from "../src/stream";
+import { buildStatus, handleRequest } from "../backend/client/methods";
+import * as eventlog from "../backend/client/eventlog";
+import { bondingMethods } from "../backend/client/methods/bonding";
+import { parseBitrates, parseEncoderConfig } from "../backend/client/methods/encoder-config";
+import { encoderStreamMethods } from "../backend/client/methods/encoder-stream";
+import { moduleObsMethods } from "../backend/client/methods/modules-obs";
+import { pipelineMethods } from "../backend/client/methods/pipelines";
+import { setupSettingsStatusMethods } from "../backend/client/methods/setup-settings-status";
+import { startChecked, type MethodContext } from "../backend/client/methods/shared";
+import * as moduleCore from "../backend/client/module-core";
+import type { Params } from "../shared/params";
+import * as registry from "../shared/registry";
+import * as routing from "../backend/client/routing";
+import * as services from "../backend/client/services";
+import { defaultModules, OBS_MODULE, state } from "../backend/client/state";
+import * as stream from "../backend/client/stream";
 
 const originalSettings = state.settings;
 const originalEncoder = state.encoder;
@@ -108,8 +108,8 @@ describe("device RPC domain composition", () => {
         const child = Bun.spawnSync([
             process.execPath,
             "--eval",
-            `import "./src/methods/${domain}.ts";
-             import { handleRequest } from "./src/methods.ts";
+            `import "./backend/client/methods/${domain}.ts";
+             import { handleRequest } from "./backend/client/methods.ts";
              console.log(await handleRequest('{"method":"settings.get"}'));`,
         ], { cwd: new URL("../", import.meta.url).pathname });
         expect(child.stderr.toString()).toBe("");

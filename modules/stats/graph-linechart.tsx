@@ -1,5 +1,5 @@
 import m from "mithril";
-import type { MithrilJSXComponent } from "../../public/ts/jsx";
+import type { MithrilJSXComponent } from "../../frontend/ts/jsx";
 import type { StatsSample } from "./types";
 
 const W_FALLBACK = 260;

@@ -13,7 +13,7 @@ import type {
     SrtlaStats,
     SrtlaStatsEvent,
     Status,
-} from "../../public/types";
+} from "../../shared/types";
 import {
     Actions,
     Badge,
@@ -31,17 +31,17 @@ import {
     numberAttrs,
     Options,
     Select,
-} from "../../public/ts/components/ui";
-import { icon } from "../../public/ts/components/icons";
+} from "../../frontend/ts/components/ui";
+import { icon } from "../../frontend/ts/components/icons";
 import {
     formatBitrate,
     formatSpeed,
     inRange,
     since,
-} from "../../public/ts/util";
-import { t } from "../../public/ts/i18n";
-import { card, type DeviceCard } from "../../public/ts/device/store";
-import type { DeviceDashboardWidget } from "../../public/ts/module-contracts";
+} from "../../frontend/ts/util";
+import { t } from "../../frontend/ts/i18n";
+import { card, type DeviceCard } from "../../frontend/ts/device/store";
+import type { DeviceDashboardWidget } from "../../frontend/ts/module-contracts";
 import type { BridgedModule } from "./types";
 
 type SrtlaOptions = Status["state"]["srtlaOptions"];

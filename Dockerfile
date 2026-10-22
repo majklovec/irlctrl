@@ -24,25 +24,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy only what is needed to run the server. The server runs unbundled
-# (`bun server.ts`): modules are discovered by a runtime scan of modules/
-# and dynamically imported, the module backends import obs-client.ts, and
+# (`bun backend/server/server.ts`): modules are discovered by a runtime scan
+# of modules/ and dynamically imported, and
 # the web UI is bundled at startup via scripts/gen-modules.ts + Bun.build.
 COPY --from=builder /app/package.json /app/bun.lock ./
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/server.ts ./
-COPY --from=builder /app/obs-client.ts ./
-COPY --from=builder /app/src ./src
+COPY --from=builder /app/backend/client ./backend/client
+COPY --from=builder /app/backend/server ./backend/server
+COPY --from=builder /app/backend/obs-client ./backend/obs-client
 COPY --from=builder /app/modules ./modules
-COPY --from=builder /app/public ./public
+COPY --from=builder /app/frontend ./frontend
+COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/i18n ./i18n
 COPY --from=builder /app/scripts ./scripts
 # tsconfig.json drives the JSX transform at bundle time (jsxFactory "m" ->
 # Mithril). Without it Bun defaults to react/jsx-dev-runtime, which isn't a dep.
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
+# generated/ is gitignored and regenerated at startup (scripts/gen-modules.ts) —
+# create it writable by the runtime user (1000:1000).
+RUN mkdir -p /app/generated && chown 1000:1000 /app/generated
+
 # Expose the default control-server port
 EXPOSE 8090
 
 # Default entrypoint — override with `command` in docker-compose
-ENTRYPOINT ["bun", "server.ts"]
+ENTRYPOINT ["bun", "backend/server/server.ts"]
 CMD ["--host", "0.0.0.0", "--port", "8090"]
