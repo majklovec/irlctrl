@@ -195,6 +195,7 @@
     "log.restart_failed": "Restart nie powiódł się: {{error}}",
     "log.settings_saved_reconnect": "Ustawienia zapisane; ponowne łączenie z {{url}}",
     "log.settings_saved_renamed": "Ustawienia zapisane; urządzenie przemianowane na {{hostname}}",
+    "log.settings_saved_fields": "Ustawienia zapisane: {{fields}}",
     "log.srtla_exited": "srtla_send zakończył działanie z kodem {{code}}; restart za {{delay}}s",
     "log.started": "Usługa uruchomiona ({{role}})",
     "log.stopped_signal": "Usługa zatrzymana ({{signal}})",

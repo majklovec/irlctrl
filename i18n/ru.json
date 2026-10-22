@@ -195,6 +195,7 @@
     "log.restart_failed": "Перезапуск не удался: {{error}}",
     "log.settings_saved_reconnect": "Настройки сохранены; переподключение к {{url}}",
     "log.settings_saved_renamed": "Настройки сохранены; устройство переименовано в {{hostname}}",
+    "log.settings_saved_fields": "Настройки сохранены: {{fields}}",
     "log.srtla_exited": "srtla_send завершился с кодом {{code}}; перезапуск через {{delay}}s",
     "log.started": "Служба запущена ({{role}})",
     "log.stopped_signal": "Служба остановлена ({{signal}})",

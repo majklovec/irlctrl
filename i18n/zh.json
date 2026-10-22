@@ -195,6 +195,7 @@
     "log.restart_failed": "重启失败：{{error}}",
     "log.settings_saved_reconnect": "设置已保存；正在重连到 {{url}}",
     "log.settings_saved_renamed": "设置已保存；设备已重命名为 {{hostname}}",
+    "log.settings_saved_fields": "设置已保存：{{fields}}",
     "log.srtla_exited": "srtla_send 以代码 {{code}} 退出；将在 {{delay}}s 后重启",
     "log.started": "服务已启动 ({{role}})",
     "log.stopped_signal": "服务已停止 ({{signal}})",

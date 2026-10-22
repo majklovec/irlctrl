@@ -195,6 +195,7 @@
     "log.restart_failed": "Restart selhal: {{error}}",
     "log.settings_saved_reconnect": "Nastavení uloženo; připojuji se k {{url}}",
     "log.settings_saved_renamed": "Nastavení uloženo; zařízení přejmenováno na {{hostname}}",
+    "log.settings_saved_fields": "Nastavení uloženo: {{fields}}",
     "log.srtla_exited": "srtla_send byl ukončen s kódem {{code}}; bude restartován za {{delay}}s",
     "log.started": "Služba spuštěna ({{role}})",
     "log.stopped_signal": "Služba zastavena ({{signal}})",

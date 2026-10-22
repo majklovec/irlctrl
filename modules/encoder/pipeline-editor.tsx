@@ -16,6 +16,7 @@ import {
     Form,
     Input,
     Page,
+    TitleWithBack,
 } from "../../frontend/ts/components/ui";
 import { t } from "../../frontend/ts/i18n";
 import { RpcClient, socketUrl } from "../../frontend/ts/services/rpc";
@@ -437,12 +438,13 @@ const App: m.Component = {
 
         return (
             <Page
-                title={[
-                    <a href={base + "settings/"} title={t("ui.back")}>
-                        {"←"}
-                    </a>,
-                    ` ${pageTitle()}`,
-                ]}
+                title={
+                    <TitleWithBack
+                        href={base + "settings/"}
+                        backLabel={t("ui.back")}>
+                        {pageTitle()}
+                    </TitleWithBack>
+                }
                 headerRight={<ConnectionBadge connected={state.connected} />}>
                 <Form class={"pipeline-editor"} onSubmit={() => void save()}>
                     {state.mode === "new" ? (

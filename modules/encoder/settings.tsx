@@ -258,7 +258,9 @@ export const def: ModuleDef = {
                                   {expanded
                                       ? pipelines.map((pipeline) => (
                                             <div class={"pipeline-item"}>
-                                                <code>{pipeline.id}</code>
+                                                <code title={pipeline.id}>
+                                                    {pipeline.name}
+                                                </code>
                                                 <div class={"dash-row-actions"}>
                                                     <a
                                                         href={pipelineEditUrl(

@@ -195,6 +195,7 @@
     "log.restart_failed": "Falha ao reiniciar: {{error}}",
     "log.settings_saved_reconnect": "Definições guardadas; a religar a {{url}}",
     "log.settings_saved_renamed": "Definições guardadas; dispositivo renomeado para {{hostname}}",
+    "log.settings_saved_fields": "Definições guardadas: {{fields}}",
     "log.srtla_exited": "srtla_send saiu com código {{code}}; a reiniciar em {{delay}}s",
     "log.started": "Serviço iniciado ({{role}})",
     "log.stopped_signal": "Serviço parado ({{signal}})",

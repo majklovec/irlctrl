@@ -19,11 +19,17 @@ import {
     Options,
     Page,
     Select,
+    TitleWithBack,
 } from "./components/ui";
 import { t } from "./i18n";
 import { RpcClient, socketUrl } from "./services/rpc";
 import { HOSTNAME_PATTERN, mountPage, setHeaderColor } from "./util";
-import { bind, refreshDevice, renderModuleCards, setDraftRole } from "./modules";
+import {
+    bind,
+    refreshDevice,
+    renderModuleCards,
+    setDraftRole,
+} from "./modules";
 import type { Settings, modulesView } from "../types";
 
 const state = {
@@ -70,9 +76,7 @@ async function run<T>(call: () => Promise<T>): Promise<T | undefined> {
 async function load(): Promise<void> {
     // Right after a (re)start the device link to the server is flapping and
     // the first fetch can time out; retry a few times before giving up.
-    let result:
-        | [{ settings: Settings }, { modules: modulesView }]
-        | undefined;
+    let result: [{ settings: Settings }, { modules: modulesView }] | undefined;
     for (let attempt = 0; attempt < 5; attempt++) {
         if (attempt > 0) await new Promise((r) => setTimeout(r, 1500));
         result = await run(() =>
@@ -151,16 +155,13 @@ function settingsCard(): m.Vnode {
                         <Select
                             target={draft}
                             prop="role"
-                            onChange={() => setDraftRole(draft.role)}
-                        >
+                            onChange={() => setDraftRole(draft.role)}>
                             <Options
                                 pairs={[
-                                    ["", t("set.role_keep")],
                                     ["relay", t("role.relay")],
                                     ["encoder", t("role.encoder")],
                                     ["combined", t("role.combined")],
                                     ["obs", t("role.obs")],
-                                    ["custom", t("role.custom")],
                                 ]}
                             />
                         </Select>
@@ -220,12 +221,11 @@ function settingsCard(): m.Vnode {
 const App: m.Component = {
     view: () => (
         <Page
-            title={[
-                <a href={"../"} title={t("set.back")}>
-                    {"←"}
-                </a>,
-                ` ${t("set.title")}`,
-            ]}
+            title={
+                <TitleWithBack href={"../"} backLabel={t("set.back")}>
+                    {t("set.title")}
+                </TitleWithBack>
+            }
             headerRight={<ConnectionBadge connected={state.connected} />}>
             {settingsCard()}
             {renderModuleCards()}

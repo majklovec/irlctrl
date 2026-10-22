@@ -163,6 +163,7 @@
     "log.restart_failed": "Restart failed: {{error}}",
     "log.settings_saved_reconnect": "Settings saved; reconnecting to {{url}}",
     "log.settings_saved_renamed": "Settings saved; device renamed to {{hostname}}",
+    "log.settings_saved_fields": "Settings saved: {{fields}}",
     "log.srtla_exited": "srtla_send exited with code {{code}}; restarting in {{delay}}s",
     "log.started": "Service started ({{role}})",
     "log.stopped_signal": "Service stopped ({{signal}})",

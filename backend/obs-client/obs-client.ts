@@ -739,9 +739,11 @@ async function main(): Promise<void> {
                     const remoteChanged =
                         remoteUrl_ !== remoteUrl ||
                         (remoteToken_ ?? "") !== remoteToken;
-                    // A renamed device must re-hello so the server sees the
-                    // new name; the re-dial reuses the current URL/token.
+                    // A renamed or re-coloured device must re-hello so the
+                    // server sees the new name / dot color; the re-dial
+                    // reuses the current URL/token.
                     const renamed = deviceName_ !== deviceName;
+                    const colorChanged = deviceColor_ !== deviceColor;
                     deviceName = deviceName_;
                     deviceColor = deviceColor_;
                     remoteUrl = remoteUrl_;
@@ -756,14 +758,19 @@ async function main(): Promise<void> {
                         } satisfies ObsClientConfig,
                     );
                     writeCfg();
-                    if (remoteChanged || (renamed && remoteUrl)) {
+                    if (
+                        remoteChanged ||
+                        ((renamed || colorChanged) && remoteUrl)
+                    ) {
                         // The socket's close handler re-dials `connect()`,
-                        // which re-sends hello with the new URL/name/token.
+                        // which re-sends hello with the new URL/name/color.
                         sock?.close(
                             1001,
                             remoteChanged
                                 ? "remote settings changed"
-                                : "device renamed",
+                                : renamed
+                                  ? "device renamed"
+                                  : "device recoloured",
                         );
                     }
                     result = {
@@ -917,6 +924,9 @@ async function main(): Promise<void> {
         );
         const ws = new BunWebSocket(remoteUrl, { headers });
         sock = ws;
+        // Drop any timers a superseded connection left running (see the `close`
+        // guard below), which would otherwise keep firing against a dead socket.
+        clearTimers();
         const touch = (): void => {
             lastSeen = Date.now();
         };
@@ -970,8 +980,13 @@ async function main(): Promise<void> {
         });
 
         ws.addEventListener("close", (ev) => {
+            // A superseded socket's delayed close must be ignored, else two
+            // sockets for the same uuid each treat the other's 4001 "replaced"
+            // close as a reconnect trigger and kick each other in an endless
+            // loop (see the matching guard in backend/client/remote.ts).
+            if (sock !== ws) return;
+            sock = null;
             clearTimers();
-            if (sock === ws) sock = null;
             if (stopped) return;
             console.warn(
                 `[obs-client] disconnected (${ev.code}${ev.reason ? `: ${ev.reason}` : ""}); retrying in ${backoff / 1000}s`,

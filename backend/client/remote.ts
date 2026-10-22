@@ -175,6 +175,10 @@ function connect(): void {
     console.log(`[remote] connecting to ${safeUrl()} as "${id}"...`);
     const sock = new BunWebSocket(target.url, { headers });
     ws = sock;
+    // This socket will own the liveness/status timers once it opens; drop any
+    // timers the previous connection left running so they don't fire against a
+    // socket that has already been superseded (see the `close` guard below).
+    clearTimers();
     const touch = () => {
         lastSeen = Date.now();
     };
@@ -237,9 +241,15 @@ function connect(): void {
     });
 
     sock.addEventListener("close", (ev) => {
+        // A superseded socket (one already replaced by a newer connection,
+        // e.g. after applyRemoteSettings re-registers) can still deliver its
+        // close frame later. Ignoring it here prevents the double-connection
+        // loop where two sockets for the same uuid each treat the other's 4001
+        // "replaced" close as a reason to reconnect, kicking each other forever.
+        if (ws !== sock) return;
+        ws = null;
         clearTimers();
         failOutgoing("disconnected from control server");
-        if (ws === sock) ws = null;
         if (stopped) return;
         console.warn(
             `[remote] disconnected (${ev.code}${ev.reason ? `: ${ev.reason}` : ""}); retrying in ${backoff / 1000}s`,

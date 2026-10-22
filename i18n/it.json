@@ -195,6 +195,7 @@
     "log.restart_failed": "Riavvio non riuscito: {{error}}",
     "log.settings_saved_reconnect": "Impostazioni salvate; riconnessione a {{url}}",
     "log.settings_saved_renamed": "Impostazioni salvate; dispositivo rinominato in {{hostname}}",
+    "log.settings_saved_fields": "Impostazioni salvate: {{fields}}",
     "log.srtla_exited": "srtla_send è uscito con codice {{code}}; riavvio tra {{delay}}s",
     "log.started": "Servizio avviato ({{role}})",
     "log.stopped_signal": "Servizio arrestato ({{signal}})",

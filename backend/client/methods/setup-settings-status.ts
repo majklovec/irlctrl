@@ -22,6 +22,7 @@ import {
 } from "../../../shared/params";
 import {
     completeSetup,
+    type DeviceSettings,
     type SrtlaOptions,
     saveState,
     setupRequired,
@@ -29,7 +30,6 @@ import {
     state,
     uiLanguage,
 } from "../state";
-import { scrubUrl } from "../../../shared/util";
 import { DEFAULT_COLOR, ROLES } from "../../../shared/validate";
 import { parseEncoderConfig } from "./encoder-config";
 import { effectiveRole, type MethodContext, type MethodMap } from "./shared";
@@ -97,9 +97,31 @@ const settingsView = () => {
     };
 };
 
-export function setupSettingsStatusMethods(
-    context: Context,
-): MethodMap {
+/** [field, label] pairs for the settings re-registered & logged on change. */
+const settingFields: ReadonlyArray<
+    readonly [key: keyof DeviceSettings, label: string]
+> = [
+    ["hostname", "name"],
+    ["role", "role"],
+    ["remoteUrl", "remote URL"],
+    ["remoteToken", "remote token"],
+    ["color", "color"],
+];
+
+/** Labels of the fields whose value differs between `a` and `b`. */
+function compare<K extends string>(
+    fields: ReadonlyArray<readonly [key: K, label: string]>,
+    a: Partial<Record<K, unknown>>,
+    b: Partial<Record<K, unknown>>,
+): string[] {
+    const changed: string[] = [];
+    for (const [key, label] of fields) {
+        if (a[key] !== b[key]) changed.push(label);
+    }
+    return changed;
+}
+
+export function setupSettingsStatusMethods(context: Context): MethodMap {
     const { applyRemoteSettings } = context;
     const { encoderServices, srtlaServices } = context.services;
     /** First-run wizard: validate all fields, write the initial state and bring the role up. */
@@ -188,7 +210,9 @@ export function setupSettingsStatusMethods(
         );
         const roleValue = optionalSettingString(p, "role", current.role);
         const role =
-            roleValue === undefined ? undefined : oneOf(roleValue, "role", ROLES);
+            roleValue === undefined
+                ? undefined
+                : oneOf(roleValue, "role", ROLES);
         const remoteUrl = checkRemoteUrl(
             optionalSettingString(p, "remoteUrl", current.remoteUrl),
         );
@@ -206,13 +230,7 @@ export function setupSettingsStatusMethods(
             p.language === undefined
                 ? uiLanguage()
                 : oneOf(p.language, "language", LANGUAGES);
-        const remoteChanged =
-            remoteUrl !== current.remoteUrl ||
-            remoteToken !== current.remoteToken;
-        // A rename forces a re-hello to the same URL.
-        const renamed = hostname !== current.hostname;
-
-        state.settings = {
+        const next: DeviceSettings = {
             ...current,
             hostname,
             role,
@@ -221,29 +239,22 @@ export function setupSettingsStatusMethods(
             color,
             language,
         };
+        // Labels of the settings that moved from their saved value. A non-empty
+        // list means the box must re-register with the control server (new
+        // name / dot color / endpoint); an empty remote url stops the link.
+        const changed = compare(settingFields, current, next);
+
+        state.settings = next;
         setCurrentLanguage(language);
         await saveState();
-        if (remoteChanged) {
-            applyRemoteSettings(remoteUrl ?? "", remoteToken);
-            logEvent(
-                "info",
-                "Settings",
-                remoteUrl
-                    ? t("log.settings_saved_reconnect", {
-                          url: scrubUrl(remoteUrl),
-                      })
-                    : t("mlog.done.remote_disabled"),
-            );
-        } else if (renamed && remoteUrl) {
-            applyRemoteSettings(remoteUrl, remoteToken);
-            logEvent(
-                "info",
-                "Settings",
-                t("log.settings_saved_renamed", { hostname }),
-            );
-        } else {
-            logEvent("info", "Settings", t("mlog.done.settings_saved"));
-        }
+        if (changed.length > 0) applyRemoteSettings(remoteUrl ?? "", remoteToken);
+        logEvent(
+            "info",
+            "Settings",
+            changed.length > 0
+                ? t("log.settings_saved_fields", { fields: changed.join(", ") })
+                : t("mlog.done.settings_saved"),
+        );
         return { settings: settingsView(), restartRequired: true };
     }
 

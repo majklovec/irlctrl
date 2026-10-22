@@ -195,6 +195,7 @@
     "log.restart_failed": "Échec du redémarrage : {{error}}",
     "log.settings_saved_reconnect": "Paramètres enregistrés; reconnexion à {{url}}",
     "log.settings_saved_renamed": "Paramètres enregistrés; appareil renommé en {{hostname}}",
+    "log.settings_saved_fields": "Paramètres enregistrés : {{fields}}",
     "log.srtla_exited": "srtla_send s'est arrêté avec le code {{code}}; redémarrage dans {{delay}}s",
     "log.started": "Service démarré ({{role}})",
     "log.stopped_signal": "Service arrêté ({{signal}})",

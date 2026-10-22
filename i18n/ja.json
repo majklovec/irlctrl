@@ -195,6 +195,7 @@
     "log.restart_failed": "再起動に失敗しました: {{error}}",
     "log.settings_saved_reconnect": "設定を保存しました; {{url}} に再接続中",
     "log.settings_saved_renamed": "設定を保存しました; デバイスを {{hostname}} に名前変更しました",
+    "log.settings_saved_fields": "設定を保存しました: {{fields}}",
     "log.srtla_exited": "srtla_send がコード {{code}} で終了しました; {{delay}}s 後に再起動します",
     "log.started": "サービスを開始しました ({{role}})",
     "log.stopped_signal": "サービスを停止しました ({{signal}})",
