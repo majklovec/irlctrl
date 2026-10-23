@@ -11,3 +11,4 @@ pipeline/majklovec
 generated/
 dist/*
 users.db
+config/
