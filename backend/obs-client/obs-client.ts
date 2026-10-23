@@ -215,6 +215,12 @@ const FORWARDED_EVENTS = [
     "InputMuteStateChanged",
 ] as const;
 
+// Max rate (Hz) at which InputVolumeMeters frames are pushed to the control
+// server. The dashboard's VU meter is smoothed in a rAF loop, so 15 Hz is
+// visually identical to OBS's full metering rate while cutting the traffic.
+const METERS_MAX_HZ = 5;
+const METERS_MIN_INTERVAL_MS = Math.floor(1000 / METERS_MAX_HZ);
+
 // Case-insensitive event-name -> subscription bit (same names methods.ts accepts)
 const SUBSCRIPTION_LOOKUP: Record<string, number> = Object.fromEntries(
     Object.entries(EventSubscription)
@@ -296,11 +302,8 @@ async function main(): Promise<void> {
     const remoteInterval =
         arg("--remote-interval") !== undefined
             ? intArg("--remote-interval", 30, 0, 3600)
-            : (cfg.remoteInterval ?? 30);
-    let deviceName = arg(
-        "--hostname",
-        cfgStr("hostname") ?? hostname(),
-    );
+            : cfg.remoteInterval ?? 30;
+    let deviceName = arg("--hostname", cfgStr("hostname") ?? hostname());
     let deviceColor = checkColor(cfgStr("color") ?? DEFAULT_COLOR);
 
     if (flag("--help") || flag("-h")) {
@@ -333,15 +336,22 @@ async function main(): Promise<void> {
     // the uuid and the switcher's slice lived in a separate state file.
     // Pull them into the config file if it doesn't have them yet, so existing
     // boxes keep their identity and switcher settings.
-    if (cfg["uuid"] === undefined || cfg["low-bitrate-switcher"] === undefined) {
+    if (
+        cfg["uuid"] === undefined ||
+        cfg["low-bitrate-switcher"] === undefined
+    ) {
         const legacy = (await Bun.file(join(tmpdir(), "obs-client.json"))
             .json()
-            .catch(() => null)) as
-            | { uuid?: string; "low-bitrate-switcher"?: SwitcherStateSlice }
-            | null;
+            .catch(() => null)) as {
+            uuid?: string;
+            "low-bitrate-switcher"?: SwitcherStateSlice;
+        } | null;
         if (cfg["uuid"] === undefined && legacy?.uuid)
             cfg["uuid"] = legacy.uuid;
-        if (cfg["low-bitrate-switcher"] === undefined && legacy?.["low-bitrate-switcher"])
+        if (
+            cfg["low-bitrate-switcher"] === undefined &&
+            legacy?.["low-bitrate-switcher"]
+        )
             cfg["low-bitrate-switcher"] = legacy["low-bitrate-switcher"];
     }
 
@@ -385,6 +395,10 @@ async function main(): Promise<void> {
     let pingTimer: ReturnType<typeof setInterval> | null = null;
     let statusTimer: ReturnType<typeof setInterval> | null = null;
     let lastSeen = 0;
+    // Throttle bookkeeping for InputVolumeMeters (leading edge on first tick,
+    // trailing edge so the newest level is always the one sent).
+    let lastMeterPushAt = 0;
+    let meterTrailTimer: ReturnType<typeof setTimeout> | null = null;
 
     const send = (msg: string): void => {
         if (sock && sock.readyState === WebSocket.OPEN) sock.send(msg);
@@ -566,6 +580,40 @@ async function main(): Promise<void> {
             }),
         );
 
+    // Throttled InputVolumeMeters push. Leading edge fires immediately when the
+    // interval elapsed; a trailing edge guarantees the most recent level is
+    // sent even when OBS ticks faster than the cap, so the VU meter never lags.
+    const pushMetersEvent = (event: {
+        eventIntent: number;
+        eventData?: Record<string, unknown>;
+    }): void => {
+        const frame = (): string =>
+            JSON.stringify({
+                type: "event",
+                event: "obs.event",
+                module: OBS_MODULE,
+                data: {
+                    eventType: "InputVolumeMeters",
+                    eventIntent: event.eventIntent,
+                    eventData: event.eventData,
+                },
+            });
+        const now = Date.now();
+        if (now - lastMeterPushAt >= METERS_MIN_INTERVAL_MS) {
+            lastMeterPushAt = now;
+            send(frame());
+        } else if (meterTrailTimer === null) {
+            meterTrailTimer = setTimeout(
+                () => {
+                    meterTrailTimer = null;
+                    lastMeterPushAt = Date.now();
+                    send(frame());
+                },
+                METERS_MIN_INTERVAL_MS - (now - lastMeterPushAt),
+            );
+        }
+    };
+
     // The modules card (shared by the status page and the settings page).
     const moduleState = (): Record<string, unknown> => ({
         relay: { enabled: false },
@@ -708,9 +756,7 @@ async function main(): Promise<void> {
                     // The shared settings page saves the common fields here.
                     const p = params;
                     if (p.uuid !== undefined && p.uuid !== uuid)
-                        throw new ApiError(
-                            "The device uuid can't be changed",
-                        );
+                        throw new ApiError("The device uuid can't be changed");
                     const deviceName_ =
                         checkHostname(
                             optionalSettingString(p, "hostname", deviceName),
@@ -747,15 +793,12 @@ async function main(): Promise<void> {
                     deviceColor = deviceColor_;
                     remoteUrl = remoteUrl_;
                     remoteToken = remoteToken_ ?? "";
-                    Object.assign(
-                        cfg,
-                        {
-                            hostname: deviceName,
-                            color: deviceColor,
-                            remoteUrl,
-                            remoteToken,
-                        } satisfies ObsClientConfig,
-                    );
+                    Object.assign(cfg, {
+                        hostname: deviceName,
+                        color: deviceColor,
+                        remoteUrl,
+                        remoteToken,
+                    } satisfies ObsClientConfig);
                     writeCfg();
                     if (
                         remoteChanged ||
@@ -887,6 +930,13 @@ async function main(): Promise<void> {
                 if (name === "StreamStateChanged")
                     obsStreaming = readStreaming(data);
             }
+            if (name === "InputVolumeMeters") {
+                // High-rate meter ticks: throttle them, and do NOT re-push
+                // status — the 30s liveness timer is enough, and a full status
+                // frame per meter tick is what drove the page to ~1 Mbps.
+                pushMetersEvent(event);
+                return;
+            }
             pushObsEvent(name, event.eventIntent, event.eventData);
             pushStatus(); // the event proves the OBS link is alive
         });
@@ -907,7 +957,8 @@ async function main(): Promise<void> {
     function clearTimers(): void {
         if (pingTimer) clearInterval(pingTimer);
         if (statusTimer) clearInterval(statusTimer);
-        pingTimer = statusTimer = null;
+        if (meterTrailTimer) clearTimeout(meterTrailTimer);
+        pingTimer = statusTimer = meterTrailTimer = null;
     }
 
     function connect(): void {
