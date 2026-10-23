@@ -239,10 +239,10 @@ const help = (code: number = 0): void => {
         "The connection info (uuid, obsUrl, obsPassword, remoteUrl, remoteToken," +
             " hostname, low-bitrate-switcher) is kept in the config file" +
             " (defaults to tmpdir/obs-client-config.json);" +
-            " CLI flags > config file > env vars > defaults.",
+            " CLI flags > env vars > config file > defaults.",
     );
     console.log(
-        "The CONTROL_SERVER_TOKEN / CONTROL_SERVER_URL / OBS_URL / OBS_PASSWORD env vars provide initial values (the config file wins).",
+        "The CONTROL_SERVER_TOKEN / CONTROL_SERVER_URL / OBS_URL / OBS_PASSWORD env vars override the config file (e.g. from docker-compose).",
     );
     process.exit(code);
 };
@@ -274,25 +274,24 @@ async function main(): Promise<void> {
             .catch(() => null)) as ObsClientConfig | null) ?? {};
     const cfgStr = (key: keyof ObsClientConfig): string | undefined =>
         typeof cfg[key] === "string" ? (cfg[key] as string) : undefined;
-    // CLI flags > config file > env vars > defaults: the env vars are only
-    // initial values (first run); values persisted to the config file (e.g.
-    // by the settings page) win on later runs.
+    // CLI flags > env vars > config file > defaults: the env vars (e.g. from
+    // docker-compose) override values persisted to the config file.
     const obsUrl = arg(
         "--obs",
-        cfgStr("obsUrl") ?? process.env.OBS_URL ?? "ws://127.0.0.1:4455",
+        process.env.OBS_URL ?? cfgStr("obsUrl") ?? "ws://127.0.0.1:4455",
     );
     const obsPassword = arg(
         "--obs-password",
-        cfgStr("obsPassword") ?? process.env.OBS_PASSWORD ?? "",
+        process.env.OBS_PASSWORD ?? cfgStr("obsPassword") ?? "",
     );
     // mutable — `settings.update` can change these while the box runs
     let remoteUrl = arg(
         "--remote",
-        cfgStr("remoteUrl") ?? process.env.CONTROL_SERVER_URL ?? "",
+        process.env.CONTROL_SERVER_URL ?? cfgStr("remoteUrl") ?? "",
     );
     let remoteToken = arg(
         "--remote-token",
-        cfgStr("remoteToken") ?? process.env.CONTROL_SERVER_TOKEN ?? "",
+        process.env.CONTROL_SERVER_TOKEN ?? cfgStr("remoteToken") ?? "",
     );
     const remoteInterval =
         arg("--remote-interval") !== undefined
@@ -314,8 +313,8 @@ async function main(): Promise<void> {
         argFail("--remote", remoteUrl, "ws:// or wss:// URL");
 
     // This box's own config file: the resolved connection info is written
-    // back (CLI flags win), so the file always reflects the connection
-    // actually in use and survives restarts; env vars only seed first run.
+    // back (CLI > env > config file), so the file always reflects the
+    // connection actually in use and survives restarts.
     const cfgUuid = arg("--uuid");
     if (cfgUuid) cfg["uuid"] = cfgUuid;
     Object.assign(cfg, {

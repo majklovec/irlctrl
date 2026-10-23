@@ -39,13 +39,10 @@ function connBadge(): m.Vnode {
     const online = state.devices?.filter((d) => d.online).length ?? 0;
     return (
         <Badge
-            text={t(
-                "dev.badge.online_count",
-                {
-                    online,
-                    total: state.devices?.length ?? 0,
-                },
-            )}
+            text={t("dev.badge.online_count", {
+                online,
+                total: state.devices?.length ?? 0,
+            })}
             kind={online ? "on" : "warn"}
         />
     );
@@ -113,10 +110,7 @@ const App: m.Component = {
         const columns = deviceSummaryColumnDefinitions();
         const headers = columnHeaders(columns);
         return (
-            <Page
-                title={t("mgmt.title")}
-                nav={<ServerNav active="devices" />}
-                headerRight={connBadge()}>
+            <Page title={t("mgmt.title")} nav={<ServerNav active="devices" />}>
                 <Card>
                     <table>
                         <thead>

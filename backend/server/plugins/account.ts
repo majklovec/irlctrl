@@ -10,18 +10,10 @@ export function accountRoutes(auth: Auth, frontend: Frontend) {
     return new Elysia({ name: "control-account" })
         .get(
             "/",
-            authenticatedHandler(auth, () =>
-                frontend.htmlResponse("devices"),
-            ),
+            authenticatedHandler(auth, () => frontend.htmlResponse("devices")),
         )
         .get(
             "/profile",
-            authenticatedHandler(auth, () =>
-                Response.redirect("/profile/", 308),
-            ),
-        )
-        .get(
-            "/profile/",
             authenticatedHandler(auth, () => frontend.htmlResponse("profile")),
         )
         .get(

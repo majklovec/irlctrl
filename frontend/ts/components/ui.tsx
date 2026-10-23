@@ -132,7 +132,7 @@ const ServerNavComponent: m.Component<{
                 </button>
                 {profile.open ? (
                     <span class={"profile-menu-dropdown"} role={"menu"}>
-                        <a role={"menuitem"} href={"/profile/"}>
+                        <a role={"menuitem"} href={"/profile"}>
                             {t("nav.profile")}
                         </a>
                         <button

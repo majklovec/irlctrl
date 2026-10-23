@@ -38,15 +38,15 @@ export const ALLOWED_ORIGINS = arg("--allow-origin", "")
     .map((o) => o.trim())
     .filter(Boolean);
 // Outbound control connection: status is pushed to and requests accepted from this server.
-// CLI > config file > env: the env vars are only initial values (first run);
-// values persisted to the config file (e.g. by the settings page) win.
+// CLI > env > config file: the env vars (e.g. from docker-compose) override the
+// persisted config; an explicit CLI flag still wins over both.
 export const REMOTE_URL = arg(
     "--remote",
-    persisted("remoteUrl") ?? process.env.CONTROL_SERVER_URL ?? "",
+    process.env.CONTROL_SERVER_URL ?? persisted("remoteUrl") ?? "",
 );
 export const REMOTE_TOKEN = arg(
     "--remote-token",
-    persisted("remoteToken") ?? process.env.CONTROL_SERVER_TOKEN ?? "",
+    process.env.CONTROL_SERVER_TOKEN ?? persisted("remoteToken") ?? "",
 );
 export const REMOTE_INTERVAL = intArg("--remote-interval", 30); // periodic status push, seconds (0 = off)
 export const REMOTE_STATS_INTERVAL = intArg("--remote-stats-interval", 2); // srtla_send link stats push, seconds (0 = off)

@@ -92,8 +92,8 @@ sudo CONTROL_SERVER_TOKEN=token \
 | `--bitrate-file`          |                        | `$TMPDIR/belacoder_br`           | belacoder bitrate file (re-read on SIGHUP)                                                                  |
 | `--ceracoder-conf`        |                        | `$TMPDIR/ceracoder.conf`         | ceracoder INI config (balancer + tuning), applied live by the encoder module                                |
 | `--log-file`              |                        | `$TMPDIR/srtla_log.json`         | Persistent event log shown in the web UI                                                                    |
-| `--remote`                | `CONTROL_SERVER_URL`   |                                  | Control server, e.g. `wss://ctl.example.com/device`                                                         |
-| `--remote-token`          | `CONTROL_SERVER_TOKEN` |                                  | Prefer the env var (keeps it out of `ps`)                                                                   |
+| `--remote`                | `CONTROL_SERVER_URL`   |                                  | Control server, e.g. `wss://ctl.example.com/device`. The env var overrides the config file (CLI flag overrides both)  |
+| `--remote-token`          | `CONTROL_SERVER_TOKEN` |                                  | Prefer the env var (keeps it out of `ps`); the env var overrides the config file                              |
 | `--remote-interval`       |                        | `30`                             | Periodic status push in seconds (`0` = only on change)                                                      |
 | `--remote-stats-interval` |                        | `2`                              | `srtla_send` link-stats push to the control server in seconds (`0` = off)                                   |
 | `--dry-run`               |                        |                                  | Print `ip`/process actions instead of running them                                                          |
@@ -128,7 +128,7 @@ The server replaces HTTP Basic auth with per-user profiles stored in a local **S
 -   **Devices** authenticate with `Authorization: Bearer <token>` when they open their `ws://<server>/device` connection. The server resolves the token to a user and assigns the device to that user — devices are therefore owned by the profile whose token presented them.
 -   **Browsers** sign in at `/login` with the username and password. A successful login sets an `HttpOnly` session cookie; all device lists, device pages, and dashboards are then scoped to that user. Only devices owned by the signed-in user are visible, and only that user can open a device's page/WS or edit its dashboards.
 -   **`/register`** creates a new account. The **first** account is bootstrapped as admin without an invite code; every account after that needs a valid, single-use **invitation code** (optionally expiring) minted by an admin. New profiles start with no device tokens — add them on the profile page after signing in.
--   **`/profile/`** (reached from the username menu in the header) changes the login password and lists/manages the user's device tokens — adding new ones and removing old ones. Admins additionally get an **invitations panel** to mint fresh invite codes and review the code history.
+-   **`/profile`** (reached from the username menu in the header) changes the login password and lists/manages the user's device tokens — adding new ones and removing old ones. Admins additionally get an **invitations panel** to mint fresh invite codes and review the code history.
 -   `--no-auth` maps everything to a single local profile for local testing (no database needed; dashboards are kept in memory only).
 
 ```sh
@@ -142,10 +142,10 @@ CONTROL_SERVER_TOKEN=tok-alice-1 bun backend/client/client.ts --role encoder --r
 open http://ctl.example.com/  # redirects to /login; enter the username + password
 ```
 
-| Option             | Env        | Notes                                                             |
-| ------------------ | ---------- | ----------------------------------------------------------------- |
-| `--host`, `--port` |            | Default `0.0.0.0:8090`                                            |
-| `--db`             | `SRTLA_DB` | SQLite database: users, device tokens, dashboards (default `users.db`) |
+| Option             | Env        | Notes                                                                                                               |
+| ------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------- |
+| `--host`, `--port` |            | Default `0.0.0.0:8090`                                                                                              |
+| `--db`             | `SRTLA_DB` | SQLite database: users, device tokens, dashboards (default `users.db`)                                              |
 | `--no-auth`        |            | Local testing only — one shared `local` profile, no tokens needed (no database; dashboards are kept in memory only) |
 
 > [!IMPORTANT]
@@ -232,10 +232,10 @@ and frontend implementation remain co-located. Cross-layer wire types live in
 
 **Channel widgets** — dashboard-only, run on the control server (device-independent); one hub per module serves all widgets of its kind:
 
-| Widget       | Source                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `stats`      | Configure YouTube (channel ID or handle), Twitch, and Kick channels independently. Polls each configured source every 30 s and charts each viewer count plus their combined total (1 h window).                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `chat`       | One widget, one merged feed: config has a channel per platform (`youtube`, `twitch`, `tiktok`, `kick`) and every filled channel is joined, its messages merged into the single view. Per-platform transports live in `modules/chat/providers/`: Kick joins the public chat Pusher room (no auth), Twitch one IRC-over-websocket connection per channel (anonymous `justinfan` nick, IRCv3 tags), YouTube polls the live-chat endpoint per creator handle (~1 s cadence) via [`youtube-chat-next`](https://www.npmjs.com/package/youtube-chat-next), TikTok one [`tiktok-live-connector`](https://www.npmjs.com/package/tiktok-live-connector) websocket (reconnect loop owned by the module). |
+| Widget  | Source                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `stats` | Configure YouTube (channel ID or handle), Twitch, and Kick channels independently. Polls each configured source every 30 s and charts each viewer count plus their combined total (1 h window).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `chat`  | One widget, one merged feed: config has a channel per platform (`youtube`, `twitch`, `tiktok`, `kick`) and every filled channel is joined, its messages merged into the single view. Per-platform transports live in `modules/chat/providers/`: Kick joins the public chat Pusher room (no auth), Twitch one IRC-over-websocket connection per channel (anonymous `justinfan` nick, IRCv3 tags), YouTube polls the live-chat endpoint per creator handle (~1 s cadence) via [`youtube-chat-next`](https://www.npmjs.com/package/youtube-chat-next), TikTok one [`tiktok-live-connector`](https://www.npmjs.com/package/tiktok-live-connector) websocket (reconnect loop owned by the module). |
 
 Chat widgets keep rolling message history so reconnects don't re-send, and a `seen` set that dedupes message ids across reconnects.
 
@@ -296,12 +296,12 @@ The control-server build hook bundles the browser pages and embeds their generat
 [`backend/server/server.ts`](./backend/server/server.ts) remains the CLI entrypoint. Its implementation lives in
 [`backend/server/`](./backend/server/):
 
-- [`auth.ts`](./backend/server/auth.ts) owns SQLite initialization, passwords, sessions, profiles, device tokens and invitations.
-- [`devices.ts`](./backend/server/devices.ts) owns the device registry, request forwarding, cached telemetry/logs and device-list broadcasts.
-- [`dashboards.ts`](./backend/server/dashboards.ts) owns dashboard validation, persistence, API responses and widget-hub synchronization.
-- [`shared/frontend.ts`](./shared/frontend.ts) bundles the UI at startup in source mode; compiled builds serve matching pages and embedded assets generated by [`gen-control-server-assets.ts`](./scripts/gen-control-server-assets.ts).
-- [`control-server.ts`](./backend/server/control-server.ts) composes the domains, HTTP routes, WebSocket handlers and maintenance timers.
-- [`contracts.ts`](./backend/server/contracts.ts) holds shared socket data, topics and event framing.
+-   [`auth.ts`](./backend/server/auth.ts) owns SQLite initialization, passwords, sessions, profiles, device tokens and invitations.
+-   [`devices.ts`](./backend/server/devices.ts) owns the device registry, request forwarding, cached telemetry/logs and device-list broadcasts.
+-   [`dashboards.ts`](./backend/server/dashboards.ts) owns dashboard validation, persistence, API responses and widget-hub synchronization.
+-   [`shared/frontend.ts`](./shared/frontend.ts) bundles the UI at startup in source mode; compiled builds serve matching pages and embedded assets generated by [`gen-control-server-assets.ts`](./scripts/gen-control-server-assets.ts).
+-   [`control-server.ts`](./backend/server/control-server.ts) composes the domains, HTTP routes, WebSocket handlers and maintenance timers.
+-   [`contracts.ts`](./backend/server/contracts.ts) holds shared socket data, topics and event framing.
 
 The domains receive their dependencies explicitly: authentication resolves device
 tokens, the registry supplies device ownership checks to dashboards, and the

@@ -526,7 +526,7 @@
     "lowbs.enable_switcher": "Přepínač nízkého datového toku",
     "lowbs.auto_switch": "Automatické přepínání",
     "lowbs.obs_source": "OBS SRT zdroj",
-    "lowbs.group_triggers": "Spouštěče",
+    "lowbs.group_triggers": "Podmínky",
     "lowbs.trigger_low_bitrate": "Nízký datový tok (kbps)",
     "lowbs.trigger_offline_bitrate": "Datový tok při odpojení (kbps)",
     "lowbs.trigger_rtt": "RTT (ms)",
