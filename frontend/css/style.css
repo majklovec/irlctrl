@@ -410,9 +410,11 @@ main {
 	--tint: var(--warn);
 }
 
+/* Label column keeps its natural width when space is plentiful but shrinks
+   (labels wrap) in narrow containers, so values always get the rest. */
 dl {
 	display: grid;
-	grid-template-columns: max-content 1fr;
+	grid-template-columns: minmax(min-content, max-content) 1fr;
 	gap: 0.3rem 1rem;
 	margin: 0 0 1rem;
 }
