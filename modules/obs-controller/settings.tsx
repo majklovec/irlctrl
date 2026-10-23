@@ -37,9 +37,7 @@ async function save(ctx: ModuleContext): Promise<void> {
 export const def: ModuleDef = {
 	id: "obs-controller",
 	titleKey: "set.obs",
-	visible: (ctx) =>
-		ctx.role === "obs" ||
-		(ctx.role === "custom" && ctx.modules["obs-controller"].enabled === true),
+	visible: (ctx) => ctx.role === "obs",
 	refresh: (ctx) => {
 		draft.obsUrl = ctx.modules["obs-controller"].obsUrl;
 		draft.obsPassword = "";

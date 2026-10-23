@@ -105,7 +105,7 @@ async function startSaved(): Promise<boolean> {
 				await startCombined(state.stream, cfg);
 			return true;
 		default:
-			// obs/custom roles have no stream of their own
+			// obs roles have no stream of their own
 			return false;
 	}
 }

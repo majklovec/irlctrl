@@ -1166,7 +1166,6 @@ const obsDashboardWidgets: DeviceDashboardWidget[] = [
 		type: "obs",
 		available: (device) =>
 			(device.role === "obs" ||
-				device.role === "custom" ||
 				device.role === undefined) &&
 			device.modules?.["obs-controller"]?.enabled === true,
 		defaultSize: { w: 6, h: 13 },

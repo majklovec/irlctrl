@@ -91,6 +91,9 @@ const METHOD_LOG: Record<string, MethodLog> = {
 	"ssh.reset_password": log("SSH", "Password reset", (p) =>
 		translate("mlog.done.ssh_password_reset", { user: p.user }),
 	),
+	"ssh.set_password": log("SSH", "Password set", (p) =>
+		translate("mlog.done.ssh_password_set", { user: p.user }),
+	),
 	"modems.select": log(
 		"Interfaces",
 		"Bond selection",

@@ -26,12 +26,6 @@ const ROLE_SHAPES = {
 		["path", { d: "m9 7 5 3.5L9 14z" }],
 		["path", { d: "M8 21h8M12 17v4" }],
 	],
-	custom: [
-		["rect", { x: "3", y: "3", width: "8", height: "8", rx: "1.5" }],
-		["rect", { x: "13", y: "3", width: "8", height: "8", rx: "1.5" }],
-		["rect", { x: "3", y: "13", width: "8", height: "8", rx: "1.5" }],
-		["path", { d: "M17 13v8M13 17h8" }],
-	],
 } as const satisfies Record<string, Shape>;
 
 // Four-tile pictogram that marks the dashboard editor page
@@ -86,12 +80,6 @@ const ROLE_CARD_SHAPES = {
 		["rect", { x: "2", y: "3", width: "20", height: "14", rx: "2" }],
 		["path", { d: "m9 7 5 3.5L9 14z" }],
 		["path", { d: "M8 21h8M12 17v4" }],
-	],
-	custom: [
-		["rect", { x: "3", y: "3", width: "8", height: "8", rx: "1.5" }],
-		["rect", { x: "13", y: "3", width: "8", height: "8", rx: "1.5" }],
-		["rect", { x: "3", y: "13", width: "8", height: "8", rx: "1.5" }],
-		["path", { d: "M17 13v8M13 17h8" }],
 	],
 } as const satisfies Record<Role, Shape>;
 

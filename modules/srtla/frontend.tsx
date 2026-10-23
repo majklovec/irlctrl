@@ -5,7 +5,7 @@
  * same content. */
 import "./styles.css";
 import m from "mithril";
-import { icon } from "../../frontend/ts/components/icons";
+import { gearIcon, icon } from "../../frontend/ts/components/icons";
 import {
 	Actions,
 	Badge,
@@ -156,7 +156,6 @@ const srtlaDashboardWidgets: DeviceDashboardWidget[] = [
 		type: "relay",
 		available: (device) =>
 			device.role === "relay" ||
-			device.role === "custom" ||
 			device.role === undefined,
 		defaultSize: { w: 4, h: 4 },
 		minSize: { w: 3, h: 3 },
@@ -173,7 +172,6 @@ const srtlaDashboardWidgets: DeviceDashboardWidget[] = [
 		type: "combined",
 		available: (device) =>
 			device.role === "combined" ||
-			device.role === "custom" ||
 			device.role === undefined,
 		defaultSize: { w: 6, h: 10 },
 		minSize: { w: 4, h: 8 },
@@ -610,7 +608,10 @@ function interfacesCard(host: DeviceCard, status: Status): m.Vnode {
 					/>
 				),
 				<Button
-					label={t("ui.reconfigure")}
+					label={gearIcon()}
+					class="icon-link"
+					title={t("ui.reconfigure")}
+					aria-label={t("ui.reconfigure")}
 					disabled={host.busy.has("reconfigure")}
 					onclick={() => void host.act("reconfigure", "reconfigure")}
 				/>,

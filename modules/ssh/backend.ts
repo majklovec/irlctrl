@@ -124,20 +124,14 @@ async function setAccountPassword(
 	}
 }
 
-async function resetPassword(
-	params: Record<string, unknown>,
-): Promise<SshPasswordReset> {
-	const user =
-		(typeof params.user === "string" && params.user.trim()) || sshUser();
-	if (!user) throw new Error("user is required");
-
+/** Ensure the account exists, set its password, and persist the state. */
+async function applyPassword(user: string, password: string): Promise<void> {
 	// Ensure the account exists (idempotent).
 	const uid = await core.run("id", ["-u", user], true);
 	if (!uid.trim()) {
 		await core.run("useradd", ["-m", "-s", "/bin/bash", user]);
 	}
 
-	const password = generatePassword();
 	await setAccountPassword(user, password);
 
 	const slice = core.state.settings.modules?.ssh;
@@ -146,6 +140,17 @@ async function resetPassword(
 		slice.password = password;
 	}
 	await core.saveState();
+}
+
+async function resetPassword(
+	params: Record<string, unknown>,
+): Promise<SshPasswordReset> {
+	const user =
+		(typeof params.user === "string" && params.user.trim()) || sshUser();
+	if (!user) throw new Error("user is required");
+
+	const password = generatePassword();
+	await applyPassword(user, password);
 	core.logEvent(
 		"info",
 		"ssh",
@@ -154,11 +159,32 @@ async function resetPassword(
 	return { user, password };
 }
 
+/** Set the operator-supplied password on the SSH account. */
+async function setPassword(
+	params: Record<string, unknown>,
+): Promise<{ user: string }> {
+	const user =
+		(typeof params.user === "string" && params.user.trim()) || sshUser();
+	const password =
+		typeof params.password === "string" ? params.password.trim() : "";
+	if (!user) throw new Error("user is required");
+	if (!password) throw new Error("password is required");
+
+	await applyPassword(user, password);
+	core.logEvent(
+		"info",
+		"ssh",
+		core.t("mlog.done.ssh_password_set", { user }),
+	);
+	return { user };
+}
+
 const methods = [
 	"ssh.status",
 	"ssh.start",
 	"ssh.stop",
 	"ssh.reset_password",
+	"ssh.set_password",
 ] as const;
 
 export default {
@@ -186,6 +212,8 @@ export default {
 				return stopSsh();
 			case "ssh.reset_password":
 				return resetPassword(params);
+			case "ssh.set_password":
+				return setPassword(params);
 		}
 		throw new Error(`unknown method ${method}`);
 	},

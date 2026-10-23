@@ -196,8 +196,7 @@ export const def: ModuleDef = {
 	selfCards: true,
 	visible: (ctx) =>
 		ctx.role === "encoder" ||
-		ctx.role === "combined" ||
-		(ctx.role === "custom" && ctx.modules.encoder.enabled === true),
+		ctx.role === "combined",
 	refresh: (ctx) => {
 		state.repositories = repositoryList(ctx.settings.pipelineRepositories);
 		void loadPipelines(ctx);
