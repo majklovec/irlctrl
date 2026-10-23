@@ -13,26 +13,31 @@ jobs:
   version:
     runs-on: ubuntu-latest
     outputs:
-      new_tag: ${{ steps.tag.outputs.new_tag }}
-      changelog: ${{ steps.changelog.outputs.changes }}
+      new_tag: ${{ steps.semver.outputs.new_tag }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Create changelog text
-        id: changelog
-        uses: loopwerk/tag-changelog@v1
+      - uses: actions/setup-node@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          exclude_types: other,doc,chore
+          node-version: 22
 
-      - id: tag
-        uses: anothrNick/github-tag-action@1.71.0
+      - name: Semantic versioning (semantic-release)
+        id: semver
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WITH_V: true
-          RELEASE_BRANCHES: main
+        run: |
+          # Analyzes conventional commits since the last tag and, when a
+          # bump is warranted, publishes the tag + GitHub release directly.
+          npx --yes semantic-release@24
+
+          # Detect whether this push was released: semantic-release tags HEAD.
+          git fetch --force --tags
+          TAG="$(git describe --tags --abbrev=0 HEAD 2>/dev/null || true)"
+          if [ -n "$TAG" ] && [ "$(git rev-parse "$TAG^{commit}")" = "$(git rev-parse HEAD)" ]; then
+            echo "new_tag=${TAG}" >> "$GITHUB_OUTPUT"
+          fi
 
   build:
     needs: version
@@ -196,6 +201,7 @@ jobs:
         with:
           tag_name: ${{ needs.version.outputs.new_tag }}
           name: Release ${{ needs.version.outputs.new_tag }}
-          body: ${{ needs.version.outputs.changelog }}
+          # Release body is already set by semantic-release (conventional
+          # commit changelog); this step only attaches the binaries.
           files: artifacts/*
           token: ${{ secrets.GITHUB_TOKEN }}
