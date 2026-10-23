@@ -13,28 +13,28 @@
  */
 import "../../shared/registry"; // side effect: discover module backends + provide capabilities
 import {
-    requireCapability,
-    type EncoderServices,
-    type ModemServices,
-    type ObsServices,
-    type SrtlaServices,
+	type EncoderServices,
+	type ModemServices,
+	type ObsServices,
+	requireCapability,
+	type SrtlaServices,
 } from "./capabilities";
 
 function lazyCapability<T>(name: string): T {
-    return new Proxy({} as Record<PropertyKey, unknown>, {
-        get(_target, prop) {
-            const impl = requireCapability<Record<PropertyKey, unknown>>(name);
-            const value = impl[prop];
-            return typeof value === "function" ? value.bind(impl) : value;
-        },
-    }) as T;
+	return new Proxy({} as Record<PropertyKey, unknown>, {
+		get(_target, prop) {
+			const impl = requireCapability<Record<PropertyKey, unknown>>(name);
+			const value = impl[prop];
+			return typeof value === "function" ? value.bind(impl) : value;
+		},
+	}) as T;
 }
 
 export const encoderServices: EncoderServices =
-    lazyCapability<EncoderServices>("stream.encoder");
+	lazyCapability<EncoderServices>("stream.encoder");
 export const srtlaServices: SrtlaServices =
-    lazyCapability<SrtlaServices>("stream.srtla");
+	lazyCapability<SrtlaServices>("stream.srtla");
 export const modemServices: ModemServices =
-    lazyCapability<ModemServices>("stream.modems");
+	lazyCapability<ModemServices>("stream.modems");
 export const obsServices: ObsServices =
-    lazyCapability<ObsServices>("stream.obs");
+	lazyCapability<ObsServices>("stream.obs");

@@ -6,31 +6,31 @@
  * now lives inside this one) scope the modem panels of the composite card.
  */
 .mod-modems .modem {
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 0.9rem 1rem;
-    background: var(--card-subtle);
-    transition:
-        border-color var(--t),
-        background var(--t);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 0.9rem 1rem;
+	background: var(--card-subtle);
+	transition:
+		border-color var(--t),
+		background var(--t);
 }
 .mod-modems .modem:hover {
-    border-color: var(--border-strong);
+	border-color: var(--border-strong);
 }
 .mod-modems .modem h3 {
-    font-size: 0.95rem;
-    margin: 0 0 0.5rem;
-    display: flex;
-    justify-content: space-between;
-    gap: 0.5rem;
+	font-size: 0.95rem;
+	margin: 0 0 0.5rem;
+	display: flex;
+	justify-content: space-between;
+	gap: 0.5rem;
 }
 .mod-modems .modem dl {
-    font-size: 0.85rem;
-    margin-bottom: 0.75rem;
+	font-size: 0.85rem;
+	margin-bottom: 0.75rem;
 }
 .mod-modems .modem .actions button {
-    padding: 0.35rem 0.6rem;
-    font-size: 0.8rem;
+	padding: 0.35rem 0.6rem;
+	font-size: 0.8rem;
 }
 
 /* Responsive interfaces table: when the dashboard cell is narrow, drop the
@@ -40,45 +40,45 @@
  * signal/network tiers apply there. Ignored outside .dash-widget (e.g. the
  * full-width device page). */
 @container dash-widget (max-width: 920px) {
-    th.is-inflight,
-    td.is-inflight,
-    th.is-naks,
-    td.is-naks,
-    th.is-loss,
-    td.is-loss,
-    th.is-quality,
-    td.is-quality {
-        display: none;
-    }
+	th.is-inflight,
+	td.is-inflight,
+	th.is-naks,
+	td.is-naks,
+	th.is-loss,
+	td.is-loss,
+	th.is-quality,
+	td.is-quality {
+		display: none;
+	}
 }
 @container dash-widget (max-width: 660px) {
-    th.is-rtt,
-    td.is-rtt,
-    th.is-network,
-    td.is-network {
-        display: none;
-    }
+	th.is-rtt,
+	td.is-rtt,
+	th.is-network,
+	td.is-network {
+		display: none;
+	}
 }
 @container dash-widget (max-width: 486px) {
-    th.is-signal,
-    td.is-signal {
-        display: none;
-    }
-    /* Compact: small padding/font and a wrapping interface name keep the
+	th.is-signal,
+	td.is-signal {
+		display: none;
+	}
+	/* Compact: small padding/font and a wrapping interface name keep the
      * 4-column table inside very narrow cells (fits down to ~260px). */
-    .mod-srtla table {
-        font-size: 0.8rem;
-    }
-    .mod-srtla th,
-    .mod-srtla td {
-        padding: 0.35rem 0.4rem;
-    }
-    .mod-srtla td meter.share {
-        display: none;
-    }
-    .mod-srtla th.is-iface,
-    .mod-srtla td.is-iface {
-        white-space: normal;
-        overflow-wrap: break-word;
-    }
+	.mod-srtla table {
+		font-size: 0.8rem;
+	}
+	.mod-srtla th,
+	.mod-srtla td {
+		padding: 0.35rem 0.4rem;
+	}
+	.mod-srtla td meter.share {
+		display: none;
+	}
+	.mod-srtla th.is-iface,
+	.mod-srtla td.is-iface {
+		white-space: normal;
+		overflow-wrap: break-word;
+	}
 }

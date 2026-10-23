@@ -14,14 +14,14 @@
 
 /** One chat message (platform message id used for deduplication). */
 export interface ChatLive {
-    id: string | number;
-    username?: string;
-    /** The sender's platform color (hex), for username display. */
-    color?: string;
-    text?: string;
-    type?: string;
-    /** Message time (epoch ms) — where the platform provides it. */
-    ts?: number;
+	id: string | number;
+	username?: string;
+	/** The sender's platform color (hex), for username display. */
+	color?: string;
+	text?: string;
+	type?: string;
+	/** Message time (epoch ms) — where the platform provides it. */
+	ts?: number;
 }
 
 /** The platform a live fragment / spec key refers to. */
@@ -32,10 +32,10 @@ export type ChatSpec = `${ChatPlatform}:${string}`;
 
 /** One channel's snapshot entry: connection state + rolling messages. */
 export interface ChannelLive {
-    /** the provider's socket/poller for this channel was open */
-    connected?: boolean;
-    /** most recent messages, newest first */
-    chat?: ChatLive[];
+	/** the provider's socket/poller for this channel was open */
+	connected?: boolean;
+	/** most recent messages, newest first */
+	chat?: ChatLive[];
 }
 
 /** Channels to keep attached (spec keys). */
@@ -46,39 +46,39 @@ export type PublishFn = (msg: string) => void;
 
 /** Serialize an event frame for the module websockets. */
 export const eventFrame = (event: string, data: unknown): string =>
-    JSON.stringify({ type: "event", event, data });
+	JSON.stringify({ type: "event", event, data });
 
 /** Render context passed to a widget by the core: the widget's normalized
  * channel key, the live state of its own device (undefined for
  * device-independent widgets) and its device info. */
 export interface WidgetContext {
-    /** The widget's normalized channel key ("" when not configured). */
-    channel: string;
-    deviceLive?: Record<string, unknown> | null;
-    device?: Record<string, unknown> | null;
+	/** The widget's normalized channel key ("" when not configured). */
+	channel: string;
+	deviceLive?: Record<string, unknown> | null;
+	device?: Record<string, unknown> | null;
 }
 
 /** A config parameter: a bare string (free text) or a `{name, type:"select",
  * options}` fixed-choice field rendered as a dropdown. */
 export type WidgetConfigField =
-    | string
-    | { name: string; type: "select"; options: readonly string[] };
+	| string
+	| { name: string; type: "select"; options: readonly string[] };
 
 /** Frontend descriptor the dashboard registry renders. The module owns its
  * live state (fed by `onFrame`); `body`/`badge` render from it plus, where
  * relevant, the widget's device state in `ctx`. */
 export interface ChannelWidgetModule<TWidget = unknown> {
-    id: string;
-    kind: "widget";
-    /** Widget types this module composes; the core routes by this table. */
-    widgetTypes: readonly string[];
-    defaultSize: { w: number; h: number };
-    /** Config parameter names this widget accepts, in editor form order. */
-    configFields: readonly WidgetConfigField[];
-    /** Render the widget body from the module's live state. */
-    body(w: TWidget, ctx: WidgetContext): unknown;
-    /** Status badge shown next to the widget title in the card head. */
-    badge(w: TWidget, ctx: WidgetContext): unknown;
-    /** Fold one dashboard-websocket frame into the module's live state. */
-    onFrame(event: string, data: unknown): void;
+	id: string;
+	kind: "widget";
+	/** Widget types this module composes; the core routes by this table. */
+	widgetTypes: readonly string[];
+	defaultSize: { w: number; h: number };
+	/** Config parameter names this widget accepts, in editor form order. */
+	configFields: readonly WidgetConfigField[];
+	/** Render the widget body from the module's live state. */
+	body(w: TWidget, ctx: WidgetContext): unknown;
+	/** Status badge shown next to the widget title in the card head. */
+	badge(w: TWidget, ctx: WidgetContext): unknown;
+	/** Fold one dashboard-websocket frame into the module's live state. */
+	onFrame(event: string, data: unknown): void;
 }

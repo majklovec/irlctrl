@@ -16,14 +16,14 @@ export type DashboardsChanged = ServerDashboard | { id: string; deleted: true };
 const rpc = new RpcClient(() => socketUrl("/dashboards/ws"));
 
 interface Handlers {
-    /** Every devices.snapshot / devices.changed push, in server order. */
-    devices?: (list: DeviceSummary[]) => void;
-    /** The maintained dashboard list, after a snapshot or change. */
-    dashboards?: (list: ServerDashboard[]) => void;
-    /** Raw dashboards.changed events before/without the maintained list. */
-    dashboardsChanged?: (event: DashboardsChanged) => void;
-    open?: () => void;
-    close?: () => void;
+	/** Every devices.snapshot / devices.changed push, in server order. */
+	devices?: (list: DeviceSummary[]) => void;
+	/** The maintained dashboard list, after a snapshot or change. */
+	dashboards?: (list: ServerDashboard[]) => void;
+	/** Raw dashboards.changed events before/without the maintained list. */
+	dashboardsChanged?: (event: DashboardsChanged) => void;
+	open?: () => void;
+	close?: () => void;
 }
 
 const handlers = new Set<Handlers>();
@@ -34,66 +34,64 @@ let dashboards: ServerDashboard[] = [];
 let widgetSnapshot: unknown = null;
 
 const applyDevices = (list: DeviceSummary[]): void => {
-    for (const h of handlers) h.devices?.(list);
+	for (const h of handlers) h.devices?.(list);
 };
 
 const applyDashboards = (): void => {
-    for (const h of handlers) h.dashboards?.([...dashboards]);
+	for (const h of handlers) h.dashboards?.([...dashboards]);
 };
 
 rpc.on("devices.snapshot", (data) => applyDevices(data as DeviceSummary[]));
 rpc.on("devices.changed", (data) => applyDevices(data as DeviceSummary[]));
 rpc.on("dashboards.snapshot", (data) => {
-    dashboards = (data as { dashboards?: ServerDashboard[] }).dashboards ?? [];
-    applyDashboards();
+	dashboards = (data as { dashboards?: ServerDashboard[] }).dashboards ?? [];
+	applyDashboards();
 });
 rpc.on("dashboards.changed", (data) => {
-    const e = data as DashboardsChanged;
-    if (e && "deleted" in e && e.deleted)
-        dashboards = dashboards.filter((d) => d.id !== e.id);
-    else {
-        const i = dashboards.findIndex(
-            (d) => d.id === (e as ServerDashboard).id,
-        );
-        dashboards =
-            i >= 0
-                ? [
-                      ...dashboards.slice(0, i),
-                      e as ServerDashboard,
-                      ...dashboards.slice(i + 1),
-                  ]
-                : [...dashboards, e as ServerDashboard];
-    }
-    for (const h of handlers) h.dashboardsChanged?.(e);
-    applyDashboards();
+	const e = data as DashboardsChanged;
+	if (e && "deleted" in e && e.deleted)
+		dashboards = dashboards.filter((d) => d.id !== e.id);
+	else {
+		const i = dashboards.findIndex((d) => d.id === (e as ServerDashboard).id);
+		dashboards =
+			i >= 0
+				? [
+						...dashboards.slice(0, i),
+						e as ServerDashboard,
+						...dashboards.slice(i + 1),
+					]
+				: [...dashboards, e as ServerDashboard];
+	}
+	for (const h of handlers) h.dashboardsChanged?.(e);
+	applyDashboards();
 });
 rpc.on("widget.snapshot", (data) => {
-    widgetSnapshot = data;
+	widgetSnapshot = data;
 });
 rpc.on("open", () => {
-    for (const h of handlers) h.open?.();
+	for (const h of handlers) h.open?.();
 });
 rpc.on("close", () => {
-    for (const h of handlers) h.close?.();
+	for (const h of handlers) h.close?.();
 });
 
 export const serverLive = {
-    /** The raw client: the dashboard pages register their widget frames here. */
-    rpc,
-    get connected(): boolean {
-        return rpc.open;
-    },
-    get dashboards(): ServerDashboard[] {
-        return [...dashboards];
-    },
-    on(h: Handlers): () => void {
-        handlers.add(h);
-        return () => handlers.delete(h);
-    },
-    /** The last `widget.snapshot` payload (null until the server sent one):
-     * the socket can deliver it before a dashboard page registers its `onAny`
-     * handler, so the page replays it into the widget modules on registration. */
-    get widgetSnapshot(): unknown {
-        return widgetSnapshot;
-    },
+	/** The raw client: the dashboard pages register their widget frames here. */
+	rpc,
+	get connected(): boolean {
+		return rpc.open;
+	},
+	get dashboards(): ServerDashboard[] {
+		return [...dashboards];
+	},
+	on(h: Handlers): () => void {
+		handlers.add(h);
+		return () => handlers.delete(h);
+	},
+	/** The last `widget.snapshot` payload (null until the server sent one):
+	 * the socket can deliver it before a dashboard page registers its `onAny`
+	 * handler, so the page replays it into the widget modules on registration. */
+	get widgetSnapshot(): unknown {
+		return widgetSnapshot;
+	},
 };

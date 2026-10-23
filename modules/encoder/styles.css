@@ -1,63 +1,63 @@
 .pipeline-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-left: 30px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-left: 30px;
 }
 .pipeline-item .icon-link {
-    border: none;
+	border: none;
 }
 .pipeline-item .icon-link:hover {
-    border-color: transparent;
+	border-color: transparent;
 }
 
 /* Link styled as a secondary form button (actions rows) */
 a.link-button.secondary {
-    font: inherit;
-    padding: 0.5rem 0.75rem;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: transparent;
-    color: var(--text);
-    text-decoration: none;
-    transition:
-        border-color var(--t),
-        background var(--t);
+	font: inherit;
+	padding: 0.5rem 0.75rem;
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--border);
+	background: transparent;
+	color: var(--text);
+	text-decoration: none;
+	transition:
+		border-color var(--t),
+		background var(--t);
 }
 a.link-button.secondary:hover {
-    border-color: var(--border-strong);
-    background: color-mix(in srgb, var(--text) 6%, transparent);
+	border-color: var(--border-strong);
+	background: color-mix(in srgb, var(--text) 6%, transparent);
 }
 a.link-button.secondary:focus-visible {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--ring);
+	outline: none;
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px var(--ring);
 }
 
 /* Foldable pipeline groups (encoder settings) */
 .pipe-group {
-    margin-bottom: 0.25rem;
+	margin-bottom: 0.25rem;
 }
 .pipe-group-toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.35rem 0.25rem;
-    border: none;
-    border-radius: var(--radius-sm);
-    color: var(--text);
-    font: inherit;
-    font-weight: 600;
-    text-align: left;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	width: 100%;
+	padding: 0.35rem 0.25rem;
+	border: none;
+	border-radius: var(--radius-sm);
+	color: var(--text);
+	font: inherit;
+	font-weight: 600;
+	text-align: left;
 }
 .pipe-group-toggle:hover {
-    background: color-mix(in srgb, var(--accent) 10%, transparent);
+	background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 .pipe-group-toggle svg {
-    flex: none;
-    transition: transform var(--t);
+	flex: none;
+	transition: transform var(--t);
 }
 .pipe-group-toggle.open svg {
-    transform: rotate(90deg);
+	transform: rotate(90deg);
 }

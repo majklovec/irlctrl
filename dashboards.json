@@ -1,67 +1,67 @@
 {
-    "dashboards": [
-        {
-            "id": "1f982e5d-e121-49a7-b4dc-24b169642e4f",
-            "name": "Dashboard",
-            "version": 40,
-            "widgets": [
-                {
-                    "id": "14306d92-1646-4e89-9f16-26a6911fe513",
-                    "deviceId": "54d4c237-01b4-439b-ad52-14de42c4484a",
-                    "type": "combined",
-                    "name": "Enkodér + relay",
-                    "x": 0,
-                    "y": 0,
-                    "w": 6,
-                    "h": 18,
-                    "visible": true
-                },
-                {
-                    "id": "c36d444b-6ed0-4b5c-a487-779c9cde191e",
-                    "deviceId": "",
-                    "type": "chat",
-                    "name": "Chat Kick",
-                    "x": 0,
-                    "y": 18,
-                    "w": 4,
-                    "h": 13,
-                    "visible": true,
-                    "config": {
-                        "youtube": "destiny",
-                        "twitch": "agraelus",
-                        "tiktok": "dima__live1",
-                        "kick": "destiny",
-                        "history": "100",
-                        "order": "bottom"
-                    }
-                },
-                {
-                    "id": "d2bc1f8d-9bbe-4c65-a1d1-7ee490bb8c92",
-                    "deviceId": "",
-                    "type": "stats",
-                    "name": "Stats Kick",
-                    "x": 4,
-                    "y": 18,
-                    "w": 5,
-                    "h": 8,
-                    "visible": true,
-                    "config": {
-                        "channel": "cicero_mt"
-                    }
-                },
-                {
-                    "id": "86ba0d67-804c-4ef9-ad94-6f193067f547",
-                    "deviceId": "73ffbe65-cfab-4dbc-abff-52c8c3033319",
-                    "type": "obs",
-                    "name": "OBS Studio",
-                    "x": 6,
-                    "y": 0,
-                    "w": 6,
-                    "h": 13,
-                    "visible": true
-                }
-            ],
-            "columns": 12
-        }
-    ]
+	"dashboards": [
+		{
+			"id": "1f982e5d-e121-49a7-b4dc-24b169642e4f",
+			"name": "Dashboard",
+			"version": 40,
+			"widgets": [
+				{
+					"id": "14306d92-1646-4e89-9f16-26a6911fe513",
+					"deviceId": "54d4c237-01b4-439b-ad52-14de42c4484a",
+					"type": "combined",
+					"name": "Enkodér + relay",
+					"x": 0,
+					"y": 0,
+					"w": 6,
+					"h": 18,
+					"visible": true
+				},
+				{
+					"id": "c36d444b-6ed0-4b5c-a487-779c9cde191e",
+					"deviceId": "",
+					"type": "chat",
+					"name": "Chat Kick",
+					"x": 0,
+					"y": 18,
+					"w": 4,
+					"h": 13,
+					"visible": true,
+					"config": {
+						"youtube": "destiny",
+						"twitch": "agraelus",
+						"tiktok": "dima__live1",
+						"kick": "destiny",
+						"history": "100",
+						"order": "bottom"
+					}
+				},
+				{
+					"id": "d2bc1f8d-9bbe-4c65-a1d1-7ee490bb8c92",
+					"deviceId": "",
+					"type": "stats",
+					"name": "Stats Kick",
+					"x": 4,
+					"y": 18,
+					"w": 5,
+					"h": 8,
+					"visible": true,
+					"config": {
+						"channel": "cicero_mt"
+					}
+				},
+				{
+					"id": "86ba0d67-804c-4ef9-ad94-6f193067f547",
+					"deviceId": "73ffbe65-cfab-4dbc-abff-52c8c3033319",
+					"type": "obs",
+					"name": "OBS Studio",
+					"x": 6,
+					"y": 0,
+					"w": 6,
+					"h": 13,
+					"visible": true
+				}
+			],
+			"columns": 12
+		}
+	]
 }

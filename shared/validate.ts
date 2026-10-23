@@ -20,20 +20,20 @@ export type Role = (typeof ROLES)[number];
  * operator assembles the dashboard freely.
  */
 export const modulesForRole = (role: Role): string[] => {
-    switch (role) {
-        case "obs":
-            return ["obs-controller"];
-        case "custom":
-            return [];
-        case "relay":
-            return ["relay", "modems"];
-        case "combined":
-            return ["relay", "encoder", "modems"];
-        default:
-            return [role];
-    }
+	switch (role) {
+		case "obs":
+			return ["obs-controller"];
+		case "custom":
+			return [];
+		case "relay":
+			return ["relay", "modems"];
+		case "combined":
+			return ["relay", "encoder", "modems"];
+		default:
+			return [role];
+	}
 };
 export const isRole = (v: unknown): v is Role =>
-    (ROLES as readonly unknown[]).includes(v);
+	(ROLES as readonly unknown[]).includes(v);
 
 export const DEFAULT_COLOR = "#3b82f6";

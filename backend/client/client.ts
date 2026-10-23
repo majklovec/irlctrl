@@ -56,94 +56,94 @@
  *                            SIGHUP delivery fails or no pid is known)
  */
 
-import { startApiServer } from "./api";
 import { flag } from "../../shared/args";
-import { argv, HAS_RELAY, REMOTE_URL, ROLE } from "./config";
-import { flushLog, logEvent } from "./eventlog";
 import { i18nReady, t } from "../../shared/i18n";
 import {
-    startModules as startRegistryModules,
-    stopModules as stopRegistryModules,
+	startModules as startRegistryModules,
+	stopModules as stopRegistryModules,
 } from "../../shared/registry";
+import { startApiServer } from "./api";
+import { argv, HAS_RELAY, REMOTE_URL, ROLE } from "./config";
+import { flushLog, logEvent } from "./eventlog";
 import { startRemote, stopRemote } from "./remote";
 import {
-    reconfigure,
-    startInterfaceMonitor,
-    stopInterfaceMonitor,
+	reconfigure,
+	startInterfaceMonitor,
+	stopInterfaceMonitor,
 } from "./routing";
 import { srtlaServices } from "./services";
 import { runAutostart } from "./stream";
 
 async function main(): Promise<void> {
-    // Exit before any module/service boots (CI runs `--help` on the compiled
-    // binary to verify it and to record bytecode profiles).
-    if (flag("--help") || flag("-h")) {
-        console.log(
-            "Usage: bun backend/client/client.ts [--config /path/to/config.json] [--dry-run] [--port 8085] " +
-                "[--role relay|encoder|combined] [--pipelines /path/to/pipelines] " +
-                "[--remote ws://host:port/device] [--remote-token secret]",
-        );
-        console.log(
-            "The token/URL may also come from CONTROL_SERVER_TOKEN / CONTROL_SERVER_URL env vars. See the README for the full option list.",
-        );
-        process.exit(0);
-    }
+	// Exit before any module/service boots (CI runs `--help` on the compiled
+	// binary to verify it and to record bytecode profiles).
+	if (flag("--help") || flag("-h")) {
+		console.log(
+			"Usage: bun backend/client/client.ts [--config /path/to/config.json] [--dry-run] [--port 8085] " +
+				"[--role relay|encoder|combined] [--pipelines /path/to/pipelines] " +
+				"[--remote ws://host:port/device] [--remote-token secret]",
+		);
+		console.log(
+			"The token/URL may also come from CONTROL_SERVER_TOKEN / CONTROL_SERVER_URL env vars. See the README for the full option list.",
+		);
+		process.exit(0);
+	}
 
-    await i18nReady;
-    console.log(`=== SRTLA Bonding Setup (Bun) — role: ${ROLE} ===\n`);
+	await i18nReady;
+	console.log(`=== SRTLA Bonding Setup (Bun) — role: ${ROLE} ===\n`);
 
-    const shutdown = async (signal: string) => {
-        console.log(`\nReceived ${signal}, shutting down...`);
-        // Before stopRemote so the control server still receives it
-        logEvent("info", "Service", t("log.stopped_signal", { signal }));
-        stopRemote();
-        stopRegistryModules(); // modules/<id>/backend.ts stop()s (no-ops for modules that never started)
-        await stopInterfaceMonitor();
-        await flushLog();
-        process.exit(0);
-    };
+	const shutdown = async (signal: string) => {
+		console.log(`\nReceived ${signal}, shutting down...`);
+		// Before stopRemote so the control server still receives it
+		logEvent("info", "Service", t("log.stopped_signal", { signal }));
+		stopRemote();
+		stopRegistryModules(); // modules/<id>/backend.ts stop()s (no-ops for modules that never started)
+		await stopInterfaceMonitor();
+		await flushLog();
+		process.exit(0);
+	};
 
-    logEvent("info", "Service", t("log.started", { role: ROLE }));
+	logEvent("info", "Service", t("log.started", { role: ROLE }));
 
-    // Modules bind their `core` bag at start, and every module capability
-    // (srtla/encoder) reads it — so start them before any service call below.
-    // Signal handlers come after: a signal while modules start hits the default
-    // kill (fine), and keeps shutdown from touching half-bound module `core`.
-    await startRegistryModules();
-    process.on("SIGINT", () => void shutdown("SIGINT"));
-    process.on("SIGTERM", () => void shutdown("SIGTERM"));
+	// Modules bind their `core` bag at start, and every module capability
+	// (srtla/encoder) reads it — so start them before any service call below.
+	// Signal handlers come after: a signal while modules start hits the default
+	// kill (fine), and keeps shutdown from touching half-bound module `core`.
+	await startRegistryModules();
+	process.on("SIGINT", () => void shutdown("SIGINT"));
+	process.on("SIGTERM", () => void shutdown("SIGTERM"));
 
-    if (HAS_RELAY) {
-        // 1. Prime routing + write uplinks file
-        const result = await reconfigure();
-        if (!result.ok) {
-            console.error("Initial reconfigure failed:", result.error);
-            logEvent(
-                "error",
-                "Interfaces",
-                t("log.reconfigure_failed", { error: result.error }),
-            );
-            await flushLog();
-            process.exit(1);
-        }
-        console.log(`Initial uplinks: ${result.ips.join(", ")}`);
+	if (HAS_RELAY) {
+		// 1. Prime routing + write uplinks file
+		const result = await reconfigure();
+		if (!result.ok) {
+			console.error("Initial reconfigure failed:", result.error);
+			logEvent(
+				"error",
+				"Interfaces",
+				t("log.reconfigure_failed", { error: result.error }),
+			);
+			await flushLog();
+			process.exit(1);
+		}
+		console.log(`Initial uplinks: ${result.ips.join(", ")}`);
 
-        // 2. Start srtla_send if requested (uses the file we just wrote)
-        await srtlaServices.maybeStartSrtla(argv);
+		// 2. Start srtla_send if requested (uses the file we just wrote)
+		await srtlaServices.maybeStartSrtla(argv);
 
-        // 3. Start the monitor (will reload srtla_send on changes); encoders have nothing to watch
-        startInterfaceMonitor(srtlaServices.reloadSrtla);
-    }
+		// 3. Start the monitor (will reload srtla_send on changes); encoders have nothing to watch
+		startInterfaceMonitor(srtlaServices.reloadSrtla);
+	}
 
-    // 4. Start the local API and, if configured, the remote control link
-    await startApiServer();
-    if (REMOTE_URL) startRemote();
+	// 4. Start the local API and, if configured, the remote control link
+	await startApiServer();
+	if (REMOTE_URL) startRemote();
 
-    // 5. Resume the last stream if autostart is enabled (retries until it succeeds)
-    runAutostart();
+	// 5. Resume the last stream if autostart is enabled (retries until it succeeds)
+	runAutostart();
 }
 
 main().catch((err) => {
-    console.error("Fatal error:", err);
-    process.exit(1);
+	console.error("Fatal error:", err);
+	process.exit(1);
 });

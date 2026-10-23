@@ -45,86 +45,87 @@
  * Methods that change something are recorded in the event log (success or failure); their
  * responses carry `"logged": true` so clients do not log them a second time.
  */
-import { logEvent } from "./eventlog";
+
 import { t } from "../../shared/i18n";
 import { isLoggedMethod, methodLog } from "../../shared/logMessages";
+import { ApiError, type Params } from "../../shared/params";
+import * as registry from "../../shared/registry";
+import { errorMessage, textOf } from "../../shared/util";
+import { logEvent } from "./eventlog";
 import { bondingMethods } from "./methods/bonding";
 import { encoderStreamMethods } from "./methods/encoder-stream";
 import { moduleObsMethods } from "./methods/modules-obs";
 import { pipelineMethods } from "./methods/pipelines";
 import {
-    buildStatus as domainBuildStatus,
-    setupSettingsStatusMethods,
+	buildStatus as domainBuildStatus,
+	setupSettingsStatusMethods,
 } from "./methods/setup-settings-status";
 import {
-    effectiveRole,
-    type MethodContext,
-    type MethodMap,
+	effectiveRole,
+	type MethodContext,
+	type MethodMap,
 } from "./methods/shared";
 import * as moduleCore from "./module-core";
 import { moduleEnabled } from "./module-core";
-import { ApiError, type Params } from "../../shared/params";
 import { applyRemoteSettings } from "./remote";
-import * as registry from "../../shared/registry";
 import * as routing from "./routing";
 import * as services from "./services";
 import { OBS_MODULE } from "./state";
 import * as stream from "./stream";
-import { errorMessage, textOf } from "../../shared/util";
 
 const methodContext = (): MethodContext => ({
-    services,
-    routing,
-    moduleCore,
-    registry,
-    stream,
-    applyRemoteSettings,
+	services,
+	routing,
+	moduleCore,
+	registry,
+	stream,
+	applyRemoteSettings,
 });
 
 export async function buildStatus() {
-    return domainBuildStatus(methodContext());
+	return domainBuildStatus(methodContext());
 }
 
 // Registry discovery and the push/remote transports import this composition
 // point too. Bind domain dependencies only once the first request arrives.
 let methods: MethodMap | undefined;
 function deviceMethods(): MethodMap {
-    if (!methods) {
-        const context = methodContext();
-        methods = {
-            ...setupSettingsStatusMethods(context),
-            ...bondingMethods(context),
-            ...pipelineMethods(context),
-            ...encoderStreamMethods(context),
-            ...moduleObsMethods(context),
-        };
-    }
-    return methods;
+	if (!methods) {
+		const context = methodContext();
+		methods = {
+			...setupSettingsStatusMethods(context),
+			...bondingMethods(context),
+			...pipelineMethods(context),
+			...encoderStreamMethods(context),
+			...moduleObsMethods(context),
+		};
+	}
+	return methods;
 }
 
 function methodAllowed(name: string): boolean {
-    const role = effectiveRole();
-    if (name.startsWith("stream.")) return role === "combined";
-    // Module-owned API surface: 409 when the owning module is disabled
-    // (the low-bitrate switcher rides on the OBS module now)
-    if (
-        (name.startsWith("obs.") || name.startsWith("lowBitrateSwitcher.")) &&
-        !moduleEnabled(OBS_MODULE)
-    )
-        return false;
-    if (
-        name.startsWith("encoder.") ||
-        name.startsWith("ceracoder.") ||
-        name.startsWith("pipelines.")
-    )
-        return role !== "relay";
-    if (
-        name.startsWith("modems.") ||
-        name.startsWith("srtla.") ||
-        name === "reconfigure"
-    )
-        return role !== "encoder";
-    return true;
+	const role = effectiveRole();
+	if (name.startsWith("stream.")) return role === "combined";
+	// Module-owned API surface: 409 when the owning module is disabled
+	// (the low-bitrate switcher rides on the OBS module now)
+	if (
+		(name.startsWith("obs.") || name.startsWith("lowBitrateSwitcher.")) &&
+		!moduleEnabled(OBS_MODULE)
+	)
+		return false;
+	if (
+		name.startsWith("encoder.") ||
+		name.startsWith("ceracoder.") ||
+		name.startsWith("pipelines.")
+	)
+		return role !== "relay";
+	if (
+		name.startsWith("modems.") ||
+		name.startsWith("srtla.") ||
+		name === "reconfigure"
+	)
+		return role !== "encoder";
+	return true;
 }
 
 // ----------------------------------------------------------------------
@@ -132,79 +133,77 @@ function methodAllowed(name: string): boolean {
 // ----------------------------------------------------------------------
 /** Dispatch one request message; returns the serialized response. */
 export async function handleRequest(
-    raw: string | Buffer | ArrayBuffer | Uint8Array,
+	raw: string | Buffer | ArrayBuffer | Uint8Array,
 ): Promise<string> {
-    let id: unknown = null;
-    let method = "";
-    let logged = false;
-    try {
-        let msg: unknown;
-        try {
-            msg = JSON.parse(textOf(raw));
-        } catch {
-            throw new ApiError("Invalid JSON");
-        }
-        if (!msg || typeof msg !== "object" || Array.isArray(msg))
-            throw new ApiError("Message must be a JSON object");
-        const req = msg as { id?: unknown; method?: unknown; params?: unknown };
-        id = req.id ?? null;
-        if (typeof req.method !== "string")
-            throw new ApiError("method is required");
-        method = req.method;
+	let id: unknown = null;
+	let method = "";
+	let logged = false;
+	try {
+		let msg: unknown;
+		try {
+			msg = JSON.parse(textOf(raw));
+		} catch {
+			throw new ApiError("Invalid JSON");
+		}
+		if (!msg || typeof msg !== "object" || Array.isArray(msg))
+			throw new ApiError("Message must be a JSON object");
+		const req = msg as { id?: unknown; method?: unknown; params?: unknown };
+		id = req.id ?? null;
+		if (typeof req.method !== "string")
+			throw new ApiError("method is required");
+		method = req.method;
 
-        const handlers = deviceMethods();
-        const handler = Object.hasOwn(handlers, method)
-            ? handlers[method]
-            : undefined;
-        if (!handler) throw new ApiError(`Unknown method: ${method}`, 404);
-        if (!methodAllowed(method))
-            throw new ApiError(
-                `${method} is not available on ${effectiveRole()} devices`,
-                409,
-            );
+		const handlers = deviceMethods();
+		const handler = Object.hasOwn(handlers, method)
+			? handlers[method]
+			: undefined;
+		if (!handler) throw new ApiError(`Unknown method: ${method}`, 404);
+		if (!methodAllowed(method))
+			throw new ApiError(
+				`${method} is not available on ${effectiveRole()} devices`,
+				409,
+			);
 
-        const params: Params =
-            req.params &&
-            typeof req.params === "object" &&
-            !Array.isArray(req.params)
-                ? (req.params as Params)
-                : {};
-        logged = isLoggedMethod(method);
-        const result = await handler(params);
-        if (logged) {
-            const { section, done } = methodLog(method);
-            logEvent("info", section, done(params));
-        }
-        return JSON.stringify({
-            type: "response",
-            id,
-            method,
-            ok: true,
-            result,
-            ...(logged ? { logged } : {}),
-        });
-    } catch (err: unknown) {
-        const code = err instanceof ApiError ? err.code : 500;
-        if (code >= 500) console.error(`API error (${method || "?"}):`, err);
-        if (logged) {
-            const { section, action } = methodLog(method);
-            logEvent(
-                "error",
-                section,
-                t("mlog.failed", {
-                    action,
-                    reason: errorMessage(err),
-                }),
-            );
-        }
-        return JSON.stringify({
-            type: "response",
-            id,
-            method,
-            ok: false,
-            error: errorMessage(err),
-            code,
-            ...(logged ? { logged } : {}),
-        });
-    }
+		const params: Params =
+			req.params && typeof req.params === "object" && !Array.isArray(req.params)
+				? (req.params as Params)
+				: {};
+		logged = isLoggedMethod(method);
+		const result = await handler(params);
+		if (logged) {
+			const { section, done } = methodLog(method);
+			logEvent("info", section, done(params));
+		}
+		return JSON.stringify({
+			type: "response",
+			id,
+			method,
+			ok: true,
+			result,
+			...(logged ? { logged } : {}),
+		});
+	} catch (err: unknown) {
+		const code = err instanceof ApiError ? err.code : 500;
+		if (code >= 500) console.error(`API error (${method || "?"}):`, err);
+		if (logged) {
+			const { section, action } = methodLog(method);
+			logEvent(
+				"error",
+				section,
+				t("mlog.failed", {
+					action,
+					reason: errorMessage(err),
+				}),
+			);
+		}
+		return JSON.stringify({
+			type: "response",
+			id,
+			method,
+			ok: false,
+			error: errorMessage(err),
+			code,
+			...(logged ? { logged } : {}),
+		});
+	}
 }
