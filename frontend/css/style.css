@@ -850,6 +850,24 @@ fieldset.group > legend {
 	text-transform: uppercase;
 	color: var(--text);
 }
+/* Inside widget cards, each field takes a flex share of the row, so controls
+   stretch with the cell width instead of keeping the ~170px native input size.
+   Checkbox/color keep their fixed sizes. */
+.dash-widget form > label,
+.dash-widget fieldset.group > label {
+	flex: 1 1 12rem;
+	min-inline-size: 0;
+}
+.dash-widget form > label > input:not([type="color"]):not([type="checkbox"]),
+.dash-widget form > label > select,
+.dash-widget form > label > textarea,
+.dash-widget fieldset.group > label > input:not(
+	[type="color"]
+):not([type="checkbox"]),
+.dash-widget fieldset.group > label > select,
+.dash-widget fieldset.group > label > textarea {
+	width: 100%;
+}
 
 /* srtla_send link telemetry */
 .iface-sub {
