@@ -156,6 +156,17 @@
     grid-template-columns: 1fr 1fr 1fr;
     gap: 0.5rem 1rem;
 }
+/* Narrow dashboard cell: collapse the layout grid */
+@container dash-widget (max-width: 620px) {
+    .mod-obs-controller .lbs-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+@container dash-widget (max-width: 420px) {
+    .mod-obs-controller .lbs-grid {
+        grid-template-columns: 1fr;
+    }
+}
 .mod-obs-controller .lbs-select {
     margin-left: 0.5rem;
     flex: 1;

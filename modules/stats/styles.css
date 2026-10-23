@@ -22,6 +22,17 @@
     padding: 2px 0;
     font-size: 0.85rem;
 }
+/* Narrow dashboard cell: drop the category column, tighten the row */
+@container dash-widget (max-width: 480px) {
+    .dash-widget-body .stats-row {
+        grid-template-columns:
+            minmax(52px, auto) minmax(0, 1fr) auto auto;
+        gap: 8px;
+    }
+    .dash-widget-body .stats-row-category {
+        display: none;
+    }
+}
 .dash-widget-body .stats-row-label {
     display: inline-flex;
     align-items: center;
