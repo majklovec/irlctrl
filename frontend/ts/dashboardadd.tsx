@@ -267,6 +267,9 @@ const App: m.Component = {
                                                 )
                                             }>
                                             {[
+                                                <option key="choose" value={""}>
+                                                    {t("dash.widget_choose")}
+                                                </option>,
                                                 ...groups.map((g) => (
                                                     <optgroup
                                                         key={g.label}
@@ -291,11 +294,9 @@ const App: m.Component = {
                                     }
                                 />,
                                 ...(type
-                                    ? (
-                                          visibleWidgetConfigFields(
-                                              widgetModule(type)?.configFields ??
-                                                  [],
-                                          )
+                                    ? visibleWidgetConfigFields(
+                                          widgetModule(type)?.configFields ??
+                                              [],
                                       ).map((f) => {
                                           const name = configFieldName(f);
                                           return typeof f !== "string" &&
@@ -367,6 +368,7 @@ const App: m.Component = {
                                             label={t("dash.add")}
                                             type={"submit"}
                                             disabled={
+                                                !state.type ||
                                                 state.saveState === "saving"
                                             }
                                         />,

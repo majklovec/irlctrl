@@ -31,6 +31,7 @@
     "dash.widget.scene": "Scene",
     "dash.widget.streaming": "Streaming",
     "dash.widget_type": "Type",
+    "dash.widget_choose": "Choose a widget type…",
     "dash.widget_waiting": "Waiting for data…",
     "dash.saving": "Saving…",
     "dash.view": "View",

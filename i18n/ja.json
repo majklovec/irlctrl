@@ -29,6 +29,7 @@
     "dash.version_stale": "古いアプリ",
     "dash.widget_module_off": "デバイスのモジュールが無効です",
     "dash.widget_type": "タイプ",
+    "dash.widget_choose": "ウィジェットの種類を選択…",
     "dash.widget_waiting": "データを待っています…",
     "dash.widgets": "ウィジェット",
     "dash.width": "幅",

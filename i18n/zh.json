@@ -29,6 +29,7 @@
     "dash.version_stale": "旧版应用",
     "dash.widget_module_off": "设备上的模块已禁用",
     "dash.widget_type": "类型",
+    "dash.widget_choose": "选择组件类型…",
     "dash.widget_waiting": "等待数据…",
     "dash.widgets": "小组件",
     "dash.width": "宽度",

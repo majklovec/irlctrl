@@ -29,6 +29,7 @@
     "dash.version_stale": "stara aplikacja",
     "dash.widget_module_off": "Moduł wyłączony na urządzeniu",
     "dash.widget_type": "Typ widżetu",
+    "dash.widget_choose": "Wybierz typ widżetu…",
     "dash.widget_waiting": "Czeka na dane…",
     "dash.widgets": "Widżety",
     "dash.width": "Szerokość",
