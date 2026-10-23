@@ -26,11 +26,11 @@ export const modulesForRole = (role: Role): string[] => {
 		case "custom":
 			return [];
 		case "relay":
-			return ["relay", "modems"];
+			return ["relay", "modems", "ssh"];
 		case "combined":
-			return ["relay", "encoder", "modems"];
+			return ["relay", "encoder", "modems", "ssh"];
 		default:
-			return [role];
+			return [role, "ssh"];
 	}
 };
 export const isRole = (v: unknown): v is Role =>

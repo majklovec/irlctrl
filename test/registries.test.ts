@@ -13,7 +13,7 @@ import { modulesForRole } from "../shared/validate";
  * obs-controller module — so it no longer appears here. A new start dependency
  * shifts the positions accordingly and this expectation must be revisited.
  */
-const DEVICE_ORDER = ["encoder", "modems", "obs-controller", "srtla"];
+const DEVICE_ORDER = ["encoder", "modems", "obs-controller", "srtla", "ssh"];
 /** The channel widget modules (device-independent dashboard widgets). */
 const WIDGET_IDS = ["stats", "chat"];
 
@@ -355,9 +355,9 @@ describe("module registries", () => {
 // on the unbound modems core after the self-contained-modules refactor).
 describe("modems role presets", () => {
 	test("relay and combined roles enable the modems module", () => {
-		expect(modulesForRole("relay")).toEqual(["relay", "modems"]);
-		expect(modulesForRole("combined")).toEqual(["relay", "encoder", "modems"]);
-		expect(modulesForRole("encoder")).toEqual(["encoder"]);
+		expect(modulesForRole("relay")).toEqual(["relay", "modems", "ssh"]);
+		expect(modulesForRole("combined")).toEqual(["relay", "encoder", "modems", "ssh"]);
+		expect(modulesForRole("encoder")).toEqual(["encoder", "ssh"]);
 	});
 
 	test("default modules mirror the role presets", () => {

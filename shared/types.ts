@@ -402,6 +402,8 @@ export interface Status {
 	ceracoder: CeraConfig | null;
 	/** Live state of the low-bitrate switcher (null when the module is stopped). */
 	lowBitrateSwitcher?: SwitcherStatus | null;
+	/** Live state of the local SSH server (null when the module is not enabled). */
+	ssh?: SshStatus | null;
 	/** Module system: enabled flags + non-secret settings (secrets come back as `{configured}`). */
 	modules: modulesView;
 }
@@ -431,7 +433,14 @@ export interface modulesView {
 	encoder: { enabled: boolean };
 	modems: { enabled: boolean };
 	"obs-controller": ObsModuleView;
+	ssh: { enabled: boolean; user?: string; password?: { configured: boolean } };
 }
+export interface SshStatus {
+	user: string;
+	active: boolean;
+	passwordConfigured: boolean;
+}
+
 /** Device settings as returned by `settings.get` / accepted by `settings.update`. */
 export interface Settings {
 	/** Stable identity on the control server; hostnames change, the uuid does not */

@@ -16,6 +16,7 @@ import {
 import type {
 	EncoderConfig,
 	ModemInfo,
+	SshStatus,
 	SwitcherStatus,
 } from "../../../shared/types";
 import { DEFAULT_COLOR, ROLES } from "../../../shared/validate";
@@ -79,6 +80,8 @@ export async function buildStatus(context: Context) {
 		// null when the switcher is not running; the card shows "idle" then
 		lowBitrateSwitcher:
 			(modFragments.lowBitrateSwitcher as SwitcherStatus | null) ?? null,
+		// null when the ssh module is not enabled
+		ssh: (modFragments.ssh as SshStatus | null) ?? null,
 		modules: safeModules(),
 	};
 }

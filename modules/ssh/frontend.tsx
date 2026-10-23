@@ -1,0 +1,109 @@
+/* SSH card: sshd state, the login account, and the start / stop / password-reset actions. */
+import m from "mithril";
+import {
+	Actions,
+	Badge,
+	Button,
+	Card,
+	DefinitionList,
+} from "../../frontend/ts/components/ui";
+import { card, type DeviceCard } from "../../frontend/ts/device/store";
+import { t } from "../../frontend/ts/i18n";
+import type { Status } from "../../shared/types";
+import type { BridgedModule } from "./types";
+import "./styles.css";
+
+/** Per-connection card state (the fresh password is shown once, until the card unmounts). */
+interface SshCardState {
+	newPassword: string | null;
+}
+
+const sshStates = new WeakMap<DeviceCard, SshCardState>();
+
+function sshState(host: DeviceCard): SshCardState {
+	let state = sshStates.get(host);
+	if (!state) {
+		state = { newPassword: null };
+		sshStates.set(host, state);
+	}
+	return state;
+}
+
+async function resetPassword(host: DeviceCard): Promise<void> {
+	const user = host.st.status?.ssh?.user ?? "root";
+	if (!confirm(t("dev.ssh_reset_confirm", { user }))) return;
+	const result = await host.act<{ user: string; password: string }>(
+		"ssh-reset",
+		"ssh.reset_password",
+	);
+	if (result) {
+		sshState(host).newPassword = result.password;
+		m.redraw();
+	}
+}
+
+function sshCardBody(host: DeviceCard, status: Status): m.Vnode {
+	const s = status.ssh;
+	const { newPassword } = sshState(host);
+	return (
+		<Card title={t("dev.card.ssh")} class="mod-ssh">
+			<DefinitionList
+				rows={[
+					[
+						t("dev.row.state"),
+						s?.active ? (
+							<Badge text={t("dev.badge.online")} kind="on" />
+						) : (
+							<Badge text={t("dev.badge.stopped")} kind="off" />
+						),
+					],
+					[t("dev.row.user"), s?.user ?? null],
+					[
+						t("dev.row.password"),
+						s?.passwordConfigured ? (
+							<Badge text={t("dev.badge.password_set")} kind="on" />
+						) : (
+							<Badge text={t("dev.badge.password_none")} kind="warn" />
+						),
+					],
+				]}
+			/>
+			{newPassword && (
+				<p class="ssh-password">
+					{t("dev.ssh_new_password")}: <code>{newPassword}</code>
+				</p>
+			)}
+			<Actions>
+				<Button
+					label={t("ui.start")}
+					disabled={!!s?.active || host.pending("ssh-start")}
+					onclick={() => host.press("ssh-start", "ssh.start")}
+				/>
+				<Button
+					label={t("ui.stop")}
+					class="danger"
+					disabled={!s?.active || host.pending("ssh-stop")}
+					onclick={() => host.press("ssh-stop", "ssh.stop")}
+				/>
+				<Button
+					label={t("ui.reset_password")}
+					disabled={host.pending("ssh-reset")}
+					onclick={() => void resetPassword(host)}
+				/>
+			</Actions>
+		</Card>
+	);
+}
+
+const sshModule: BridgedModule = {
+	id: "ssh",
+	kind: "device-card",
+	title: "SSH",
+	order: 40,
+	available: (status) => status.role !== "obs",
+	defaultSize: { w: 4, h: 4 },
+	minSize: { w: 3, h: 3 },
+	component: (status: Status) => sshCardBody(card, status),
+};
+
+export default sshModule;

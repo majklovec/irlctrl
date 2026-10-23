@@ -90,7 +90,12 @@ export interface ObsModuleConfig {
 	logToFile?: boolean;
 }
 /** All module keys the registry knows, and their on-disk shape. */
-export const ALL_MODULES = ["relay", "encoder", "obs-controller"] as const;
+export const ALL_MODULES = [
+	"relay",
+	"encoder",
+	"obs-controller",
+	"ssh",
+] as const;
 
 /**
  * Registry module ID → persisted settings key. `srtla` persists under the
@@ -102,6 +107,7 @@ export const MODULE_CONFIG_KEYS: Record<string, string> = {
 	srtla: "relay",
 	modems: "modems",
 	"obs-controller": "obs-controller",
+	ssh: "ssh",
 };
 
 export type ModuleId = (typeof ALL_MODULES)[number];
@@ -134,6 +140,7 @@ export interface ModulesState {
 	encoder: { enabled: boolean };
 	modems: { enabled: boolean };
 	"obs-controller": ObsModuleConfig;
+	ssh: { enabled: boolean; user?: string; password?: string };
 }
 
 /** Permanent device parameters persisted to the config file (no process state). */
@@ -271,6 +278,7 @@ export function defaultModules(role?: Role): ModulesState {
 			sceneEvents: true,
 			...SWITCHER_DEFAULTS,
 		},
+		ssh: { enabled: on.has("ssh") },
 	};
 }
 

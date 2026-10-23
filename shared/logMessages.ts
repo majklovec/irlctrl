@@ -86,6 +86,11 @@ const METHOD_LOG: Record<string, MethodLog> = {
 			.filter(Boolean)
 			.join(", "),
 	),
+	"ssh.start": log("SSH", "Start", "mlog.done.started"),
+	"ssh.stop": log("SSH", "Stop", "mlog.done.stopped"),
+	"ssh.reset_password": log("SSH", "Password reset", (p) =>
+		translate("mlog.done.ssh_password_reset", { user: p.user }),
+	),
 	"modems.select": log(
 		"Interfaces",
 		"Bond selection",
@@ -165,6 +170,7 @@ const SECTIONS: Record<string, string> = {
 	encoder: "Encoder",
 	stream: "Stream",
 	srtla: "SRTLA",
+	ssh: "SSH",
 	modems: "Modems",
 	interfaces: "Interfaces",
 	pipelines: "Pipelines",
@@ -202,6 +208,7 @@ const LABEL_KEYS: Record<string, string> = {
 	Connection: "mlog.section.connection",
 	Device: "mgmt.th.device",
 	SRTLA: "dev.card.srtla",
+	SSH: "dev.card.ssh",
 	Stream: "mgmt.th.stream",
 	Setup: "mlog.section.setup",
 	Unknown: "mlog.section.unknown",

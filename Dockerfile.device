@@ -46,13 +46,16 @@ FROM oven/bun:1
 
 # GStreamer (ceracoder/belacoder encode pipelines), git (pipeline repos),
 # iproute2 (the relay detects uplinks via `ip -o -4 addr show` and watches them
-# with `ip monitor`), ca-certificates (TLS for wss:// control servers).
+# with `ip monitor`), ca-certificates (TLS for wss:// control servers),
+# openssh-server (the ssh module lets the operator start/stop it and reset the
+# root password).
 # NOTE: SRT is NOT apt-installed here — it is built from the CERALIVE fork in
 # the `srt-builder` stage and copied in below.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ca-certificates \
     iproute2 \
+    openssh-server \
     gstreamer1.0-tools \
     gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
     gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \

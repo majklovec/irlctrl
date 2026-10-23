@@ -202,6 +202,12 @@ export function configureModule(
 			// Subprocess wiring follows the process role and applies on restart
 			break;
 		}
+		case "ssh": {
+			if (typeof config.enabled === "boolean") m.ssh.enabled = config.enabled;
+			if (typeof config.user === "string" && config.user.trim())
+				m.ssh.user = config.user.trim();
+			break;
+		}
 	}
 }
 
