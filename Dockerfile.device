@@ -61,6 +61,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
     gstreamer1.0-libav gstreamer1.0-x \
     && rm -rf /var/lib/apt/lists/*
+# ssh in this container runs without a PAM stack (none is installed):
+#  - `UsePAM no` so sshd starts and `chpasswd` (password reset) can set the
+#    root password without pam_chauthtok();
+#  - the sshd privilege-separation directory, missing on every fresh start.
+RUN sed -i 's/^#\?UsePAM.*/UsePAM no/' /etc/ssh/sshd_config \
+    && mkdir -p /run/sshd
 
 # The CERALIVE SRT fork (v1.5.7) installs as /usr/local/lib/libsrt.so.1.5.7,
 # but the committed ceracoder/belacoder binaries were linked against the

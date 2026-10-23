@@ -60,8 +60,8 @@ function sshCardBody(host: DeviceCard, status: Status): m.Vnode {
 					[t("dev.row.user"), s?.user ?? null],
 					[
 						t("dev.row.password"),
-						s?.passwordConfigured ? (
-							<Badge text={t("dev.badge.password_set")} kind="on" />
+						s?.password ? (
+							<code class="ssh-password-code">{s.password}</code>
 						) : (
 							<Badge text={t("dev.badge.password_none")} kind="warn" />
 						),
@@ -86,8 +86,9 @@ function sshCardBody(host: DeviceCard, status: Status): m.Vnode {
 					onclick={() => host.press("ssh-stop", "ssh.stop")}
 				/>
 				<Button
-					label={t("ui.reset_password")}
-					disabled={host.pending("ssh-reset")}
+					label={t("dev.ssh_new_password")}
+					disabled={!!s?.active || host.pending("ssh-reset")}
+					title={s?.active ? t("set.ssh_stop_hint") : undefined}
 					onclick={() => void resetPassword(host)}
 				/>
 			</Actions>

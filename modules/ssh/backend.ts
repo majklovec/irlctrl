@@ -55,17 +55,41 @@ async function isActive(): Promise<boolean> {
 	return isDaemonRunning();
 }
 
+/**
+ * Wait until the daemon state reaches `want` — `sshd` forks and the pid file
+ * appears a few ms after the command returns, and a stopped daemon takes a
+ * moment to die. Resolves false on timeout (the status simply reports the
+ * old state).
+ */
+async function waitActive(want: boolean, timeoutMs = 5000): Promise<boolean> {
+	const deadline = Date.now() + timeoutMs;
+	for (;;) {
+		if ((await isActive()) === want) return true;
+		if (Date.now() > deadline) return false;
+		await new Promise((r) => setTimeout(r, 150));
+	}
+}
+
 async function sshStatus(): Promise<SshHostStatus> {
+	const password = core.state.settings.modules?.ssh?.password;
 	return {
 		user: sshUser(),
 		active: await isActive(),
-		passwordConfigured: Boolean(
-			core.state.settings.modules?.ssh?.password,
-		),
+		password: password || null,
+		passwordConfigured: Boolean(password),
 	};
 }
 
-async function startSsh(): Promise<SshHostStatus> {
+async function startSsh(params: Record<string, unknown>): Promise<SshHostStatus> {
+	// Starting also saves the SSH card's settings: the enabled flag and the
+	// login account persist under modules.ssh before the daemon comes up.
+	const slice = core.state.settings.modules?.ssh;
+	if (slice) {
+		slice.enabled = true;
+		if (typeof params.user === "string" && params.user.trim())
+			slice.user = params.user.trim();
+		await core.saveState();
+	}
 	if (hasSystemd()) {
 		await core.run("systemctl", ["start", "ssh"]);
 	} else {
@@ -73,6 +97,7 @@ async function startSsh(): Promise<SshHostStatus> {
 		if (!core.config.DRY_RUN) mkdirSync("/run/sshd", { recursive: true });
 		await core.run("sshd", ["-o", `PidFile=${PID_FILE}`]);
 	}
+	await waitActive(true);
 	return sshStatus();
 }
 
@@ -93,6 +118,7 @@ async function stopSsh(): Promise<SshHostStatus> {
 			await core.run("pkill", ["-x", "sshd"], true);
 		}
 	}
+	await waitActive(false);
 	return sshStatus();
 }
 
@@ -148,6 +174,8 @@ async function resetPassword(
 	const user =
 		(typeof params.user === "string" && params.user.trim()) || sshUser();
 	if (!user) throw new Error("user is required");
+	if (await isActive())
+		throw new Error(core.t("ssh.reset_blocked"));
 
 	const password = generatePassword();
 	await applyPassword(user, password);
@@ -192,7 +220,9 @@ export default {
 	id: "ssh",
 	title: "SSH",
 	configSchema: z.object({}).passthrough(),
-	secretFields: ["password"] as string[],
+	// No secret fields — the generated password is intentionally visible in
+	// the status so the operator can always read it from the UI.
+	secretFields: [] as string[],
 	bind(c: SshCore) {
 		core = c;
 	},
@@ -207,7 +237,7 @@ export default {
 			case "ssh.status":
 				return sshStatus();
 			case "ssh.start":
-				return startSsh();
+				return startSsh(params);
 			case "ssh.stop":
 				return stopSsh();
 			case "ssh.reset_password":

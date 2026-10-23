@@ -39,6 +39,8 @@
  *   stream.start {pipeline, remoteHost, remotePort, listenPort?, ...same encoder options},
  *   stream.stop   (combined devices: srtla_send + belacoder in one action)
  *   autostart.set {enabled}   resume the last stream when the service starts
+ *   ssh.status, ssh.start, ssh.stop, ssh.reset_password {user?},
+ *   ssh.set_password {user?, password}   (the ssh module; routed via the registry)
  *
  * Methods are limited by the device role (--role): relay → modems/srtla/reconfigure,
  * encoder → pipelines/encoder, combined → everything plus stream.*.
@@ -92,12 +94,20 @@ let methods: MethodMap | undefined;
 function deviceMethods(): MethodMap {
 	if (!methods) {
 		const context = methodContext();
+		// ssh.* is routed through the module registry (stays in sync with the
+		// ssh module's `methods` list in shared/registry.ts).
+		const sshMethods: MethodMap = {};
+		for (const method of registry.ALL_MODULES.find((mod) => mod.id === "ssh")?.methods ?? []) {
+			sshMethods[method] = async (params) =>
+				(await registry.callModule(method, params)) as object;
+		}
 		methods = {
 			...setupSettingsStatusMethods(context),
 			...bondingMethods(context),
 			...pipelineMethods(context),
 			...encoderStreamMethods(context),
 			...moduleObsMethods(context),
+			...sshMethods,
 		};
 	}
 	return methods;
@@ -125,6 +135,8 @@ function methodAllowed(name: string): boolean {
 		name === "reconfigure"
 	)
 		return role !== "encoder";
+	// The ssh server runs on any box; obs-only devices have no sshd to manage
+	if (name.startsWith("ssh.")) return role !== "obs";
 	return true;
 }
 

@@ -60,6 +60,17 @@ rpc.on("close", () => {
 	state.connected = false;
 	m.redraw();
 });
+// Live status pushes (ssh start/stop/password, srtla control, …) refresh the
+// module cards so their state (e.g. the ssh `active` flag and password) never
+// lags behind the device. The push carries {settings, modules, role} already.
+rpc.on("status", (data) => {
+	if (state.settings)
+		refreshDevice({
+			settings: state.settings,
+			modules: (data as { modules: modulesView }).modules,
+			role: draft.role,
+		});
+});
 
 /** Run an RPC call, routing its error message into `state.message`; redraws afterwards. */
 async function run<T>(call: () => Promise<T>): Promise<T | undefined> {

@@ -327,11 +327,11 @@ export const def: ModuleDef = {
 			...repositoryRows,
 		];
 		const addPipelineElement: m.Children = (
-			<Actions>
+			<div class="actions pipeline-new">
 				<a href={PIPELINE_NEW_URL} class="link-button secondary">
 					{t("set.pipeline_new")}
 				</a>
-			</Actions>
+			</div>
 		);
 		const pipelinesChildren: m.Children[] = [
 			<p class="muted">{t("set.pipelines_desc")}</p>,

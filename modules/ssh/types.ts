@@ -17,6 +17,8 @@ export interface SshHostStatus {
 	user: string;
 	/** sshd is accepting connections. */
 	active: boolean;
+	/** The account's current password (null when none is set). */
+	password: string | null;
 	/** A password has been generated for the account. */
 	passwordConfigured: boolean;
 }

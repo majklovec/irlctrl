@@ -433,11 +433,15 @@ export interface modulesView {
 	encoder: { enabled: boolean };
 	modems: { enabled: boolean };
 	"obs-controller": ObsModuleView;
+	// The plain password is NOT in this view — safeModules() masks it as
+	// `{configured}`; it is reported in the clear in the `ssh` status fragment.
 	ssh: { enabled: boolean; user?: string; password?: { configured: boolean } };
 }
 export interface SshStatus {
 	user: string;
 	active: boolean;
+	/** The account's current password (null when none is set). */
+	password: string | null;
 	passwordConfigured: boolean;
 }
 

@@ -2,69 +2,61 @@
  * SSH server controls for the Settings page.
  *
  * Visible for the relay/encoder/combined roles (and the custom role when the
- * server reports the ssh module as enabled). The account and enable flag live
- * under `modules.ssh` (via `modules.configure`); the password is write-only —
- * the device only ever reports it as `{configured}`. A typed password is
- * applied live through `ssh.set_password`; the reset button generates a fresh
- * one through `ssh.reset_password` and shows it once.
+ * server reports the ssh module as enabled). The login account lives under
+ * `modules.ssh` and is saved when Start is pressed (the device persists
+ * user + enabled with the daemon start). The password is ALWAYS visible in
+ * the card (the device reports it in the clear) and is changed only by
+ * "New password", which generates a fresh one — allowed while sshd is
+ * stopped (enforced on the device too). Start / Stop control sshd.
  *
  * Default-exports its ModuleDef; the settings framework registers it from the
  * generated manifest (generated/modules.settings.ts) — no per-module imports.
  */
 import m from "mithril";
-import {
-	Actions,
-	Break,
-	Button,
-	CheckField,
-	Checkbox,
-	Field,
-	Form,
-	Input,
-} from "../../frontend/ts/components/ui";
+import { Actions, Button, Field, Input } from "../../frontend/ts/components/ui";
 import { t } from "../../frontend/ts/i18n";
 import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
 import "./styles.css";
 
-/**
- * Editable copy of the module's SSH account. `password` is only ever sent when
- * the operator types one; the device never returns it.
- */
+/** Editable copy of the module's SSH login account. */
 const draft = {
-	enabled: false,
 	user: "root",
-	password: "",
 };
 
-/** One-shot generated password from a reset; cleared on the next save/reset. */
-let newPassword: string | null = null;
-
-async function save(ctx: ModuleContext): Promise<void> {
-	const { password } = draft;
-	// Account + enable flag persist under modules.ssh.
-	const result = await ctx.run(() =>
-		ctx.rpc.call<{ modules: ModuleContext["modules"] }>("modules.configure", {
-			id: "ssh",
-			config: { enabled: draft.enabled, user: draft.user },
-		}),
-	);
-	ctx.setModules(result.modules);
-
-	// A typed password is applied to the live sshd account and persisted.
-	if (password) {
-		await ctx.run(() =>
-			ctx.rpc.call<{ user: string }>("ssh.set_password", {
-				user: draft.user,
-				password,
-			}),
-		);
-		draft.password = "";
-		newPassword = null;
-	}
-	ctx.note(t("set.saved"));
+/** Live ssh state as last reported by the device (the status `ssh` fragment). */
+interface SshStatus {
+	user: string;
+	active: boolean;
+	password: string | null;
+	passwordConfigured: boolean;
 }
 
-async function resetPassword(ctx: ModuleContext): Promise<void> {
+let ssh: SshStatus | null = null;
+/** The card's own subscription to status pushes (the plain password only
+ * arrives in the top-level `ssh` fragment — the modules view masks it). */
+let sub: (() => void) | undefined;
+
+/** Adopt a fresh status fragment (null when the ssh module is disabled). */
+function adopt(status: SshStatus | null): void {
+	ssh = status;
+	m.redraw();
+}
+
+async function setRunning(ctx: ModuleContext, run: boolean): Promise<void> {
+	if (!run && !window.confirm(t("dev.ssh_stop_confirm", { user: draft.user })))
+		return;
+	// Start also persists the card's user (and the enabled flag) on the
+	// device — there is no separate Save button.
+	const result = await ctx.run(() =>
+		ctx.rpc.call<SshStatus>(run ? "ssh.start" : "ssh.stop", {
+			user: draft.user,
+		}),
+	);
+	adopt(result);
+	ctx.note(run ? t("mlog.done.started") : t("mlog.done.stopped"));
+}
+
+async function newPassword(ctx: ModuleContext): Promise<void> {
 	if (!window.confirm(t("dev.ssh_reset_confirm", { user: draft.user }))) {
 		return;
 	}
@@ -73,8 +65,10 @@ async function resetPassword(ctx: ModuleContext): Promise<void> {
 			user: draft.user,
 		}),
 	);
-	draft.user = result.user;
-	newPassword = result.password;
+	if (ssh) {
+		ssh.user = result.user;
+		ssh.password = result.password;
+	}
 	ctx.note(t("set.ssh_reset_done", { user: result.user }));
 	m.redraw();
 }
@@ -88,28 +82,33 @@ export const def: ModuleDef = {
 		ctx.role === "combined",
 	refresh: (ctx) => {
 		const s = ctx.modules.ssh;
-		draft.enabled = s.enabled === true;
 		draft.user = s.user ?? "root";
-		draft.password = "";
-		newPassword = null;
+		// The modules view masks the password as `{configured}` — the plain
+		// value only lives in the status `ssh` fragment. The connect-time push
+		// can arrive before this card subscribes, so fetch the live state.
+		void ctx.rpc
+			.call<SshStatus | null>("ssh.status")
+			.then(adopt)
+			.catch(() => {});
+		m.redraw();
 	},
 	render: (ctx) => {
-		const account = ctx.modules.ssh;
-		const passwordState = account.password;
-		const passwordPlaceholder = !passwordState
-			? t("set.token_ph_unchanged")
-			: typeof passwordState === "object" && passwordState.configured
-				? t("set.token_ph_configured")
-				: t("set.token_ph_missing");
+		// The plain password + live `active` only come in the status pushes'
+		// top-level `ssh` fragment, so this card keeps its own subscription.
+		if (!sub) {
+			sub = ctx.rpc.on("status", (data) => {
+				adopt(
+					(data as { ssh?: SshStatus | null } | null | undefined)?.ssh ??
+						null,
+				);
+			});
+		}
+		const active = ssh?.active ?? false;
+		const busy = ctx.busy;
 		return [
-			<p class="muted" key="hint">
-				{t("set.ssh_desc")}
-			</p>,
-			<Form key="form" onSubmit={() => void save(ctx)}>
-				<CheckField
-					label={t("set.ssh_enable")}
-					control={<Checkbox target={draft} prop="enabled" />}
-				/>
+			<p class="muted" key="hint">{t("set.ssh_desc")}</p>,
+			<p class="muted" key="stophint">{t("set.ssh_stop_hint")}</p>,
+			<div key="card" class="mod-ssh">
 				<Field
 					label={t("dev.row.user")}
 					control={<Input target={draft} prop="user" autocomplete="off" />}
@@ -117,31 +116,34 @@ export const def: ModuleDef = {
 				<Field
 					label={t("dev.row.password")}
 					control={
-						<Input
-							target={draft}
-							prop="password"
-							type="password"
+						<input
+							value={ssh?.password ?? ""}
+							readonly
 							autocomplete="off"
-							placeholder={passwordPlaceholder}
+							placeholder={t("set.token_ph_missing")}
 						/>
 					}
 				/>
-				{newPassword ? (
-					<p class="ssh-password" key="newpass">
-						{t("dev.ssh_new_password")}{" "}
-						<code>{newPassword}</code>
-					</p>
-				) : null}
-				<Break />
 				<Actions>
-					<Button label={t("set.save")} type="submit" disabled={ctx.busy} />
 					<Button
-						label={t("ui.reset_password")}
-						disabled={ctx.busy}
-						onClick={() => void resetPassword(ctx)}
+						label={t("ui.start")}
+						disabled={busy || active}
+						onclick={() => void setRunning(ctx, true)}
+					/>
+					<Button
+						label={t("ui.stop")}
+						class="danger"
+						disabled={busy || !active}
+						onclick={() => void setRunning(ctx, false)}
+					/>
+					<Button
+						label={t("dev.ssh_new_password")}
+						disabled={busy || active}
+						title={active ? t("set.ssh_stop_hint") : undefined}
+						onclick={() => void newPassword(ctx)}
 					/>
 				</Actions>
-			</Form>,
+			</div>,
 		];
 	},
 };
