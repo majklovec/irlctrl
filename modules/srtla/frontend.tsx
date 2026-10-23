@@ -537,17 +537,20 @@ function linkCells(l: SrtlaLinkStats | undefined, total: number): m.Vnode[] {
         ),
         cell(
             l.connected ? `${Math.round(l.rtt_ms)} ms` : "—",
-            "num",
+            "num is-rtt",
             t("dev.link_min_rtt", { rtt: Math.round(l.rtt_min_ms) }),
         ),
-        cell(`${l.in_flight} / ${l.window}`, "num"),
-        cell(l.nak_count, "num"),
-        cell(`${((l.cc_loss_permille ?? 0) / 10).toFixed(1)}%`, "num"),
+        cell(`${l.in_flight} / ${l.window}`, "num is-inflight"),
+        cell(l.nak_count, "num is-naks"),
+        cell(
+            `${((l.cc_loss_permille ?? 0) / 10).toFixed(1)}%`,
+            "num is-loss",
+        ),
         cell(
             l.quality_multiplier !== undefined
                 ? `×${l.quality_multiplier.toFixed(2)}`
                 : "—",
-            "num",
+            "num is-quality",
             l.base_score !== undefined
                 ? t("dev.link_score", { score: l.base_score })
                 : "",
@@ -556,8 +559,8 @@ function linkCells(l: SrtlaLinkStats | undefined, total: number): m.Vnode[] {
 }
 
 function linkHeader(): m.Vnode {
-    const th = (text: string, title?: string) => (
-        <th class={"link-col"} title={title}>
+    const th = (text: string, title?: string, cls?: string) => (
+        <th class={`link-col ${cls ?? ""}`.trim()} title={title}>
             {text}
         </th>
     );
@@ -565,16 +568,16 @@ function linkHeader(): m.Vnode {
         <thead>
             <tr>
                 <th>{t("dev.th.bond")}</th>
-                <th>{t("dev.th.interface")}</th>
-                <th>{t("dev.signal")}</th>
-                <th>{t("dev.th.network")}</th>
+                <th class={"is-iface"}>{t("dev.th.interface")}</th>
+                <th class={"is-signal"}>{t("dev.signal")}</th>
+                <th class={"is-network"}>{t("dev.th.network")}</th>
                 {th(t("dev.th.link"))}
                 {th(t("mgmt.th_bitrate"))}
-                {th("RTT")}
-                {th(t("dev.th.in_flight"), t("dev.th.in_flight_title"))}
-                {th(t("dev.th.naks"))}
-                {th(t("dev.th.loss"))}
-                {th(t("dev.th.quality"))}
+                {th("RTT", undefined, "is-rtt")}
+                {th(t("dev.th.in_flight"), t("dev.th.in_flight_title"), "is-inflight")}
+                {th(t("dev.th.naks"), undefined, "is-naks")}
+                {th(t("dev.th.loss"), undefined, "is-loss")}
+                {th(t("dev.th.quality"), undefined, "is-quality")}
             </tr>
         </thead>
     );
@@ -623,7 +626,7 @@ function interfacesCard(host: DeviceCard, status: Status): m.Vnode {
                         }
                     />
                 </td>
-                <td>
+                <td class={"is-iface"}>
                     {i.iface}
                     {i.speed ? (
                         <small
@@ -633,8 +636,8 @@ function interfacesCard(host: DeviceCard, status: Status): m.Vnode {
                     ) : null}
                     {sub ? <span class={"iface-sub muted"}>{sub}</span> : null}
                 </td>
-                <td>{signal(i.signalQuality)}</td>
-                <td>{network || "—"}</td>
+                <td class={"is-signal"}>{signal(i.signalQuality)}</td>
+                <td class={"is-network"}>{network || "—"}</td>
                 {linkCells(links.get(i.ip), total)}
             </tr>
         );

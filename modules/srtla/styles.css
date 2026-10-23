@@ -32,3 +32,53 @@
     padding: 0.35rem 0.6rem;
     font-size: 0.8rem;
 }
+
+/* Responsive interfaces table: when the dashboard cell is narrow, drop the
+ * lower-priority link columns one tier at a time (bond checkbox, interface,
+ * link state and bitrate stay). The classes live on th/td pairs; in the
+ * `no-stats` table the .link-col cells are already hidden, so only
+ * signal/network tiers apply there. Ignored outside .dash-widget (e.g. the
+ * full-width device page). */
+@container dash-widget (max-width: 920px) {
+    th.is-inflight,
+    td.is-inflight,
+    th.is-naks,
+    td.is-naks,
+    th.is-loss,
+    td.is-loss,
+    th.is-quality,
+    td.is-quality {
+        display: none;
+    }
+}
+@container dash-widget (max-width: 660px) {
+    th.is-rtt,
+    td.is-rtt,
+    th.is-network,
+    td.is-network {
+        display: none;
+    }
+}
+@container dash-widget (max-width: 486px) {
+    th.is-signal,
+    td.is-signal {
+        display: none;
+    }
+    /* Compact: small padding/font and a wrapping interface name keep the
+     * 4-column table inside very narrow cells (fits down to ~260px). */
+    .mod-srtla table {
+        font-size: 0.8rem;
+    }
+    .mod-srtla th,
+    .mod-srtla td {
+        padding: 0.35rem 0.4rem;
+    }
+    .mod-srtla td meter.share {
+        display: none;
+    }
+    .mod-srtla th.is-iface,
+    .mod-srtla td.is-iface {
+        white-space: normal;
+        overflow-wrap: break-word;
+    }
+}

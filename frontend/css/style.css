@@ -1059,6 +1059,11 @@ td.num {
     border-radius: var(--radius);
     overflow: hidden;
     min-width: 0;
+    /* Size container: widget contents use `@container dash-widget` queries to
+     * adapt to the resized cell. Safe here — the width is fully determined by
+     * the absolutely-positioned .grid-stack-item-content, never by content. */
+    container-type: inline-size;
+    container-name: dash-widget;
 }
 .dash-widget-head {
     display: flex;
