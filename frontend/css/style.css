@@ -423,6 +423,24 @@ dd {
 	margin: 0;
 	overflow-wrap: anywhere;
 }
+/* Narrow dashboard cells (e.g. the two-column mobile grid): definition
+ * labels move to their own rows and badge text is cropped with an ellipsis
+ * instead of wrapping. Container-scoped, so full pages are unaffected. */
+@container dash-widget (max-width: 420px) {
+	.dash-widget dl {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 0.15rem 0;
+	}
+	.dash-widget dl dd {
+		margin-top: 2px;
+	}
+	.dash-widget .badge {
+		max-width: 100%;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+}
 
 form {
 	display: flex;
