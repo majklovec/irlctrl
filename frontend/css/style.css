@@ -1244,6 +1244,13 @@ td.num {
 .dash-edittoggle {
 	font-weight: 600;
 }
+/* Dashboard name input in the header (edit mode only): transparent until
+ * hovered/focused, the global input rules provide the focus ring */
+header h1 .dash-name-input {
+	padding: 0.15rem 0.5rem;
+	background: transparent;
+	border-color: transparent;
+}
 .dash-save {
 	font-size: 0.8rem;
 	color: var(--muted);

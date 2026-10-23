@@ -1,8 +1,8 @@
 /* Dashboard page: the merged inline grid editor. Serves both
  * `/dashboards/view/<id>/` (starts read-only) and `/dashboards/edit/<id>/`
  * (starts in edit mode). One GridStack grid renders the live widgets; in edit
- * mode widgets can be dragged/resized, hidden, removed, renamed and
- * re-configured; new widgets are added on the dedicated page
+ * mode the dashboard name is editable and widgets can be dragged/resized,
+ * hidden, removed, renamed and re-configured; new widgets are added on the dedicated page
  * `/dashboards/add/<id>/` (frontend/ts/dashboardadd.ts). Layout + name changes
  * autosave (debounced) with optimistic concurrency: a 409 reloads the server
  * copy and toasts the conflict. Broadcast `dashboards.changed` events rebase
@@ -204,6 +204,14 @@ function setEdit(on: boolean): void {
 	m.redraw();
 }
 
+function onNameInput(value: string): void {
+	const dash = state.dash;
+	if (!dash) return;
+	dash.name = value;
+	// The API rejects a blank name, so only save once there is one.
+	if (value.trim()) scheduleSave();
+}
+
 async function _newDashboard(): Promise<void> {
 	state.dashMenu = false;
 	const res = await fetch("/api/dashboards", {
@@ -275,7 +283,25 @@ const App: m.Component = {
 			<Page
 				title={
 					<TitleWithBack href="/dashboards/" backLabel={t("dash.back")}>
-						{dash?.name ?? t("dash.title")}
+						{dash ? (
+							state.editMode ? (
+								<input
+									class="dash-name-input"
+									type="text"
+									value={dash.name}
+									aria-label={t("dash.rename")}
+									oninput={(e: Event) =>
+										onNameInput(
+											(e.target as HTMLInputElement).value,
+										)
+									}
+								/>
+							) : (
+								dash.name
+							)
+						) : (
+							t("dash.title")
+						)}
 					</TitleWithBack>
 				}
 				nav={
