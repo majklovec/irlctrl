@@ -129,9 +129,11 @@ Then open `http://<server>:8090/` in a browser — it redirects to `/login`.
 **First account = admin.** Open `/register`, fill in a username and an 8+ character password, and create the account. The page tells you this is the first account and that it will get administrator privileges:
 
 ![Sign in page](screenshots/00-login.png)
+
 *Sign in page — use it after creating the account.*
 
 ![Create account page](screenshots/02-register.png)
+
 *Create account page. For the very first account the invitation code is not needed; everyone after that receives a single-use code from an admin.*
 
 After that, create **device tokens** on the [profile page](#114-profile-password-tokens-invitations) — each device gets its own token.

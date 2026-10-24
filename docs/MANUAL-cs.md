@@ -129,9 +129,11 @@ Poté v prohlížeči otevřete `http://<server>:8090/` — přesměruje na `/lo
 **První účet = admin.** Otevřete `/register`, vyplňte uživatelské jméno a heslo alespoň 8 znaků a účet vytvořte. Stránka vás informuje, že jde o první účet a že získává oprávnění administrátora:
 
 ![Přihlašovací stránka](screenshots/00-login-cs.png)
+
 *Přihlašovací stránka — použijte ji po vytvoření účtu.*
 
 ![Stránka pro vytvoření účtu](screenshots/02-register-cs.png)
+
 *Stránka pro vytvoření účtu. Pro úplně první účet pozvánkový kód není potřeba; každý další dostává od admina jednorázový kód.*
 
 Poté na [profilové stránce](#113-profil--heslo-tokeny-pozvánky) vytvořte **tokeny zařízení** — každé zařízení by mělo mít vlastní token.
