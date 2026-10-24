@@ -2,15 +2,22 @@
  * demand by the i18next-http-backend plugin from /i18n/<lang>.json (served by
  * server.ts / the device API from the embedded catalogs). The plugin loads the
  * current and fallback languages during init and any further language on
- * changeLanguage. The header <LanguageSelect> is the Mithril component that
- * drives the switch: it persists the choice, updates <html lang> and redraws. */
+ * changeLanguage. The initial language is detected by
+ * i18next-browser-languagedetector: the persisted choice first, then the
+ * navigator locale (regional variants folded to their base code). The header
+ * <LanguageSelect> is the Mithril component that drives the switch: it
+ * persists the choice, updates <html lang> and redraws. */
 
 import i18next, { type TOptions } from "i18next";
+import LanguageDetector, {
+	type DetectorOptions,
+} from "i18next-browser-languagedetector";
 import httpBackend from "i18next-http-backend";
 import m from "mithril";
 import {
 	asLanguage,
 	DEFAULT_LANGUAGE,
+	isLanguage,
 	LANGUAGE_INFO,
 	LANGUAGES,
 	type Language,
@@ -23,24 +30,42 @@ export { LANGUAGES };
 
 const STORAGE_KEY = "irlctrl-lang";
 
+/**
+ * Where the UI language is looked up: the persisted choice first, then the
+ * navigator locale. Switches made through setLanguage are persisted to the
+ * same key by the detector's caches, so the explicit choice always wins over
+ * the locale on the next load.
+ */
+const detection: DetectorOptions = {
+	order: ["localStorage", "navigator"],
+	lookupLocalStorage: STORAGE_KEY,
+	caches: ["localStorage"],
+};
+
 const i18n = i18next.createInstance();
 
+// Same options as the instance i18next registers, so both look up identically.
+const detector = new LanguageDetector(undefined, detection);
+
+/**
+ * The initial UI language: the persisted choice (irlctrl-lang) first, then
+ * the navigator locale. "cs-CZ" is folded to "cs" and anything unsupported
+ * falls back to the default language.
+ */
 function readInitial(): Language {
-	try {
-		const stored = localStorage.getItem(STORAGE_KEY);
-		if (stored) return asLanguage(stored);
-	} catch {
-		/* private mode / disabled */
-	}
-	return asLanguage(document.documentElement.lang);
+	const detected = detector.detect();
+	const code = Array.isArray(detected) ? detected[0] : detected;
+	const base = code?.split(/[-_]/)[0];
+	return isLanguage(base) ? base : DEFAULT_LANGUAGE;
 }
 
 let current: Language = readInitial();
 document.documentElement.lang = current;
 
-const initPromise = i18n.use(httpBackend).init({
+const initPromise = i18n.use(httpBackend).use(LanguageDetector).init({
 	lng: current,
 	fallbackLng: DEFAULT_LANGUAGE,
+	detection,
 	backend: {
 		// Absolute URL so non-browser fetch (Bun) and cross-origin hosts both
 		// work; in the page this is same-origin.
@@ -84,17 +109,15 @@ export const languageLabel = (l: Language): string => {
 	return info ? `${info.flag} ${info.name}` : l;
 };
 
-/** Change the UI language: state, <html lang>, localStorage, bundle, redraw. */
+/**
+ * Change the UI language: state, <html lang>, bundle, redraw. Persistence to
+ * localStorage happens through the detector's caches on changeLanguage.
+ */
 export function setLanguage(next: string): void {
 	const value = asLanguage(next);
 	if (value === current) return;
 	current = value;
 	document.documentElement.lang = current;
-	try {
-		localStorage.setItem(STORAGE_KEY, current);
-	} catch {
-		/* ignore */
-	}
 	m.redraw(); // the select updates immediately, before the bundle lands
 	void i18n
 		.changeLanguage(current) // the http backend fetches the catalog
