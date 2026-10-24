@@ -128,10 +128,10 @@ Poté v prohlížeči otevřete `http://<server>:8090/` — přesměruje na `/lo
 
 **První účet = admin.** Otevřete `/register`, vyplňte uživatelské jméno a heslo alespoň 8 znaků a účet vytvořte. Stránka vás informuje, že jde o první účet a že získává oprávnění administrátora:
 
-![Přihlašovací stránka](screenshots/00-login.png)
+![Přihlašovací stránka](screenshots/00-login-cs.png)
 *Přihlašovací stránka — použijte ji po vytvoření účtu.*
 
-![Stránka pro vytvoření účtu](screenshots/02-register.png)
+![Stránka pro vytvoření účtu](screenshots/02-register-cs.png)
 *Stránka pro vytvoření účtu. Pro úplně první účet pozvánkový kód není potřeba; každý další dostává od admina jednorázový kód.*
 
 Poté na [profilové stránce](#113-profil--heslo-tokeny-pozvánky) vytvořte **tokeny zařízení** — každé zařízení by mělo mít vlastní token.
@@ -216,7 +216,7 @@ Nové zařízení místo běžného rozhraní otevře **průvodce nastavením**.
 
 Vyberte jazyk rozhraní (k dispozici je 12 jazyků). Lze ho kdykoli změnit v jazykovém výběru v hlavičce.
 
-![Průvodce: jazyk](screenshots/01-wizard-language.png)
+![Průvodce: jazyk](screenshots/01-wizard-language-cs.png)
 
 ### Krok 2 — Role zařízení
 
@@ -228,7 +228,7 @@ Zvolte, jak se toto IRLCTRL zapojí do sítě. Tři možnosti přesně ukazují,
 
 Výběrem možnosti *Combined* se do průvodce přidají kroky Kodér a Relay (celkem tedy sedm kroků, jak je vidět na snímku).
 
-![Průvodce: role](screenshots/03-wizard-role.png)
+![Průvodce: role](screenshots/03-wizard-role-cs.png)
 
 ### Krok 3 — Identita
 
@@ -237,7 +237,7 @@ Jak se zařízení představuje ovládacímu serveru:
 - **Jméno zařízení (hostname)** — malá písmena, číslice, tečky a pomlčky, max 64 znaků.
 - **Akcentová barva** — barva hlavičky UI zařízení.
 
-![Průvodce: identita](screenshots/04-wizard-identity.png)
+![Průvodce: identita](screenshots/04-wizard-identity-cs.png)
 
 ### Krok 4 — Ovládací server
 
@@ -246,7 +246,7 @@ Volitelné připojení k centrálnímu serveru:
 - **URL ovládacího serveru** — např. `ws://192.168.1.10:8090/device` (nebo `wss://…` za TLS).
 - **Ovládací token** — jeden z tokenů zařízení vytvořených na profilové stránce vlastníka. Chcete-li zařízení používat samostatně (pouze s místním rozhraním), ponechte obě pole prázdná.
 
-![Průvodce: ovládací server](screenshots/05-wizard-control.png)
+![Průvodce: ovládací server](screenshots/05-wizard-control-cs.png)
 
 ### Krok 5 — Enkodér
 
@@ -261,7 +261,7 @@ Pole pro enkodér a snímací pipeline:
 - **Stream ID** (volitelné) — SRT stream ID oznamovaný přijímači.
 - **Bitrate overlay** — zobrazuje aktuální datový tok přímo ve videu.
 
-![Průvodce: enkodér](screenshots/06-wizard-encoder.png)
+![Průvodce: enkodér](screenshots/06-wizard-encoder-cs.png)
 
 ### Krok 6 — Relay
 
@@ -272,7 +272,7 @@ Pole SRTLA relay (jen pro role relay/combined):
 - **Scheduler** — algoritmus plánování spojení `Enhanced` (výchozí) nebo `Classic`.
 - **Hodnocení kvality** — SRTLA hodnocení používané pro výběr nejlepšího spojení.
 
-![Průvodce: relay](screenshots/07-wizard-relay.png)
+![Průvodce: relay](screenshots/07-wizard-relay-cs.png)
 
 ### Krok 7 — Přehled a uložení
 
@@ -283,7 +283,7 @@ Zkontrolujte všechna nastavení. Pomocí tlačítka Zpět se můžete kdykoli v
 
 Potvrzení zní: *„Configuration saved. Restart the service to apply the selected role, hostname and control server.“*
 
-![Průvodce: přehled](screenshots/08-wizard-review.png)
+![Průvodce: přehled](screenshots/08-wizard-review-cs.png)
 
 Po uložení se objeví běžné UI zařízení — [další sekce](#6-uživatelské-rozhraní-zařízení--běžná-obsluha).
 
@@ -295,17 +295,17 @@ Hlavní stránka (`http://<device>:8085/`) zobrazuje kartu pro každou funkci ak
 
 ### 6.1 Kombinované zařízení (všechny karty)
 
-![Hlavní stránka kombinovaného zařízení](screenshots/09-device-main-combined.png)
+![Hlavní stránka kombinovaného zařízení](screenshots/09-device-main-combined-cs.png)
 *Kombinované zařízení: karty Encoder, Relay, Interfaces, Modems, SSH a Log.*
 
 ### 6.2 Role encoder
 
-![Hlavní stránka zařízení encoder](screenshots/12-device-main-encoder.png)
+![Hlavní stránka zařízení encoder](screenshots/12-device-main-encoder-cs.png)
 *Role encoder: karta Encoder se seznamem pipeline — bez karet Relay a Interfaces.*
 
 ### 6.3 Role relay
 
-![Hlavní stránka zařízení relay](screenshots/13-device-main-relay.png)
+![Hlavní stránka zařízení relay](screenshots/13-device-main-relay-cs.png)
 *Role relay: karty Relay (spojení a hodnocení kvality), Interfaces, Modems, SSH a Log.*
 
 ### 6.4 Karta Encoder
@@ -363,7 +363,7 @@ Otevřete ozubené kolo v hlavičce zařízení a vyberte **Device settings**. U
 > *„Settings are re-applied on the control server after saving.“* a
 > *„The new role takes effect after restarting the device service.“*
 
-![Stránka nastavení zařízení](screenshots/10-device-settings.png)
+![Stránka nastavení zařízení](screenshots/10-device-settings-cs.png)
 
 | Možnost | Význam |
 | --- | --- |
@@ -380,7 +380,7 @@ Na zařízení jsou uloženy soubory GStreamer pipeline. **Podadresáře určuj�
 
 **Editor pipeline** (na adrese `/pipelines/new/` nebo po výběru *Edit* u existující pipeline):
 
-![Editor pipeline](screenshots/11-pipeline-editor.png)
+![Editor pipeline](screenshots/11-pipeline-editor-cs.png)
 
 - **Cesta k pipeline** — cesta ve tvaru `group/name` (např. `test/x264_test_pattern`). Nový soubor se uloží na toto místo pod adresářem `--pipelines`.
 - **Obsah pipeline** — příkazový řetězec GStreamer se zvýrazněnou syntaxí. Legenda **Element colours** označuje typy prvků: source, sink, parser, demuxer, muxer, decoder, encoder, converter, filter, other, caps, key-pad a value.
@@ -502,7 +502,7 @@ Spusťte server příkazem `bun backend/server/server.ts --port 8090`, přihlast
 
 ### 11.1 Seznam zařízení
 
-![Seznam zařízení na ovládacím serveru](screenshots/14-control-devices.png)
+![Seznam zařízení na ovládacím serveru](screenshots/14-control-devices-cs.png)
 
 Tabulka zobrazuje všechna zařízení patřící přihlášenému uživateli:
 
@@ -521,7 +521,7 @@ Kliknutím na zařízení se otevře jeho **stránka zařízení**.
 
 ### 11.2 Stránka zařízení (`/d/<id>/`)
 
-![Stránka zařízení na ovládacím serveru](screenshots/15-control-device-page.png)
+![Stránka zařízení na ovládacím serveru](screenshots/15-control-device-page-cs.png)
 
 Stránka zařízení zobrazuje **stejné karty** jako místní rozhraní zařízení (Encoder, Relay, Interfaces, Modems, SSH a Log). Je poskytována ovládacím serverem, který příkazy předává zařízení přes jeho odchozí spojení — můžete tak ovládat i zařízení za NAT nebo v mobilní síti. V hlavičce je navíc zaškrtávací políčko **Autostart** a odkaz **Device settings**. Akce Start, Stop, Reload a nastavení fungují stejně jako v [sekci 6](#6-uživatelské-rozhraní-zařízení--běžná-obsluha).
 
@@ -529,24 +529,24 @@ Stránka zařízení zobrazuje **stejné karty** jako místní rozhraní zaříz
 
 Dostanete se k ní z menu uživatelského jména v hlavičce.
 
-![Profilová stránka](screenshots/16-control-profile.png)
+![Profilová stránka](screenshots/16-control-profile-cs.png)
 
 - **Change password** — aktuální heslo, nové heslo (alespoň 8 znaků) a jeho potvrzení.
 - **Device tokens** — **Add token** vydá nový token; **kliknutím zkopírujete** hodnotu; **Remove** jej odvolá. *„No tokens yet. Add one so your devices can connect.“* Každé zařízení, které chcete spravovat, by se mělo připojit s jedním z vašich tokenů (`--remote-token` / `CONTROL_SERVER_TOKEN`).
-- **Invitations** (pouze pro administrátory) — **Create invitation** vytvoří jednorázový kód, případně s nastavenou platností. Nový uživatel jej zadá na [registrační stránce](screenshots/02-register.png). *„No invitations yet. Create one so someone can join.“*
+- **Invitations** (pouze pro administrátory) — **Create invitation** vytvoří jednorázový kód, případně s nastavenou platností. Nový uživatel jej zadá na [registrační stránce](screenshots/02-register-cs.png). *„No invitations yet. Create one so someone can join.“*
 
 ### 11.4 Dashboardy
 
 Dashboardy jsou pro každého uživatele uloženy v databázi SQLite a průběžně se aktualizují. Společný datový proud odesílá data widgetů do všech právě otevřených zobrazení.
 
-![Seznam dashboardů](screenshots/17-control-dashboards.png)
+![Seznam dashboardů](screenshots/17-control-dashboards-cs.png)
 
 - **Vytvořit nový dashboard** — zadejte název (např. *Streaming*) a stiskněte **Create**.
 - Každý řádek obsahuje **Name** (odkaz na stránku dashboardu), počet **Widgets** a akce **View / Edit / Delete**.
 
 **Přidat widget** — vyberte typ:
 
-![Stránka přidat widget](screenshots/18-dashboard-add.png)
+![Stránka přidat widget](screenshots/18-dashboard-add-cs.png)
 
 Widgety jsou dvou druhů:
 
@@ -555,7 +555,7 @@ Widgety jsou dvou druhů:
 
 **Pohledová stránka dashboardu:**
 
-![Pohled dashboardu](screenshots/19-dashboard-view.png)
+![Pohled dashboardu](screenshots/19-dashboard-view-cs.png)
 
 **Možnosti v režimu úprav a zobrazení:**
 
