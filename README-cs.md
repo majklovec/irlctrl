@@ -14,7 +14,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-7.x-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
 <p align="center">
-  <img src="frontend/img/relay.svg" alt="Relé zařízení — enkodér odesílá stream přes SRT do relé, které jej distribuuje přes všechna dostupná připojení" width="900" />
+  <img src="diagram-cs.svg" alt="Relay device — encoder streams over SRT into a relay, which bonds the stream out over all uplinks" width="100%" />
 </p>
 
 ## Role
@@ -69,9 +69,6 @@ sudo CONTROL_SERVER_TOKEN=token \
   --remote ws://127.0.0.1:8090/device \
   --role combined --pipelines ./pipeline
 ```
-
-> [!NOTE]
-> Používejte `CONTROL_SERVER_TOKEN`, nikoli `REMOTE_TOKEN` — klient čte první z těchto proměnných. Přiřazení proměnných **za příkazem `sudo`** předá jejich hodnoty spuštěnému příkazu, aniž by bylo nutné nastavovat trvalé proměnné prostředí shellu.
 
 ### Parametry
 

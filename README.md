@@ -14,7 +14,7 @@ Bun-based controller for [BELABOX](https://belabox.net/)-style bonded streaming.
 </div>
 
 <p align="center">
-  <img src="frontend/img/relay.svg" alt="Relay device — encoder streams over SRT into a relay, which bonds the stream out over all uplinks" width="900" />
+  <img src="diagram.svg" alt="Relay device — encoder streams over SRT into a relay, which bonds the stream out over all uplinks" width="100%" />
 </p>
 
 ## Roles
@@ -69,9 +69,6 @@ sudo CONTROL_SERVER_TOKEN=token \
   --remote ws://127.0.0.1:8090/device \
   --role combined --pipelines ./pipeline
 ```
-
-> [!NOTE]
-> Use `CONTROL_SERVER_TOKEN`, not `REMOTE_TOKEN` — the former is the variable the client reads. Placing the assignments **after** `sudo` passes them to the command without requiring a persistent shell environment.
 
 ### Options
 
