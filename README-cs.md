@@ -6,9 +6,6 @@
 [![Bun](https://img.shields.io/badge/Bun-1.x-f9f1e1?style=flat-square&logo=bun)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-7.x-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
-> [!WARNING]
-> Vývoj stále probíhá — nepoužívejte pro produkční streamování.
-
 <p align="center">
   <img src="frontend/img/relay.svg" alt="Relé zařízení — enkodér odesílá stream přes SRT do relé, které jej distribuuje přes všechna dostupná připojení" width="900" />
 </p>

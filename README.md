@@ -10,9 +10,6 @@ Bun-based controller for [BELABOX](https://belabox.net/)-style bonded streaming.
 
 </div>
 
-> [!WARNING]
-> Development in progress — do not run in a production stream.
-
 <p align="center">
   <img src="frontend/img/relay.svg" alt="Relay device — encoder streams over SRT into a relay, which bonds the stream out over all uplinks" width="900" />
 </p>
