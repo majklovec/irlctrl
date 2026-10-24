@@ -23,6 +23,16 @@ jobs:
               with:
                   node-version: 22
 
+            - uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: latest
+
+            # Installs devDependencies so that the plugins listed in
+            # .releaserc.json (e.g. @semantic-release/git) can be resolved.
+            - name: Install dependencies
+              shell: bash
+              run: bun install
+
             - name: Semantic versioning (semantic-release)
               id: semver
               env:

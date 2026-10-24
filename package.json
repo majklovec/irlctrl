@@ -17,6 +17,7 @@
         "build:server": "bun build --compile --minify --sourcemap --format=esm --bytecode --asset i18n ./backend/server/server.ts --outfile dist/server"
     },
     "devDependencies": {
+        "@semantic-release/git": "^11.0.1",
         "@types/bun": "^1.4.2",
         "@types/mithril": "^2.2.9",
         "@types/node": "^26.6.3",
