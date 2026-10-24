@@ -169,9 +169,7 @@ function dashboardsCard(): m.Vnode {
 
 const App: m.Component = {
 	view: () => (
-		<Page title={t("dash.title")} nav={<ServerNav active="dashboards" />}>
-			{dashboardsCard()}
-		</Page>
+		<Page nav={<ServerNav active="dashboards" />}>{dashboardsCard()}</Page>
 	),
 };
 
