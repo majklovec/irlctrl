@@ -1,6 +1,6 @@
 /*
  * obs-controller module: owns the ObsClient connection to the paired OBS
- * Studio and forwards its events into the belabox event stream (pushed with a
+ * Studio and forwards its events into the irlctrl event stream (pushed with a
  * `module: "obs-controller"` tag). The obs.* API methods in methods.ts
  * dispatch their raw requests straight to this client.
  *

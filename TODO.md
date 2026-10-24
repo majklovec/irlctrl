@@ -1,7 +1,6 @@
-- rename the project from Belabox Duo to IRLCTRL
 - vzdy pri zmene page at se zepta backendu
 
-Your request to make the Belabox Duo CSS "fully responsive" is a great step forward. The project's current stylesheet (`frontend/css/style.css`) is a solid starting point, but it lacks a systematic approach to breakpoints and fluid layouts. By borrowing proven patterns from modern CSS libraries, you can create a robust, mobile-first interface without a heavy framework.
+Your request to make the IRLCTRL CSS "fully responsive" is a great step forward. The project's current stylesheet (`frontend/css/style.css`) is a solid starting point, but it lacks a systematic approach to breakpoints and fluid layouts. By borrowing proven patterns from modern CSS libraries, you can create a robust, mobile-first interface without a heavy framework.
 
 ### 🔍 Current State of the CSS
 
@@ -106,7 +105,7 @@ For structural elements like the header, settings page, or dashboard toolbar, us
 
 #### 5. Add Container Queries for Modular Components
 
-Since Belabox Duo uses a module system, container queries allow components (e.g., `.mod-encoder`, `.dash-card`) to respond to their own container's width, not just the viewport.
+Since IRLCTRL uses a module system, container queries allow components (e.g., `.mod-encoder`, `.dash-card`) to respond to their own container's width, not just the viewport.
 
 ```css
 .mod-card {
@@ -155,4 +154,4 @@ Review the current `@media` rules and add missing breakpoints for smaller device
 4.  **Test on real devices.** Use browser dev tools to emulate various screen sizes (320px, 375px, 768px, 1024px, 1440px) to verify the layout.
 5.  **Consider adding a lightweight reset.** Skeleton includes a Normalize.css reset, which can help eliminate cross-browser inconsistencies.
 
-By systematically applying these patterns, your Belabox Duo UI will become fully responsive, scalable, and maintainable, all while keeping the bundle size minimal.
+By systematically applying these patterns, your IRLCTRL UI will become fully responsive, scalable, and maintainable, all while keeping the bundle size minimal.

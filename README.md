@@ -1,10 +1,10 @@
 <div align="center">
 
-# Belabox Duo
+# IRLCTRL
 
 Bun-based controller for [BELABOX](https://belabox.net/)-style bonded streaming. One program covers three device types, and an optional control server manages a fleet of them from a browser.
 
-[![Build & Release](https://img.shields.io/github/actions/workflow/status/majklovec/belabox-duo/release.yml?style=flat-square&label=release)](https://github.com/majklovec/belabox-duo/actions)
+[![Build & Release](https://img.shields.io/github/actions/workflow/status/majklovec/irlctrl/release.yml?style=flat-square&label=release)](https://github.com/majklovec/irlctrl/actions)
 [![Bun](https://img.shields.io/badge/Bun-1.x-f9f1e1?style=flat-square&logo=bun)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-7.x-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
@@ -155,16 +155,16 @@ open http://ctl.example.com/  # redirects to /login; enter the username + passwo
 
 ### systemd
 
-Run the compiled binaries (`bun run build:client` / `bun run build:server`) as a service. Example device unit (`/etc/systemd/system/belabox-duo.service`):
+Run the compiled binaries (`bun run build:client` / `bun run build:server`) as a service. Example device unit (`/etc/systemd/system/irlctrl.service`):
 
 ```ini
 [Unit]
-Description=Belabox Duo device
+Description=IRLCTRL device
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=/usr/local/bin/bun /opt/belabox-duo/client --config /var/lib/belabox-duo/config.json
+ExecStart=/usr/local/bin/bun /opt/irlctrl/client --config /var/lib/irlctrl/config.json
 Restart=always
 User=root
 
@@ -180,7 +180,7 @@ The control server is the same with `server` in place of `client` (no `root` nee
 
 -   `setup-host.sh` — one-time install of the build dependencies (run as root)
 -   `build.sh [config]` — clones the Armbian build framework, links the bundled `userpatches/`, and compiles the image (default config `orangepi5-plus`)
--   `build-all.sh` — builds both variants: the SD-card image and the **eMMC auto-install** image (`orangepi5-plus-emmc`), which copies itself to eMMC on first boot via a one-shot `belabox-emmc-install.service`
+-   `build-all.sh` — builds both variants: the SD-card image and the **eMMC auto-install** image (`orangepi5-plus-emmc`), which copies itself to eMMC on first boot via a one-shot `irlctrl-emmc-install.service`
 
 The image ships with the whole streaming chain — GStreamer (incl. `gstreamer1.0-rockchip1`), CERALIVE's SRT, [ceracoder](https://github.com/CERALIVE/ceracoder) (built from source), [srtla_send](https://github.com/irlserver/srtla_send) (prebuilt arm64 .deb), and udev rules for belaUI audio — so `backend/client/client.ts --role combined` runs out of the box.
 
@@ -192,9 +192,9 @@ The image ships with the whole streaming chain — GStreamer (incl. `gstreamer1.
 docker compose up -d --build
 ```
 
--   **server** — `backend/server/server.ts`, the control server (`Dockerfile`, image `majkl/belabox-duo-control`), UI on `:8090`.
+-   **server** — `backend/server/server.ts`, the control server (`Dockerfile`, image `majkl/irlctrl-control`), UI on `:8090`.
 -   **obs-client** — `backend/obs-client/obs-client.ts`, proxies a host's OBS Studio (`ws://host.docker.internal:4455`) into the server; reuses the control image with a different entrypoint.
--   **relay** — `backend/client/client.ts --role relay`, bonds SRT out via `srtla_send` (`Dockerfile.device`, image `majkl/belabox-duo-device`).
+-   **relay** — `backend/client/client.ts --role relay`, bonds SRT out via `srtla_send` (`Dockerfile.device`, image `majkl/irlctrl-device`).
 -   **encoder** — `backend/client/client.ts --role encoder`, runs `ceracoder`/GStreamer and sends SRT to the relay; same device image, different role + `ENCODER_BIN`.
 
 The relay/encoder device image bundles `backend/client/client.ts` plus the native `srtla_send`, `ceracoder`, `belacoder` binaries, the GStreamer pipeline definitions, and `iproute2`. The **relay** grants the `NET_ADMIN` capability (`cap_add`) because at startup it builds per-uplink policy routing (`ip rule add` + route tables) and watches interfaces with `ip monitor`; without it the relay logs `ip rule add … Operation not permitted` and exits. The encoder does not need the capability. On the default bridge network the relay's routing changes act on the container's own network namespace, not the host; for real bonded uplinks on the host's raw interfaces, run the relay with `network_mode: host`.

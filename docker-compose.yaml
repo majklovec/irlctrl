@@ -5,8 +5,8 @@ services:
         build:
             context: .
             dockerfile: Dockerfile
-        image: majkl/belabox-duo-control:latest
-        container_name: belabox-server
+        image: majkl/irlctrl-control:latest
+        container_name: irlctrl-server
         restart: unless-stopped
         user: "1000:1000"
         command:
@@ -29,8 +29,8 @@ services:
             retries: 5
 
     obs-client:
-        image: majkl/belabox-duo-control:latest
-        container_name: belabox-obs-client
+        image: majkl/irlctrl-control:latest
+        container_name: irlctrl-obs-client
         restart: unless-stopped
         entrypoint:
             [
@@ -56,8 +56,8 @@ services:
         build:
             context: .
             dockerfile: Dockerfile.device
-        image: majkl/belabox-duo-device:latest
-        container_name: belabox-relay
+        image: majkl/irlctrl-device:latest
+        container_name: irlctrl-relay
         restart: unless-stopped
         cap_add:
             - NET_ADMIN
@@ -90,8 +90,8 @@ services:
                 condition: service_healthy
 
     encoder:
-        image: majkl/belabox-duo-device:latest
-        container_name: belabox-encoder
+        image: majkl/irlctrl-device:latest
+        container_name: irlctrl-encoder
         restart: unless-stopped
         # Runs as root (like the relay): the ssh module needs root for
         # sshd (port 22, root logins) and chpasswd (password reset).

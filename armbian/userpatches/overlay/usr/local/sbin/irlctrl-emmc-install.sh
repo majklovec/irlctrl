@@ -1,5 +1,5 @@
 #!/bin/bash
-# belabox-emmc-install.sh
+# irlctrl-emmc-install.sh
 #
 # Runs on first boot from SD card. Detects eMMC, then uses armbian-install
 # to migrate the system to eMMC (boot + rootfs on eMMC).
@@ -9,7 +9,7 @@
 
 set -e
 
-LOG_TAG="belabox-emmc-install"
+LOG_TAG="irlctrl-emmc-install"
 EMMC_DEV="/dev/mmcblk0"
 
 log() {
@@ -24,7 +24,7 @@ log "Current root device: $ROOT_DEV"
 
 if [[ "$ROOT_DEV" == *"mmcblk0"* ]]; then
 	log "Already running from eMMC ($ROOT_DEV). Nothing to do."
-	systemctl disable belabox-emmc-install.service 2>/dev/null || true
+	systemctl disable irlctrl-emmc-install.service 2>/dev/null || true
 	exit 0
 fi
 
@@ -69,7 +69,7 @@ printf '2\n1\ny\n' | armbian-install || {
 log "eMMC install completed successfully."
 
 # --- 4. Disable the service so it doesn't run again ---
-systemctl disable belabox-emmc-install.service 2>/dev/null || true
+systemctl disable irlctrl-emmc-install.service 2>/dev/null || true
 
 # --- 5. Write a marker so the user knows the install succeeded ---
 touch /root/.emmc-install-complete

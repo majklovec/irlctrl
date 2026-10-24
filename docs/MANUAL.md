@@ -1,6 +1,6 @@
-# Belabox Duo — User Operations Manual
+# IRLCTRL — User Operations Manual
 
-This manual explains how to **turn on**, **operate**, and **configure** Belabox Duo — a Bun-based controller for [BELABOX](https://belabox.net/)-style bonded streaming. One program covers three device types, and an optional control server manages a whole fleet of them from a browser.
+This manual explains how to **turn on**, **operate**, and **configure** IRLCTRL — a Bun-based controller for [BELABOX](https://belabox.net/)-style bonded streaming. One program covers three device types, and an optional control server manages a whole fleet of them from a browser.
 
 All screenshots in this manual were captured from a real running instance and are in [`docs/screenshots/`](screenshots/).
 
@@ -26,7 +26,7 @@ All screenshots in this manual were captured from a real running instance and ar
 
 ## 1. Overview
 
-Belabox Duo captures a livestream on an **encoder** box and bonds it out over several network uplinks (multiple modems / Wi-Fi / Ethernet) with [`srtla_send`](https://github.com/irlserver/srtla_send) so that no single weak link can kill the stream. An optional **control server** ties everything together in a browser.
+IRLCTRL captures a livestream on an **encoder** box and bonds it out over several network uplinks (multiple modems / Wi-Fi / Ethernet) with [`srtla_send`](https://github.com/irlserver/srtla_send) so that no single weak link can kill the stream. An optional **control server** ties everything together in a browser.
 
 ```mermaid
 flowchart LR
@@ -45,7 +45,7 @@ flowchart LR
     end
 
     subgraph control server
-        C[Belabox Duo control server]
+        C[IRLCTRL control server]
         D[Dashboards]
     end
     E -. WebSocket .-> C
@@ -166,16 +166,16 @@ CONTROL_SERVER_TOKEN=tok-alice-1 bun backend/client/client.ts --role encoder --r
 
 #### systemd
 
-Run the compiled binaries (`bun run build:client` / `bun run build:server`) as a service. Example device unit (`/etc/systemd/system/belabox-duo.service`):
+Run the compiled binaries (`bun run build:client` / `bun run build:server`) as a service. Example device unit (`/etc/systemd/system/irlctrl.service`):
 
 ```ini
 [Unit]
-Description=Belabox Duo device
+Description=IRLCTRL device
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=/usr/local/bin/bun /opt/belabox-duo/client --config /var/lib/belabox-duo/config.json
+ExecStart=/usr/local/bin/bun /opt/irlctrl/client --config /var/lib/irlctrl/config.json
 Restart=always
 User=root
 
@@ -193,9 +193,9 @@ The control server uses the same pattern with `server` (no `root` needed). Put r
 docker compose up -d --build
 ```
 
-- **server** — the control server (`Dockerfile`, image `majkl/belabox-duo-control`), UI on `:8090`.
+- **server** — the control server (`Dockerfile`, image `majkl/irlctrl-control`), UI on `:8090`.
 - **obs-client** — proxies a host's OBS Studio (`ws://host.docker.internal:4455`) into the server.
-- **relay** — `client.ts --role relay`, bonds SRT out via `srtla_send` (`Dockerfile.device`, image `majkl/belabox-duo-device`).
+- **relay** — `client.ts --role relay`, bonds SRT out via `srtla_send` (`Dockerfile.device`, image `majkl/irlctrl-device`).
 - **encoder** — `client.ts --role encoder`, runs `ceracoder`/GStreamer and sends SRT to the relay; same device image, different role + `ENCODER_BIN`.
 
 The **relay** container grants the `NET_ADMIN` capability because at startup it builds per-uplink policy routing (`ip rule add` + route tables) and watches interfaces with `ip monitor`; without it the relay logs `ip rule add … Operation not permitted` and exits. The encoder does not need the capability. On the default bridge network the relay's routing changes act on the container's own namespace; for real bonded uplinks on the host's raw interfaces run the relay with `network_mode: host`.
@@ -220,7 +220,7 @@ Pick the interface language (12 languages are available). It can be changed at a
 
 ### Step 2 — Device role
 
-Choose how this Belabox joins the network. The three choices show exactly what each does:
+Choose how this IRLCTRL joins the network. The three choices show exactly what each does:
 
 - **Relay** — "Receives streams and forwards them with SRTLA"
 - **Encoder** — "Captures a GStreamer pipeline and sends it over SRT"

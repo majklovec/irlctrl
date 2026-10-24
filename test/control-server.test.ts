@@ -148,7 +148,7 @@ function nextFrame(
 
 describe("control server HTTP contracts", () => {
 	beforeAll(async () => {
-		tempDir = await mkdtemp(join(tmpdir(), "belabox-control-server-"));
+		tempDir = await mkdtemp(join(tmpdir(), "irlctrl-control-server-"));
 		databasePath = join(tempDir, "users.sqlite");
 		port = await availablePort();
 		await startServer();

@@ -2,7 +2,7 @@
 /**
  * backend/obs-client/obs-client.ts
  *
- * A belabox-duo device that proxies between OBS Studio (obs-websocket v5)
+ * An IRLCTRL device that proxies between OBS Studio (obs-websocket v5)
  * and a remote control server (server.ts). Run it on the OBS machine just
  * like client.ts:
  *
@@ -177,7 +177,7 @@ export * from "../../shared/obs/client";
 // ============================================================================
 // Standalone proxy device: `bun backend/obs-client/obs-client.ts`
 //
-// Registers as an "obs" device on a belabox control server (server.ts) and
+// Registers as an "obs" device on an IRLCTRL control server (server.ts) and
 // bridges the two: requests coming over the remote socket are forwarded to
 // OBS, and OBS events are pushed back to the server so server-side dashboards
 // can render them.

@@ -21,7 +21,7 @@ import type { MithrilJSXComponent } from "./jsx";
 export type { Language };
 export { LANGUAGES };
 
-const STORAGE_KEY = "belabox-lang";
+const STORAGE_KEY = "irlctrl-lang";
 
 const i18n = i18next.createInstance();
 

@@ -1,8 +1,8 @@
-# Belabox Duo
+# IRLCTRL
 
 Řídicí aplikace založená na Bun pro streamování s agregací připojení ve stylu [BELABOX](https://belabox.net/). Jeden program podporuje tři typy zařízení a volitelný řídicí server umožňuje spravovat celou jejich skupinu prostřednictvím webového prohlížeče.
 
-[![Build & Release](https://img.shields.io/github/actions/workflow/status/majklovec/belabox-duo/release.yml?style=flat-square&label=release)](https://github.com/majklovec/belabox-duo/actions)
+[![Build & Release](https://img.shields.io/github/actions/workflow/status/majklovec/irlctrl/release.yml?style=flat-square&label=release)](https://github.com/majklovec/irlctrl/actions)
 [![Bun](https://img.shields.io/badge/Bun-1.x-f9f1e1?style=flat-square&logo=bun)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-7.x-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
@@ -170,16 +170,16 @@ open http://ctl.example.com/  # přesměruje na /login; zadejte uživatelské jm
 
 ### systemd
 
-Spouštějte zkompilované binární soubory (`bun run build:client` / `bun run build:server`) jako službu. Příklad jednotky pro zařízení (`/etc/systemd/system/belabox-duo.service`):
+Spouštějte zkompilované binární soubory (`bun run build:client` / `bun run build:server`) jako službu. Příklad jednotky pro zařízení (`/etc/systemd/system/irlctrl.service`):
 
 ```ini
 [Unit]
-Description=Belabox Duo device
+Description=IRLCTRL device
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=/usr/local/bin/bun /opt/belabox-duo/client --config /var/lib/belabox-duo/config.json
+ExecStart=/usr/local/bin/bun /opt/irlctrl/client --config /var/lib/irlctrl/config.json
 Restart=always
 User=root
 
@@ -197,7 +197,7 @@ Adresář [`armbian/`](armbian/) obsahuje nástroje pro nativní sestavení při
 
 -   `setup-host.sh` — jednorázová instalace závislostí potřebných pro sestavení (spouštějte jako root).
 -   `build.sh [config]` — stáhne sestavovací framework Armbian, propojí přibalený adresář `userpatches/` a sestaví obraz. Výchozí konfigurace je `orangepi5-plus`.
--   `build-all.sh` — sestaví obě varianty: obraz pro SD kartu a obraz pro automatickou instalaci na **eMMC** (`orangepi5-plus-emmc`), který při prvním spuštění zkopíruje systém na eMMC pomocí jednorázové služby `belabox-emmc-install.service`.
+-   `build-all.sh` — sestaví obě varianty: obraz pro SD kartu a obraz pro automatickou instalaci na **eMMC** (`orangepi5-plus-emmc`), který při prvním spuštění zkopíruje systém na eMMC pomocí jednorázové služby `irlctrl-emmc-install.service`.
 
 Obraz obsahuje celý řetězec pro streamování: GStreamer (včetně `gstreamer1.0-rockchip1`), SRT od CERALIVE, [ceracoder](https://github.com/CERALIVE/ceracoder) (sestavený ze zdrojových kódů), [srtla_send](https://github.com/irlserver/srtla_send) (předpřipravený balíček `.deb` pro arm64) a pravidla udev pro zvuk v belaUI.
 
@@ -211,9 +211,9 @@ Soubor `docker-compose.yaml` spouští celý systém — řídicí server, relé
 docker compose up -d --build
 ```
 
--   **server** — `backend/server/server.ts`, řídicí server (`Dockerfile`, obraz `majkl/belabox-duo-control`), webové rozhraní na portu `8090`.
+-   **server** — `backend/server/server.ts`, řídicí server (`Dockerfile`, obraz `majkl/irlctrl-control`), webové rozhraní na portu `8090`.
 -   **obs-client** — `backend/obs-client/obs-client.ts`, zpřístupňuje OBS Studio hostitelského počítače (`ws://host.docker.internal:4455`) prostřednictvím serveru; používá stejný obraz jako řídicí server, ale jiný vstupní bod.
--   **relay** — `backend/client/client.ts --role relay`, agreguje SRT stream pomocí `srtla_send` (`Dockerfile.device`, obraz `majkl/belabox-duo-device`).
+-   **relay** — `backend/client/client.ts --role relay`, agreguje SRT stream pomocí `srtla_send` (`Dockerfile.device`, obraz `majkl/irlctrl-device`).
 -   **encoder** — `backend/client/client.ts --role encoder`, spouští `ceracoder`/GStreamer a odesílá SRT do relé; používá stejný obraz zařízení, ale jinou roli a proměnnou `ENCODER_BIN`.
 
 Obraz zařízení pro relé a enkodér obsahuje `backend/client/client.ts`, nativní binární soubory `srtla_send`, `ceracoder` a `belacoder`, definice GStreamer pipeline a nástroje `iproute2`.
