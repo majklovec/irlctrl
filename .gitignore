@@ -7,6 +7,9 @@ armbian/output
 armbian/userpatches/config-example.conf
 pipeline/majklovec
 
+# Local environment variables (secrets)
+.env
+
 # Generated manifests and embedded assets.
 generated/
 dist/*
