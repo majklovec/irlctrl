@@ -7,6 +7,7 @@
 Bun-based controller for [BELABOX](https://belabox.net/)-style bonded streaming. One program covers three device types, and an optional control server manages a fleet of them from a browser.
 
 [![Build & Release](https://img.shields.io/github/actions/workflow/status/majklovec/irlctrl/release.yml?style=flat-square&label=release)](https://github.com/majklovec/irlctrl/actions)
+[![Version](https://img.shields.io/github/v/tag/majklovec/irlctrl?style=flat-square&label=version)](https://github.com/majklovec/irlctrl/releases)
 [![Bun](https://img.shields.io/badge/Bun-1.x-f9f1e1?style=flat-square&logo=bun)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-7.x-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
