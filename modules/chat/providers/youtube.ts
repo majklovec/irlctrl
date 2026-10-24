@@ -4,9 +4,12 @@
  * YouTube's suggested `timeoutMs` throttle so messages land within about a
  * second. The config value carries no `@`; the poll adds it back for the
  * handle. Offline streams make the first fetch reject — treated like a
- * disconnect and retried with backoff; five consecutive poll failures (or a
- * ScrapeError, whose response shape no longer parses) force a full
- * reconnect, since the page may have changed (e.g. the stream ended).
+ * disconnect and retried with backoff. The live-page fetch is part of the
+ * same failure budget as the polls: a single unparseable page (a consent
+ * interstitial, a mid-stream 404) is retried with backoff instead of
+ * forcing a reconnect, and only five consecutive failures (or a
+ * ScrapeError, whose response shape no longer parses) restart the loop,
+ * since the page may have changed (e.g. the stream ended).
  */
 
 import { RateLimitError, ScrapeError } from "youtube-chat-next";
@@ -18,8 +21,9 @@ import { ChatProvider } from "./base";
 
 /** Fixed poll cadence in ms (see module docs: ignore the 10 s throttle). */
 const POLL_INTERVAL_MS = 1_000;
-/** Give up the poll loop and reconnect after this many consecutive failures. */
-const MAX_POLL_FAILURES = 5;
+/** Shared failure budget for live-page fetches and polls: give up the loop
+ * and reconnect after this many consecutive failures. */
+const MAX_FAILURES = 5;
 
 const sleep = (ms: number): Promise<void> =>
 	new Promise((resolve) => setTimeout(resolve, ms));
@@ -101,22 +105,58 @@ export class YoutubeChatProvider extends ChatProvider {
 				err instanceof Error ? err.message : String(err);
 
 			let options: FetchOptions | null = null;
-			try {
-				options = await fetchLivePage({ handle }, "live");
-			} catch (err) {
-				// Offline stream (NotLiveError) or transient failure — "try
-				// again later".
-				this.log("live page", errText(err));
-				this.#onEnd();
-				return;
-			}
-
 			let failures = 0;
 			// The first fetched page is YouTube's buffered history (up to ~50
 			// messages, minutes old) — skip it so viewers only see fresh
 			// messages arriving live, then take its continuation token.
 			let live = false;
+
+			/** Count one failure against the shared budget; resolves true when
+			 * the loop must give up (full reconnect). The live-page fetch and
+			 * the polls share this budget so a flapping page (consent
+			 * interstitial, mid-stream 404) doesn't restart the loop on a
+			 * single bad tick. */
+			const fail = async (err: unknown): Promise<boolean> => {
+				if (this.stopped) return true;
+				// ScrapeError means the response shape no longer parses —
+				// retrying won't help until a reconnect re-resolves it.
+				if (err instanceof ScrapeError) {
+					this.log(
+						"scrape error",
+						`${errText(err)} (field: ${err.field})`,
+					);
+					return true;
+				}
+				failures += 1;
+				this.log(options ? "poll" : "live page", errText(err));
+				if (failures >= MAX_FAILURES) return true;
+				if (err instanceof RateLimitError && err.retryAfterMs) {
+					// Honor YouTube's rate-limit ask on this tick, then
+					// resume the normal cadence.
+					await sleep(err.retryAfterMs);
+				}
+				return false;
+			};
+
 			while (!this.stopped) {
+				// (Re)resolve the live page while no continuation is in hand.
+				// An offline stream (NotLiveError) or a transient unparseable
+				// page lands in the shared failure budget below.
+				if (!options) {
+					try {
+						options = await fetchLivePage({ handle }, "live");
+						failures = 0;
+					} catch (err) {
+						if (await fail(err)) {
+							this.#onEnd();
+							return;
+						}
+						if (this.stopped) return;
+						await sleep(POLL_INTERVAL_MS);
+						continue;
+					}
+				}
+
 				try {
 					const [items, continuation] = await fetchChat(options);
 					failures = 0;
@@ -137,24 +177,9 @@ export class YoutubeChatProvider extends ChatProvider {
 						}
 					}
 				} catch (err) {
-					if (this.stopped) return;
-					// ScrapeError means the response shape no longer parses —
-					// retrying won't help until a reconnect re-resolves it.
-					if (err instanceof ScrapeError) {
-						this.log("scrape error", `${errText(err)} (field: ${err.field})`);
+					if (await fail(err)) {
 						this.#onEnd();
 						return;
-					}
-					failures += 1;
-					this.log("poll", errText(err));
-					if (failures >= MAX_POLL_FAILURES) {
-						this.#onEnd();
-						return;
-					}
-					if (err instanceof RateLimitError && err.retryAfterMs) {
-						// Honor YouTube's rate-limit ask on this tick, then
-						// resume the normal cadence.
-						await sleep(err.retryAfterMs);
 					}
 				}
 				// Fixed cadence. Awaiting the fetch before the next tick also

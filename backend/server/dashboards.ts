@@ -55,11 +55,16 @@ export function createDashboards({
 	databaseFile,
 	publish,
 	ownsDevice,
+	deviceExists,
 }: {
 	db: Database | null;
 	databaseFile: string;
 	publish: Publish;
 	ownsDevice: (id: string, user: string) => boolean;
+	/** `true` when the device exists (owned or not), `false`/`null` when it no
+	 * longer exists at all. Lets a save keep widgets bound to pruned devices
+	 * (they simply cannot connect) instead of rejecting the whole dashboard. */
+	deviceExists?: (id: string) => boolean | null | undefined;
 }) {
 	const DB_FILE = databaseFile;
 	let dashboards: ServerDashboard[] = [];
@@ -87,7 +92,11 @@ export function createDashboards({
 		return { x, y, w, h };
 	}
 
-	function parseWidgets(raw: unknown, owner: string): ServerDashboardWidget[] {
+	function parseWidgets(
+		raw: unknown,
+		owner: string,
+		strict = true,
+	): ServerDashboardWidget[] {
 		if (!Array.isArray(raw)) throw new ApiError("widgets is required");
 		return raw.map((w) => {
 			const item = (w && typeof w === "object" ? w : {}) as Record<
@@ -149,8 +158,19 @@ export function createDashboards({
 			}
 			if (typeof deviceId !== "string" || deviceId === "")
 				throw new ApiError("Widget needs a deviceId");
-			// A widget may only bind to a device assigned to the dashboard's owner
-			if (!ownsDevice(deviceId, owner))
+			// A widget may only bind to a device assigned to the dashboard's owner.
+			// Exception on saves (strict=false): a widget bound to a device that no
+			// longer exists is kept — the widget simply renders "No device" and the
+			// user can remove it. Rejecting the whole save would brick any
+			// dashboard that ever had a bound device pruned (even the save that
+			// removes the widget itself would be rejected). The relaxation only
+			// applies when the server can verify the device is actually gone, so
+			// foreign/unknown devices are still rejected without a deviceExists
+			// dependency.
+			if (
+				!ownsDevice(deviceId, owner) &&
+				(strict || !deviceExists || deviceExists(deviceId))
+			)
 				throw new ApiError(`Device not available: ${deviceId}`);
 			if (item.config !== undefined)
 				throw new ApiError("Only channel widgets accept a config");
@@ -338,7 +358,7 @@ export function createDashboards({
 					);
 				}
 				dashboardsById.name = name;
-				dashboardsById.widgets = parseWidgets(body.widgets, user);
+				dashboardsById.widgets = parseWidgets(body.widgets, user, false);
 				dashboardsById.version += 1;
 				saveDashboards();
 				syncKick();

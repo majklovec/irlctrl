@@ -49,6 +49,7 @@ export async function createControlServer(options: ControlServerOptions) {
 		databaseFile: options.databaseFile,
 		publish,
 		ownsDevice: devices.ownsDevice,
+		deviceExists: (id) => !!devices.getDevice(id),
 	});
 
 	app

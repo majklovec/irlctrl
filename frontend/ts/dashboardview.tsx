@@ -111,8 +111,13 @@ async function doSave(): Promise<void> {
 		}
 		if (!res.ok) throw new Error(`HTTP ${res.status}`);
 		const body = (await res.json().catch(() => null)) as {
+			ok?: boolean;
 			dashboard?: ServerDashboard;
+			error?: string;
 		} | null;
+		// Validation failures come back as HTTP 200 with `ok: false` — surface them
+		// so the user is not left believing a change was saved.
+		if (body && body.ok === false) throw new Error(body.error ?? "Save rejected");
 		const fresh = body?.dashboard;
 		if (fresh) {
 			// Adopt the bumped version so the next save targets the latest revision;
@@ -124,9 +129,14 @@ async function doSave(): Promise<void> {
 		state.saveState = "saved";
 		if (toastTimer !== null) window.clearTimeout(toastTimer);
 		toastTimer = window.setTimeout(() => (state.saveState = "idle"), 2_000);
-	} catch (_err) {
+	} catch (err) {
 		state.saveState = "error";
-		toastMsg(t("dash.save_error"));
+		// Show the server's reason (e.g. a widget bound to a removed device)
+		const detail =
+			err instanceof Error && err.message && err.message !== "Save rejected"
+				? ` (${err.message})`
+				: "";
+		toastMsg(t("dash.save_error") + detail);
 	} finally {
 		state.saving = false;
 		m.redraw();

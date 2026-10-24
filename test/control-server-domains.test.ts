@@ -212,6 +212,101 @@ describe("control-server domain contracts", () => {
 		});
 	});
 
+	test("PUT keeps widgets bound to pruned devices, POST stays strict", async () => {
+		// relay: owned + exists, other: exists but foreign, gone: pruned.
+		const dash = createDashboards({
+			db: auth.db,
+			databaseFile: ":memory:",
+			publish: (topic, message) => published.push({ topic, message }),
+			ownsDevice: (id, owner) => id === "relay" && owner === "alice",
+			deviceExists: (id) => id === "relay" || id === "other",
+		});
+		const call = (method: string, path: string, body?: unknown) => {
+			const req = new Request(`http://localhost${path}`, {
+				method,
+				...(body === undefined ? {} : { body: JSON.stringify(body) }),
+			});
+			return dash.dashApi(req, new URL(req.url), "alice");
+		};
+		{
+			const strictPost = await call("POST", "/api/dashboards", {
+				name: "Strict",
+				widgets: [{ type: "relay", deviceId: "gone" }],
+			});
+			expect(await strictPost.json()).toEqual({
+				ok: false,
+				error: "Device not available: gone",
+				code: 400,
+			});
+
+			const created = await call("POST", "/api/dashboards", {
+				name: "Tolerant",
+				widgets: [{ id: "w1", type: "relay", deviceId: "relay" }],
+			});
+			const { dashboard } = await created.json();
+			const path = `/api/dashboards/${dashboard.id}`;
+
+			// Pruned device: the save goes through and the binding is kept,
+			// so the dashboard is not bricked by a device that was removed.
+			const kept = await call("PUT", path, {
+				name: "Tolerant",
+				widgets: [
+					{ id: "w1", type: "relay", deviceId: "relay" },
+					{ id: "w2", type: "encoder", deviceId: "gone" },
+				],
+				version: dashboard.version,
+			});
+			expect(kept.status).toBe(200);
+			const keptBody = await kept.json();
+			expect(keptBody.ok).toBe(true);
+			expect(keptBody.dashboard.widgets).toEqual([
+				{
+					id: "w1",
+					deviceId: "relay",
+					type: "relay",
+					name: "relay",
+					x: 0,
+					y: 0,
+					w: 4,
+					h: 4,
+					visible: false,
+				},
+				{
+					id: "w2",
+					deviceId: "gone",
+					type: "encoder",
+					name: "encoder",
+					x: 0,
+					y: 0,
+					w: 6,
+					h: 5,
+					visible: false,
+				},
+			]);
+
+			// Foreign device that still exists: rejected on PUT as before.
+			const foreign = await call("PUT", path, {
+				name: "Tolerant",
+				widgets: [{ id: "w1", type: "relay", deviceId: "other" }],
+				version: keptBody.dashboard.version,
+			});
+			expect(await foreign.json()).toEqual({
+				ok: false,
+				error: "Device not available: other",
+				code: 400,
+			});
+
+			// And the widget can still be removed in a later save.
+			const removed = await call("PUT", path, {
+				name: "Tolerant",
+				widgets: [],
+				version: keptBody.dashboard.version,
+			});
+			expect((await removed.json()).ok).toBe(true);
+			await call("DELETE", path);
+		}
+	});
+
 	test("preserves no-auth local identity and disabled registration", async () => {
 		const local = await createAuth({
 			noAuth: true,

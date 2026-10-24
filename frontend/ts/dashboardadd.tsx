@@ -196,9 +196,16 @@ async function submit(): Promise<void> {
 		m.redraw();
 		return;
 	}
-	state.saveState = res?.ok ? "saved" : "error";
+	// Validation failures come back as HTTP 200 with `ok: false` — do not treat
+	// them as a successful save.
+	const body =
+		res?.ok
+			? ((await res.json().catch(() => null)) as { ok?: boolean } | null)
+			: null;
+	const saved = !!res?.ok && body?.ok !== false;
+	state.saveState = saved ? "saved" : "error";
 	m.redraw();
-	if (res?.ok)
+	if (saved)
 		location.href = `/dashboards/view/${encodeURIComponent(dash.id)}/`;
 }
 
