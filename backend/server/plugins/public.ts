@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
 import type { createFrontend } from "../../../shared/frontend";
-import { i18nResponse, notFound, text } from "../../../shared/http";
-import { catalog } from "../../../shared/i18n";
+import { faviconResponse, notFound, text } from "../../../shared/http";
 import type { createAuth } from "../auth";
 
 type Auth = Awaited<ReturnType<typeof createAuth>>;
@@ -10,6 +9,7 @@ type Frontend = Awaited<ReturnType<typeof createFrontend>>;
 export function publicRoutes(auth: Auth, frontend: Frontend) {
 	return new Elysia({ name: "control-public" })
 		.get("/healthz", () => text("ok"))
+		.get("/favicon.ico", () => faviconResponse())
 		.get("/login", () =>
 			auth.db && !auth.hasUsers()
 				? Response.redirect("/register", 302)
@@ -27,9 +27,6 @@ export function publicRoutes(auth: Auth, frontend: Frontend) {
 					})
 				: notFound();
 		})
-		.get("/i18n/*", ({ request }) =>
-			i18nResponse(new URL(request.url).pathname, catalog),
-		)
 		.post("/api/login", ({ request }) => auth.loginResponse(request))
 		.post("/api/register", ({ request }) => auth.registerResponse(request))
 		.get("/api/register/status", () => auth.registerStatusResponse())

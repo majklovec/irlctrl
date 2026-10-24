@@ -1,3 +1,9 @@
+<div align="center">
+
+<img src="logo-irlctrl.png" alt="IRLCTRL" width="240" />
+
+</div>
+
 # IRLCTRL
 
 Řídicí aplikace založená na Bun pro streamování s agregací připojení ve stylu [BELABOX](https://belabox.net/). Jeden program podporuje tři typy zařízení a volitelný řídicí server umožňuje spravovat celou jejich skupinu prostřednictvím webového prohlížeče.

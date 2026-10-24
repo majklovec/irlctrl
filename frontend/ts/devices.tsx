@@ -103,7 +103,7 @@ const App: m.Component = {
 		const columns = deviceSummaryColumnDefinitions();
 		const headers = columnHeaders(columns);
 		return (
-			<Page title={t("mgmt.title")} nav={<ServerNav active="devices" />}>
+			<Page nav={<ServerNav active="devices" />}>
 				<Card>
 					<table>
 						<thead>

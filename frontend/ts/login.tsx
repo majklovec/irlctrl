@@ -1,4 +1,5 @@
 /* Sign-in page: exchanges a username + password for the session cookie. */
+import logoUrl from "../img/logo-irlctrl.png";
 import m from "mithril";
 import { Card, Field, Input } from "./components/ui";
 import { i18nReady, LanguageSelect, t } from "./i18n";
@@ -48,10 +49,11 @@ const App: m.Component = {
 	view: () => (
 		<div class="login-page">
 			<Card>
-				<div class="login-lang">
+				<img class="login-logo" src={logoUrl} alt="IRLCTRL" />
+				<div class="login-head">
+					<h2>{t("login.title")}</h2>
 					<LanguageSelect />
 				</div>
-				<h2>{t("login.title")}</h2>
 				<form onsubmit={submit}>
 					<Field
 						label={t("login.username")}

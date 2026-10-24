@@ -1,6 +1,7 @@
 /* Registration page: create a profile, then hand off to the login page. The
  * first account bootstraps as admin; everyone after needs an invite, which the
  * /api/register/status probe (plus a ?invite= link) drives showing the field. */
+import logoUrl from "../img/logo-irlctrl.png";
 import m from "mithril";
 import { Card, Field, Input } from "./components/ui";
 import { i18nReady, LanguageSelect, t } from "./i18n";
@@ -114,10 +115,11 @@ const App: m.Component = {
 	view: () => (
 		<div class="login-page">
 			<Card>
-				<div class="login-lang">
+				<img class="login-logo" src={logoUrl} alt="IRLCTRL" />
+				<div class="login-head">
+					<h2>{t("register.title")}</h2>
 					<LanguageSelect />
 				</div>
-				<h2>{t("register.title")}</h2>
 				{state.statusLoaded && !state.needsInvite ? (
 					<p>{t("register.firstAdminInfo")}</p>
 				) : null}

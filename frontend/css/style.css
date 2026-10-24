@@ -94,6 +94,19 @@ header {
 	-webkit-backdrop-filter: blur(16px);
 }
 
+/* Brand logo at the head of the page header (links home). */
+.brand {
+	display: inline-flex;
+	align-items: center;
+	flex-shrink: 0;
+}
+.brand-logo {
+	width: 32px;
+	height: 32px;
+	object-fit: contain;
+	display: block;
+}
+
 header > .actions {
 	margin-left: auto;
 }
@@ -224,10 +237,24 @@ header:has(.profile-menu) > .actions {
 	justify-content: center;
 	margin-top: 1rem;
 }
-.login-lang {
+/* Brand logo above the sign-in / register form. */
+.login-logo {
+	display: block;
+	width: 6rem;
+	max-width: 50%;
+	height: auto;
+	margin: 0.25rem auto 2rem;
+}
+/* Sign-in / register heading row: title on the left, language selector on the right. */
+.login-head {
 	display: flex;
-	justify-content: flex-end;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
 	margin-bottom: 0.75rem;
+}
+.login-head h2 {
+	margin: 0;
 }
 .login-alt {
 	margin-top: 1rem;

@@ -17,8 +17,8 @@ import { deviceConnectionRoutes } from "./plugins/device-connection";
 import { deviceListRoutes } from "./plugins/device-list";
 import { devicePageRoutes } from "./plugins/device-pages";
 import { deviceViewerRoutes } from "./plugins/device-viewers";
-import { imageRoutes } from "./plugins/images";
 import { publicRoutes } from "./plugins/public";
+import { staticRoutes } from "./plugins/static";
 
 interface ControlServerOptions {
 	hostname: string;
@@ -60,7 +60,7 @@ export async function createControlServer(options: ControlServerOptions) {
 		.use(deviceConnectionRoutes(devices))
 		.use(deviceViewerRoutes(auth, devices))
 		.use(devicePageRoutes(auth, devices, frontend))
-		.use(imageRoutes(auth))
+		.use(await staticRoutes(options.frontendDirectory))
 		.use(
 			new Elysia({ name: "control-not-found" }).all(
 				"*",

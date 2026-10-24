@@ -9,12 +9,22 @@ export type { Child };
 
 // -- Page skeleton -----------------------------------------------------------------
 
-/** <header> + <main> page skeleton. The header carries the optional main menu, then the
- * language selector and the page's own `headerRight` actions on its right edge. */
+/** <header> + <main> page skeleton. The header leads with the brand logo (linking
+ * home), then carries the optional main menu, and the language selector plus the
+ * page's own `headerRight` actions on its right edge. */
 export const Page = {
 	view: (v) => [
 		<header>
-			<h1>{v.attrs.title}</h1>
+			<a class="brand" href="/" aria-label="IRLCTRL">
+				<img
+					class="brand-logo"
+					src="/img/logo-irlctrl-64.png"
+					alt="IRLCTRL"
+					width={32}
+					height={32}
+				/>
+			</a>
+			{v.attrs.title && <h1>{v.attrs.title}</h1>}
 			{[
 				v.attrs.nav !== undefined ? (
 					<nav class="main-nav">{v.attrs.nav}</nav>
@@ -28,7 +38,7 @@ export const Page = {
 		<main>{v.children}</main>,
 	],
 } as MithrilJSXComponent<{
-	title: m.Children;
+	title?: m.Children;
 	nav?: m.Children;
 	headerRight?: m.Children;
 }>;
@@ -42,6 +52,7 @@ export const TitleWithBack = {
 				title={backLabel}
 				aria-label={backLabel}
 			>
+				<span class="sr-only">{backLabel}</span>
 				<svg
 					width={16}
 					height={16}
@@ -239,6 +250,7 @@ export const WidgetTable = {
 /** A <label> with a caption above its control; extra attrs (`class`, `hidden`, …) pass through. */
 export const Field = {
 	view: ({ attrs: { label, control, ...extra } }) => (
+		// biome-ignore lint/a11y/noLabelWithoutControl: <explanation>
 		<label {...extra}>
 			{label}
 			{control}
@@ -280,6 +292,7 @@ export const NumberField = {
 /** A checkbox (or radios) with its caption after it. */
 export const CheckField = {
 	view: ({ attrs: { label, control, class: extraClass, ...extra } }) => (
+		// biome-ignore lint/a11y/noLabelWithoutControl: <explanation>
 		<label {...extra} class={extraClass ? `${extraClass} check` : "check"}>
 			{control}
 			{label}

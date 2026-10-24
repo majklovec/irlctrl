@@ -55,16 +55,45 @@ export async function i18nResponse(
 		: notFound();
 }
 
-const IMG_PATH_RE = /^\/img\/[\w-]+\.svg$/;
+const IMG_PATH_RE = /^\/img\/[\w-]+\.(svg|png|ico)$/;
 
-/** Role diagrams of the setup wizard (`/img/<name>.svg` from frontend/); null for other paths. */
+const IMG_CONTENT_TYPES: Record<string, string> = {
+	svg: "image/svg+xml",
+	png: "image/png",
+	ico: "image/x-icon",
+};
+
+/**
+ * Content type of a `/img/` asset by extension (role diagrams are SVG, the brand
+ * logo is PNG, the tab favicon is ICO); null for any other path.
+ */
+function imgContentType(path: string): string | null {
+	const m = IMG_PATH_RE.exec(path);
+	return m ? IMG_CONTENT_TYPES[m[1]] : null;
+}
+
+/** The browser tab icon (`/favicon.ico`), served from frontend/img; 404 if missing. */
+export async function faviconResponse(): Promise<Response> {
+	const file = Bun.file(new URL("../frontend/img/favicon.ico", import.meta.url));
+	return (await file.exists())
+		? new Response(file, {
+				headers: {
+					"content-type": "image/x-icon",
+					"cache-control": "no-cache",
+				},
+			})
+		: notFound();
+}
+
+/** Static images from frontend/ (`/img/<name>.svg|png`); null for other paths. */
 export async function imageResponse(path: string): Promise<Response | null> {
-	if (!IMG_PATH_RE.test(path)) return null;
+	const contentType = imgContentType(path);
+	if (!contentType) return null;
 	const file = Bun.file(new URL(`../frontend${path}`, import.meta.url));
 	return (await file.exists())
 		? new Response(file, {
 				headers: {
-					"content-type": "image/svg+xml; charset=utf-8",
+					"content-type": contentType,
 					"cache-control": "no-cache",
 				},
 			})

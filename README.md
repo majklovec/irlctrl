@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="logo-irlctrl.png" alt="IRLCTRL" width="240" />
+
 # IRLCTRL
 
 Bun-based controller for [BELABOX](https://belabox.net/)-style bonded streaming. One program covers three device types, and an optional control server manages a fleet of them from a browser.
