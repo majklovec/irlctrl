@@ -1,36 +1,39 @@
 {
-	"scripts": {
-		"gen:modules": "bun scripts/gen-modules.ts",
-		"predev": "bun scripts/gen-modules.ts",
-		"pretest": "bun scripts/gen-control-server-assets.ts",
-		"dev": "bun backend/server/server.ts",
-		"test": "bun test",
-		"prebuild:obs-client": "bun scripts/gen-modules.ts",
-		"build:obs-client": "bun build --compile --minify --sourcemap --format=esm --asset i18n ./backend/obs-client/obs-client.ts --outfile dist/obs-client",
-		"prebuild:client": "bun scripts/gen-control-server-assets.ts",
-		"build:client": "bun build --compile --minify --sourcemap --format=esm --bytecode --asset i18n ./backend/client/client.ts --outfile dist/client",
-		"prebuild:server": "bun scripts/gen-control-server-assets.ts",
-		"build:server": "bun build --compile --minify --sourcemap --format=esm --bytecode --asset i18n ./backend/server/server.ts --outfile dist/server"
-	},
-	"devDependencies": {
-		"@types/bun": "^1.4.2",
-		"@types/mithril": "^2.2.9",
-		"@types/node": "^26.6.3",
-		"@types/ws": "^8.18.2",
-		"bun-plugin-glob-import": "^1.1.1",
-		"typescript": "^7.0.2"
-	},
-	"dependencies": {
-		"@elysia/static": "^1.4.11",
-		"elysia": "^1.4.30",
-		"gridstack": "^11",
-		"i18next": "^26.4.6",
-		"i18next-browser-languagedetector": "^8.2.2",
-		"i18next-http-backend": "^4.0.3",
-		"mithril": "^2.3.8",
-		"tiktok-live-connector": "^2.5.0",
-		"youtube-chat-next": "^3.1.0",
-		"zod": "^4.6.5"
-	},
-	"version": "1.0.0"
+    "name": "irlctrl",
+    "version": "1.0.0",
+    "description": "IRL control application",
+    "author": "Michal Vondráček",
+    "scripts": {
+        "gen:modules": "bun scripts/gen-modules.ts",
+        "predev": "bun scripts/gen-modules.ts",
+        "pretest": "bun scripts/gen-control-server-assets.ts",
+        "dev": "bun backend/server/server.ts",
+        "test": "bun test",
+        "prebuild:obs-client": "bun scripts/gen-modules.ts",
+        "build:obs-client": "bun build --compile --minify --sourcemap --format=esm --asset i18n ./backend/obs-client/obs-client.ts --outfile dist/obs-client",
+        "prebuild:client": "bun scripts/gen-control-server-assets.ts",
+        "build:client": "bun build --compile --minify --sourcemap --format=esm --bytecode --asset i18n ./backend/client/client.ts --outfile dist/client",
+        "prebuild:server": "bun scripts/gen-control-server-assets.ts",
+        "build:server": "bun build --compile --minify --sourcemap --format=esm --bytecode --asset i18n ./backend/server/server.ts --outfile dist/server"
+    },
+    "devDependencies": {
+        "@types/bun": "^1.4.2",
+        "@types/mithril": "^2.2.9",
+        "@types/node": "^26.6.3",
+        "@types/ws": "^8.18.2",
+        "bun-plugin-glob-import": "^1.1.1",
+        "typescript": "^7.0.2"
+    },
+    "dependencies": {
+        "@elysia/static": "^1.4.11",
+        "elysia": "^1.4.30",
+        "gridstack": "^11",
+        "i18next": "^26.4.6",
+        "i18next-browser-languagedetector": "^8.2.2",
+        "i18next-http-backend": "^4.0.3",
+        "mithril": "^2.3.8",
+        "tiktok-live-connector": "^2.5.0",
+        "youtube-chat-next": "^3.1.0",
+        "zod": "^4.6.5"
+    }
 }
