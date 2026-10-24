@@ -7,8 +7,13 @@ export interface SshModuleConfig {
 	enabled: boolean;
 	/** SSH login account (defaults to the box's admin user, "root"). */
 	user?: string;
-	/** Last generated password (secret — the status view reports it as `{configured}`). */
+	/**
+	 * The staged password (secret — the status view reports it as
+	 * `{configured}`). It reaches the account via chpasswd when sshd starts.
+	 */
 	password?: string;
+	/** The password last applied to the account (baseline for staging). */
+	appliedPassword?: string;
 }
 
 /** Live ssh state (the status `ssh` fragment, the `ssh.status` result). */
@@ -21,6 +26,8 @@ export interface SshHostStatus {
 	password: string | null;
 	/** A password has been generated for the account. */
 	passwordConfigured: boolean;
+	/** A staged password is waiting to be applied — it lands on SSH start. */
+	pendingPassword: boolean;
 }
 
 /** Result of a password reset (the fresh password is shown once, then only its presence). */

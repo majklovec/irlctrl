@@ -71,25 +71,65 @@ async function waitActive(want: boolean, timeoutMs = 5000): Promise<boolean> {
 }
 
 async function sshStatus(): Promise<SshHostStatus> {
-	const password = core.state.settings.modules?.ssh?.password;
+	const slice = core.state.settings.modules?.ssh;
+	const password = slice?.password;
 	return {
 		user: sshUser(),
 		active: await isActive(),
 		password: password || null,
 		passwordConfigured: Boolean(password),
+		// A staged password that has not reached the account yet — it is
+		// applied when sshd starts.
+		pendingPassword: Boolean(password && password !== slice?.appliedPassword),
 	};
+}
+
+/**
+ * Apply the staged password to the account (chpasswd) and record it as the
+ * applied baseline. Callers handle persistence; this only changes the slice.
+ */
+async function applyStagedPassword(user: string): Promise<void> {
+	const slice = core.state.settings.modules?.ssh;
+	const password = slice?.password;
+	if (!slice || !password) return;
+	if (slice.appliedPassword === password) return;
+	// Ensure the account exists (idempotent) — chpasswd needs it.
+	const uid = await core.run("id", ["-u", user], true);
+	if (!uid.trim()) {
+		await core.run("useradd", ["-m", "-s", "/bin/bash", user]);
+	}
+	await setAccountPassword(user, password);
+	slice.appliedPassword = password;
+}
+
+/**
+ * Stage a password on the module slice (no chpasswd yet). The value is the
+ * one the operator sees in the UI; it reaches the account when sshd starts.
+ */
+function stagePassword(user: string, password: string): void {
+	const settings = core.state.settings;
+	if (!settings.modules) settings.modules = {};
+	if (!settings.modules.ssh) settings.modules.ssh = { enabled: false };
+	const slice = settings.modules.ssh;
+	slice.user = user;
+	slice.password = password;
 }
 
 async function startSsh(params: Record<string, unknown>): Promise<SshHostStatus> {
 	// Starting also saves the SSH card's settings: the enabled flag and the
 	// login account persist under modules.ssh before the daemon comes up.
 	const slice = core.state.settings.modules?.ssh;
+	let user = sshUser();
 	if (slice) {
 		slice.enabled = true;
 		if (typeof params.user === "string" && params.user.trim())
 			slice.user = params.user.trim();
-		await core.saveState();
+		user = slice.user || user;
+		// A password staged while sshd was stopped reaches the account now —
+		// the change is made on start, never while the daemon is down.
+		await applyStagedPassword(user);
 	}
+	if (slice) await core.saveState();
 	if (hasSystemd()) {
 		await core.run("systemctl", ["start", "ssh"]);
 	} else {
@@ -141,31 +181,16 @@ async function setAccountPassword(
 		stdout: "pipe",
 		stderr: "pipe",
 	});
-	proc.stdin!.write(`${user}:${password}\n`);
-	proc.stdin!.end();
+	const stdin = proc.stdin;
+	if (stdin) {
+		stdin.write(`${user}:${password}\n`);
+		stdin.end();
+	}
 	const code = await proc.exited;
 	if (code !== 0) {
 		const err = (await new Response(proc.stderr).text()).trim();
 		throw new Error(`chpasswd failed (${code}): ${err}`);
 	}
-}
-
-/** Ensure the account exists, set its password, and persist the state. */
-async function applyPassword(user: string, password: string): Promise<void> {
-	// Ensure the account exists (idempotent).
-	const uid = await core.run("id", ["-u", user], true);
-	if (!uid.trim()) {
-		await core.run("useradd", ["-m", "-s", "/bin/bash", user]);
-	}
-
-	await setAccountPassword(user, password);
-
-	const slice = core.state.settings.modules?.ssh;
-	if (slice) {
-		slice.user = user;
-		slice.password = password;
-	}
-	await core.saveState();
 }
 
 async function resetPassword(
@@ -174,11 +199,14 @@ async function resetPassword(
 	const user =
 		(typeof params.user === "string" && params.user.trim()) || sshUser();
 	if (!user) throw new Error("user is required");
+	// Staging is only meaningful with sshd down — while it runs, the account
+	// password may not change.
 	if (await isActive())
 		throw new Error(core.t("ssh.reset_blocked"));
 
 	const password = generatePassword();
-	await applyPassword(user, password);
+	stagePassword(user, password);
+	await core.saveState();
 	core.logEvent(
 		"info",
 		"ssh",
@@ -187,18 +215,19 @@ async function resetPassword(
 	return { user, password };
 }
 
-/** Set the operator-supplied password on the SSH account. */
-async function setPassword(
-	params: Record<string, unknown>,
-): Promise<{ user: string }> {
+/** Stage the operator-supplied password (applied to the account at start). */
+async function setPassword(params: Record<string, unknown>): Promise<{ user: string }> {
 	const user =
 		(typeof params.user === "string" && params.user.trim()) || sshUser();
 	const password =
 		typeof params.password === "string" ? params.password.trim() : "";
 	if (!user) throw new Error("user is required");
 	if (!password) throw new Error("password is required");
+	if (await isActive())
+		throw new Error(core.t("ssh.reset_blocked"));
 
-	await applyPassword(user, password);
+	stagePassword(user, password);
+	await core.saveState();
 	core.logEvent(
 		"info",
 		"ssh",

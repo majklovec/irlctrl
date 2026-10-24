@@ -25,3 +25,10 @@
     border-radius: var(--radius-sm, 4px);
     user-select: all;
 }
+
+/* Staged-but-not-applied password: value + "applies on start" badge. */
+.ssh-pending {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}

@@ -5,7 +5,7 @@
  * same content. */
 import "./styles.css";
 import m from "mithril";
-import { gearIcon, icon } from "../../frontend/ts/components/icons";
+import { actionIcon, icon } from "../../frontend/ts/components/icons";
 import {
 	Actions,
 	Badge,
@@ -608,7 +608,7 @@ function interfacesCard(host: DeviceCard, status: Status): m.Vnode {
 					/>
 				),
 				<Button
-					label={gearIcon()}
+					label={actionIcon("sync")}
 					class="icon-link"
 					title={t("ui.reconfigure")}
 					aria-label={t("ui.reconfigure")}

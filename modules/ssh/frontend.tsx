@@ -1,4 +1,7 @@
-/* SSH card: sshd state, the login account, and the start / stop / password-reset actions. */
+/* SSH card: sshd state, the login account, and the start / stop /
+ * password-reset actions. A staged password (not yet applied, because the
+ * account is only writable while sshd runs) is flagged with a "pending"
+ * badge; it lands on the account at the next Start. */
 import m from "mithril";
 import {
 	Actions,
@@ -61,7 +64,17 @@ function sshCardBody(host: DeviceCard, status: Status): m.Vnode {
 					[
 						t("dev.row.password"),
 						s?.password ? (
-							<code class="ssh-password-code">{s.password}</code>
+							s?.pendingPassword ? (
+								<span class="ssh-pending">
+									<code class="ssh-password-code">{s.password}</code>
+									<Badge
+										text={t("dev.ssh_pending_apply")}
+										kind="warn"
+									/>
+								</span>
+							) : (
+								<code class="ssh-password-code">{s.password}</code>
+							)
 						) : (
 							<Badge text={t("dev.badge.password_none")} kind="warn" />
 						),

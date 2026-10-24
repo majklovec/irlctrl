@@ -443,6 +443,8 @@ export interface SshStatus {
 	/** The account's current password (null when none is set). */
 	password: string | null;
 	passwordConfigured: boolean;
+	/** A staged password is waiting to be applied — it lands on SSH start. */
+	pendingPassword: boolean;
 }
 
 /** Device settings as returned by `settings.get` / accepted by `settings.update`. */
