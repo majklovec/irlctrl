@@ -4,8 +4,10 @@
  * published as a platform-tagged `stats.update` event.
  */
 import {
+	DEFAULT_SERIES_CAP,
 	parseStatsSpec,
 	STATS_CONFIG_FIELDS,
+	statsSeriesCapFromConfig,
 	statsSpecsFromConfig,
 } from "./config";
 import { fetchPlatformStats } from "./providers";
@@ -20,8 +22,11 @@ import {
 export { STATS_CONFIG_FIELDS, statsSpecsFromConfig } from "./config";
 
 export const STATS_POLL_MS = 30_000;
-const HUB_CONFIG_FIELDS = [...STATS_CONFIG_FIELDS, "channel"] as const;
-const SERIES_CAP = 120;
+const HUB_CONFIG_FIELDS = [
+	...STATS_CONFIG_FIELDS,
+	"seriesCap",
+	"channel",
+] as const;
 
 /** Per-platform-channel latest stats sample for the merged hub snapshot. */
 export type StatsSnapshot = Record<string, StatsLive | null>;
@@ -39,6 +44,7 @@ type StatsChannelState = {
 export class StatsChannelManager {
 	#channels = new Map<string, StatsChannelState>();
 	#publish: PublishFn;
+	#seriesCap = DEFAULT_SERIES_CAP;
 
 	constructor(publish: PublishFn) {
 		this.#publish = publish;
@@ -71,7 +77,17 @@ export class StatsChannelManager {
 		this.#channels.delete(spec);
 	}
 
-	sync(specs: ChannelSpecs): void {
+	sync(
+		specs: ChannelSpecs,
+		configs: readonly (Record<string, string> | undefined)[] = [],
+	): void {
+		this.#seriesCap = configs.reduce(
+			(cap, config) => Math.max(cap, statsSeriesCapFromConfig(config)),
+			DEFAULT_SERIES_CAP,
+		);
+		for (const state of this.#channels.values()) {
+			state.series = state.series.slice(-this.#seriesCap);
+		}
 		for (const spec of specs) {
 			if (spec && !this.#channels.has(spec)) this.start(spec);
 		}
@@ -104,7 +120,7 @@ export class StatsChannelManager {
 			state.series = [
 				...state.series,
 				{ t: at, v: sample.isLive ? (sample.viewers ?? 0) : 0 },
-			].slice(-SERIES_CAP);
+			].slice(-this.#seriesCap);
 			state.stats = {
 				platform: state.platform,
 				channel: state.channel,

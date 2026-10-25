@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test";
 import m from "mithril";
 import {
 	parseStatsSpec,
+	DEFAULT_SERIES_CAP,
+	MAX_SERIES_CAP,
 	STATS_EDITOR_FIELDS,
+	statsSeriesCapFromConfig,
 	statsSpecsFromConfig,
 } from "../modules/stats/config";
 import { currentViewerTotal, mergeViewerSeries } from "../modules/stats/series";
@@ -17,7 +20,28 @@ describe("stats channel configuration", () => {
 			return m("label", { key: name }, m("input"));
 		});
 		expect(() => m("div", children)).not.toThrow();
-		expect(fields).toEqual(["youtube", "twitch", "kick"]);
+		expect(fields).toEqual(["youtube", "twitch", "kick", "seriesCap"]);
+	});
+
+	test("includes a configurable series cap in the editor", () => {
+		expect(STATS_EDITOR_FIELDS).toContain("seriesCap");
+	});
+
+	test("uses the default series cap when config is missing or invalid", () => {
+		expect(statsSeriesCapFromConfig(undefined)).toBe(DEFAULT_SERIES_CAP);
+		expect(statsSeriesCapFromConfig({ seriesCap: "0" })).toBe(
+			DEFAULT_SERIES_CAP,
+		);
+		expect(statsSeriesCapFromConfig({ seriesCap: "1.5" })).toBe(
+			DEFAULT_SERIES_CAP,
+		);
+		expect(
+			statsSeriesCapFromConfig({ seriesCap: String(MAX_SERIES_CAP + 1) }),
+		).toBe(DEFAULT_SERIES_CAP);
+	});
+
+	test("accepts valid configured series caps", () => {
+		expect(statsSeriesCapFromConfig({ seriesCap: "240" })).toBe(240);
 	});
 
 	test("exposes Kick, YouTube, and Twitch in both widget config editors", () => {

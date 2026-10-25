@@ -88,7 +88,10 @@ interface ModuleRegistration {
 }
 
 interface ChannelHub {
-	sync(specs: ChannelSpecs): void;
+	sync(
+		specs: ChannelSpecs,
+		configs?: readonly (Record<string, string> | undefined)[],
+	): void;
 	startedChannels(): string[];
 	snapshot(): Record<string, unknown>;
 	destroy(): void;
@@ -408,8 +411,17 @@ export function initWidgetHub(publish: (msg: string) => void): void {
 
 /** Sync the widget backends with the dashboard configs (the dashboards write path). */
 export function syncWidgetHub(dashboards: ServerDashboard[]): void {
-	for (const w of WIDGETS)
-		w.hub?.sync(widgetChannelSpecs(dashboards, w.type, w.spec));
+	for (const w of WIDGETS) {
+		const configs = dashboards.flatMap((dashboard) =>
+			dashboard.widgets
+				.filter((widget) => widget.type === w.type)
+				.map((widget) => widget.config),
+		);
+		w.hub?.sync(
+			widgetChannelSpecs(dashboards, w.type, w.spec),
+			configs,
+		);
+	}
 }
 
 /** Latest per-type samples for warm-starting a dashboard viewer. */

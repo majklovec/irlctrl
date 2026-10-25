@@ -500,6 +500,7 @@
     "wtype.obs": "OBS Studio",
     "wtype.relay": "Relay",
     "dash.widget_channel": "Channel",
+    "dash.widget_seriesCap": "Series cap",
     "dash.widget_youtube": "YouTube channel",
     "dash.widget_twitch": "Twitch channel",
     "dash.widget_tiktok": "TikTok channel",

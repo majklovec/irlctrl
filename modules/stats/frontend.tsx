@@ -8,6 +8,7 @@ import type { ServerDashboardWidget } from "../../shared/types";
 import {
 	parseStatsSpec,
 	STATS_EDITOR_FIELDS,
+	statsSeriesCapFromConfig,
 	statsSpecsFromConfig,
 } from "./config";
 import { LineChart } from "./graph-linechart";
@@ -76,7 +77,9 @@ function body(w: ServerDashboardWidget, _ctx: WidgetContext): m.Children {
 						{
 							key: parsed.platform,
 							label: t(`stats.${parsed.platform}`),
-							points: sample.series,
+							points: sample.series.slice(
+								-statsSeriesCapFromConfig(w.config),
+							),
 						},
 					]
 				: [];

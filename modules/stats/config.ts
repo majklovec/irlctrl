@@ -2,13 +2,35 @@
 export const STATS_PLATFORMS = ["youtube", "twitch", "kick"] as const;
 export type StatsPlatform = (typeof STATS_PLATFORMS)[number];
 
+/** Default and hard maximum rolling history retained for each channel. */
+export const DEFAULT_SERIES_CAP = 120;
+export const MAX_SERIES_CAP = 10_000;
+
 /** The stats widget's configurable channel references, in editor order. */
 export const STATS_CONFIG_FIELDS = STATS_PLATFORMS;
 /** Keep the old singular Kick config during the transition, without showing it. */
 export const STATS_EDITOR_FIELDS = [
 	...STATS_CONFIG_FIELDS,
 	{ name: "channel", type: "hidden" },
+	"seriesCap",
 ] as const;
+
+/** The number of samples a Stats widget displays, validated from its config. */
+export function statsSeriesCapFromConfig(
+	config: Record<string, string> | undefined,
+): number {
+	const value = (config?.seriesCap ?? "").trim();
+	if (!value) return DEFAULT_SERIES_CAP;
+	const cap = Number(value);
+	if (
+		!Number.isInteger(cap) ||
+		cap < 1 ||
+		cap > MAX_SERIES_CAP
+	) {
+		return DEFAULT_SERIES_CAP;
+	}
+	return cap;
+}
 
 const normalizeChannel = (
 	platform: StatsPlatform,

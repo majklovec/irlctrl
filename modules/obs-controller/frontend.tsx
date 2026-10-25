@@ -34,6 +34,7 @@ import type {
 import { since, uuid } from "../../frontend/ts/util";
 import type { ObsModuleView, Status, SwitcherStatus } from "../../shared/types";
 import type { BridgedModule } from "./types";
+import { VUMeter, type VuLevels } from "./vu-meter";
 
 const SWITCHER_NUMBER_FIELDS = [
 	["lowbs.trigger_low_bitrate", "lowBitrate", 0, 1e9, "2500"],
@@ -114,18 +115,6 @@ export interface ObsPanel {
 	destroy(): void;
 }
 
-/** Per-input VU meter frame: the smoothed display level plus its target. */
-interface VuFrame {
-	/** 0..1 target level from the last InputVolumeMeters push. */
-	target: number;
-	/** Displayed (smoothed) level. */
-	level: number;
-	/** Peak-hold level. */
-	peak: number;
-	/** Frames left before the peak starts to decay. */
-	peakHold: number;
-}
-
 /** Outline microphone (24×24, strokes with currentColor); muted adds a slash. */
 function micIcon(muted: boolean): m.Vnode {
 	return (
@@ -191,24 +180,21 @@ export function createObsPanel({
 	let switcherLive: SwitcherStatus | null = null;
 	let mounts = 0;
 	let tickTimer = 0;
-	let rafId = 0;
 	let pingInFlight = false;
 	let lastPing = 0;
 	/** Scene list staleness: re-run loadAll() every 15 s while connected (as the switcher does). */
 	let lastLoadAt = 0;
 	const SCENE_REFRESH_MS = 15_000;
 
-	/* One meter canvas per input plus its smoothed frame. Smoothing is as in
-	 * obs.html: fast attack, 30-frame peak hold, slow decay. */
-	const vuCanvases = new Map<string, HTMLCanvasElement>();
-	const vuState = new Map<string, VuFrame>();
-	const getVuFrame = (name: string): VuFrame => {
-		let f = vuState.get(name);
-		if (!f) {
-			f = { target: 0, level: 0, peak: 0, peakHold: 0 };
-			vuState.set(name, f);
+	/* Live levels per input; each VUMeter animates from its own entry. */
+	const vuLevels = new Map<string, VuLevels>();
+	const getVuLevels = (name: string): VuLevels => {
+		let l = vuLevels.get(name);
+		if (!l) {
+			l = { channels: [] };
+			vuLevels.set(name, l);
 		}
-		return f;
+		return l;
 	};
 
 	const pushState = (): void => {
@@ -319,8 +305,7 @@ export function createObsPanel({
 		ui.recording = false;
 		ui.scene = null;
 		ui.loaded = false;
-		vuCanvases.clear();
-		vuState.clear();
+		vuLevels.clear();
 		ui.vuMuted.clear();
 		ui.inputs = [];
 		ui.vuInputs = [];
@@ -484,45 +469,6 @@ export function createObsPanel({
 		m.redraw();
 	};
 
-	/** Smooth one input's level/peak and paint its meter canvas. */
-	function drawVu(c: HTMLCanvasElement, f: VuFrame): void {
-		const dpr = window.devicePixelRatio || 1;
-		const rect = c.getBoundingClientRect();
-		const W = Math.max(1, Math.round(rect.width * dpr));
-		const H = Math.max(1, Math.round(rect.height * dpr));
-		if (c.width !== W) c.width = W;
-		if (c.height !== H) c.height = H;
-		const ctx = c.getContext("2d");
-		if (!ctx) return;
-
-		f.level += (f.target - f.level) * 0.35;
-		if (f.target > f.peak) {
-			f.peak = f.target;
-			f.peakHold = 30;
-		} else if (f.peakHold > 0) {
-			f.peakHold--;
-		} else f.peak = Math.max(f.level, f.peak - 0.008);
-
-		ctx.fillStyle = "#0a0a0a";
-		ctx.fillRect(0, 0, W, H);
-		const g = ctx.createLinearGradient(0, 0, W, 0);
-		g.addColorStop(0, "#00e676");
-		g.addColorStop(0.6, "#ffeb3b");
-		g.addColorStop(0.85, "#ff9800");
-		g.addColorStop(1, "#f44336");
-		ctx.fillStyle = g;
-		ctx.fillRect(0, 0, Math.min(f.level, 1) * W, H);
-		if (f.peak > 0.01) {
-			ctx.fillStyle = "#fff";
-			ctx.fillRect(Math.min(f.peak, 1) * W - 2, 0, 2, H);
-		}
-	}
-
-	const vuLoop = (): void => {
-		for (const [name, c] of vuCanvases) drawVu(c, getVuFrame(name));
-		rafId = requestAnimationFrame(vuLoop);
-	};
-
 	function handleEvent(event: string, data: unknown): void {
 		if (event === "lowBitrateSwitcher.state") {
 			switcherLive = (data as SwitcherStatus) ?? null;
@@ -584,17 +530,17 @@ export function createObsPanel({
 							...ui.vuInputs.filter((n) => incoming.includes(n)),
 							...fresh,
 						];
-						for (const n of dropped) vuState.delete(n);
+						for (const n of dropped) vuLevels.delete(n);
 						for (const n of fresh) ensureMute(n);
 						dirty = true; // the row set changed — re-render the list
 					}
 					for (const inp of inputs) {
-						const flat = [...(inp.inputLevelsMul ?? [])].flat();
-						const avg =
-							flat.reduce((a, b) => a + b, 0) / Math.max(1, flat.length);
-						getVuFrame(inp.inputName).target = Math.min(
-							1,
-							Math.max(0, avg ** 0.5),
+						// Each channel is [magnitude, peak, input-peak] (or a bare magnitude).
+						getVuLevels(inp.inputName).channels = (inp.inputLevelsMul ?? []).map(
+							(c) => {
+								const [mag = 0, peak = mag] = Array.isArray(c) ? c : [c];
+								return { mag, peak };
+							},
 						);
 					}
 				}
@@ -660,7 +606,6 @@ export function createObsPanel({
 					if (mounts === 1) {
 						if (startConnected?.()) ui.connected = true;
 						tickTimer = window.setInterval(tick, 500);
-						rafId = requestAnimationFrame(vuLoop);
 					}
 				}}
 				onremove={() => {
@@ -826,13 +771,7 @@ export function createObsPanel({
 												<span class="obs-audio-name" title={name}>
 													{name}
 												</span>
-												<canvas
-													class="obs-vu"
-													oncreate={(v) =>
-														vuCanvases.set(name, v.dom as HTMLCanvasElement)
-													}
-													onremove={() => vuCanvases.delete(name)}
-												/>
+												<VUMeter levels={getVuLevels(name)} muted={muted} />
 											</div>
 										);
 									})
@@ -987,9 +926,7 @@ export function createObsPanel({
 		if (destroyed) return;
 		destroyed = true;
 		window.clearInterval(tickTimer);
-		cancelAnimationFrame(rafId);
-		vuCanvases.clear();
-		vuState.clear();
+		vuLevels.clear();
 		unsubscribe();
 		onDestroy?.();
 	}
