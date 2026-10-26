@@ -535,13 +535,19 @@ export function createObsPanel({
 						dirty = true; // the row set changed — re-render the list
 					}
 					for (const inp of inputs) {
-						// Each channel is [magnitude, peak, input-peak] (or a bare magnitude).
-						getVuLevels(inp.inputName).channels = (inp.inputLevelsMul ?? []).map(
-							(c) => {
-								const [mag = 0, peak = mag] = Array.isArray(c) ? c : [c];
-								return { mag, peak };
-							},
-						);
+						// Each channel is [magnitude, peak, input-peak] (or a bare magnitude). While
+						// muted obs-websocket zeroes the first two but still reports the
+						// unscaled input-peak, so fall back to it to keep the meter moving.
+						getVuLevels(inp.inputName).channels = (
+							inp.inputLevelsMul ?? []
+						).map((c) => {
+							const [mag = 0, peak = mag, inPeak = 0] = Array.isArray(c)
+								? c
+								: [c];
+							return mag === 0 && peak === 0 && inPeak > 0
+								? { mag: inPeak, peak: inPeak }
+								: { mag, peak };
+						});
 					}
 				}
 				// The first event after a drop is what proves the link is back up
@@ -829,9 +835,6 @@ export function createObsPanel({
 										: null,
 								],
 								[t("lowbs.row_updated"), s ? since(s.updatedAt) : null],
-								//                ...(srtMissing
-								//                  ? [[t("lowbs.srt_unavailable"), null] as [string, Child]]
-								//                  : []),
 							]}
 						/>
 						<Form
@@ -1102,8 +1105,7 @@ const obsDashboardWidgets: DeviceDashboardWidget[] = [
 	{
 		type: "obs",
 		available: (device) =>
-			(device.role === "obs" ||
-				device.role === undefined) &&
+			(device.role === "obs" || device.role === undefined) &&
 			device.modules?.["obs-controller"]?.enabled === true,
 		defaultSize: { w: 6, h: 13 },
 		minSize: { w: 4, h: 4 },
