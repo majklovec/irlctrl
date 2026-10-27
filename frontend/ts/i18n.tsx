@@ -62,24 +62,27 @@ function readInitial(): Language {
 let current: Language = readInitial();
 document.documentElement.lang = current;
 
-const initPromise = i18n.use(httpBackend).use(LanguageDetector).init({
-	lng: current,
-	fallbackLng: DEFAULT_LANGUAGE,
-	detection,
-	backend: {
-		// Absolute URL so non-browser fetch (Bun) and cross-origin hosts both
-		// work; in the page this is same-origin.
-		loadPath: (languages: string[]) =>
-			`${window.location.origin}/i18n/${languages[0]}.json`,
-		addPath: false,
-		reloadInterval: false,
-	},
-	// Keys are flat strings that may contain dots, so no path splitting.
-	keySeparator: false,
-	nsSeparator: false,
-	interpolation: { escapeValue: false },
-	returnNull: false,
-});
+const initPromise = i18n
+	.use(httpBackend)
+	.use(LanguageDetector)
+	.init({
+		lng: current,
+		fallbackLng: DEFAULT_LANGUAGE,
+		detection,
+		backend: {
+			// Absolute URL so non-browser fetch (Bun) and cross-origin hosts both
+			// work; in the page this is same-origin.
+			loadPath: (languages: string[]) =>
+				`${window.location.origin}/i18n/${languages[0]}.json`,
+			addPath: false,
+			reloadInterval: false,
+		},
+		// Keys are flat strings that may contain dots, so no path splitting.
+		keySeparator: false,
+		nsSeparator: false,
+		interpolation: { escapeValue: false },
+		returnNull: false,
+	});
 
 /**
  * Resolves once i18next is initialized and the catalogs it loads on init

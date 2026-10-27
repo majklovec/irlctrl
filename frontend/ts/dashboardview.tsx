@@ -117,7 +117,8 @@ async function doSave(): Promise<void> {
 		} | null;
 		// Validation failures come back as HTTP 200 with `ok: false` — surface them
 		// so the user is not left believing a change was saved.
-		if (body && body.ok === false) throw new Error(body.error ?? "Save rejected");
+		if (body && body.ok === false)
+			throw new Error(body.error ?? "Save rejected");
 		const fresh = body?.dashboard;
 		if (fresh) {
 			// Adopt the bumped version so the next save targets the latest revision;
@@ -301,9 +302,7 @@ const App: m.Component = {
 									value={dash.name}
 									aria-label={t("dash.rename")}
 									oninput={(e: Event) =>
-										onNameInput(
-											(e.target as HTMLInputElement).value,
-										)
+										onNameInput((e.target as HTMLInputElement).value)
 									}
 								/>
 							) : (

@@ -110,9 +110,7 @@ export const def: ModuleDef = {
 	id: "ssh",
 	titleKey: "set.ssh",
 	visible: (ctx) =>
-		ctx.role === "relay" ||
-		ctx.role === "encoder" ||
-		ctx.role === "combined",
+		ctx.role === "relay" || ctx.role === "encoder" || ctx.role === "combined",
 	refresh: (ctx) => {
 		const s = ctx.modules.ssh as SshSliceView;
 		draft.user = s.user ?? "root";
@@ -132,16 +130,19 @@ export const def: ModuleDef = {
 		if (!sub) {
 			sub = ctx.rpc.on("status", (data) => {
 				adopt(
-					(data as { ssh?: SshStatus | null } | null | undefined)?.ssh ??
-						null,
+					(data as { ssh?: SshStatus | null } | null | undefined)?.ssh ?? null,
 				);
 			});
 		}
 		const active = ssh?.active ?? false;
 		const busy = ctx.busy;
 		return [
-			<p class="muted" key="hint">{t("set.ssh_desc")}</p>,
-			<p class="muted" key="stophint">{t("set.ssh_stop_hint")}</p>,
+			<p class="muted" key="hint">
+				{t("set.ssh_desc")}
+			</p>,
+			<p class="muted" key="stophint">
+				{t("set.ssh_stop_hint")}
+			</p>,
 			<div key="card" class="mod-ssh">
 				<Field
 					label={t("dev.row.user")}

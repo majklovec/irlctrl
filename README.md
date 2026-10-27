@@ -120,7 +120,6 @@ Tick **Autostart** in the UI (or call `autostart.set`) to resume the last stream
 ### Authentication
 
 The server replaces HTTP Basic auth with per-user profiles stored in a local **SQLite** database (`bun:sqlite`). Each profile has a login **password** (browser) and one or more **device tokens**.
-
 -   **Users** live in the SQLite database (default `users.db`, see `--db`). Passwords are stored as **scrypt hashes** — the plaintext never touches disk.
 -   **Devices** authenticate with `Authorization: Bearer <token>` when they open their `ws://<server>/device` connection. The server resolves the token to a user and assigns the device to that user — devices are therefore owned by the profile whose token presented them.
 -   **Browsers** sign in at `/login` with the username and password. A successful login sets an `HttpOnly` session cookie; all device lists, device pages, and dashboards are then scoped to that user. Only devices owned by the signed-in user are visible, and only that user can open a device's page/WS or edit its dashboards.
@@ -150,7 +149,7 @@ open http://ctl.example.com/  # redirects to /login; enter the username + passwo
 
 ### Install as an app (PWA)
 
-The control-server UI is an installable web app: every page links a web app manifest (`frontend/pwa/manifest.webmanifest`, bundled with the pages) and registers a service worker served at the origin root (`/sw.js`, scope `/`, from `frontend/pwa/` via [`shared/pwa.ts`](shared/pwa.ts) — embedded in the compiled binary). On a phone open the server over **HTTPS**, sign in, then *Add to Home Screen* (iOS Safari: Share → Add to Home Screen; Android Chrome: menu → Install app / Add to Home screen). Desktop Chrome/Edge show an install icon in the address bar.
+The control-server UI is an installable web app: every page links a web app manifest (`frontend/pwa/manifest.webmanifest`, bundled with the pages) and registers a service worker served at the origin root (`/sw.js`, scope `/`, from `frontend/pwa/` via [`shared/pwa.ts`](shared/pwa.ts) — embedded in the compiled binary). On a phone open the server over **HTTPS**, sign in, then _Add to Home Screen_ (iOS Safari: Share → Add to Home Screen; Android Chrome: menu → Install app / Add to Home screen). Desktop Chrome/Edge show an install icon in the address bar.
 
 The service worker caches only the app shell: the hashed `/assets/*` bundles and the icons cache-first, page navigations network-first with the last good copy as an offline fallback. It never touches `/api/*`, `/i18n/*`, the device connection (`/device`) or any websocket (`…/ws`), so live data, RPC and dashboards behave exactly as before. Service workers need a secure context — plain `http://` (other than `localhost`) just skips the registration.
 
@@ -180,7 +179,6 @@ The control server is the same with `server` in place of `client` (no `root` nee
 ### Armbian image (Orange Pi 5 Plus)
 
 [`armbian/`](armbian/) builds a ready-to-stream **Armbian** image natively on the host:
-
 -   `setup-host.sh` — one-time install of the build dependencies (run as root)
 -   `build.sh [config]` — clones the Armbian build framework, links the bundled `userpatches/`, and compiles the image (default config `orangepi5-plus`)
 -   `build-all.sh` — builds both variants: the SD-card image and the **eMMC auto-install** image (`orangepi5-plus-emmc`), which copies itself to eMMC on first boot via a one-shot `irlctrl-emmc-install.service`
@@ -205,7 +203,6 @@ The relay/encoder device image bundles `backend/client/client.ts` plus the nativ
 ## API
 
 The local `/ws` endpoint and the control server speak the same JSON protocol:
-
 -   request — `{ "id", "method", "params" }`
 -   response — `{ "type": "response", "id", "ok", … }`
 -   push — `{ "type": "event", "event": "status" | "log" | "srtla.stats", "data": … }`
@@ -230,7 +227,7 @@ and frontend implementation remain co-located. Cross-layer wire types live in
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `encoder`        | Runs and supervises the encoder process for encoder/combined devices: pipeline discovery (ids are paths under `--pipelines`, e.g. `rk3588/h265_hdmi_1440p25`), start/stop with automatic restart, and live bitrate changes. Supports **belacoder** (bitrate via a min/max file, re-read on SIGHUP) and **ceracoder** (INI config with balancer tuning).                                                 |
 | `srtla`          | Manages the `srtla_send` process for relay/combined devices: start/stop/reload (SIGHUP or restart), and applies scheduler options (mode, quality) over the control socket live.                                                                                                                                                                                                                         |
-| `modems`         | Bonding uplinks for relay/combined devices: interface detection, the bonding selection, source routing tables, the uplinks file `srtla_send` reads and the netlink monitor that keeps it current — plus ModemManager (`mmcli`) integration: enumeration, per-modem state, signal quality, operator, and enable/disable/reset/connect/disconnect actions.                                                 |
+| `modems`         | Bonding uplinks for relay/combined devices: interface detection, the bonding selection, source routing tables, the uplinks file `srtla_send` reads and the netlink monitor that keeps it current — plus ModemManager (`mmcli`) integration: enumeration, per-modem state, signal quality, operator, and enable/disable/reset/connect/disconnect actions.                                                |
 | `ssh`            | Manages the box's sshd (start/stop) and the SSH login account password.                                                                                                                                                                                                                                                                                                                                 |
 | `obs-controller` | Owns the [obs-websocket](https://github.com/obsproject/obs-websocket) (v5) connection to a paired OBS Studio instance and forwards its events into the device event stream. Also runs the **low-bitrate switcher**: a pure state machine ([`switcher-engine.ts`](modules/obs-controller/switcher-engine.ts)) that watches SRT/OBS metrics and switches OBS between `normal` / `low` / `offline` scenes. |
 
@@ -243,12 +240,11 @@ and frontend implementation remain co-located. Cross-layer wire types live in
 
 Chat widgets keep rolling message history so reconnects don't re-send, and a `seen` set that dedupes message ids across reconnects.
 
-**Buttons widget** (`modules/buttons/`) — a **virtual StreamDeck**, offered once per dashboard (under *Independent*): a grid of buttons where each button fires one RPC method of one module on one of your devices (`encoder.stop`, a bitrate preset, `srtla.reload`, an OBS `StartStream`, …) — one widget can mix buttons from any number of devices. Modules declare the actions they offer with `dashboardActions` on their backend registration — a fixed list, or a `status => …` factory for actions that depend on live device state (e.g. one mute button per OBS audio source); the control server resolves them against the device's freshest status and merges the enabled modules' actions into each device's cached status (`status.actions`), and the widget's settings (pencil icon in edit mode) compose the layout from the catalogues of all your devices — with per-button label / icon overrides and a JSON params override (e.g. `pipeline`, `host`, `port` for `encoder.start`). Actions marked `confirm` ask before firing; buttons whose device went away or whose module was disabled are shown as unavailable. See [modules/README.md → Dashboard actions](modules/README.md#dashboard-actions) for declaring actions in a module.
+**Buttons widget** (`modules/buttons/`) — a **virtual StreamDeck**, offered once per dashboard (under _Independent_): a grid of buttons where each button fires one RPC method of one module on one of your devices (`encoder.stop`, a bitrate preset, `srtla.reload`, an OBS `StartStream`, …) — one widget can mix buttons from any number of devices. Modules declare the actions they offer with `dashboardActions` on their backend registration — a fixed list, or a `status => …` factory for actions that depend on live device state (e.g. one mute button per OBS audio source); the control server resolves them against the device's freshest status and merges the enabled modules' actions into each device's cached status (`status.actions`), and the widget's settings (pencil icon in edit mode) compose the layout from the catalogues of all your devices — with per-button label / icon overrides and a JSON params override (e.g. `pipeline`, `host`, `port` for `encoder.start`). Actions marked `confirm` ask before firing; buttons whose device went away or whose module was disabled are shown as unavailable. See [modules/README.md → Dashboard actions](modules/README.md#dashboard-actions) for declaring actions in a module.
 
 ### How the module system works
 
 Each `modules/<id>/` is a plugin the core discovers by directory; it ships:
-
 -   `backend.ts` — the backend registration (runs in Bun on the host; no DOM). It parses its own CLI arguments, owns its config sections, validates and answers its own RPC methods, and contributes status / settings / setup / log wording / pages / widgets through the hooks of the contract in [`shared/module-contract.ts`](shared/module-contract.ts).
 -   `frontend.tsx` — the frontend registration (mithril components; no backend imports): the device card, dashboard widgets, setup steps, device-list columns and event handlers (contract in [`frontend/ts/module-contracts.ts`](frontend/ts/module-contracts.ts)).
 -   `types.ts` (its own wire types), `styles.css`, `i18n/<lang>.json` (its own translations), optional `settings.tsx` (settings-page card), `log.ts` (log wording shared by both sides), `pages/*.html` (module-owned pages), and any private helpers.
@@ -300,7 +296,6 @@ The control-server build hook bundles the browser pages and embeds their generat
 
 [`backend/server/server.ts`](./backend/server/server.ts) remains the CLI entrypoint. Its implementation lives in
 [`backend/server/`](./backend/server/):
-
 -   [`auth.ts`](./backend/server/auth.ts) owns SQLite initialization, passwords, sessions, profiles, device tokens and invitations.
 -   [`devices.ts`](./backend/server/devices.ts) owns the device registry, request forwarding, cached telemetry/logs and device-list broadcasts.
 -   [`dashboards.ts`](./backend/server/dashboards.ts) owns dashboard validation, persistence, API responses and widget-hub synchronization.

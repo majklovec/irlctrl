@@ -1,14 +1,14 @@
 {
-	"log.reconfigure_failed": "Początkowa rekonfiguracja nie powiodła się: {{error}}",
-	"mlog.action.bond_selection": "Wybór bondu",
-	"mlog.action.bond_toggle": "Przełączenie bondu",
-	"mlog.done.bond_toggled": "{{iface}} przełączono w bondzie",
-	"mlog.done.bond_updated": "Wybór bondu zaktualizowany",
-	"mlog.done.modem_connected": "Modem #{{index}} połączony",
-	"mlog.done.modem_disabled": "Modem #{{index}} wyłączony",
-	"mlog.done.modem_disconnected": "Modem #{{index}} rozłączony",
-	"mlog.done.modem_enabled": "Modem #{{index}} włączony",
-	"mlog.done.modem_reset": "Modem #{{index}} zresetowany",
-	"mlog.done.reconfigured": "Przekonfigurowano",
-	"act.modems.reconfigure": "Przekonfiguruj modemy"
+    "log.reconfigure_failed": "Początkowa rekonfiguracja nie powiodła się: {{error}}",
+    "mlog.action.bond_selection": "Wybór bondu",
+    "mlog.action.bond_toggle": "Przełączenie bondu",
+    "mlog.done.bond_toggled": "{{iface}} przełączono w bondzie",
+    "mlog.done.bond_updated": "Wybór bondu zaktualizowany",
+    "mlog.done.modem_connected": "Modem #{{index}} połączony",
+    "mlog.done.modem_disabled": "Modem #{{index}} wyłączony",
+    "mlog.done.modem_disconnected": "Modem #{{index}} rozłączony",
+    "mlog.done.modem_enabled": "Modem #{{index}} włączony",
+    "mlog.done.modem_reset": "Modem #{{index}} zresetowany",
+    "mlog.done.reconfigured": "Przekonfigurowano",
+    "act.modems.reconfigure": "Przekonfiguruj modemy"
 }

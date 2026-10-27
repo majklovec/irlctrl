@@ -29,21 +29,21 @@ import { existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import i18next, { type TOptions } from "i18next";
 import {
-	asLanguage,
-	DEFAULT_LANGUAGE,
-	isLanguage,
-	type Language,
+    asLanguage,
+    DEFAULT_LANGUAGE,
+    isLanguage,
+    type Language,
 } from "./languages";
 import { setLogTranslator } from "./logMessages";
 import { isCompiledBinary } from "./util";
 
 export type { Language } from "./languages";
 export {
-	asLanguage,
-	DEFAULT_LANGUAGE,
-	isLanguage,
-	LANGUAGE_INFO,
-	LANGUAGES,
+    asLanguage,
+    DEFAULT_LANGUAGE,
+    isLanguage,
+    LANGUAGE_INFO,
+    LANGUAGES,
 } from "./languages";
 
 const i18n = i18next.createInstance();
@@ -54,29 +54,33 @@ type Catalog = Record<string, string>;
 
 /** The core catalog file plus every module's catalog for `lng` (unbundled). */
 function catalogFiles(lng: Language): string[] {
-	const files = [fileURLToPath(new URL(`../i18n/${lng}.json`, import.meta.url))];
-	for (const entry of readdirSync(MODULES_DIR).sort()) {
-		const file = `${MODULES_DIR}${entry}/i18n/${lng}.json`;
-		if (existsSync(file)) files.push(file);
-	}
-	return files;
+    const files = [
+        fileURLToPath(new URL(`../i18n/${lng}.json`, import.meta.url)),
+    ];
+    for (const entry of readdirSync(MODULES_DIR).sort()) {
+        const file = `${MODULES_DIR}${entry}/i18n/${lng}.json`;
+        if (existsSync(file)) files.push(file);
+    }
+    return files;
 }
 
 /** Every catalog contributing to `lng`, in merge order (core first). */
 async function catalogParts(lng: Language): Promise<Catalog[]> {
-	if (isCompiledBinary()) {
-		const manifest = (
-			(await import("../generated/i18n")) as {
-				default: Record<string, Catalog[]>;
-			}
-		).default;
-		const parts = manifest[lng];
-		if (!parts) throw new Error(`missing i18n catalog for ${lng}`);
-		return parts;
-	}
-	return Promise.all(
-		catalogFiles(lng).map((file) => Bun.file(file).json() as Promise<Catalog>),
-	);
+    if (isCompiledBinary()) {
+        const manifest = (
+            (await import("../generated/i18n")) as {
+                default: Record<string, Catalog[]>;
+            }
+        ).default;
+        const parts = manifest[lng];
+        if (!parts) throw new Error(`missing i18n catalog for ${lng}`);
+        return parts;
+    }
+    return Promise.all(
+        catalogFiles(lng).map(
+            (file) => Bun.file(file).json() as Promise<Catalog>,
+        ),
+    );
 }
 
 const cached = new Map<Language, Catalog>();
@@ -84,25 +88,25 @@ const inFlight = new Map<Language, Promise<Catalog>>();
 
 /** The English catalog, loaded once at startup so i18next has a fallback. */
 const initGate: Promise<void> = (async () => {
-	const en = await readRaw(DEFAULT_LANGUAGE);
-	cached.set(DEFAULT_LANGUAGE, en);
-	await i18n.init({
-		resources: { en: { translation: en } },
-		lng: DEFAULT_LANGUAGE,
-		fallbackLng: DEFAULT_LANGUAGE,
-		// Keys are flat strings that may contain dots, so no path splitting.
-		keySeparator: false,
-		nsSeparator: false,
-		interpolation: { escapeValue: false },
-		returnNull: false,
-	});
+    const en = await readRaw(DEFAULT_LANGUAGE);
+    cached.set(DEFAULT_LANGUAGE, en);
+    await i18n.init({
+        resources: { en: { translation: en } },
+        lng: DEFAULT_LANGUAGE,
+        fallbackLng: DEFAULT_LANGUAGE,
+        // Keys are flat strings that may contain dots, so no path splitting.
+        keySeparator: false,
+        nsSeparator: false,
+        interpolation: { escapeValue: false },
+        returnNull: false,
+    });
 })();
 
 export const i18nReady: Promise<void> = initGate;
 
 /** Read and merge a language's catalogs. */
 async function readRaw(lng: Language): Promise<Catalog> {
-	return Object.assign({}, ...(await catalogParts(lng))) as Catalog;
+    return Object.assign({}, ...(await catalogParts(lng))) as Catalog;
 }
 
 /**
@@ -110,22 +114,22 @@ async function readRaw(lng: Language): Promise<Catalog> {
  * The default language is served from the cache populated by `initGate`.
  */
 function readCatalog(lng: Language): Promise<Catalog> {
-	const hit = cached.get(lng);
-	if (hit) return Promise.resolve(hit);
-	const pending = inFlight.get(lng);
-	if (pending) return pending;
-	const load = (async () => {
-		const bundle = await readRaw(lng);
-		cached.set(lng, bundle);
-		// Guard i18next's addResourceBundle behind init (the default language
-		// is already inside `resources`, so this only runs for other languages).
-		await initGate;
-		i18n.addResourceBundle(lng, "translation", bundle, true, true);
-		return bundle;
-	})();
-	const tracked = load.finally(() => inFlight.delete(lng));
-	inFlight.set(lng, tracked);
-	return tracked;
+    const hit = cached.get(lng);
+    if (hit) return Promise.resolve(hit);
+    const pending = inFlight.get(lng);
+    if (pending) return pending;
+    const load = (async () => {
+        const bundle = await readRaw(lng);
+        cached.set(lng, bundle);
+        // Guard i18next's addResourceBundle behind init (the default language
+        // is already inside `resources`, so this only runs for other languages).
+        await initGate;
+        i18n.addResourceBundle(lng, "translation", bundle, true, true);
+        return bundle;
+    })();
+    const tracked = load.finally(() => inFlight.delete(lng));
+    inFlight.set(lng, tracked);
+    return tracked;
 }
 
 /** The language t() currently resolves to; set at startup and on change. */
@@ -137,12 +141,12 @@ let current: Language = DEFAULT_LANGUAGE;
  * background, then i18next is pointed at it once the read settles.
  */
 export function setCurrentLanguage(lang: unknown): void {
-	current = asLanguage(lang);
-	void readCatalog(current)
-		.then(() => i18n.changeLanguage(current))
-		.catch((error) =>
-			console.error(`failed to load i18n catalog for ${current}`, error),
-		);
+    current = asLanguage(lang);
+    void readCatalog(current)
+        .then(() => i18n.changeLanguage(current))
+        .catch((error) =>
+            console.error(`failed to load i18n catalog for ${current}`, error),
+        );
 }
 
 /**
@@ -150,16 +154,16 @@ export function setCurrentLanguage(lang: unknown): void {
  * back to English, unknown keys fall back to English, then to the raw key.
  */
 export function translate(
-	lang: unknown,
-	key: string,
-	options?: TOptions,
+    lang: unknown,
+    key: string,
+    options?: TOptions,
 ): string {
-	return i18n.t(key, { ...options, lng: asLanguage(lang) }) as string;
+    return i18n.t(key, { ...options, lng: asLanguage(lang) }) as string;
 }
 
 /** Translate using the current language. */
 export function t(key: string, options?: TOptions): string {
-	return i18n.t(key, { ...options, lng: current }) as string;
+    return i18n.t(key, { ...options, lng: current }) as string;
 }
 
 // The shared log wording localizes through the installed translator.
@@ -171,5 +175,5 @@ setLogTranslator(t);
  * caches. null for unknown codes.
  */
 export function catalog(lang: string): Promise<Catalog | null> {
-	return isLanguage(lang) ? readCatalog(lang) : Promise.resolve(null);
+    return isLanguage(lang) ? readCatalog(lang) : Promise.resolve(null);
 }

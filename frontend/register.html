@@ -15,7 +15,7 @@
   <script type="module" src="./ts/register.tsx"></script>
   <script>
     if ("serviceWorker" in navigator)
-      addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+      addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => { }));
   </script>
 </body>
 

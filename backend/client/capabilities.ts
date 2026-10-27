@@ -13,18 +13,18 @@ const provided = new Map<string, unknown>();
 
 /** Register a capability implementation. Re-registering replaces the old one. */
 export function provideCapability<T>(name: string, impl: T): T {
-	provided.set(name, impl);
-	return impl;
+    provided.set(name, impl);
+    return impl;
 }
 
 /** Look up a capability by name. Throws when no module provides it. */
 export function requireCapability<T = unknown>(name: string): T {
-	const impl = provided.get(name);
-	if (impl === undefined)
-		throw new Error(
-			`capability ${JSON.stringify(name)} is not provided by any module`,
-		);
-	return impl as T;
+    const impl = provided.get(name);
+    if (impl === undefined)
+        throw new Error(
+            `capability ${JSON.stringify(name)} is not provided by any module`,
+        );
+    return impl as T;
 }
 
 /** Whether a capability is currently provided. */
@@ -32,5 +32,5 @@ export const hasCapability = (name: string): boolean => provided.has(name);
 
 /** Drop all capabilities (registry reload, tests). */
 export function clearCapabilities(): void {
-	provided.clear();
+    provided.clear();
 }

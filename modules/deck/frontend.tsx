@@ -18,16 +18,16 @@ import type { DeviceSummary } from "../../shared/types";
 import { ButtonsGrid, type GridItem } from "./grids";
 import {
 	type ButtonConfig,
+	buttonDevices,
+	type DashboardActionEntry,
 	DECK_DEFAULT_SIZE,
 	DECK_FIELD,
 	DECK_MAX,
 	DECK_MAX_SIZE,
 	DECK_MIN_SIZE,
 	DECK_WIDGET_TYPE,
-	buttonDevices,
-	type DashboardActionEntry,
-	mergedParams,
 	layoutButtons,
+	mergedParams,
 	nextButtonSlot,
 	parseButtons,
 	serializeButtons,
@@ -152,7 +152,11 @@ function laidOutButtons(
 
 /** The inner content of one key (icon, label, device) — shared by the live
  * body and the editor canvas. Carries the press-state classes. */
-function keyContent(ctx: FleetDashboardContext, b: ButtonConfig, index: number) {
+function keyContent(
+	ctx: FleetDashboardContext,
+	b: ButtonConfig,
+	index: number,
+) {
 	const run = runFor(ctx.widget.id);
 	const r = resolve(ctx, b);
 	const busy = run.inflight.has(index);
@@ -176,9 +180,7 @@ function keyContent(ctx: FleetDashboardContext, b: ButtonConfig, index: number) 
 				</span>
 			) : null}
 			<span class="buttons-label">{labelOf(r, b)}</span>
-			<span class="buttons-device">
-				{deviceLabel(r.device, b.deviceId)}
-			</span>
+			<span class="buttons-device">{deviceLabel(r.device, b.deviceId)}</span>
 		</div>
 	);
 }
@@ -208,9 +210,7 @@ function grid(
 		<ButtonsGrid
 			items={items}
 			interactive={interactive}
-			selectedId={
-				selectedIndex === undefined ? null : String(selectedIndex)
-			}
+			selectedId={selectedIndex === undefined ? null : String(selectedIndex)}
 			onLayout={(updated) => onLayout?.(updated)}
 			onSelect={(id) => {
 				const i = Number(id);
@@ -220,7 +220,9 @@ function grid(
 			}}
 			renderCell={(id) => {
 				const i = Number(id);
-				return i >= 0 && i < buttons.length ? keyContent(ctx, buttons[i], i) : null;
+				return i >= 0 && i < buttons.length
+					? keyContent(ctx, buttons[i], i)
+					: null;
 			}}
 		/>
 	);
@@ -304,9 +306,10 @@ function editorFor(values: Record<string, string>): EditorState {
 }
 
 /** The params override a row's text parses to, or an error (undefined = none). */
-function parseParamsText(
-	text: string,
-): { params?: Record<string, unknown>; error?: true } {
+function parseParamsText(text: string): {
+	params?: Record<string, unknown>;
+	error?: true;
+} {
 	if (text.trim() === "") return {};
 	try {
 		const v: unknown = JSON.parse(text);
@@ -344,7 +347,9 @@ function configError(
 	const state = editorFor(values);
 	if (state.buttons.some((b) => resolve(ctx, b).state === "orphan"))
 		return t("buttons.orphan_blocks_save");
-	const bad = state.buttons.findIndex((b) => parseParamsText(b.paramsText).error);
+	const bad = state.buttons.findIndex(
+		(b) => parseParamsText(b.paramsText).error,
+	);
 	if (bad >= 0) return t("buttons.params_invalid", { index: bad + 1 });
 	return undefined;
 }
@@ -366,7 +371,9 @@ function catalogueFor(
 			</p>
 		);
 	if (actions.length === 0)
-		return <p class="muted buttons-catalogue-note">{t("buttons.none_available")}</p>;
+		return (
+			<p class="muted buttons-catalogue-note">{t("buttons.none_available")}</p>
+		);
 	const byModule = new Map<string, DashboardActionEntry[]>();
 	for (const a of actions) {
 		const list = byModule.get(a.moduleTitle) ?? [];
@@ -440,7 +447,9 @@ function configEditor(
 							<span class="buttons-catalogue-device-name">
 								{deviceLabel(device, device.id)}
 								<Badge
-									text={t(device.online ? "dev.badge.online" : "dev.badge.offline")}
+									text={t(
+										device.online ? "dev.badge.online" : "dev.badge.offline",
+									)}
 									kind={device.online ? "on" : "off"}
 								/>
 							</span>
@@ -499,10 +508,7 @@ function buttonForm(
 	const paramsBad = !!parseParamsText(b.paramsText).error;
 	return (
 		<div
-			class={[
-				"buttons-form",
-				r.state === "orphan" ? "is-orphan" : undefined,
-			]
+			class={["buttons-form", r.state === "orphan" ? "is-orphan" : undefined]
 				.filter(Boolean)
 				.join(" ")}
 		>
@@ -516,9 +522,7 @@ function buttonForm(
 						{deviceLabel(r.device, b.deviceId)}
 					</span>{" "}
 					{r.state === "orphan" ? (
-						<span class="buttons-orphan-tag">
-							{t("buttons.unavailable")}
-						</span>
+						<span class="buttons-orphan-tag">{t("buttons.unavailable")}</span>
 					) : null}
 				</span>
 			</span>
@@ -551,10 +555,7 @@ function buttonForm(
 				<label class="buttons-field-params">
 					<span>{t("buttons.params_override")}</span>
 					<textarea
-						class={[
-							"dash-config-input",
-							paramsBad ? "is-invalid" : undefined,
-						]
+						class={["dash-config-input", paramsBad ? "is-invalid" : undefined]
 							.filter(Boolean)
 							.join(" ")}
 						rows={2}

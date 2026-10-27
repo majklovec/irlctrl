@@ -1,9 +1,9 @@
 {
-	"chat.empty": "Sem nenhuma mensagem ainda",
-	"wtype.chat": "Chat",
-	"dash.widget_tiktok": "Canal do TikTok",
-	"dash.widget_history": "Linhas de histórico",
-	"dash.widget_order": "Novas mensagens",
-	"dash.widget_order.top": "No topo",
-	"dash.widget_order.bottom": "Na parte inferior"
+    "chat.empty": "Sem nenhuma mensagem ainda",
+    "wtype.chat": "Chat",
+    "dash.widget_tiktok": "Canal do TikTok",
+    "dash.widget_history": "Linhas de histórico",
+    "dash.widget_order": "Novas mensagens",
+    "dash.widget_order.top": "No topo",
+    "dash.widget_order.bottom": "Na parte inferior"
 }

@@ -89,8 +89,8 @@ sudo CONTROL_SERVER_TOKEN=token \
 | `‑‑bitrate‑file`          |                        | `$TMPDIR/belacoder_br`           | Soubor s datovým tokem belacoder; znovu se načítá při SIGHUP                                                                          |
 | `‑‑ceracoder‑conf`        |                        | `$TMPDIR/ceracoder.conf`         | Konfigurace INI pro ceracoder (balancer a ladění parametrů), kterou modul enkodéru aplikuje za běhu                                   |
 | `‑‑log‑file`              |                        | `$TMPDIR/srtla_log.json`         | Trvalý protokol událostí zobrazovaný ve webovém rozhraní                                                                              |
-| `‑‑remote`                | `CONTROL_SERVER_URL`   |                                  | Řídicí server, např. `wss://ctl.example.com/device`. Proměnná prostředí přebije hodnotu ze souboru (CLI flag má před oběma)    |
-| `‑‑remote‑token`          | `CONTROL_SERVER_TOKEN` |                                  | Upřednostněte proměnnou prostředí, aby token nebyl viditelný ve výpisu procesů `ps`; proměnná přebije token ze souboru        |
+| `‑‑remote`                | `CONTROL_SERVER_URL`   |                                  | Řídicí server, např. `wss://ctl.example.com/device`. Proměnná prostředí přebije hodnotu ze souboru (CLI flag má před oběma)           |
+| `‑‑remote‑token`          | `CONTROL_SERVER_TOKEN` |                                  | Upřednostněte proměnnou prostředí, aby token nebyl viditelný ve výpisu procesů `ps`; proměnná přebije token ze souboru                |
 | `‑‑remote‑interval`       |                        | `30`                             | Interval odesílání stavových informací v sekundách (`0` = pouze při změně)                                                            |
 | `‑‑remote‑stats‑interval` |                        | `2`                              | Interval odesílání statistik připojení `srtla_send` na řídicí server v sekundách (`0` = vypnuto)                                      |
 | `‑‑dry‑run`               |                        |                                  | Vypisuje akce `ip` a procesů, místo aby je skutečně prováděl                                                                          |
@@ -130,7 +130,6 @@ Soubor `backend/server/server.ts` zobrazuje seznam všech zařízení a zpříst
 Server rovněž poskytuje jednotlivým uživatelům vlastní **nástěnky (dashboards)**. Ty využívají mřížky Gridstack složené z widgetů libovolných zařízení vlastněných daným uživatelem a mají samostatné stránky pro přidávání, úpravy a zobrazení.
 
 Widgety jsou dvojího druhu:
-
 -   **Widgety zařízení** — živá stavová karta pro každé zařízení: `relay`, `encoder`, `combined` nebo `obs`, podle jeho role a povolených modulů.
 -   **Widgety kanálů** — na zařízení nezávislé moduly. Jeden centrální hub pro každý typ modulu obsluhuje všechny widgety daného typu.
 
@@ -139,7 +138,6 @@ Nástěnky se ukládají do databáze SQLite (tabulka `dashboards` v souboru `--
 ### Ověřování uživatelů
 
 Server nahrazuje HTTP Basic autentizaci uživatelskými profily uloženými v místní databázi **SQLite** (`bun:sqlite`). Každý profil má přihlašovací heslo pro webový prohlížeč a jeden nebo více tokenů zařízení.
-
 -   **Uživatelé** jsou uloženi v databázi SQLite (výchozí soubor `users.db`, viz `--db`). Hesla jsou ukládána jako hashe algoritmu **scrypt** — hesla v otevřeném textu se nikdy neukládají na disk.
 -   **Zařízení** se ověřují pomocí hlavičky `Authorization: Bearer <token>` při navazování spojení `ws://<server>/device`. Server přiřadí token uživateli a zařízení přiřadí tomuto uživateli. Zařízení tedy patří profilu, jehož token použilo.
 -   **Prohlížeče** se přihlašují na `/login` pomocí uživatelského jména a hesla. Po úspěšném přihlášení server nastaví relační cookie `HttpOnly`. Seznamy zařízení, stránky zařízení i nástěnky jsou následně omezeny na daného uživatele. Uživatel vidí pouze svá zařízení a pouze on může otevřít jejich stránku či WebSocket a upravovat své nástěnky.
@@ -195,7 +193,6 @@ Zařízení uchovává stav v cestě určené parametrem `--config`. Tato cesta 
 ### Obraz Armbian (Orange Pi 5 Plus)
 
 Adresář [`armbian/`](armbian/) obsahuje nástroje pro nativní sestavení připraveného obrazu Armbian pro streamování přímo na hostitelském počítači:
-
 -   `setup-host.sh` — jednorázová instalace závislostí potřebných pro sestavení (spouštějte jako root).
 -   `build.sh [config]` — stáhne sestavovací framework Armbian, propojí přibalený adresář `userpatches/` a sestaví obraz. Výchozí konfigurace je `orangepi5-plus`.
 -   `build-all.sh` — sestaví obě varianty: obraz pro SD kartu a obraz pro automatickou instalaci na **eMMC** (`orangepi5-plus-emmc`), který při prvním spuštění zkopíruje systém na eMMC pomocí jednorázové služby `irlctrl-emmc-install.service`.
@@ -226,7 +223,6 @@ Enkodér toto oprávnění nepotřebuje. Při použití výchozí síťové konf
 ## API
 
 Lokální koncový bod `/ws` a řídicí server používají stejný JSON protokol:
-
 -   Požadavek — `{ "id", "method", "params" }`
 -   Odpověď — `{ "type": "response", "id", "ok", … }`
 -   Událost — `{ "type": "event", "event": "status" | "log" | "srtla.stats", "data": … }`
@@ -274,7 +270,6 @@ Widgety chatu uchovávají průběžnou historii zpráv, aby se při opětovném
 ### Jak funguje systém modulů
 
 Každý adresář `modules/<id>/` obsahuje přesně čtyři soubory:
-
 -   `backend.ts` — registrace backendu (běží v Bun na hostiteli, bez DOM).
 -   `frontend.tsx` — registrace frontendu (komponenty Mithril, bez importů z backendu).
 -   `types.ts` — pouze lokální typy daného modulu (může importovat typy jádra, nikdy však typy jiného modulu).

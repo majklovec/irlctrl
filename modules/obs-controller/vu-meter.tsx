@@ -325,7 +325,12 @@ export const VUMeter = {
 			if (smoothed.length !== n) {
 				smoothed = [];
 				for (let i = 0; i < n; i++) {
-					smoothed.push({ peak: MIN_DB, mag: MIN_DB, hold: MIN_DB, holdAt: now });
+					smoothed.push({
+						peak: MIN_DB,
+						mag: MIN_DB,
+						hold: MIN_DB,
+						holdAt: now,
+					});
 				}
 			}
 			for (let i = 0; i < n; i++) {

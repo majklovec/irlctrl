@@ -157,9 +157,7 @@ function syncSrtlaForm(host: DeviceCard, status: SrtlaStatus): void {
 const srtlaDashboardWidgets: DeviceDashboardWidget[] = [
 	{
 		type: "relay",
-		available: (device) =>
-			device.role === "relay" ||
-			device.role === undefined,
+		available: (device) => device.role === "relay" || device.role === undefined,
 		defaultSize: { w: 4, h: 4 },
 		minSize: { w: 3, h: 3 },
 		body: ({ card: host, status }) =>
@@ -174,8 +172,7 @@ const srtlaDashboardWidgets: DeviceDashboardWidget[] = [
 	{
 		type: "combined",
 		available: (device) =>
-			device.role === "combined" ||
-			device.role === undefined,
+			device.role === "combined" || device.role === undefined,
 		defaultSize: { w: 6, h: 10 },
 		minSize: { w: 4, h: 8 },
 		body: ({ card: host, status }) =>

@@ -1,9 +1,9 @@
 {
-	"chat.empty": "还没有消息",
-	"wtype.chat": "聊天",
-	"dash.widget_tiktok": "TikTok 频道",
-	"dash.widget_history": "历史行数",
-	"dash.widget_order": "新消息",
-	"dash.widget_order.top": "顶部",
-	"dash.widget_order.bottom": "底部"
+    "chat.empty": "还没有消息",
+    "wtype.chat": "聊天",
+    "dash.widget_tiktok": "TikTok 频道",
+    "dash.widget_history": "历史行数",
+    "dash.widget_order": "新消息",
+    "dash.widget_order.top": "顶部",
+    "dash.widget_order.bottom": "底部"
 }

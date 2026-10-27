@@ -1,6 +1,7 @@
 /* Sign-in page: exchanges a username + password for the session cookie. */
-import logoUrl from "../img/logo-irlctrl.png";
+
 import m from "mithril";
+import logoUrl from "../img/logo-irlctrl.png";
 import { Card, Field, Footer, Input } from "./components/ui";
 import { i18nReady, LanguageSelect, t } from "./i18n";
 import { mountPage } from "./util";

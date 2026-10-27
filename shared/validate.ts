@@ -15,6 +15,6 @@ export const ROLES = ["relay", "encoder", "combined", "obs"] as const;
 export type Role = (typeof ROLES)[number];
 
 export const isRole = (v: unknown): v is Role =>
-	(ROLES as readonly unknown[]).includes(v);
+    (ROLES as readonly unknown[]).includes(v);
 
 export const DEFAULT_COLOR = "#3b82f6";

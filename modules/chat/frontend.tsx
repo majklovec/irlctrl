@@ -6,6 +6,10 @@
 import m from "mithril";
 import { Badge } from "../../frontend/ts/components/ui";
 import { t } from "../../frontend/ts/i18n";
+import type {
+	ChannelWidgetModule,
+	WidgetContext,
+} from "../../frontend/ts/module-contracts";
 import type { ServerDashboardWidget } from "../../shared/types";
 import {
 	CHAT_CONFIG_FIELDS,
@@ -14,12 +18,8 @@ import {
 	historyLengthFromConfig,
 	platformChannel,
 } from "./config";
-import type {
-	ChannelWidgetModule,
-	WidgetContext,
-} from "../../frontend/ts/module-contracts";
-import type { ChannelLive, ChatLive, ChatPlatform } from "./types";
 import { decorateText } from "./text";
+import type { ChannelLive, ChatLive, ChatPlatform } from "./types";
 import "./styles.css";
 
 /** Live chat buffer size per channel; matches the backend rolling buffer. */

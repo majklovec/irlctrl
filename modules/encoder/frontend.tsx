@@ -318,8 +318,7 @@ const encoderDashboardWidgets: DeviceDashboardWidget[] = [
 	{
 		type: "encoder",
 		available: (device) =>
-			device.role === "encoder" ||
-			device.role === undefined,
+			device.role === "encoder" || device.role === undefined,
 		defaultSize: { w: 6, h: 5 },
 		minSize: { w: 4, h: 4 },
 		body: ({ card: host, status }) =>
@@ -348,8 +347,7 @@ const encoderDashboardWidgets: DeviceDashboardWidget[] = [
 	{
 		type: "combined",
 		available: (device) =>
-			device.role === "combined" ||
-			device.role === undefined,
+			device.role === "combined" || device.role === undefined,
 		defaultSize: { w: 6, h: 10 },
 		minSize: { w: 4, h: 8 },
 		body: ({ card: host, status }) =>

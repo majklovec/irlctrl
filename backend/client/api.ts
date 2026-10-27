@@ -11,32 +11,32 @@ import { API_HOST, API_PORT } from "./config";
 import { addStatusSink } from "./push";
 
 export async function createDeviceApiApp() {
-	const frontend = await createFrontend(
-		new URL("../../frontend/", import.meta.url),
-	);
-	return new Elysia({ name: "device-api" })
-		.use(pwaRoutes())
-		.use(devicePagesPlugin(frontend))
-		.use(deviceRpcPlugin());
+    const frontend = await createFrontend(
+        new URL("../../frontend/", import.meta.url),
+    );
+    return new Elysia({ name: "device-api" })
+        .use(pwaRoutes())
+        .use(devicePagesPlugin(frontend))
+        .use(deviceRpcPlugin());
 }
 
 export async function startApiServer(): Promise<void> {
-	const app = (await createDeviceApiApp()).listen({
-		hostname: API_HOST,
-		port: API_PORT,
-	});
-	const server = app.server;
-	if (!server) throw new Error("Elysia failed to start the device API");
+    const app = (await createDeviceApiApp()).listen({
+        hostname: API_HOST,
+        port: API_PORT,
+    });
+    const server = app.server;
+    if (!server) throw new Error("Elysia failed to start the device API");
 
-	addStatusSink({
-		active: () => server.subscriberCount("status") > 0,
-		send: (msg) => server.publish("status", msg),
-	});
+    addStatusSink({
+        active: () => server.subscriberCount("status") > 0,
+        send: (msg) => server.publish("status", msg),
+    });
 
-	const url = `ws://${API_HOST}:${server.port}/ws`;
-	console.log(`Web UI on http://${API_HOST}:${server.port}/`);
-	console.log(`WebSocket API listening on ${url}`);
-	console.log(
-		`Try:  bunx wscat -c ${url}  then send {"id":1,"method":"status"}`,
-	);
+    const url = `ws://${API_HOST}:${server.port}/ws`;
+    console.log(`Web UI on http://${API_HOST}:${server.port}/`);
+    console.log(`WebSocket API listening on ${url}`);
+    console.log(
+        `Try:  bunx wscat -c ${url}  then send {"id":1,"method":"status"}`,
+    );
 }

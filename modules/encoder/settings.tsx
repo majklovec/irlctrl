@@ -194,9 +194,7 @@ export const def: ModuleDef = {
 	// wrapper, so titleKey is unused here.
 	titleKey: "set.repos",
 	selfCards: true,
-	visible: (ctx) =>
-		ctx.role === "encoder" ||
-		ctx.role === "combined",
+	visible: (ctx) => ctx.role === "encoder" || ctx.role === "combined",
 	refresh: (ctx) => {
 		state.repositories = repositoryList(
 			(ctx.settings as EncoderSettings).pipelineRepositories,

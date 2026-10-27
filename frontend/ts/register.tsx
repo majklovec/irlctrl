@@ -1,8 +1,9 @@
 /* Registration page: create a profile, then hand off to the login page. The
  * first account bootstraps as admin; everyone after needs an invite, which the
  * /api/register/status probe (plus a ?invite= link) drives showing the field. */
-import logoUrl from "../img/logo-irlctrl.png";
+
 import m from "mithril";
+import logoUrl from "../img/logo-irlctrl.png";
 import { Card, Field, Footer, Input } from "./components/ui";
 import { i18nReady, LanguageSelect, t } from "./i18n";
 import { mountPage } from "./util";

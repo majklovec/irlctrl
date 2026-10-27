@@ -1,14 +1,14 @@
 {
-	"log.reconfigure_failed": "Riconfigurazione iniziale non riuscita: {{error}}",
-	"mlog.action.bond_selection": "Selezione bond",
-	"mlog.action.bond_toggle": "Commutazione bond",
-	"mlog.done.bond_toggled": "{{iface}} commutato nel bond",
-	"mlog.done.bond_updated": "Selezione bond aggiornata",
-	"mlog.done.modem_connected": "Modem #{{index}} connesso",
-	"mlog.done.modem_disabled": "Modem #{{index}} disabilitato",
-	"mlog.done.modem_disconnected": "Modem #{{index}} disconnesso",
-	"mlog.done.modem_enabled": "Modem #{{index}} abilitato",
-	"mlog.done.modem_reset": "Modem #{{index}} reimpostato",
-	"mlog.done.reconfigured": "Riconfigurato",
-	"act.modems.reconfigure": "Riconfigura modem"
+    "log.reconfigure_failed": "Riconfigurazione iniziale non riuscita: {{error}}",
+    "mlog.action.bond_selection": "Selezione bond",
+    "mlog.action.bond_toggle": "Commutazione bond",
+    "mlog.done.bond_toggled": "{{iface}} commutato nel bond",
+    "mlog.done.bond_updated": "Selezione bond aggiornata",
+    "mlog.done.modem_connected": "Modem #{{index}} connesso",
+    "mlog.done.modem_disabled": "Modem #{{index}} disabilitato",
+    "mlog.done.modem_disconnected": "Modem #{{index}} disconnesso",
+    "mlog.done.modem_enabled": "Modem #{{index}} abilitato",
+    "mlog.done.modem_reset": "Modem #{{index}} reimpostato",
+    "mlog.done.reconfigured": "Riconfigurato",
+    "act.modems.reconfigure": "Riconfigura modem"
 }

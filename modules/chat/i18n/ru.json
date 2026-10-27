@@ -1,9 +1,9 @@
 {
-	"chat.empty": "Сообщений пока нет",
-	"wtype.chat": "Чат",
-	"dash.widget_tiktok": "TikTok-канал",
-	"dash.widget_history": "Строк истории",
-	"dash.widget_order": "Новые сообщения",
-	"dash.widget_order.top": "Сверху",
-	"dash.widget_order.bottom": "Снизу"
+    "chat.empty": "Сообщений пока нет",
+    "wtype.chat": "Чат",
+    "dash.widget_tiktok": "TikTok-канал",
+    "dash.widget_history": "Строк истории",
+    "dash.widget_order": "Новые сообщения",
+    "dash.widget_order.top": "Сверху",
+    "dash.widget_order.bottom": "Снизу"
 }

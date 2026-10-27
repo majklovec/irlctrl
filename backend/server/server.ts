@@ -14,19 +14,19 @@ const NO_AUTH = flag("--no-auth");
 const DB_FILE = arg("--db", process.env.DB_FILE ?? "users.db");
 
 const app = await createControlServer({
-	hostname: HOST,
-	port: PORT,
-	noAuth: NO_AUTH,
-	databaseFile: DB_FILE,
-	frontendDirectory: new URL("../../frontend/", import.meta.url),
+    hostname: HOST,
+    port: PORT,
+    noAuth: NO_AUTH,
+    databaseFile: DB_FILE,
+    frontendDirectory: new URL("../../frontend/", import.meta.url),
 });
 
 const port = app.server?.port;
 if (port === undefined)
-	throw new Error("Elysia failed to start the control server");
+    throw new Error("Elysia failed to start the control server");
 console.log(`irlctrl control server on http://${HOST}:${port}/`);
 console.log(`Relays connect with: --remote ws://<this-host>:${port}/device`);
 if (NO_AUTH)
-	console.warn(
-		"WARNING: --no-auth — anyone can register devices and control them.",
-	);
+    console.warn(
+        "WARNING: --no-auth — anyone can register devices and control them.",
+    );

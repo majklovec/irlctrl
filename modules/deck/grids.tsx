@@ -67,10 +67,7 @@ function cellView(mgr: Manager, id: string): m.Vnode {
 	const cur = mgr.current;
 	return (
 		<div
-			class={[
-				"buttons-cell",
-				cur.selectedId === id ? "is-selected" : undefined,
-			]
+			class={["buttons-cell", cur.selectedId === id ? "is-selected" : undefined]
 				.filter(Boolean)
 				.join(" ")}
 			onclick={() => cur.onSelect?.(id)}
@@ -107,8 +104,7 @@ function createDecoupledGrid(
 		for (const { el } of hidden) el.classList.remove(itemClass);
 		return new GridStack(host, opts);
 	} finally {
-		for (const { el, had } of hidden)
-			if (had) el.classList.add(itemClass);
+		for (const { el, had } of hidden) if (had) el.classList.add(itemClass);
 	}
 }
 
@@ -149,10 +145,7 @@ function reconcile(mgr: Manager): void {
 		.map((n) => n.id as string)
 		.sort()
 		.join("\0");
-	if (
-		desiredId !== presentId ||
-		grid.engine.nodes.length > cur.items.length
-	)
+	if (desiredId !== presentId || grid.engine.nodes.length > cur.items.length)
 		grid.load(desiredNodes(cur.items), true);
 
 	const present = new Set(grid.engine.nodes.map((n) => n.id as string));
@@ -194,7 +187,10 @@ function setEditReserve(mgr: Manager, interactive: boolean): void {
 		host.style.removeProperty("--edit-min-rows");
 		return;
 	}
-	host.style.setProperty("--edit-min-rows", String(Math.max(grid.getRow(), 1) + 1));
+	host.style.setProperty(
+		"--edit-min-rows",
+		String(Math.max(grid.getRow(), 1) + 1),
+	);
 	host.classList.add("buttons-grid-edit");
 }
 
@@ -266,10 +262,7 @@ export const ButtonsGrid = {
 					mgr.current = props;
 					if (changed) reconcile(mgr);
 					setInteractive(mgr, props.interactive);
-					if (
-						changed &&
-						(mgr.grid?.getRow() ?? 0) !== prevRows
-					)
+					if (changed && (mgr.grid?.getRow() ?? 0) !== prevRows)
 						setEditReserve(mgr, props.interactive);
 				}}
 				onremove={(vd: m.VnodeDOM) => teardown(vd.dom as HTMLElement)}

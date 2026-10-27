@@ -22,56 +22,55 @@ import { publicRoutes } from "./plugins/public";
 import { staticRoutes } from "./plugins/static";
 
 interface ControlServerOptions {
-	hostname: string;
-	port: number;
-	noAuth: boolean;
-	databaseFile: string;
-	frontendDirectory: URL;
+    hostname: string;
+    port: number;
+    noAuth: boolean;
+    databaseFile: string;
+    frontendDirectory: URL;
 }
 
 export async function createControlServer(options: ControlServerOptions) {
-	const auth = await createAuth({
-		noAuth: options.noAuth,
-		databaseFile: options.databaseFile,
-	});
-	const frontend = await createFrontend(options.frontendDirectory);
-	await i18nReady;
+    const auth = await createAuth({
+        noAuth: options.noAuth,
+        databaseFile: options.databaseFile,
+    });
+    const frontend = await createFrontend(options.frontendDirectory);
+    await i18nReady;
 
-	const app = new Elysia({ name: "control-server" });
-	const publish: Publish = (topic, message) => {
-		app.server?.publish(topic, message);
-	};
-	const devices = createDevices({
-		publish,
-		userForToken: auth.userForToken,
-	});
-	const dashboards = createDashboards({
-		db: auth.db,
-		databaseFile: options.databaseFile,
-		publish,
-		ownsDevice: devices.ownsDevice,
-		deviceExists: (id) => !!devices.getDevice(id),
-		deviceStatus: (id) => devices.getDevice(id)?.status,
-	});
+    const app = new Elysia({ name: "control-server" });
+    const publish: Publish = (topic, message) => {
+        app.server?.publish(topic, message);
+    };
+    const devices = createDevices({
+        publish,
+        userForToken: auth.userForToken,
+    });
+    const dashboards = createDashboards({
+        db: auth.db,
+        databaseFile: options.databaseFile,
+        publish,
+        ownsDevice: devices.ownsDevice,
+        deviceExists: (id) => !!devices.getDevice(id),
+        deviceStatus: (id) => devices.getDevice(id)?.status,
+    });
 
-	app
-		.use(publicRoutes(auth, frontend))
-		.use(pwaRoutes())
-		.use(accountRoutes(auth, frontend))
-		.use(dashboardRoutes(auth, dashboards, devices, frontend))
-		.use(deviceListRoutes(auth, devices))
-		.use(deviceConnectionRoutes(devices))
-		.use(deviceViewerRoutes(auth, devices))
-		.use(devicePageRoutes(auth, devices, frontend))
-		.use(await staticRoutes(options.frontendDirectory))
-		.use(
-			new Elysia({ name: "control-not-found" }).all(
-				"*",
-				authenticatedHandler(auth, () => notFound()),
-			),
-		);
+    app.use(publicRoutes(auth, frontend))
+        .use(pwaRoutes())
+        .use(accountRoutes(auth, frontend))
+        .use(dashboardRoutes(auth, dashboards, devices, frontend))
+        .use(deviceListRoutes(auth, devices))
+        .use(deviceConnectionRoutes(devices))
+        .use(deviceViewerRoutes(auth, devices))
+        .use(devicePageRoutes(auth, devices, frontend))
+        .use(await staticRoutes(options.frontendDirectory))
+        .use(
+            new Elysia({ name: "control-not-found" }).all(
+                "*",
+                authenticatedHandler(auth, () => notFound()),
+            ),
+        );
 
-	app.listen({ hostname: options.hostname, port: options.port });
-	devices.startMaintenance();
-	return app;
+    app.listen({ hostname: options.hostname, port: options.port });
+    devices.startMaintenance();
+    return app;
 }

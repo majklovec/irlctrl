@@ -1,14 +1,14 @@
 {
-	"log.reconfigure_failed": "Initial reconfigure failed: {{error}}",
-	"mlog.action.bond_selection": "Bond selection",
-	"mlog.action.bond_toggle": "Bond toggle",
-	"mlog.done.bond_toggled": "{{iface}} toggled in bond",
-	"mlog.done.bond_updated": "Bond selection updated",
-	"mlog.done.modem_connected": "Modem #{{index}} connected",
-	"mlog.done.modem_disabled": "Modem #{{index}} disabled",
-	"mlog.done.modem_disconnected": "Modem #{{index}} disconnected",
-	"mlog.done.modem_enabled": "Modem #{{index}} enabled",
-	"mlog.done.modem_reset": "Modem #{{index}} reset",
-	"mlog.done.reconfigured": "Reconfigured",
-	"act.modems.reconfigure": "Reconfigure modems"
+    "log.reconfigure_failed": "Initial reconfigure failed: {{error}}",
+    "mlog.action.bond_selection": "Bond selection",
+    "mlog.action.bond_toggle": "Bond toggle",
+    "mlog.done.bond_toggled": "{{iface}} toggled in bond",
+    "mlog.done.bond_updated": "Bond selection updated",
+    "mlog.done.modem_connected": "Modem #{{index}} connected",
+    "mlog.done.modem_disabled": "Modem #{{index}} disabled",
+    "mlog.done.modem_disconnected": "Modem #{{index}} disconnected",
+    "mlog.done.modem_enabled": "Modem #{{index}} enabled",
+    "mlog.done.modem_reset": "Modem #{{index}} reset",
+    "mlog.done.reconfigured": "Reconfigured",
+    "act.modems.reconfigure": "Reconfigure modems"
 }

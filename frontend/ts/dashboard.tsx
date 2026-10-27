@@ -173,9 +173,7 @@ function openConnection(id: string): Connection {
 	const existing = connections.get(id);
 	if (existing) return existing;
 	const live: DeviceLive = {};
-	const rpc = new RpcClient(() =>
-		socketUrl(`/d/${encodeURIComponent(id)}/ws`),
-	);
+	const rpc = new RpcClient(() => socketUrl(`/d/${encodeURIComponent(id)}/ws`));
 	const conn: Connection = { rpc, live, card: createCardHost({ rpc }) };
 	connections.set(id, conn);
 	rpc.on("device", (data) => {
@@ -386,7 +384,9 @@ function customConfigEditor(
 			error: fleet.configError?.(context, values),
 		};
 	}
-	const widget = isIndependent(w.type) ? undefined : deviceWidgetForType(w.type);
+	const widget = isIndependent(w.type)
+		? undefined
+		: deviceWidgetForType(w.type);
 	if (!widget?.configEditor) return null;
 	const device = deviceById(w.deviceId);
 	const context = device ? deviceWidgetContext(w, device) : undefined;

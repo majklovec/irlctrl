@@ -1,9 +1,9 @@
 {
-	"chat.empty": "Brak wiadomości",
-	"wtype.chat": "Czat",
-	"dash.widget_tiktok": "Kanał TikTok",
-	"dash.widget_history": "Wiersze historii",
-	"dash.widget_order": "Nowe wiadomości",
-	"dash.widget_order.top": "Na górze",
-	"dash.widget_order.bottom": "Na dole"
+    "chat.empty": "Brak wiadomości",
+    "wtype.chat": "Czat",
+    "dash.widget_tiktok": "Kanał TikTok",
+    "dash.widget_history": "Wiersze historii",
+    "dash.widget_order": "Nowe wiadomości",
+    "dash.widget_order.top": "Na górze",
+    "dash.widget_order.bottom": "Na dole"
 }

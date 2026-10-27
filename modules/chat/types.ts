@@ -14,14 +14,14 @@
 
 /** One chat message (platform message id used for deduplication). */
 export interface ChatLive {
-	id: string | number;
-	username?: string;
-	/** The sender's platform color (hex), for username display. */
-	color?: string;
-	text?: string;
-	type?: string;
-	/** Message time (epoch ms) — where the platform provides it. */
-	ts?: number;
+    id: string | number;
+    username?: string;
+    /** The sender's platform color (hex), for username display. */
+    color?: string;
+    text?: string;
+    type?: string;
+    /** Message time (epoch ms) — where the platform provides it. */
+    ts?: number;
 }
 
 /** The platform a live fragment / spec key refers to. */
@@ -32,10 +32,10 @@ export type ChatSpec = `${ChatPlatform}:${string}`;
 
 /** One channel's snapshot entry: connection state + rolling messages. */
 export interface ChannelLive {
-	/** the provider's socket/poller for this channel was open */
-	connected?: boolean;
-	/** most recent messages, newest first */
-	chat?: ChatLive[];
+    /** the provider's socket/poller for this channel was open */
+    connected?: boolean;
+    /** most recent messages, newest first */
+    chat?: ChatLive[];
 }
 
 /** Channels to keep attached (spec keys). */
@@ -46,10 +46,10 @@ export type PublishFn = (msg: string) => void;
 
 /** Serialize an event frame for the module websockets. */
 export const eventFrame = (event: string, data: unknown): string =>
-	JSON.stringify({ type: "event", event, data });
+    JSON.stringify({ type: "event", event, data });
 
 /** A config parameter: a bare string (free text) or a `{name, type:"select",
  * options}` fixed-choice field rendered as a dropdown. */
 export type WidgetConfigField =
-	| string
-	| { name: string; type: "select"; options: readonly string[] };
+    | string
+    | { name: string; type: "select"; options: readonly string[] };

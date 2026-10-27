@@ -68,5 +68,5 @@ a.link-button.secondary:focus-visible {
 }
 
 select[name="pipeline"] {
-	width: 100%;
+    width: 100%;
 }

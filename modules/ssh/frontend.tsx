@@ -68,10 +68,7 @@ function sshCardBody(host: DeviceCard, status: SshStatus): m.Vnode {
 							s?.pendingPassword ? (
 								<span class="ssh-pending">
 									<code class="ssh-password-code">{s.password}</code>
-									<Badge
-										text={t("dev.ssh_pending_apply")}
-										kind="warn"
-									/>
+									<Badge text={t("dev.ssh_pending_apply")} kind="warn" />
 								</span>
 							) : (
 								<code class="ssh-password-code">{s.password}</code>

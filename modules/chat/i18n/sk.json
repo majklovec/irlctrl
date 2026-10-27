@@ -1,9 +1,9 @@
 {
-	"chat.empty": "Zatiaľ žiadne správy",
-	"wtype.chat": "Chat",
-	"dash.widget_tiktok": "TikTok kanál",
-	"dash.widget_history": "Riadky histórie",
-	"dash.widget_order": "Nové správy",
-	"dash.widget_order.top": "Hore",
-	"dash.widget_order.bottom": "Dole"
+    "chat.empty": "Zatiaľ žiadne správy",
+    "wtype.chat": "Chat",
+    "dash.widget_tiktok": "TikTok kanál",
+    "dash.widget_history": "Riadky histórie",
+    "dash.widget_order": "Nové správy",
+    "dash.widget_order.top": "Hore",
+    "dash.widget_order.bottom": "Dole"
 }

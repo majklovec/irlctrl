@@ -1,15 +1,15 @@
 {
-	"linter": {
-		"rules": {
-			"style": {
-				"useConsistentCurlyBraces": "error",
-				"useImportType": "off"
-			}
-		}
-	},
-	"vcs": {
-		"enabled": true,
-		"clientKind": "git",
-		"useIgnoreFile": true
-	}
+    "linter": {
+        "rules": {
+            "style": {
+                "useConsistentCurlyBraces": "error",
+                "useImportType": "off"
+            }
+        }
+    },
+    "vcs": {
+        "enabled": true,
+        "clientKind": "git",
+        "useIgnoreFile": true
+    }
 }

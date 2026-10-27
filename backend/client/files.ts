@@ -13,15 +13,15 @@ import { rename, unlink, writeFile } from "node:fs/promises";
  * SIGHUP never see a half-written file.
  */
 export async function writeFileAtomic(
-	path: string,
-	data: string,
+    path: string,
+    data: string,
 ): Promise<void> {
-	const tmp = `${path}.${randomBytes(6).toString("hex")}.tmp`;
-	try {
-		await writeFile(tmp, data, { flag: "wx" });
-		await rename(tmp, path);
-	} catch (err: unknown) {
-		await unlink(tmp).catch(() => {});
-		throw err;
-	}
+    const tmp = `${path}.${randomBytes(6).toString("hex")}.tmp`;
+    try {
+        await writeFile(tmp, data, { flag: "wx" });
+        await rename(tmp, path);
+    } catch (err: unknown) {
+        await unlink(tmp).catch(() => {});
+        throw err;
+    }
 }

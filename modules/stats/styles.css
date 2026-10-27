@@ -2,134 +2,134 @@
 
 /* Stats card */
 .dash-widget-body .stats {
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-	height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    height: 100%;
 }
 /* Concise per-platform table: name | title | category | duration | viewers */
 .dash-widget-body .stats-table {
-	display: flex;
-	flex-direction: column;
+    display: flex;
+    flex-direction: column;
 }
 .dash-widget-body .stats-row {
-	display: grid;
-	grid-template-columns: minmax(72px, auto) minmax(0, 1fr) minmax(0, auto) auto auto;
-	align-items: center;
-	gap: 10px;
-	min-width: 0;
-	padding: 2px 0;
-	font-size: 0.85rem;
+    display: grid;
+    grid-template-columns: minmax(72px, auto) minmax(0, 1fr) minmax(0, auto) auto auto;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 2px 0;
+    font-size: 0.85rem;
 }
 /* Narrow dashboard cell: drop the category column, tighten the row */
 @container dash-widget (max-width: 480px) {
-	.dash-widget-body .stats-row {
-		grid-template-columns: minmax(52px, auto) minmax(0, 1fr) auto auto;
-		gap: 8px;
-	}
-	.dash-widget-body .stats-row-category {
-		display: none;
-	}
+    .dash-widget-body .stats-row {
+        grid-template-columns: minmax(52px, auto) minmax(0, 1fr) auto auto;
+        gap: 8px;
+    }
+    .dash-widget-body .stats-row-category {
+        display: none;
+    }
 }
 .dash-widget-body .stats-row-label {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	white-space: nowrap;
-	color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    color: var(--muted);
 }
 .dash-widget-body .stats-row-label::before {
-	content: "";
-	width: 9px;
-	height: 3px;
-	border-radius: 2px;
-	background: var(--accent);
+    content: "";
+    width: 9px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--accent);
 }
 .dash-widget-body .stats-row-youtube .stats-row-label::before {
-	background: #ff0000;
+    background: #ff0000;
 }
 .dash-widget-body .stats-row-twitch .stats-row-label::before {
-	background: #9146ff;
+    background: #9146ff;
 }
 .dash-widget-body .stats-row-kick .stats-row-label::before {
-	background: #53fc18;
+    background: #53fc18;
 }
 .dash-widget-body .stats-row-title {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .dash-widget-body .stats-row-category {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--muted);
 }
 .dash-widget-body .stats-row-duration {
-	white-space: nowrap;
-	text-align: right;
-	font-variant-numeric: tabular-nums;
-	color: var(--muted);
+    white-space: nowrap;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
 }
 .dash-widget-body .stats-row-value {
-	text-align: right;
-	font-variant-numeric: tabular-nums;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
 }
 .dash-widget-body .stats-row-total {
-	border-top: 1px solid var(--border);
-	margin-top: 2px;
-	padding-top: 4px;
-	font-weight: 700;
+    border-top: 1px solid var(--border);
+    margin-top: 2px;
+    padding-top: 4px;
+    font-weight: 700;
 }
 .dash-widget-body .stats-row-total .stats-row-label::before {
-	background: var(--accent-hover);
+    background: var(--accent-hover);
 }
 
 /* Viewers line chart (svg.spark) */
 .dash-widget-body .stats-spark {
-	flex: 1;
-	min-height: 0;
-	display: flex;
-	align-items: stretch;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: stretch;
 }
 .dash-widget-body svg.spark {
-	width: 100%;
-	height: 100%;
-	display: block;
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 .dash-widget-body svg.spark .spark-grid line {
-	stroke: var(--border);
-	opacity: 0.6;
-	stroke-width: 0.75;
-	stroke-dasharray: 1, 1;
-	vector-effect: non-scaling-stroke;
+    stroke: var(--border);
+    opacity: 0.6;
+    stroke-width: 0.75;
+    stroke-dasharray: 1, 1;
+    vector-effect: non-scaling-stroke;
 }
 .dash-widget-body svg.spark .spark-axis text {
-	fill: var(--muted);
-	font-family: inherit;
-	font-size: 0.9rem;
+    fill: var(--muted);
+    font-family: inherit;
+    font-size: 0.9rem;
 }
 .dash-widget-body svg.spark .spark-points circle {
-	fill: var(--accent);
+    fill: var(--accent);
 }
 .dash-widget-body svg.spark .spark-line polyline {
-	stroke: var(--accent);
-	fill: none;
-	stroke-width: 1;
-	stroke-linejoin: round;
-	stroke-linecap: round;
-	vector-effect: non-scaling-stroke;
+    stroke: var(--accent);
+    fill: none;
+    stroke-width: 1;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
 }
 .dash-widget-body svg.spark .spark-line .stats-line-youtube {
-	stroke: #ff0000;
+    stroke: #ff0000;
 }
 .dash-widget-body svg.spark .spark-line .stats-line-twitch {
-	stroke: #9146ff;
+    stroke: #9146ff;
 }
 .dash-widget-body svg.spark .spark-line .stats-line-kick {
-	stroke: #53fc18;
+    stroke: #53fc18;
 }
 .dash-widget-body svg.spark .spark-line .stats-line-total {
-	stroke: var(--accent-hover);
-	stroke-width: 1.75;
+    stroke: var(--accent-hover);
+    stroke-width: 1.75;
 }

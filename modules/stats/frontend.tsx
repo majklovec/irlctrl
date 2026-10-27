@@ -4,6 +4,10 @@
 import m from "mithril";
 import { Badge } from "../../frontend/ts/components/ui";
 import { t } from "../../frontend/ts/i18n";
+import type {
+	ChannelWidgetModule,
+	WidgetContext,
+} from "../../frontend/ts/module-contracts";
 import type { ServerDashboardWidget } from "../../shared/types";
 import {
 	parseStatsSpec,
@@ -13,10 +17,6 @@ import {
 } from "./config";
 import { LineChart } from "./graph-linechart";
 import { currentViewerTotal, mergeViewerSeries } from "./series";
-import type {
-	ChannelWidgetModule,
-	WidgetContext,
-} from "../../frontend/ts/module-contracts";
 import type { StatsLive } from "./types";
 import "./styles.css";
 
@@ -81,9 +81,7 @@ function body(w: ServerDashboardWidget, _ctx: WidgetContext): m.Children {
 						{
 							key: parsed.platform,
 							label: t(`stats.${parsed.platform}`),
-							points: sample.series.slice(
-								-statsSeriesCapFromConfig(w.config),
-							),
+							points: sample.series.slice(-statsSeriesCapFromConfig(w.config)),
 						},
 					]
 				: [];

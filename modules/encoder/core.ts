@@ -6,17 +6,17 @@ import type { CeraConfig, EncoderConfig } from "./types";
 export let core: ModuleCore;
 
 export function bindCore(c: ModuleCore): void {
-	core = c;
+    core = c;
 }
 
 /** The module's sections of the config file (`core.state.data`). */
 export interface EncoderData {
-	/** The last used encoder config (restored by autostart and the UI form). */
-	encoder?: EncoderConfig;
-	/** ceracoder bitrate-control settings (only with the ceracoder encoder). */
-	ceracoder?: CeraConfig;
-	/** Imported GitHub pipeline repositories ("owner/repo"), sorted. */
-	pipelineRepositories?: string[];
+    /** The last used encoder config (restored by autostart and the UI form). */
+    encoder?: EncoderConfig;
+    /** ceracoder bitrate-control settings (only with the ceracoder encoder). */
+    ceracoder?: CeraConfig;
+    /** Imported GitHub pipeline repositories ("owner/repo"), sorted. */
+    pipelineRepositories?: string[];
 }
 
 export const data = (): EncoderData => core.state.data as EncoderData;

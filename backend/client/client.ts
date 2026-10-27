@@ -42,48 +42,48 @@ import { runAutostart, startModules, stopModules } from "./modules";
 import { startRemote, stopRemote } from "./remote";
 
 async function main(): Promise<void> {
-	// Exit before any module/service boots (CI runs `--help` on the compiled
-	// binary to verify it and to record bytecode profiles).
-	if (flag("--help") || flag("-h")) {
-		console.log(
-			"Usage: bun backend/client/client.ts [--config /path/to/config.json] [--dry-run] [--port 8085] " +
-				"[--role relay|encoder|combined|obs] [--remote ws://host:port/device] [--remote-token secret]",
-		);
-		console.log(
-			"The token/URL may also come from CONTROL_SERVER_TOKEN / CONTROL_SERVER_URL env vars. See the README for the full option list, including the module options.",
-		);
-		process.exit(0);
-	}
+    // Exit before any module/service boots (CI runs `--help` on the compiled
+    // binary to verify it and to record bytecode profiles).
+    if (flag("--help") || flag("-h")) {
+        console.log(
+            "Usage: bun backend/client/client.ts [--config /path/to/config.json] [--dry-run] [--port 8085] " +
+                "[--role relay|encoder|combined|obs] [--remote ws://host:port/device] [--remote-token secret]",
+        );
+        console.log(
+            "The token/URL may also come from CONTROL_SERVER_TOKEN / CONTROL_SERVER_URL env vars. See the README for the full option list, including the module options.",
+        );
+        process.exit(0);
+    }
 
-	await i18nReady;
-	console.log(`=== irlctrl device (Bun) — role: ${ROLE} ===\n`);
+    await i18nReady;
+    console.log(`=== irlctrl device (Bun) — role: ${ROLE} ===\n`);
 
-	const shutdown = async (signal: string) => {
-		console.log(`\nReceived ${signal}, shutting down...`);
-		// Before stopRemote so the control server still receives it
-		logEvent("info", "Service", t("log.stopped_signal", { signal }));
-		stopRemote();
-		await stopModules();
-		await flushLog();
-		process.exit(0);
-	};
+    const shutdown = async (signal: string) => {
+        console.log(`\nReceived ${signal}, shutting down...`);
+        // Before stopRemote so the control server still receives it
+        logEvent("info", "Service", t("log.stopped_signal", { signal }));
+        stopRemote();
+        await stopModules();
+        await flushLog();
+        process.exit(0);
+    };
 
-	logEvent("info", "Service", t("log.started", { role: ROLE }));
+    logEvent("info", "Service", t("log.started", { role: ROLE }));
 
-	// Modules first (in dependency order); signal handlers after, so a signal
-	// during start hits the default kill instead of a half-started module.
-	await startModules();
-	process.on("SIGINT", () => void shutdown("SIGINT"));
-	process.on("SIGTERM", () => void shutdown("SIGTERM"));
+    // Modules first (in dependency order); signal handlers after, so a signal
+    // during start hits the default kill instead of a half-started module.
+    await startModules();
+    process.on("SIGINT", () => void shutdown("SIGINT"));
+    process.on("SIGTERM", () => void shutdown("SIGTERM"));
 
-	await startApiServer();
-	if (REMOTE_URL) startRemote();
+    await startApiServer();
+    if (REMOTE_URL) startRemote();
 
-	// Resume the last run if autostart is enabled (retries until it succeeds)
-	runAutostart();
+    // Resume the last run if autostart is enabled (retries until it succeeds)
+    runAutostart();
 }
 
 main().catch((err) => {
-	console.error("Fatal error:", err);
-	process.exit(1);
+    console.error("Fatal error:", err);
+    process.exit(1);
 });
