@@ -3,7 +3,7 @@
  * /api/register/status probe (plus a ?invite= link) drives showing the field. */
 import logoUrl from "../img/logo-irlctrl.png";
 import m from "mithril";
-import { Card, Field, Input } from "./components/ui";
+import { Card, Field, Footer, Input } from "./components/ui";
 import { i18nReady, LanguageSelect, t } from "./i18n";
 import { mountPage } from "./util";
 
@@ -188,6 +188,7 @@ const App: m.Component = {
 					</div>
 				) : null}
 			</Card>
+			<Footer />
 		</div>
 	),
 };

@@ -235,6 +235,7 @@ header:has(.profile-menu) > .actions {
 .login-page {
     min-height: 100vh;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: 1rem;
@@ -463,6 +464,20 @@ main {
 
 .muted {
     color: var(--muted);
+}
+
+/* Pinned to the bottom-right corner, out of the content flow. */
+.page-footer {
+    position: fixed;
+    right: 0.75rem;
+    bottom: 0.5rem;
+    font-size: 0.75rem;
+    opacity: 0.7;
+    pointer-events: none;
+    z-index: 10;
+}
+.page-footer .app-version {
+    font-variant-numeric: tabular-nums;
 }
 
 .ok {

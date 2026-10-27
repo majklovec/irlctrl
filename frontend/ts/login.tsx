@@ -1,7 +1,7 @@
 /* Sign-in page: exchanges a username + password for the session cookie. */
 import logoUrl from "../img/logo-irlctrl.png";
 import m from "mithril";
-import { Card, Field, Input } from "./components/ui";
+import { Card, Field, Footer, Input } from "./components/ui";
 import { i18nReady, LanguageSelect, t } from "./i18n";
 import { mountPage } from "./util";
 
@@ -91,6 +91,7 @@ const App: m.Component = {
 					<a href="/register">{t("login.register")}</a>
 				</div>
 			</Card>
+			<Footer />
 		</div>
 	),
 };

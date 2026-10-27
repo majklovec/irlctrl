@@ -1,6 +1,7 @@
 /* Shared building blocks (header, cards, badges, definition lists, bound form controls)
  * for Mithril JSX views. These helpers keep markup consistent between pages. */
 import m from "mithril";
+import { APP_VERSION } from "../../../generated/version";
 import { LanguageSelect, t } from "../i18n";
 import type { MithrilJSXComponent } from "../jsx";
 import type { Child } from "../util";
@@ -9,7 +10,17 @@ export type { Child };
 
 // -- Page skeleton -----------------------------------------------------------------
 
-/** <header> + <main> page skeleton. The header leads with the brand logo (linking
+/** Page footer: the app name and the package.json version of this build. */
+const FooterComponent: m.Component = {
+	view: () => (
+		<footer class="page-footer muted">
+			IRLCTRL <span class="app-version">v{APP_VERSION}</span>
+		</footer>
+	),
+};
+export const Footer = FooterComponent as MithrilJSXComponent;
+
+/** <header> + <main> + <footer> page skeleton. The header leads with the brand logo (linking
  * home), then carries the optional main menu, and the language selector plus the
  * page's own `headerRight` actions on its right edge. */
 export const Page = {
@@ -36,6 +47,7 @@ export const Page = {
 			]}
 		</header>,
 		<main>{v.children}</main>,
+		<Footer />,
 	],
 } as MithrilJSXComponent<{
 	title?: m.Children;
