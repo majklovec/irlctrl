@@ -1,5 +1,5 @@
 /*
- * Buttons widget — a virtual StreamDeck on the dashboard. One widget drives
+ * Deck widget — a virtual StreamDeck on the dashboard. One widget drives
  * any number of devices: every button names its device and one of that
  * device's module actions. The layout is stored under the `buttons` config
  * field as JSON (the dashboard API keeps widget configs as string records);
@@ -30,12 +30,12 @@ export interface ButtonConfig {
 
 // The internal grid a layout is arranged on: 12 columns (a 4-cells-wide widget
 // hosts 60 px cells, exactly like the dashboard grid) and 60 px-tall cells.
-export const BUTTONS_GRID_COLUMNS = 12;
-export const BUTTONS_CELL_PX = 60;
+export const DECK_GRID_COLUMNS = 12;
+export const DECK_CELL_PX = 60;
 /** A freshly added key spans 2×2 cells; it can grow to a quarter of the grid. */
-export const BUTTONS_CELL_DEFAULT = { w: 2, h: 2 } as const;
-export const BUTTONS_CELL_MIN = { w: 1, h: 1 } as const;
-export const BUTTONS_CELL_MAX = { w: 6, h: 6 } as const;
+export const DECK_CELL_DEFAULT = { w: 2, h: 2 } as const;
+export const DECK_CELL_MIN = { w: 1, h: 1 } as const;
+export const DECK_CELL_MAX = { w: 6, h: 6 } as const;
 
 const isCount = (v: unknown, min: number): v is number =>
 	typeof v === "number" && Number.isInteger(v) && v >= min;
@@ -57,7 +57,7 @@ function firstFreeSlot(
 	h: number,
 ): { x: number; y: number; w: number; h: number } {
 	for (let y = 0; ; y++)
-		for (let x = 0; x + w <= BUTTONS_GRID_COLUMNS; x++) {
+		for (let x = 0; x + w <= DECK_GRID_COLUMNS; x++) {
 			let free = true;
 			for (let dy = 0; dy < h && free; dy++)
 				for (let dx = 0; dx < w && free; dx++)
@@ -69,8 +69,8 @@ function firstFreeSlot(
 /** First free slot (row-major) not covered by the given keys' stored slots. */
 export function nextButtonSlot(
 	buttons: readonly ButtonConfig[],
-	w: number = BUTTONS_CELL_DEFAULT.w,
-	h: number = BUTTONS_CELL_DEFAULT.h,
+	w: number = DECK_CELL_DEFAULT.w,
+	h: number = DECK_CELL_DEFAULT.h,
 ): { x: number; y: number; w: number; h: number } {
 	const occupied = new Set<string>();
 	for (const b of buttons)
@@ -101,21 +101,21 @@ export function layoutButtons(
 			claim(c.x, c.y, c.w, c.h);
 			return { ...b };
 		}
-		const c = firstFreeSlot(occupied, BUTTONS_CELL_DEFAULT.w, BUTTONS_CELL_DEFAULT.h);
+		const c = firstFreeSlot(occupied, DECK_CELL_DEFAULT.w, DECK_CELL_DEFAULT.h);
 		claim(c.x, c.y, c.w, c.h);
 		return { ...b, x: c.x, y: c.y, w: c.w, h: c.h };
 	});
 }
 
 /** The name of the widget's single (hidden) config field. */
-export const BUTTONS_FIELD = "buttons";
+export const DECK_FIELD = "buttons";
 
-export const BUTTONS_WIDGET_TYPE = "buttons";
+export const DECK_WIDGET_TYPE = "buttons";
 // Grid units are 60 px rows on a 12-column grid: 4×4 fits two rows of keys.
-export const BUTTONS_DEFAULT_SIZE = { w: 4, h: 4 } as const;
-export const BUTTONS_MIN_SIZE = { w: 2, h: 2 } as const;
-export const BUTTONS_MAX_SIZE = { w: 12, h: 8 } as const;
-export const BUTTONS_MAX = 32;
+export const DECK_DEFAULT_SIZE = { w: 4, h: 4 } as const;
+export const DECK_MIN_SIZE = { w: 2, h: 2 } as const;
+export const DECK_MAX_SIZE = { w: 12, h: 8 } as const;
+export const DECK_MAX = 32;
 
 const BUTTON_FIELDS = new Set([
 	"deviceId",
@@ -147,8 +147,8 @@ export function parseButtons(raw: string | undefined): ButtonConfig[] {
 		throw new Error("buttons must be a JSON array");
 	}
 	if (!Array.isArray(value)) throw new Error("buttons must be a JSON array");
-	if (value.length > BUTTONS_MAX)
-		throw new Error(`buttons: at most ${BUTTONS_MAX} buttons`);
+	if (value.length > DECK_MAX)
+		throw new Error(`buttons: at most ${DECK_MAX} buttons`);
 	return value.map((item, i) => {
 		if (!isRecord(item) || typeof item.deviceId !== "string" || !item.deviceId)
 			throw new Error(`buttons[${i}]: deviceId is required`);
@@ -182,9 +182,9 @@ export function parseButtons(raw: string | undefined): ButtonConfig[] {
 			if (
 				!isCount(item.w, 1) ||
 				!isCount(item.h, 1) ||
-				item.x + item.w > BUTTONS_GRID_COLUMNS
+				item.x + item.w > DECK_GRID_COLUMNS
 			)
-				throw new Error(`buttons[${i}]: size must fit the ${BUTTONS_GRID_COLUMNS}-column grid`);
+				throw new Error(`buttons[${i}]: size must fit the ${DECK_GRID_COLUMNS}-column grid`);
 			out.x = item.x;
 			out.y = item.y;
 			out.w = item.w;

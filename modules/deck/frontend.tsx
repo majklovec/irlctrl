@@ -18,12 +18,12 @@ import type { DeviceSummary } from "../../shared/types";
 import { ButtonsGrid, type GridItem } from "./grids";
 import {
 	type ButtonConfig,
-	BUTTONS_DEFAULT_SIZE,
-	BUTTONS_FIELD,
-	BUTTONS_MAX,
-	BUTTONS_MAX_SIZE,
-	BUTTONS_MIN_SIZE,
-	BUTTONS_WIDGET_TYPE,
+	DECK_DEFAULT_SIZE,
+	DECK_FIELD,
+	DECK_MAX,
+	DECK_MAX_SIZE,
+	DECK_MIN_SIZE,
+	DECK_WIDGET_TYPE,
 	buttonDevices,
 	type DashboardActionEntry,
 	mergedParams,
@@ -62,7 +62,7 @@ function showError(run: WidgetRun, message: string): void {
 /** Buttons stored in the widget config; a corrupt field renders as empty. */
 function configuredButtons(config: Record<string, string> | undefined) {
 	try {
-		return parseButtons(config?.[BUTTONS_FIELD]);
+		return parseButtons(config?.[DECK_FIELD]);
 	} catch {
 		return [];
 	}
@@ -283,7 +283,7 @@ function editorFor(values: Record<string, string>): EditorState {
 	if (!state) {
 		let buttons: ButtonConfig[] = [];
 		try {
-			buttons = parseButtons(values[BUTTONS_FIELD]);
+			buttons = parseButtons(values[DECK_FIELD]);
 		} catch {
 			// unparsable stored layout — start over
 		}
@@ -320,7 +320,7 @@ function parseParamsText(
 
 /** Write the editor layout back into the config field (invalid params are left out until fixed). */
 function commit(values: Record<string, string>, state: EditorState): void {
-	values[BUTTONS_FIELD] = serializeButtons(
+	values[DECK_FIELD] = serializeButtons(
 		state.buttons.map(({ paramsText, ...b }) => {
 			const out: ButtonConfig = { deviceId: b.deviceId, actionId: b.actionId };
 			if (b.labelOverride) out.labelOverride = b.labelOverride;
@@ -383,7 +383,7 @@ function catalogueFor(
 						key={a.key}
 						class="secondary buttons-catalogue-action"
 						title={a.method}
-						disabled={state.buttons.length >= BUTTONS_MAX}
+						disabled={state.buttons.length >= DECK_MAX}
 						onclick={() => {
 							// New keys land in the first free cell and are
 							// selected so the form edits them right away.
@@ -425,7 +425,7 @@ function configEditor(
 		...ctx,
 		widget: {
 			...ctx.widget,
-			config: { [BUTTONS_FIELD]: values[BUTTONS_FIELD] ?? "" },
+			config: { [DECK_FIELD]: values[DECK_FIELD] ?? "" },
 		},
 	};
 	return (
@@ -593,11 +593,11 @@ function buttonForm(
 // ---------------------------------------------------------------- registration
 
 const buttonsWidget: FleetDashboardWidget = {
-	type: BUTTONS_WIDGET_TYPE,
-	defaultSize: BUTTONS_DEFAULT_SIZE,
-	minSize: BUTTONS_MIN_SIZE,
-	maxSize: BUTTONS_MAX_SIZE,
-	configFields: [{ name: BUTTONS_FIELD, type: "hidden" }],
+	type: DECK_WIDGET_TYPE,
+	defaultSize: DECK_DEFAULT_SIZE,
+	minSize: DECK_MIN_SIZE,
+	maxSize: DECK_MAX_SIZE,
+	configFields: [{ name: DECK_FIELD, type: "hidden" }],
 	devicesFor: (widget) => buttonDevices(configuredButtons(widget.config)),
 	body,
 	badge,

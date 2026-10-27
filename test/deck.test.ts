@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
-	BUTTONS_FIELD,
-	BUTTONS_GRID_COLUMNS,
+	DECK_FIELD,
+	DECK_GRID_COLUMNS,
 	buttonDevices,
 	layoutButtons,
 	mergedParams,
@@ -9,7 +9,7 @@ import {
 	orphanedButtons,
 	parseButtons,
 	serializeButtons,
-} from "../modules/buttons/types";
+} from "../modules/deck/types";
 import {
 	ALL_MODULES,
 	dashboardActionKey,
@@ -174,7 +174,7 @@ describe("buttons widget config", () => {
 		expect(WIDGET_SIZES.get("buttons")).toEqual({ w: 4, h: 4 });
 		expect(isFleetWidgetType("buttons")).toBe(true);
 		expect(deviceWidgetConfigFields("buttons")).toEqual([
-			{ name: BUTTONS_FIELD, type: "hidden" },
+			{ name: DECK_FIELD, type: "hidden" },
 		]);
 		// other device widgets keep no config and stay device-bound
 		expect(deviceWidgetConfigFields("relay")).toEqual([]);
@@ -248,7 +248,7 @@ describe("buttons widget config", () => {
 		expect(() => parseButtons(at(0, 0, 2, 0))).toThrow("size");
 		// a key must not run past the last column
 		expect(() =>
-			parseButtons(at(BUTTONS_GRID_COLUMNS - 1, 0, 2, 2)),
+			parseButtons(at(DECK_GRID_COLUMNS - 1, 0, 2, 2)),
 		).toThrow("size");
 		// fits exactly in the last column
 		expect(() =>
@@ -330,7 +330,7 @@ describe("buttons widget config", () => {
 			deviceExists: (id: string) => id !== "gone",
 		});
 		const layout = (...buttons: { deviceId: string; actionId: string }[]) => ({
-			[BUTTONS_FIELD]: JSON.stringify(buttons),
+			[DECK_FIELD]: JSON.stringify(buttons),
 		});
 		const ok = layout({ deviceId: "mine", actionId: "encoder.stop" });
 		const orphan = layout(
@@ -353,9 +353,9 @@ describe("buttons widget config", () => {
 		expect(validate(gone, false)).not.toThrow();
 		expect(validate(foreign, false)).toThrow("Device not available: theirs");
 		// structural errors are always rejected
-		expect(validate({ [BUTTONS_FIELD]: "[1]" }, false)).toThrow("deviceId");
+		expect(validate({ [DECK_FIELD]: "[1]" }, false)).toThrow("deviceId");
 		expect(
-			orphanedButtons(parseButtons(orphan[BUTTONS_FIELD]), (id) =>
+			orphanedButtons(parseButtons(orphan[DECK_FIELD]), (id) =>
 				id === "mine" ? st.actions : undefined,
 			).map((b) => b.actionId),
 		).toEqual(["obs-controller.stream-start"]);

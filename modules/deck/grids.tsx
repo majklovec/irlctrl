@@ -49,6 +49,7 @@ function contentEl(item: Element): HTMLElement {
 }
 
 function desiredNodes(items: readonly GridItem[]): GridStackWidget[] {
+	// Passing content to load() would overwrite Mithril's mounted cells.
 	return items.map((it) => ({
 		id: it.id,
 		x: it.x,
@@ -59,8 +60,6 @@ function desiredNodes(items: readonly GridItem[]): GridStackWidget[] {
 		minH: 1,
 		maxW: 6,
 		maxH: 6,
-		// A zero-length string makes GridStack collapse the item's height.
-		content: " ",
 	}));
 }
 

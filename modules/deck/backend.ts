@@ -8,24 +8,24 @@
  */
 import type { ModuleWidget } from "../../shared/module-contract";
 import {
-	BUTTONS_DEFAULT_SIZE,
-	BUTTONS_FIELD,
-	BUTTONS_WIDGET_TYPE,
+	DECK_DEFAULT_SIZE,
+	DECK_FIELD,
+	DECK_WIDGET_TYPE,
 	buttonDevices,
 	orphanedButtons,
 	parseButtons,
 } from "./types";
 
 const buttonsWidget: ModuleWidget = {
-	type: BUTTONS_WIDGET_TYPE,
+	type: DECK_WIDGET_TYPE,
 	fleet: true,
-	defaultSize: BUTTONS_DEFAULT_SIZE,
-	configFields: [{ name: BUTTONS_FIELD, type: "hidden" }],
+	defaultSize: DECK_DEFAULT_SIZE,
+	configFields: [{ name: DECK_FIELD, type: "hidden" }],
 	validateConfig(
 		config,
 		{ strict, deviceStatus, ownsDevice, deviceExists },
 	) {
-		const buttons = parseButtons(config[BUTTONS_FIELD]);
+		const buttons = parseButtons(config[DECK_FIELD]);
 		// Another user's device is never accepted. Strict (creating the
 		// dashboard) also rejects devices that are gone and actions a device
 		// does not offer (its catalogue is known once it reported a status); a
