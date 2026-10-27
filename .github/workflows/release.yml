@@ -39,7 +39,8 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   # Analyzes conventional commits since the last tag and, when a
-                  # bump is warranted, publishes the tag + GitHub release directly.
+                  # bump is warranted, prepends the notes to CHANGELOG.md, commits
+                  # it with the version bump, and publishes the tag + GitHub release.
                   npx --yes semantic-release@24
 
                   # Detect whether this push was released: semantic-release tags HEAD.
