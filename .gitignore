@@ -9,6 +9,8 @@ pipeline/majklovec
 
 # Local environment variables (secrets)
 .env
+.env.local
+.env.production
 
 # Generated manifests and embedded assets.
 generated/
