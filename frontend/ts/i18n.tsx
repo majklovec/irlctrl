@@ -103,6 +103,9 @@ export function t(key: string, options?: TOptions): string {
 	return i18n.t(key, options) as string;
 }
 
+/** The current UI language (for ordering things like speech-voice lists). */
+export const currentLanguage = (): Language => current;
+
 // The shared log wording localizes through the installed translator.
 setLogTranslator(t);
 

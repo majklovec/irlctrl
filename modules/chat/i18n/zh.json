@@ -5,5 +5,19 @@
     "dash.widget_history": "历史行数",
     "dash.widget_order": "新消息",
     "dash.widget_order.top": "顶部",
-    "dash.widget_order.bottom": "底部"
+    "dash.widget_order.bottom": "底部",
+    "dash.widget_ttsEnabled": "朗读聊天 (TTS)",
+    "dash.widget_ttsEnabled.on": "开启",
+    "dash.widget_ttsEnabled.off": "关闭",
+    "dash.widget_ttsVoice": "语音",
+    "dash.widget_ttsRate": "语速",
+    "dash.widget_ttsRate.0.75": "较慢",
+    "dash.widget_ttsRate.0.85": "稍慢",
+    "dash.widget_ttsRate.0.95": "接近正常",
+    "dash.widget_ttsRate.1.0": "正常",
+    "dash.widget_ignoredWords": "忽略的词 (逗号分隔)",
+    "dash.widget_ignoredUsernames": "忽略的用户 (逗号分隔)",
+    "chat.tts.on": "正在朗读聊天",
+    "chat.tts.off": "TTS 已关闭",
+    "chat.tts.waiting": "等待捷克语语音…"
 }

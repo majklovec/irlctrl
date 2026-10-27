@@ -5,5 +5,19 @@
     "dash.widget_history": "Wiersze historii",
     "dash.widget_order": "Nowe wiadomości",
     "dash.widget_order.top": "Na górze",
-    "dash.widget_order.bottom": "Na dole"
+    "dash.widget_order.bottom": "Na dole",
+    "dash.widget_ttsEnabled": "Odczytywanie czatu (TTS)",
+    "dash.widget_ttsEnabled.on": "Włączone",
+    "dash.widget_ttsEnabled.off": "Wyłączone",
+    "dash.widget_ttsVoice": "Głos",
+    "dash.widget_ttsRate": "Prędkość mówienia",
+    "dash.widget_ttsRate.0.75": "Wolna",
+    "dash.widget_ttsRate.0.85": "Trochę wolna",
+    "dash.widget_ttsRate.0.95": "Prawie normalna",
+    "dash.widget_ttsRate.1.0": "Normalna",
+    "dash.widget_ignoredWords": "Ignorowane słowa (po przecinku)",
+    "dash.widget_ignoredUsernames": "Ignorowani użytkownicy (po przecinku)",
+    "chat.tts.on": "Czyta czat na głos",
+    "chat.tts.off": "TTS wyłączone",
+    "chat.tts.waiting": "Oczekiwanie na czeski głos…"
 }

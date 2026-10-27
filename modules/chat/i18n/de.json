@@ -5,5 +5,19 @@
     "dash.widget_history": "Verlaufszeilen",
     "dash.widget_order": "Neue Nachrichten",
     "dash.widget_order.top": "Oben",
-    "dash.widget_order.bottom": "Unten"
+    "dash.widget_order.bottom": "Unten",
+    "dash.widget_ttsEnabled": "Chat vorlesen (TTS)",
+    "dash.widget_ttsEnabled.on": "An",
+    "dash.widget_ttsEnabled.off": "Aus",
+    "dash.widget_ttsVoice": "Stimme",
+    "dash.widget_ttsRate": "Sprechgeschwindigkeit",
+    "dash.widget_ttsRate.0.75": "Langsam",
+    "dash.widget_ttsRate.0.85": "Etwas langsam",
+    "dash.widget_ttsRate.0.95": "Fast normal",
+    "dash.widget_ttsRate.1.0": "Normal",
+    "dash.widget_ignoredWords": "Ignorierte Wörter (kommagetrennt)",
+    "dash.widget_ignoredUsernames": "Ignorierte Benutzer (kommagetrennt)",
+    "chat.tts.on": "Liest Chat vor",
+    "chat.tts.off": "TTS aus",
+    "chat.tts.waiting": "Warte auf tschechische Stimme…"
 }

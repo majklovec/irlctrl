@@ -26,6 +26,7 @@ import {
 import { t } from "./i18n";
 import { widgetModule } from "./module-registry";
 import { mountPage, uuid } from "./util";
+import { configSelectField } from "./widget-config-select";
 
 const ADD_PATH_RE = /\/dashboards\/add\/([^/]+)\/?$/;
 
@@ -289,18 +290,26 @@ const App: m.Component = {
 													label={t(`dash.widget_${name}`)}
 													control={
 														<select
-															value={state.config[name] ?? f.options[0]}
+															value={
+																configSelectField(
+																	f,
+																	widgetModule(type),
+																	state.config[name] ?? "",
+																).value
+															}
 															onchange={(e: Event) => {
 																state.config[name] = (
 																	e.target as HTMLSelectElement
 																).value;
 															}}
 														>
-															{f.options.map((opt) => (
-																<option key={opt} value={opt}>
-																	{t(`dash.widget_${name}.${opt}`)}
-																</option>
-															))}
+															{
+																configSelectField(
+																	f,
+																	widgetModule(type),
+																	state.config[name] ?? "",
+																).options
+															}
 														</select>
 													}
 												/>

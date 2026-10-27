@@ -5,5 +5,19 @@
     "dash.widget_history": "Líneas de historial",
     "dash.widget_order": "Nuevos mensajes",
     "dash.widget_order.top": "Arriba",
-    "dash.widget_order.bottom": "Abajo"
+    "dash.widget_order.bottom": "Abajo",
+    "dash.widget_ttsEnabled": "Leer chat en voz alta (TTS)",
+    "dash.widget_ttsEnabled.on": "Activado",
+    "dash.widget_ttsEnabled.off": "Desactivado",
+    "dash.widget_ttsVoice": "Voz",
+    "dash.widget_ttsRate": "Velocidad de voz",
+    "dash.widget_ttsRate.0.75": "Lenta",
+    "dash.widget_ttsRate.0.85": "Un poco lenta",
+    "dash.widget_ttsRate.0.95": "Casi normal",
+    "dash.widget_ttsRate.1.0": "Normal",
+    "dash.widget_ignoredWords": "Palabras ignoradas (separadas por comas)",
+    "dash.widget_ignoredUsernames": "Usuarios ignorados (separados por comas)",
+    "chat.tts.on": "Leyendo el chat",
+    "chat.tts.off": "TTS desactivado",
+    "chat.tts.waiting": "Esperando una voz checa…"
 }

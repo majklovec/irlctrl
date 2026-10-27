@@ -5,5 +5,19 @@
     "dash.widget_history": "Délka historie zpráv",
     "dash.widget_order": "Nové zprávy nahoru/dolu",
     "dash.widget_order.top": "Nahoru",
-    "dash.widget_order.bottom": "Dolů"
+    "dash.widget_order.bottom": "Dolů",
+    "dash.widget_ttsEnabled": "Čtení chatu nahlas (TTS)",
+    "dash.widget_ttsEnabled.on": "Zapnout",
+    "dash.widget_ttsEnabled.off": "Vypnout",
+    "dash.widget_ttsVoice": "Hlas",
+    "dash.widget_ttsRate": "Rychlost čtení",
+    "dash.widget_ttsRate.0.75": "Pomalá",
+    "dash.widget_ttsRate.0.85": "Mírně pomalá",
+    "dash.widget_ttsRate.0.95": "Téměř běžná",
+    "dash.widget_ttsRate.1.0": "Běžná",
+    "dash.widget_ignoredWords": "Ignorovaná slova (čárkou)",
+    "dash.widget_ignoredUsernames": "Ignorovaní uživatelé (čárkou)",
+    "chat.tts.on": "Čte chat nahlas",
+    "chat.tts.off": "TTS vypnuto",
+    "chat.tts.waiting": "Čeká se na český hlas…"
 }

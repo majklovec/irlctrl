@@ -5,5 +5,19 @@
     "dash.widget_history": "履歴行数",
     "dash.widget_order": "新しいメッセージ",
     "dash.widget_order.top": "上",
-    "dash.widget_order.bottom": "下"
+    "dash.widget_order.bottom": "下",
+    "dash.widget_ttsEnabled": "チャットの読み上げ (TTS)",
+    "dash.widget_ttsEnabled.on": "オン",
+    "dash.widget_ttsEnabled.off": "オフ",
+    "dash.widget_ttsVoice": "音声",
+    "dash.widget_ttsRate": "読み上げ速度",
+    "dash.widget_ttsRate.0.75": "遅め",
+    "dash.widget_ttsRate.0.85": "やや遅め",
+    "dash.widget_ttsRate.0.95": "ほぼ普通",
+    "dash.widget_ttsRate.1.0": "普通",
+    "dash.widget_ignoredWords": "無視する単語 (カンマ区切り)",
+    "dash.widget_ignoredUsernames": "無視するユーザー (カンマ区切り)",
+    "chat.tts.on": "チャットを読み上げ中",
+    "chat.tts.off": "TTS オフ",
+    "chat.tts.waiting": "チェコ語の音声中…"
 }

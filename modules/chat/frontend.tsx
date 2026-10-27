@@ -5,7 +5,7 @@
 
 import m from "mithril";
 import { Badge } from "../../frontend/ts/components/ui";
-import { t } from "../../frontend/ts/i18n";
+import { currentLanguage, t } from "../../frontend/ts/i18n";
 import type {
 	ChannelWidgetModule,
 	WidgetContext,
@@ -15,10 +15,22 @@ import {
 	CHAT_CONFIG_FIELDS,
 	CHAT_PLATFORMS,
 	chatOrderFromConfig,
+	chatTtsConfig,
+	chatTtsShouldSpeak,
 	historyLengthFromConfig,
 	platformChannel,
 } from "./config";
 import { decorateText } from "./text";
+import {
+	enqueueSpeech,
+	ensureVoices,
+	initTts,
+	isReady,
+	setRate,
+	speechVoices,
+	stopSpeech,
+	voiceName,
+} from "./tts";
 import type { ChannelLive, ChatLive, ChatPlatform } from "./types";
 import "./styles.css";
 
@@ -27,6 +39,46 @@ const CAP = 500;
 
 /** Distance from the bottom at which auto-scroll re-engages. */
 const DISTANCE_THRESHOLD = 50;
+
+// ── Czech TTS: widget config cache and status (module-scoped) ─────────────
+// `onFrame` carries no widget, so the latest config is cached from `body()`
+// (once per render). TTS state itself is global in `tts.ts` — one queue and
+// one voice shared across every chat widget on the dashboard.
+let cachedConfig: Record<string, string> | undefined;
+let ttsEnabled = false;
+let ttsReady = false;
+
+/** Wire the speech queue to the current widget's config (per render). */
+function ttsSync(w: ServerDashboardWidget): void {
+	const cfg = chatTtsConfig(w.config);
+	cachedConfig = w.config;
+	if (cfg.enabled !== ttsEnabled) {
+		ttsEnabled = cfg.enabled;
+		// TTS was switched off — silence the queue and the in-flight speech.
+		if (!ttsEnabled) stopSpeech();
+	} else if (ttsEnabled) {
+		setRate(cfg.rate);
+		// The voice list arrives async; refresh the status flag once it is.
+		initTts(cfg.voice).then(() => {
+			ttsReady = isReady();
+			m.redraw();
+		});
+		ttsReady = isReady();
+	}
+}
+
+/** The browser's full voice list for the `ttsVoice` select — voices of the
+ * current UI language first, then the rest (browser order preserved inside
+ * each group). Empty while the list is still loading. */
+function ttsVoiceOptions(): string[] {
+	const lang = currentLanguage();
+	const base = (l: string): string => l.split(/[-_]/)[0].toLowerCase();
+	const all = speechVoices();
+	return [
+		...all.filter((v) => base(v.lang) === lang),
+		...all.filter((v) => base(v.lang) !== lang),
+	].map((v) => v.name);
+}
 
 type ChatSpec = { platform: ChatPlatform; spec: string };
 type MergedLine = { line: ChatLive; key: string; platform: ChatPlatform };
@@ -96,6 +148,16 @@ function onFrame(event: string, data: unknown): void {
 
 	if ("message" in frame) {
 		target.chat = [frame.message, ...(target.chat ?? [])].slice(0, CAP);
+
+		// Read the new message out loud (the batch snapshot frames don't).
+		if (
+			cachedConfig &&
+			chatTtsShouldSpeak(frame.message, chatTtsConfig(cachedConfig))
+		) {
+			const username = (frame.message.username ?? "").trim();
+			const text = (frame.message.text ?? "").trim();
+			enqueueSpeech(username ? `${username} říká: ${text}` : text);
+		}
 	} else if ("messages" in frame) {
 		target.chat = frame.messages.slice(0, CAP);
 		target.connected = true;
@@ -175,6 +237,20 @@ function badge(w: ServerDashboardWidget, _ctx: WidgetContext): m.Vnode {
 					</span>
 				);
 			})}
+
+			{/* 🔇 TTS off · 🔊 on (dimmed until the Czech voice is ready) */}
+			<span
+				class={`chat-status-icon chat-tts ${ttsReady ? "on" : "off"}`}
+				title={
+					ttsEnabled
+						? ttsReady
+							? `${t("chat.tts.on")} · ${voiceName()}`
+							: t("chat.tts.waiting")
+						: t("chat.tts.off")
+				}
+			>
+				{ttsEnabled ? "🔊" : "🔇"}
+			</span>
 		</span>
 	);
 }
@@ -498,8 +574,13 @@ const ChatFeed: m.Component<ChatFeedAttrs> = {
 	},
 };
 
+// Stop the speech when the page is closed (the queue is global, so one
+// listener per chat widget is not needed).
+window.addEventListener("beforeunload", stopSpeech);
+
 /** The merged feed for every configured platform channel. */
 function body(w: ServerDashboardWidget, _ctx: WidgetContext): m.Children {
+	ttsSync(w);
 	const specs = chatSpecsOf(w);
 
 	if (!specs.length) {
@@ -531,6 +612,13 @@ const chatModule: ChannelWidgetModule<ServerDashboardWidget> = {
 	widgetTypes: ["chat"],
 	defaultSize: { w: 3, h: 8 },
 	configFields: CHAT_CONFIG_FIELDS,
+	/** `ttsVoice` is a dynamic select — the browser's voices, UI language first. */
+	configSelectOptions(name: string): string[] | undefined {
+		if (name !== "ttsVoice") return undefined;
+		// The list loads async; refresh the open config form once it arrives.
+		ensureVoices().then(() => m.redraw());
+		return ttsVoiceOptions();
+	},
 	body,
 	badge,
 	onFrame,

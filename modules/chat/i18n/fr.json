@@ -5,5 +5,19 @@
     "dash.widget_history": "Lignes d'historique",
     "dash.widget_order": "Nouveaux messages",
     "dash.widget_order.top": "En haut",
-    "dash.widget_order.bottom": "En bas"
+    "dash.widget_order.bottom": "En bas",
+    "dash.widget_ttsEnabled": "Lire le chat à voix haute (TTS)",
+    "dash.widget_ttsEnabled.on": "Activé",
+    "dash.widget_ttsEnabled.off": "Désactivé",
+    "dash.widget_ttsVoice": "Voix",
+    "dash.widget_ttsRate": "Vitesse de lecture",
+    "dash.widget_ttsRate.0.75": "Lente",
+    "dash.widget_ttsRate.0.85": "Un peu lente",
+    "dash.widget_ttsRate.0.95": "Quasi normale",
+    "dash.widget_ttsRate.1.0": "Normale",
+    "dash.widget_ignoredWords": "Mots ignorés (séparés par des virgules)",
+    "dash.widget_ignoredUsernames": "Utilisateurs ignorés (séparés par des virgules)",
+    "chat.tts.on": "Lit le chat à voix haute",
+    "chat.tts.off": "TTS désactivé",
+    "chat.tts.waiting": "En attente d'une voix tchèque…"
 }

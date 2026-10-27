@@ -36,6 +36,7 @@ import {
 } from "./module-registry";
 import { RpcClient, socketUrl } from "./services/rpc";
 import { serverLive } from "./services/serverws";
+import { configSelectField } from "./widget-config-select";
 
 /** Device-independent widget types — offered once, with no device of their
  * own: the channel widgets (their data is fetched by the control server) and
@@ -429,6 +430,13 @@ function configEditorForm(w: ServerDashboardWidget): m.Vnode {
 				...visibleFields.map((field) => {
 					const name = configFieldName(field);
 					const isSelect = typeof field !== "string" && field.type === "select";
+					const select = isSelect
+						? configSelectField(
+								field,
+								widgetModuleForType(w.type),
+								s.values[name] ?? "",
+							)
+						: undefined;
 					return (
 						<label key={name}>
 							{[
@@ -436,21 +444,12 @@ function configEditorForm(w: ServerDashboardWidget): m.Vnode {
 								isSelect ? (
 									<select
 										class="dash-config-input"
-										value={
-											s.values[name] ??
-											(field.type === "select" ? field.options[0] : "")
-										}
+										value={select?.value ?? ""}
 										onchange={(e: Event) => {
 											s.values[name] = (e.target as HTMLSelectElement).value;
 										}}
 									>
-										{field.type === "select"
-											? field.options.map((opt) => (
-													<option key={opt} value={opt}>
-														{t(`dash.widget_${name}.${opt}`)}
-													</option>
-												))
-											: []}
+										{select?.options ?? []}
 									</select>
 								) : (
 									<input

@@ -5,5 +5,19 @@
     "dash.widget_history": "Строк истории",
     "dash.widget_order": "Новые сообщения",
     "dash.widget_order.top": "Сверху",
-    "dash.widget_order.bottom": "Снизу"
+    "dash.widget_order.bottom": "Снизу",
+    "dash.widget_ttsEnabled": "Озвучка чата (TTS)",
+    "dash.widget_ttsEnabled.on": "Вкл",
+    "dash.widget_ttsEnabled.off": "Выкл",
+    "dash.widget_ttsVoice": "Голос",
+    "dash.widget_ttsRate": "Скорость речи",
+    "dash.widget_ttsRate.0.75": "Медленная",
+    "dash.widget_ttsRate.0.85": "Чуть медленная",
+    "dash.widget_ttsRate.0.95": "Почти обычная",
+    "dash.widget_ttsRate.1.0": "Обычная",
+    "dash.widget_ignoredWords": "Игнорируемые слова (через запятую)",
+    "dash.widget_ignoredUsernames": "Игнорируемые пользователи (через запятую)",
+    "chat.tts.on": "Говорит чат вслух",
+    "chat.tts.off": "TTS выключен",
+    "chat.tts.waiting": "Ожидание чешского голоса…"
 }

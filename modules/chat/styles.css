@@ -36,6 +36,16 @@
     color: var(--bad, #d64545);
 }
 
+/* TTS status (🔊 on / 🔇 off in the card head); dimmed while TTS is off or
+   the Czech voice is still loading. */
+.chat-status-icon.chat-tts {
+    opacity: 0.4;
+}
+
+.chat-status-icon.chat-tts.on {
+    opacity: 1;
+}
+
 /* Per-line platform icon (only shown when the widget mixes platforms). */
 .dash-widget-body .chat-line .chat-icon {
     display: inline-block;

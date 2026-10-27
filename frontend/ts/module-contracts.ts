@@ -125,6 +125,14 @@ export interface ChannelWidgetModule<TWidget = ServerDashboardWidget> {
     widgetTypes: readonly string[];
     defaultSize: { w: number; h: number };
     configFields: readonly WidgetConfigField[];
+    /**
+     * Dynamic options for one of this module's select config fields (by
+     * field name) — for values the browser only knows at runtime (e.g.
+     * available speech voices). `undefined` = no dynamic options for this
+     * field; the edit/add forms fall back to the field's static options.
+     * Option labels render as the raw option value.
+     */
+    configSelectOptions?(name: string): string[] | undefined;
     body(w: TWidget, ctx: WidgetContext): m.Children;
     badge(w: TWidget, ctx: WidgetContext): m.Children;
     /** Receive one dashboard-websocket frame and fold it into the module's own live state. */
