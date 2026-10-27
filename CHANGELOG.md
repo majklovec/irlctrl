@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/majklovec/irlctrl/compare/v1.8.0...v1.9.0) (2026-10-27)
+
+
+### Features
+
+* **srtla:** add start action and localization for SRTLA control ([086894e](https://github.com/majklovec/irlctrl/commit/086894e478b5a6017160ab9269eb693192d48ad4))
+
 # [1.8.0](https://github.com/majklovec/irlctrl/compare/v1.7.0...v1.8.0) (2026-10-27)
 
 
