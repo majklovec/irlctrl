@@ -8,6 +8,16 @@
 * **buttons:** enhance button configurations with grid layout support ([5baf560](https://github.com/majklovec/irlctrl/commit/5baf56069b032056255edbfc06dfed64d4cf1799))
 * **deck:** implement button configuration and layout management ([c94356e](https://github.com/majklovec/irlctrl/commit/c94356e17971b7d59fcec4998dd2e07fa148c671))
 
+# [1.8.0](https://github.com/majklovec/irlctrl/compare/v1.7.0...v1.8.0) (2026-10-27)
+
+
+### Features
+
+* add SceneTracker and corresponding tests for OBS scene management ([a66202a](https://github.com/majklovec/irlctrl/commit/a66202acc7cb2a50eb2deb308083c0cf5dafb741))
+* **buttons:** add editor row reservation for draggable keys in grid layout ([5532997](https://github.com/majklovec/irlctrl/commit/5532997263a6e69f9c48aee741ae396f7e1933c7))
+* **buttons:** enhance button configurations with grid layout support ([5baf560](https://github.com/majklovec/irlctrl/commit/5baf56069b032056255edbfc06dfed64d4cf1799))
+* **deck:** implement button configuration and layout management ([c94356e](https://github.com/majklovec/irlctrl/commit/c94356e17971b7d59fcec4998dd2e07fa148c671))
+
 # [1.7.0](https://github.com/majklovec/irlctrl/compare/v1.6.1...v1.7.0) (2026-10-27)
 
 
