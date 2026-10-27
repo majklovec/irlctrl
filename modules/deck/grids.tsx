@@ -67,7 +67,7 @@ function cellView(mgr: Manager, id: string): m.Vnode {
 	const cur = mgr.current;
 	return (
 		<div
-			class={["buttons-cell", cur.selectedId === id ? "is-selected" : undefined]
+			class={["deck-cell", cur.selectedId === id ? "is-selected" : undefined]
 				.filter(Boolean)
 				.join(" ")}
 			onclick={() => cur.onSelect?.(id)}
@@ -176,14 +176,14 @@ function setInteractive(mgr: Manager, interactive: boolean): void {
 /** In the editor, keep one empty row open below the content so a key can be
  * dragged one row down. The count is a CSS custom property, not inline
  * min-height: GridStack's layout passes strip *inline* min-height/height but
- * honor the stylesheet `min-height` (`.buttons-grid-edit`) driven by this
+ * honor the stylesheet `min-height` (`.deck-grid-edit`) driven by this
  * property, so the reserved row survives every re-layout. */
 function setEditReserve(mgr: Manager, interactive: boolean): void {
 	const host = mgr.host;
 	const grid = mgr.grid;
 	if (!grid) return;
 	if (!interactive) {
-		host.classList.remove("buttons-grid-edit");
+		host.classList.remove("deck-grid-edit");
 		host.style.removeProperty("--edit-min-rows");
 		return;
 	}
@@ -191,7 +191,7 @@ function setEditReserve(mgr: Manager, interactive: boolean): void {
 		"--edit-min-rows",
 		String(Math.max(grid.getRow(), 1) + 1),
 	);
-	host.classList.add("buttons-grid-edit");
+	host.classList.add("deck-grid-edit");
 }
 
 function teardown(host: HTMLElement): void {
@@ -209,7 +209,7 @@ export const ButtonsGrid = {
 		const props = vnode.attrs as ButtonsGridProps;
 		return (
 			<div
-				class="grid-stack buttons-grid-stack"
+				class="grid-stack deck-grid-stack"
 				oncreate={(vd: m.VnodeDOM) => {
 					const host = vd.dom as HTMLElement;
 					teardown(host);
@@ -226,7 +226,7 @@ export const ButtonsGrid = {
 						resizable: { handles: "all" },
 						// Scoping class for this grid's keys (the base
 						// `grid-stack-item` is always added on top of it).
-						itemClass: "buttons-grid-item",
+						itemClass: "deck-grid-item",
 					});
 					const mgr: Manager = {
 						host,

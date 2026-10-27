@@ -176,11 +176,11 @@ describe("dashboard action catalogue (status.actions)", () => {
     });
 });
 
-describe("buttons widget config", () => {
+describe("deck widget config", () => {
     test("is a registered fleet widget with a hidden buttons field", () => {
-        expect(WIDGET_SIZES.get("buttons")).toEqual({ w: 4, h: 4 });
-        expect(isFleetWidgetType("buttons")).toBe(true);
-        expect(deviceWidgetConfigFields("buttons")).toEqual([
+        expect(WIDGET_SIZES.get("deck")).toEqual({ w: 4, h: 4 });
+        expect(isFleetWidgetType("deck")).toBe(true);
+        expect(deviceWidgetConfigFields("deck")).toEqual([
             { name: DECK_FIELD, type: "hidden" },
         ]);
         // other device widgets keep no config and stay device-bound
@@ -191,7 +191,7 @@ describe("buttons widget config", () => {
     test("parses and round-trips the stored layout", () => {
         expect(parseButtons("")).toEqual([]);
         expect(parseButtons(undefined)).toEqual([]);
-        const buttons = parseButtons(
+        const deck = parseButtons(
             JSON.stringify([
                 { deviceId: "d1", actionId: "encoder.stop" },
                 {
@@ -203,7 +203,7 @@ describe("buttons widget config", () => {
                 },
             ]),
         );
-        expect(buttons).toEqual([
+        expect(deck).toEqual([
             { deviceId: "d1", actionId: "encoder.stop" },
             {
                 deviceId: "d2",
@@ -212,12 +212,12 @@ describe("buttons widget config", () => {
                 paramsOverride: { pipeline: "p" },
             },
         ]);
-        expect(parseButtons(serializeButtons(buttons))).toEqual(buttons);
-        expect(buttonDevices([...buttons, buttons[0]])).toEqual(["d1", "d2"]);
+        expect(parseButtons(serializeButtons(deck))).toEqual(deck);
+        expect(buttonDevices([...deck, deck[0]])).toEqual(["d1", "d2"]);
     });
 
     test("round-trips the internal-grid position (x/y/w/h) when present", () => {
-        const buttons = parseButtons(
+        const deck = parseButtons(
             JSON.stringify([
                 {
                     deviceId: "d1",
@@ -229,7 +229,7 @@ describe("buttons widget config", () => {
                 },
             ]),
         );
-        expect(buttons).toEqual([
+        expect(deck).toEqual([
             {
                 deviceId: "d1",
                 actionId: "encoder.stop",
@@ -239,7 +239,7 @@ describe("buttons widget config", () => {
                 h: 2,
             },
         ]);
-        expect(parseButtons(serializeButtons(buttons))).toEqual(buttons);
+        expect(parseButtons(serializeButtons(deck))).toEqual(deck);
     });
 
     test("rejects positions that are not sane grid coordinates", () => {
@@ -345,9 +345,9 @@ describe("buttons widget config", () => {
             deviceExists: (id: string) => id !== "gone",
         });
         const layout = (
-            ...buttons: { deviceId: string; actionId: string }[]
+            ...deck: { deviceId: string; actionId: string }[]
         ) => ({
-            [DECK_FIELD]: JSON.stringify(buttons),
+            [DECK_FIELD]: JSON.stringify(deck),
         });
         const ok = layout({ deviceId: "mine", actionId: "encoder.stop" });
         const orphan = layout(
@@ -363,7 +363,7 @@ describe("buttons widget config", () => {
         const silent = layout({ deviceId: "silent", actionId: "whatever.x" });
         const validate =
             (config: Record<string, string>, strict: boolean) => () =>
-                validateDeviceWidgetConfig("buttons", config, context(strict));
+                validateDeviceWidgetConfig("deck", config, context(strict));
         expect(validate(ok, true)).not.toThrow();
         expect(validate(orphan, true)).toThrow("obs-controller.stream-start");
         expect(validate(foreign, true)).toThrow("Device not available: theirs");

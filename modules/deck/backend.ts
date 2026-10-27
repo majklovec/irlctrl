@@ -1,5 +1,5 @@
 /*
- * Buttons widget backend — registers the `buttons` fleet dashboard widget (a
+ * Buttons widget backend — registers the `deck` fleet dashboard widget (a
  * virtual StreamDeck, offered once per dashboard, driving any of the user's
  * devices) and validates its config on the control server. It has no device
  * lifecycle and no RPC methods of its own: a button fires another module's
@@ -16,27 +16,27 @@ import {
     parseButtons,
 } from "./types";
 
-const buttonsWidget: ModuleWidget = {
+const deckWidget: ModuleWidget = {
     type: DECK_WIDGET_TYPE,
     fleet: true,
     defaultSize: DECK_DEFAULT_SIZE,
     configFields: [{ name: DECK_FIELD, type: "hidden" }],
     validateConfig(config, { strict, deviceStatus, ownsDevice, deviceExists }) {
-        const buttons = parseButtons(config[DECK_FIELD]);
+        const deck = parseButtons(config[DECK_FIELD]);
         // Another user's device is never accepted. Strict (creating the
         // dashboard) also rejects devices that are gone and actions a device
         // does not offer (its catalogue is known once it reported a status); a
         // later save keeps those buttons — the widget shows them as
         // unavailable — so a pruned device or a disabled module cannot brick
         // the dashboard.
-        const foreign = buttonDevices(buttons).filter(
+        const foreign = buttonDevices(deck).filter(
             (id) => !ownsDevice(id) && (strict || deviceExists(id)),
         );
         if (foreign.length)
             throw new Error(`Device not available: ${foreign.join(", ")}`);
         if (!strict) return;
         const orphans = orphanedButtons(
-            buttons,
+            deck,
             (id) => deviceStatus(id)?.actions,
         );
         if (orphans.length)
@@ -47,8 +47,8 @@ const buttonsWidget: ModuleWidget = {
 };
 
 export default {
-    id: "buttons",
+    id: "deck",
     kind: "widget" as const,
     title: "Buttons",
-    dashboardWidgets: [buttonsWidget],
+    dashboardWidgets: [deckWidget],
 };

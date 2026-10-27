@@ -36,7 +36,7 @@ import {
 // ------------------------------------------------------------------ live state
 
 interface WidgetRun {
-	/** Indexes of the buttons whose call is in flight. */
+	/*	* Indexes of the buttons whose call is in flight. */
 	inflight: Set<number>;
 	error?: string;
 	errorTimer?: ReturnType<typeof setTimeout>;
@@ -110,7 +110,7 @@ async function press(
 	if (
 		r.action.confirm &&
 		!window.confirm(
-			t("buttons.confirm", {
+			t("deck.confirm", {
 				label,
 				device: deviceLabel(r.device, button.deviceId),
 			}),
@@ -124,7 +124,7 @@ async function press(
 	} catch (err) {
 		showError(
 			run,
-			t("buttons.failed", {
+			t("deck.failed", {
 				label,
 				error: err instanceof Error ? err.message : String(err),
 			}),
@@ -137,9 +137,9 @@ async function press(
 
 const stateTitle = (r: Resolved): string => {
 	if (r.state === "ok") return r.action?.method ?? "";
-	if (r.state === "waiting") return t("buttons.waiting");
+	if (r.state === "waiting") return t("deck.waiting");
 	if (r.state === "offline") return t("dev.badge.offline");
-	return t("buttons.unavailable");
+	return t("deck.unavailable");
 };
 
 /** The configured layout, every key guaranteed a slot (legacy layouts — no
@@ -162,7 +162,7 @@ function keyContent(
 	const busy = run.inflight.has(index);
 	const icon = iconOf(r, b);
 	const cls = [
-		"buttons-key",
+		"deck-key",
 		r.state === "orphan" ? "is-orphan" : undefined,
 		busy ? "is-busy" : undefined,
 		r.state !== "ok" && !busy && r.state !== "orphan" ? "is-inert" : undefined,
@@ -173,14 +173,14 @@ function keyContent(
 	return (
 		<div class={cls} title={stateTitle(r)}>
 			{busy ? (
-				<span class="buttons-spinner" aria-hidden="true" />
+				<span class="deck-spinner" aria-hidden="true" />
 			) : icon ? (
-				<span class="buttons-icon" aria-hidden="true">
+				<span class="deck-icon" aria-hidden="true">
 					{icon}
 				</span>
 			) : null}
-			<span class="buttons-label">{labelOf(r, b)}</span>
-			<span class="buttons-device">{deviceLabel(r.device, b.deviceId)}</span>
+			<span class="deck-label">{labelOf(r, b)}</span>
+			<span class="deck-device">{deviceLabel(r.device, b.deviceId)}</span>
 		</div>
 	);
 }
@@ -192,14 +192,14 @@ function keyContent(
  */
 function grid(
 	ctx: FleetDashboardContext,
-	buttons: readonly ButtonConfig[],
+	deck: readonly ButtonConfig[],
 	live: boolean,
 	interactive = false,
 	onLayout?: (updated: readonly GridItem[]) => void,
 	selectedIndex?: number,
 	onSelectButton?: (index: number) => void,
 ): m.Children {
-	const items: GridItem[] = buttons.map((b, i) => ({
+	const items: GridItem[] = deck.map((b, i) => ({
 		id: String(i),
 		x: b.x ?? 0,
 		y: b.y ?? 0,
@@ -214,14 +214,14 @@ function grid(
 			onLayout={(updated) => onLayout?.(updated)}
 			onSelect={(id) => {
 				const i = Number(id);
-				if (i < 0 || i >= buttons.length) return;
-				if (live) void press(ctx, i, buttons[i], resolve(ctx, buttons[i]));
+				if (i < 0 || i >= deck.length) return;
+				if (live) void press(ctx, i, deck[i], resolve(ctx, deck[i]));
 				else onSelectButton?.(i);
 			}}
 			renderCell={(id) => {
 				const i = Number(id);
-				return i >= 0 && i < buttons.length
-					? keyContent(ctx, buttons[i], i)
+				return i >= 0 && i < deck.length
+					? keyContent(ctx, deck[i], i)
 					: null;
 			}}
 		/>
@@ -229,15 +229,15 @@ function grid(
 }
 
 function body(ctx: FleetDashboardContext): m.Children {
-	const buttons = laidOutButtons(ctx.widget.config);
+	const deck = laidOutButtons(ctx.widget.config);
 	const run = runFor(ctx.widget.id);
-	if (buttons.length === 0)
-		return <p class="muted buttons-empty">{t("buttons.empty")}</p>;
+	if (deck.length === 0)
+		return <p class="muted deck-empty">{t("deck.empty")}</p>;
 	return (
-		<div class="buttons-widget" key="buttons-live">
-			{grid(ctx, buttons, true)}
+		<div class="deck-widget" key="deck-live">
+			{grid(ctx, deck, true)}
 			{run.error ? (
-				<div class="buttons-toast" role="alert">
+				<div class="deck-toast" role="alert">
 					{run.error}
 				</div>
 			) : null}
@@ -257,7 +257,7 @@ function badge(ctx: FleetDashboardContext): m.Children {
 			text={
 				ids.length === 1
 					? t(online ? "dev.badge.online" : "dev.badge.offline")
-					: t("buttons.badge_online", { online, total: ids.length })
+					: t("deck.badge_online", { online, total: ids.length })
 			}
 			kind={online === ids.length ? "on" : online ? "warn" : "off"}
 		/>
@@ -272,7 +272,7 @@ interface EditorButton extends ButtonConfig {
 }
 interface EditorState {
 	/** The layout, every button carrying a slot (x/y/w/h). */
-	buttons: EditorButton[];
+	deck: EditorButton[];
 	/** The button whose fields the form edits (undefined = none selected). */
 	selected?: number;
 }
@@ -283,16 +283,16 @@ const editors = new WeakMap<Record<string, string>, EditorState>();
 function editorFor(values: Record<string, string>): EditorState {
 	let state = editors.get(values);
 	if (!state) {
-		let buttons: ButtonConfig[] = [];
+		let deck: ButtonConfig[] = [];
 		try {
-			buttons = parseButtons(values[DECK_FIELD]);
+			deck = parseButtons(values[DECK_FIELD]);
 		} catch {
 			// unparsable stored layout — start over
 		}
 		// Guarantee every key a slot before the canvas renders it (legacy
 		// layouts carry no positions).
 		state = {
-			buttons: layoutButtons(buttons).map((b) => ({
+			deck: layoutButtons(deck).map((b) => ({
 				...b,
 				paramsText: b.paramsOverride
 					? JSON.stringify(b.paramsOverride, null, 1)
@@ -324,7 +324,7 @@ function parseParamsText(text: string): {
 /** Write the editor layout back into the config field (invalid params are left out until fixed). */
 function commit(values: Record<string, string>, state: EditorState): void {
 	values[DECK_FIELD] = serializeButtons(
-		state.buttons.map(({ paramsText, ...b }) => {
+		state.deck.map(({ paramsText, ...b }) => {
 			const out: ButtonConfig = { deviceId: b.deviceId, actionId: b.actionId };
 			if (b.labelOverride) out.labelOverride = b.labelOverride;
 			if (b.iconOverride) out.iconOverride = b.iconOverride;
@@ -345,12 +345,12 @@ function configError(
 	values: Record<string, string>,
 ): string | undefined {
 	const state = editorFor(values);
-	if (state.buttons.some((b) => resolve(ctx, b).state === "orphan"))
-		return t("buttons.orphan_blocks_save");
-	const bad = state.buttons.findIndex(
+	if (state.deck.some((b) => resolve(ctx, b).state === "orphan"))
+		return t("deck.orphan_blocks_save");
+	const bad = state.deck.findIndex(
 		(b) => parseParamsText(b.paramsText).error,
 	);
-	if (bad >= 0) return t("buttons.params_invalid", { index: bad + 1 });
+	if (bad >= 0) return t("deck.params_invalid", { index: bad + 1 });
 	return undefined;
 }
 
@@ -366,13 +366,13 @@ function catalogueFor(
 	const actions = ctx.connect(device.id)?.status?.actions;
 	if (!actions)
 		return (
-			<p class="muted buttons-catalogue-note">
-				{t(device.online ? "buttons.waiting" : "dev.badge.offline")}
+			<p class="muted deck-catalogue-note">
+				{t(device.online ? "deck.waiting" : "dev.badge.offline")}
 			</p>
 		);
 	if (actions.length === 0)
 		return (
-			<p class="muted buttons-catalogue-note">{t("buttons.none_available")}</p>
+			<p class="muted deck-catalogue-note">{t("deck.none_available")}</p>
 		);
 	const byModule = new Map<string, DashboardActionEntry[]>();
 	for (const a of actions) {
@@ -381,32 +381,32 @@ function catalogueFor(
 		byModule.set(a.moduleTitle, list);
 	}
 	return [...byModule.entries()].map(([title, list]) => (
-		<div class="buttons-catalogue-group" key={title}>
-			<span class="buttons-catalogue-module">{title}</span>
-			<div class="buttons-catalogue-actions">
+		<div class="deck-catalogue-group" key={title}>
+			<span class="deck-catalogue-module">{title}</span>
+			<div class="deck-catalogue-actions">
 				{list.map((a) => (
 					<button
 						type="button"
 						key={a.key}
-						class="secondary buttons-catalogue-action"
+						class="secondary deck-catalogue-action"
 						title={a.method}
-						disabled={state.buttons.length >= DECK_MAX}
+						disabled={state.deck.length >= DECK_MAX}
 						onclick={() => {
 							// New keys land in the first free cell and are
 							// selected so the form edits them right away.
-							state.buttons.push({
+							state.deck.push({
 								deviceId: device.id,
 								actionId: a.key,
 								paramsText: "",
-								...nextButtonSlot(state.buttons),
+								...nextButtonSlot(state.deck),
 							});
-							state.selected = state.buttons.length - 1;
+							state.selected = state.deck.length - 1;
 							update();
 						}}
 					>
-						{a.icon ? <span class="buttons-icon">{a.icon}</span> : null}
+						{a.icon ? <span class="deck-icon">{a.icon}</span> : null}
 						{t(a.label)}
-						<span class="buttons-add">+</span>
+						<span class="deck-add">+</span>
 					</button>
 				))}
 			</div>
@@ -436,15 +436,15 @@ function configEditor(
 		},
 	};
 	return (
-		<div class="buttons-editor">
-			<section class="buttons-editor-section">
-				<h4>{t("buttons.catalogue")}</h4>
+		<div class="deck-editor">
+			<section class="deck-editor-section">
+				<h4>{t("deck.catalogue")}</h4>
 				{devices.length === 0 ? (
-					<p class="muted">{t("buttons.no_devices")}</p>
+					<p class="muted">{t("deck.no_devices")}</p>
 				) : (
 					devices.map((device) => (
-						<div class="buttons-catalogue-device" key={device.id}>
-							<span class="buttons-catalogue-device-name">
+						<div class="deck-catalogue-device" key={device.id}>
+							<span class="deck-catalogue-device-name">
 								{deviceLabel(device, device.id)}
 								<Badge
 									text={t(
@@ -458,11 +458,11 @@ function configEditor(
 					))
 				)}
 			</section>
-			<section class="buttons-editor-section">
-				<h4>{t("buttons.configured")}</h4>
-				<p class="muted buttons-layout-hint">{t("buttons.layout_hint")}</p>
-				{state.buttons.length === 0 ? (
-					<p class="muted">{t("buttons.empty")}</p>
+			<section class="deck-editor-section">
+				<h4>{t("deck.configured")}</h4>
+				<p class="muted deck-layout-hint">{t("deck.layout_hint")}</p>
+				{state.deck.length === 0 ? (
+					<p class="muted">{t("deck.empty")}</p>
 				) : (
 					<>
 						{grid(
@@ -473,11 +473,11 @@ function configEditor(
 							(updated) => {
 								for (const it of updated) {
 									const i = Number(it.id);
-									if (i < 0 || i >= state.buttons.length) continue;
-									state.buttons[i].x = it.x;
-									state.buttons[i].y = it.y;
-									state.buttons[i].w = it.w;
-									state.buttons[i].h = it.h;
+									if (i < 0 || i >= state.deck.length) continue;
+									state.deck[i].x = it.x;
+									state.deck[i].y = it.y;
+									state.deck[i].w = it.w;
+									state.deck[i].h = it.h;
 								}
 								update();
 							},
@@ -502,18 +502,18 @@ function buttonForm(
 	update: () => void,
 ): m.Children {
 	const i = state.selected ?? 0;
-	const b = state.buttons[i];
+	const b = state.deck[i];
 	if (!b) return null;
 	const r = resolve(ctx, b);
 	const paramsBad = !!parseParamsText(b.paramsText).error;
 	return (
 		<div
-			class={["buttons-form", r.state === "orphan" ? "is-orphan" : undefined]
+			class={["deck-form", r.state === "orphan" ? "is-orphan" : undefined]
 				.filter(Boolean)
 				.join(" ")}
 		>
-			<span class="buttons-form-title">
-				{iconOf(r, b) ? <span class="buttons-icon">{iconOf(r, b)}</span> : null}
+			<span class="deck-form-title">
+				{iconOf(r, b) ? <span class="deck-icon">{iconOf(r, b)}</span> : null}
 				<span>
 					{r.action ? t(r.action.label) : b.actionId}{" "}
 					<span class="muted">
@@ -522,13 +522,13 @@ function buttonForm(
 						{deviceLabel(r.device, b.deviceId)}
 					</span>{" "}
 					{r.state === "orphan" ? (
-						<span class="buttons-orphan-tag">{t("buttons.unavailable")}</span>
+						<span class="deck-orphan-tag">{t("deck.unavailable")}</span>
 					) : null}
 				</span>
 			</span>
-			<div class="buttons-form-fields">
+			<div class="deck-form-fields">
 				<label>
-					<span>{t("buttons.label_override")}</span>
+					<span>{t("deck.label_override")}</span>
 					<input
 						class="dash-config-input"
 						value={b.labelOverride ?? ""}
@@ -539,8 +539,8 @@ function buttonForm(
 						}}
 					/>
 				</label>
-				<label class="buttons-field-icon">
-					<span>{t("buttons.icon_override")}</span>
+				<label class="deck-field-icon">
+					<span>{t("deck.icon_override")}</span>
 					<input
 						class="dash-config-input"
 						value={b.iconOverride ?? ""}
@@ -552,8 +552,8 @@ function buttonForm(
 						}}
 					/>
 				</label>
-				<label class="buttons-field-params">
-					<span>{t("buttons.params_override")}</span>
+				<label class="deck-field-params">
+					<span>{t("deck.params_override")}</span>
 					<textarea
 						class={["dash-config-input", paramsBad ? "is-invalid" : undefined]
 							.filter(Boolean)
@@ -570,16 +570,16 @@ function buttonForm(
 					/>
 				</label>
 			</div>
-			<span class="buttons-form-actions">
+			<span class="deck-form-actions">
 				<button
 					type="button"
 					class="icon-btn"
-					title={t("buttons.remove")}
-					aria-label={t("buttons.remove")}
+					title={t("deck.remove")}
+					aria-label={t("deck.remove")}
 					onclick={() => {
-						state.buttons.splice(i, 1);
-						state.selected = state.buttons.length
-							? Math.min(i, state.buttons.length - 1)
+						state.deck.splice(i, 1);
+						state.selected = state.deck.length
+							? Math.min(i, state.deck.length - 1)
 							: undefined;
 						update();
 					}}
@@ -593,11 +593,11 @@ function buttonForm(
 
 // ---------------------------------------------------------------- registration
 
-const buttonsWidget: FleetDashboardWidget = {
+const deckWidget: FleetDashboardWidget = {
 	type: DECK_WIDGET_TYPE,
 	defaultSize: DECK_DEFAULT_SIZE,
 	minSize: DECK_MIN_SIZE,
-	maxSize: DECK_MAX_SIZE,
+	// maxSize: DECK_MAX_SIZE,
 	configFields: [{ name: DECK_FIELD, type: "hidden" }],
 	devicesFor: (widget) => buttonDevices(configuredButtons(widget.config)),
 	body,
@@ -611,10 +611,10 @@ const buttonsWidget: FleetDashboardWidget = {
 	},
 };
 
-const buttonsModule: DashboardWidgetModule = {
+const deckModule: DashboardWidgetModule = {
 	kind: "dashboard",
-	id: "buttons",
-	fleetWidgets: [buttonsWidget],
+	id: "deck",
+	fleetWidgets: [deckWidget],
 };
 
-export default buttonsModule;
+export default deckModule;
