@@ -59,5 +59,9 @@
 	"lowbs.scene_privacy": "隐私 (可选)",
 	"lowbs.instantly_recover": "恢复后立即切回",
 	"lowbs.only_streaming": "仅在直播时切换",
-	"lowbs.log_to_file": "将日志写入文件"
+	"lowbs.log_to_file": "将日志写入文件",
+	"act.obs.stream_start": "OBS：开始推流",
+	"act.obs.stream_stop": "OBS：停止推流",
+	"act.obs.record_start": "OBS：开始录制",
+	"act.obs.record_stop": "OBS：停止录制"
 }

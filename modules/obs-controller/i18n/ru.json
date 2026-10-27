@@ -59,5 +59,9 @@
 	"lowbs.scene_privacy": "Приватность (необязательно)",
 	"lowbs.instantly_recover": "Сразу вернуться после восстановления",
 	"lowbs.only_streaming": "Переключать только во время трансляции",
-	"lowbs.log_to_file": "Записывать журнал в файл"
+	"lowbs.log_to_file": "Записывать журнал в файл",
+	"act.obs.stream_start": "OBS: начать трансляцию",
+	"act.obs.stream_stop": "OBS: остановить трансляцию",
+	"act.obs.record_start": "OBS: начать запись",
+	"act.obs.record_stop": "OBS: остановить запись"
 }

@@ -93,5 +93,10 @@
 	"ui.optional": "Optional",
 	"ui.remove": "Remove",
 	"wtype.combined": "Combined",
-	"wtype.encoder": "Encoder"
+	"wtype.encoder": "Encoder",
+	"act.encoder.stop": "Stop encoder",
+	"act.encoder.bitrate_low": "Bitrate 1.5 Mbps",
+	"act.encoder.bitrate_high": "Bitrate 6 Mbps",
+	"act.encoder.start": "Start encoder",
+	"act.encoder.stream_stop": "Stop stream"
 }

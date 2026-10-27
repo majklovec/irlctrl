@@ -93,5 +93,10 @@
 	"ui.optional": "Opcjonalne",
 	"ui.remove": "Usuń",
 	"wtype.combined": "Enkoder + relay",
-	"wtype.encoder": "Enkoder"
+	"wtype.encoder": "Enkoder",
+	"act.encoder.stop": "Zatrzymaj enkoder",
+	"act.encoder.bitrate_low": "Bitrate 1,5 Mb/s",
+	"act.encoder.bitrate_high": "Bitrate 6 Mb/s",
+	"act.encoder.start": "Uruchom enkoder",
+	"act.encoder.stream_stop": "Zatrzymaj stream"
 }

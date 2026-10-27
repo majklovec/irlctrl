@@ -58,5 +58,7 @@
 	"mlog.done.reloaded": "已重载",
 	"setup.step.relay_sub": "SRTLA 设置",
 	"ui.off": "关闭",
-	"wtype.relay": "Relay"
+	"wtype.relay": "Relay",
+	"act.srtla.stop": "停止 SRTLA",
+	"act.srtla.reload": "重新加载上行链路"
 }

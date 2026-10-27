@@ -6,6 +6,7 @@ import {
 	type LogEvent,
 	type LogLevel,
 } from "../../shared/logMessages";
+import { dashboardActionsFor } from "../../shared/registry";
 import type { DeviceInfo, DeviceSummary, Status } from "../../shared/types";
 import { parseJsonObject, textOf } from "../../shared/util";
 import { COLOR_RE, isRole, type Role } from "../../shared/validate";
@@ -245,9 +246,16 @@ export function createDevices({
 		}
 
 		if (msg.type === "event") {
+			let forward = text;
 			if (msg.event === "status") {
-				d.statusMsg = text;
-				d.status = msg.data as Status;
+				const status = msg.data as Status;
+				// The Buttons widget's catalogue rides on the cached status: the
+				// actions of every module enabled on the device, from the
+				// registrations (the device itself does not know the dashboard).
+				if (status && typeof status === "object")
+					status.actions = dashboardActionsFor(status);
+				d.status = status;
+				d.statusMsg = forward = JSON.stringify({ ...msg, data: status });
 				d.statusAt = Date.now();
 				const role = d.status?.role;
 				// A role change is structural — refresh the list at once for it
@@ -267,7 +275,7 @@ export function createDevices({
 				return;
 			}
 			if (typeof msg.event === "string") {
-				if (msg.retain === true) d.retained.set(msg.event, text);
+				if (msg.retain === true) d.retained.set(msg.event, forward);
 				const summary = msg.summary;
 				if (summary && typeof summary === "object") {
 					d.liveSummary.set(
@@ -277,7 +285,7 @@ export function createDevices({
 					publishDeviceList();
 				}
 			}
-			publishToDevice(d, text);
+			publishToDevice(d, forward);
 			return;
 		}
 

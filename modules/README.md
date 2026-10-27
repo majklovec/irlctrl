@@ -24,7 +24,8 @@ two contracts, discovery, persistence and the edge cases.
     ├── obs-controller/
     ├── ssh/
     ├── stats/                # channel widget modules
-    └── chat/
+    ├── chat/
+    └── buttons/              # fleet dashboard widget (virtual StreamDeck across devices)
 ```
 
 A module ships:
@@ -90,7 +91,8 @@ beyond the contracts, components, store, i18n and util helpers a card needs.
 | `setup?(params, role)`              | first-run wizard: validate the module's answers and return the apply step; nothing is applied until every module validated                                                                                                                               |
 | `configure?(config, slice)`         | apply a `modules.configure` payload to the slice (default: only `enabled`); the module is restarted afterwards                                                                                                                                           |
 | `pages?`                            | `{ match: RegExp, page }[]` — the device-relative paths that serve `pages/<page>.html` (the control server mirrors them under `/d/<id>/`)                                                                                                                 |
-| `dashboardWidgets?`                 | device-bound dashboard widget types with their default grid size (the server validates dashboards against them)                                                                                                                                         |
+| `dashboardWidgets?`                 | dashboard widget types with their default grid size (the server validates dashboards against them); a widget may declare `configFields` and a `validateConfig(config, context)` hook for a server-validated config, and `fleet: true` for a widget offered once that names its devices in that config instead of binding to one                                                                                                                                         |
+| `dashboardActions?`                 | operator actions offered to the dashboard **Buttons** widget: `{ id, label, icon?, method, params?, confirm?, roles? }[]` — `method` must be one of `methods`; the control server merges the enabled modules' actions into the device's cached status as `status.actions` (see [Dashboard actions](#dashboard-actions)) |
 | `services?.capabilities`            | `{ "<name>": impl }` offered to other modules over the bus                                                                                                                                                                                              |
 | `hub?`                              | channel-widget hub (`widgetType`, `snapshotKey`, `defaultSize`, `configFields`, `channelSpec`, `create`)                                                                                                                                                 |
 
@@ -131,11 +133,65 @@ contributions the core pages compose — `dashboardWidgets`, `setupSteps`,
 `deviceSummaryColumns`, `handleEvent(event, data, host)` and `log`.
 `ChannelWidgetModule` (dashboard widget): `kind: "widget"`, `widgetTypes`,
 `defaultSize`, `configFields`, `body` / `badge`, `onFrame`.
+`DashboardWidgetModule` (dashboard widgets without a device card):
+`kind: "dashboard"`, `id`, `dashboardWidgets` (device-bound) and/or
+`fleetWidgets` — a `FleetDashboardWidget` is offered once, names the devices
+it drives in its config (`devicesFor(widget)`) and renders with a
+`FleetDashboardContext` (`devices`, `link(deviceId)` → device, status, rpc);
+the Buttons widget composes other modules' actions across devices this way.
+Both widget shapes may bring their own config editor
+(`configEditor(context, values)` + `configError`) instead of the generic
+per-field form.
 
 Core pages compose contributions; they contain no widget-type switches, no
 module status fields and no imports from `modules/*`. Frontend modules talk to
 each other through the per-connection `DeviceCard` capability API
 (`host.provideCapability` / `host.getCapability`), never by import.
+
+## Dashboard actions
+
+The **Buttons** widget (`modules/buttons/`) is a virtual StreamDeck: a grid of
+buttons on the dashboard, each firing one RPC method of one module on the
+device it names — one widget (offered once per dashboard) can drive any number
+of the user's devices. The widget never names a module — it reads each
+device's **action catalogue** off `status.actions`, which the control server
+merges from the registrations of every module that is enabled on that device
+and serves its role (`backend/server/devices.ts` → `dashboardActionsFor` in
+`shared/registry.ts`).
+
+Declare actions on the backend registration; nothing else is needed:
+
+```ts
+// modules/<id>/backend.ts
+const registration: BackendModule<ModuleCore> = {
+	kind: "device",
+	id: "encoder",
+	// …
+	methods: ["encoder.stop", "encoder.bitrate", /* … */],
+	dashboardActions: [
+		// id: unique within the module (the widget stores "<module>.<id>")
+		// label: an i18n key from modules/<id>/i18n/*.json (or plain text)
+		// method: one of `methods` (the registry rejects anything else at load)
+		{ id: "stop", label: "act.encoder.stop", icon: "⏹", method: "encoder.stop", confirm: true },
+		{ id: "bitrate-low", label: "act.encoder.bitrate_low", icon: "▽", method: "encoder.bitrate", params: { maxBitrate: 1500 } },
+	],
+};
+```
+
+-   `params` are the defaults a press sends; the operator can override or
+    complete them per button in the widget's settings (`paramsOverride` wins),
+    so a method that needs operator-specific input (`encoder.start` needs
+    `pipeline`, `host`, `port`) can still be a button.
+-   `confirm: true` asks before firing.
+-   `roles` scopes the action to device roles; it defaults to
+    `methodRoles[method]`, then the module's `roles`. There is no user-level
+    role model beyond device ownership — a dashboard only ever shows the
+    user's own devices.
+-   An action whose module gets disabled disappears from the catalogue on the
+    next status; the widget shows such buttons (and buttons of a device that
+    is no longer the user's) as unavailable and refuses to fire them. A
+    dashboard save keeps them; creating a dashboard with unknown actions or
+    foreign devices is rejected.
 
 ## Discovery (the core names no module)
 
@@ -174,11 +230,11 @@ on it.
 ## Adding a module
 
 1. `mkdir modules/<id>`; write `backend.ts` (default-export a `BackendModule`),
-   `frontend.tsx` (default-export a `FrontendModule` or `ChannelWidgetModule`),
-   `types.ts`, `styles.css`.
+   `frontend.tsx` (default-export a `FrontendModule`, `ChannelWidgetModule` or
+   `DashboardWidgetModule`), `types.ts`, `styles.css`.
 2. Declare `roles`, `methods`, `events`, the hooks you need, `log` wording,
-   `pages` / `dashboardWidgets`, and `dependencies` if it must start after
-   another module.
+   `pages` / `dashboardWidgets` / `dashboardActions`, and `dependencies` if
+   it must start after another module.
 3. Put the module's translations in `modules/<id>/i18n/<lang>.json` (all
    languages in `shared/languages.ts`) and its wire types in `types.ts`.
 4. **No core edits** — the backend scan picks it up and `predev` regenerates

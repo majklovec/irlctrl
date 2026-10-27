@@ -9,5 +9,6 @@
 	"mlog.done.modem_disconnected": "Modem #{{index}} getrennt",
 	"mlog.done.modem_enabled": "Modem #{{index}} aktiviert",
 	"mlog.done.modem_reset": "Modem #{{index}} zurückgesetzt",
-	"mlog.done.reconfigured": "Neu konfiguriert"
+	"mlog.done.reconfigured": "Neu konfiguriert",
+	"act.modems.reconfigure": "Modems neu konfigurieren"
 }

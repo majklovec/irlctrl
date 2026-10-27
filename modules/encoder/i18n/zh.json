@@ -93,5 +93,10 @@
 	"ui.optional": "可选",
 	"ui.remove": "移除",
 	"wtype.combined": "编码器 + 中继",
-	"wtype.encoder": "编码器"
+	"wtype.encoder": "编码器",
+	"act.encoder.stop": "停止编码器",
+	"act.encoder.bitrate_low": "码率 1.5 Mbps",
+	"act.encoder.bitrate_high": "码率 6 Mbps",
+	"act.encoder.start": "启动编码器",
+	"act.encoder.stream_stop": "停止推流"
 }

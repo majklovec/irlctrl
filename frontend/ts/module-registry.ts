@@ -27,8 +27,10 @@ import type {
 import { type DeviceCard, setFrontendEventSink } from "./device/store";
 import type {
 	ChannelWidgetModule,
+	DashboardWidgetModule,
 	DeviceDashboardWidget,
 	DeviceSummaryColumn,
+	FleetDashboardWidget,
 	FrontendModule,
 	FrontendRegistration,
 	ModuleSetupStep,
@@ -64,8 +66,16 @@ export function frontendModulesForStatus(status: Status): FrontendModule[] {
 	return FRONTEND_MODULES.filter((mod) => mod.available?.(status) ?? true);
 }
 
+/** Every registration that contributes device-bound dashboard widgets: the
+ * device cards plus the widgets-only (`dashboard`) registrations. */
+const DEVICE_WIDGET_SOURCES: (FrontendModule | DashboardWidgetModule)[] =
+	FRONTS.filter(
+		(mod): mod is FrontendModule | DashboardWidgetModule =>
+			mod.kind === "device-card" || mod.kind === "dashboard",
+	);
+
 export interface RegisteredDeviceWidget {
-	module: FrontendModule;
+	module: FrontendModule | DashboardWidgetModule;
 	widget: DeviceDashboardWidget;
 }
 
@@ -73,7 +83,7 @@ export function deviceWidgetsForType(
 	type: string,
 	device: DeviceSummary,
 ): RegisteredDeviceWidget[] {
-	return FRONTEND_MODULES.flatMap((module) =>
+	return DEVICE_WIDGET_SOURCES.flatMap((module) =>
 		(module.dashboardWidgets ?? [])
 			.filter((widget) => widget.type === type && widget.available(device))
 			.map((widget) => ({ module, widget })),
@@ -83,21 +93,39 @@ export function deviceWidgetsForType(
 export function deviceWidgetForType(
 	type: string,
 ): DeviceDashboardWidget | undefined {
-	return FRONTEND_MODULES.flatMap(
+	return DEVICE_WIDGET_SOURCES.flatMap(
 		(module) => module.dashboardWidgets ?? [],
 	).find((widget) => widget.type === type);
 }
 
 export function destroyDeviceWidget(type: string, widgetId: string): void {
-	for (const module of FRONTEND_MODULES)
+	for (const module of DEVICE_WIDGET_SOURCES)
 		for (const widget of module.dashboardWidgets ?? [])
 			if (widget.type === type) widget.destroy?.(widgetId);
+	fleetWidgetForType(type)?.destroy?.(widgetId);
+}
+
+/** Fleet widgets (offered once, not bound to one device) by type. */
+const FLEET_WIDGETS = new Map<string, FleetDashboardWidget>();
+for (const mod of FRONTS)
+	if (mod.kind === "dashboard")
+		for (const widget of mod.fleetWidgets ?? [])
+			FLEET_WIDGETS.set(widget.type, widget);
+
+export function fleetWidgetForType(
+	type: string,
+): FleetDashboardWidget | undefined {
+	return FLEET_WIDGETS.get(type);
+}
+
+export function fleetWidgetTypes(): string[] {
+	return [...FLEET_WIDGETS.keys()];
 }
 
 export function deviceWidgetTypesFor(device: DeviceSummary): string[] {
 	return [
 		...new Set(
-			FRONTEND_MODULES.flatMap((module) =>
+			DEVICE_WIDGET_SOURCES.flatMap((module) =>
 				(module.dashboardWidgets ?? [])
 					.filter((widget) => widget.available(device))
 					.map((widget) => widget.type),
@@ -169,9 +197,9 @@ export function widgetConfigFieldsForType(
 	const channelFields = widgetModuleForType(type)?.configFields;
 	if (channelFields) return channelFields;
 	return (
-		FRONTEND_MODULES.flatMap((module) => module.dashboardWidgets ?? []).find(
-			(widget) => widget.type === type,
-		)?.configFields ?? []
+		fleetWidgetForType(type)?.configFields ??
+		deviceWidgetForType(type)?.configFields ??
+		[]
 	);
 }
 

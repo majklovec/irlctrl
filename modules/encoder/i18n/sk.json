@@ -93,5 +93,10 @@
 	"ui.optional": "Voliteľné",
 	"ui.remove": "Odstrániť",
 	"wtype.combined": "Enkodér + relay",
-	"wtype.encoder": "Enkodér"
+	"wtype.encoder": "Enkodér",
+	"act.encoder.stop": "Zastaviť enkodér",
+	"act.encoder.bitrate_low": "Bitrate 1,5 Mb/s",
+	"act.encoder.bitrate_high": "Bitrate 6 Mb/s",
+	"act.encoder.start": "Spustiť enkodér",
+	"act.encoder.stream_stop": "Zastaviť stream"
 }

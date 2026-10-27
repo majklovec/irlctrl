@@ -115,7 +115,7 @@ Tick **Autostart** in the UI (or call `autostart.set`) to resume the last stream
 
 ## Control server
 
-`backend/server/server.ts` lists all devices and serves the same web UI for each one at `/d/<id>/`, relaying commands to the device over its outbound connection — so devices behind NAT or on mobile networks can be managed. It also hosts per-user **dashboards**: gridstack grids composed of widgets from any device owned by that user, with dedicated add / edit / view pages. Widgets are of two kinds — **device widgets** (a live status card per device: `relay`, `encoder`, `combined`, or `obs`, depending on the device's role and enabled modules) and **channel widgets** (device-independent modules, one hub per kind serves all widgets of that kind). Dashboards are persisted to the SQLite database (`dashboards` table of `--db`), and a shared live feed (`/dashboards/ws`) streams widget data to every open view.
+`backend/server/server.ts` lists all devices and serves the same web UI for each one at `/d/<id>/`, relaying commands to the device over its outbound connection — so devices behind NAT or on mobile networks can be managed. It also hosts per-user **dashboards**: gridstack grids composed of widgets from any device owned by that user, with dedicated add / edit / view pages. Widgets come in three kinds — **device widgets** (bound to one device: the live status cards `relay`, `encoder`, `combined`, `obs` depending on the device's role and enabled modules), **channel widgets** (device-independent modules, one hub per kind serves all widgets of that kind) and **fleet widgets** (offered once, driving any of your devices: the `buttons` virtual StreamDeck). Dashboards are persisted to the SQLite database (`dashboards` table of `--db`), and a shared live feed (`/dashboards/ws`) streams widget data to every open view.
 
 ### Authentication
 
@@ -147,6 +147,12 @@ open http://ctl.example.com/  # redirects to /login; enter the username + passwo
 
 > [!IMPORTANT]
 > Run the server behind a TLS reverse proxy — device tokens and the session cookie need `wss://`/`https://`.
+
+### Install as an app (PWA)
+
+The control-server UI is an installable web app: every page links a web app manifest (`frontend/pwa/manifest.webmanifest`, bundled with the pages) and registers a service worker served at the origin root (`/sw.js`, scope `/`, from `frontend/pwa/` via [`shared/pwa.ts`](shared/pwa.ts) — embedded in the compiled binary). On a phone open the server over **HTTPS**, sign in, then *Add to Home Screen* (iOS Safari: Share → Add to Home Screen; Android Chrome: menu → Install app / Add to Home screen). Desktop Chrome/Edge show an install icon in the address bar.
+
+The service worker caches only the app shell: the hashed `/assets/*` bundles and the icons cache-first, page navigations network-first with the last good copy as an offline fallback. It never touches `/api/*`, `/i18n/*`, the device connection (`/device`) or any websocket (`…/ws`), so live data, RPC and dashboards behave exactly as before. Service workers need a secure context — plain `http://` (other than `localhost`) just skips the registration.
 
 ## Deployment
 
@@ -236,6 +242,8 @@ and frontend implementation remain co-located. Cross-layer wire types live in
 | `chat`  | One widget, one merged feed: config has a channel per platform (`youtube`, `twitch`, `tiktok`, `kick`) and every filled channel is joined, its messages merged into the single view. Per-platform transports live in `modules/chat/providers/`: Kick joins the public chat Pusher room (no auth), Twitch one IRC-over-websocket connection per channel (anonymous `justinfan` nick, IRCv3 tags), YouTube polls the live-chat endpoint per creator handle (~1 s cadence) via [`youtube-chat-next`](https://www.npmjs.com/package/youtube-chat-next), TikTok one [`tiktok-live-connector`](https://www.npmjs.com/package/tiktok-live-connector) websocket (reconnect loop owned by the module). |
 
 Chat widgets keep rolling message history so reconnects don't re-send, and a `seen` set that dedupes message ids across reconnects.
+
+**Buttons widget** (`modules/buttons/`) — a **virtual StreamDeck**, offered once per dashboard (under *Independent*): a grid of buttons where each button fires one RPC method of one module on one of your devices (`encoder.stop`, a bitrate preset, `srtla.reload`, an OBS `StartStream`, …) — one widget can mix buttons from any number of devices. Modules declare the actions they offer with `dashboardActions` on their backend registration; the control server merges the enabled modules' actions into each device's cached status (`status.actions`), and the widget's settings (pencil icon in edit mode) compose the layout from the catalogues of all your devices — with per-button label / icon overrides and a JSON params override (e.g. `pipeline`, `host`, `port` for `encoder.start`). Actions marked `confirm` ask before firing; buttons whose device went away or whose module was disabled are shown as unavailable. See [modules/README.md → Dashboard actions](modules/README.md#dashboard-actions) for declaring actions in a module.
 
 ### How the module system works
 

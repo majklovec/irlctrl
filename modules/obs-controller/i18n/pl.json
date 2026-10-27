@@ -59,5 +59,9 @@
 	"lowbs.scene_privacy": "Prywatność (opcjonalnie)",
 	"lowbs.instantly_recover": "Natychmiast wróć po poprawie parametrów",
 	"lowbs.only_streaming": "Przełączaj tylko podczas transmisji",
-	"lowbs.log_to_file": "Zapisuj dziennik do pliku"
+	"lowbs.log_to_file": "Zapisuj dziennik do pliku",
+	"act.obs.stream_start": "OBS: rozpocznij transmisję",
+	"act.obs.stream_stop": "OBS: zatrzymaj transmisję",
+	"act.obs.record_start": "OBS: rozpocznij nagrywanie",
+	"act.obs.record_stop": "OBS: zatrzymaj nagrywanie"
 }

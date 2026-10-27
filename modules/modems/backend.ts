@@ -215,6 +215,14 @@ const registration: BackendModule<ModuleCore> = {
 		"modems.disconnect",
 	],
 	events: [],
+	dashboardActions: [
+		{
+			id: "reconfigure",
+			label: "act.modems.reconfigure",
+			icon: "↻",
+			method: "reconfigure",
+		},
+	],
 	log,
 	bind,
 	/** Prime routing + the uplinks file, then watch netlink for changes. */

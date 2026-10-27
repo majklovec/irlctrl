@@ -11,10 +11,41 @@
  * below. The core never names a module id, method prefix or status key.
  */
 import type { LogWording } from "./logMessages";
-import type { WidgetConfigField } from "./types";
+import type { Status, WidgetConfigField } from "./types";
 import type { Role } from "./validate";
 
 export type Params = Record<string, unknown>;
+
+/**
+ * One operator action a module offers to the dashboard's Buttons widget: a
+ * press invokes `method` (one of the module's RPC methods) on the device with
+ * `params`. The control server merges the actions of every enabled module into
+ * the device's cached status (`status.actions`); the widget never names a module.
+ */
+export interface DashboardAction {
+	/** Unique within the module (the widget config stores `<module>.<id>`). */
+	id: string;
+	/** Default button label (an i18n key is resolved when one exists). */
+	label: string;
+	/** Short glyph shown before the label (an emoji or a few characters). */
+	icon?: string;
+	/** RPC method name on the device (must be one of the module's `methods`). */
+	method: string;
+	/** Default params; a widget may override them per button. */
+	params?: Record<string, unknown>;
+	/** Ask the operator before firing. */
+	confirm?: boolean;
+	/** Device roles the action applies on (default: `methodRoles[method]`, then the module's `roles`). */
+	roles?: readonly Role[];
+}
+
+/** A dashboard action as published in `status.actions`: tagged with its owning module. */
+export interface DashboardActionEntry extends DashboardAction {
+	/** `<module id>.<action id>` — what a widget config refers to. */
+	key: string;
+	module: string;
+	moduleTitle: string;
+}
 
 /** Options of a module-emitted push (`ctx.emit`). */
 export interface EmitOptions {
@@ -47,10 +78,37 @@ export interface ModulePage {
 	page: string;
 }
 
+/** What a device widget's server-side `validateConfig` can look at. */
+export interface WidgetConfigContext {
+	/** True when the dashboard is being created (POST); a later save (PUT) is
+	 * lenient so a module disabled or a device pruned in the meantime cannot
+	 * brick the dashboard. */
+	strict: boolean;
+	/** The bound device's last cached status (device-bound widgets only). */
+	status: Status | undefined;
+	/** Any device's last cached status (undefined before it reported one / unknown id). */
+	deviceStatus(deviceId: string): Status | undefined;
+	/** Whether the dashboard's owner owns `deviceId`. */
+	ownsDevice(deviceId: string): boolean;
+	/** Whether `deviceId` is still registered at all (a pruned device is not;
+	 * a lenient save may keep it, a foreign live device is always rejected). */
+	deviceExists(deviceId: string): boolean;
+}
+
 /** A device-bound dashboard widget the module renders (server-side validation + default size). */
 export interface ModuleWidget {
 	type: string;
 	defaultSize: { w: number; h: number };
+	/** Fleet widget: not bound to one device — it is offered once and its
+	 * config names the devices it drives (so `deviceId` stays empty). */
+	fleet?: boolean;
+	/** Config parameters the widget stores (string values, validated like the channel widgets'). */
+	configFields?: readonly WidgetConfigField[];
+	/** Extra validation of a widget's config (throw an Error to reject the save). */
+	validateConfig?(
+		config: Record<string, string>,
+		context: WidgetConfigContext,
+	): void;
 }
 
 /** Channel-widget hub (device-independent dashboard widgets: stats, chat). */
@@ -144,6 +202,8 @@ export interface BackendModule<TCore = unknown> {
 	pages?: readonly ModulePage[];
 	/** Device-bound dashboard widgets the module renders. */
 	dashboardWidgets?: readonly ModuleWidget[];
+	/** Operator actions offered to the dashboard's Buttons widget (each fires one of `methods`). */
+	dashboardActions?: readonly DashboardAction[];
 	/** Capabilities offered to other modules (looked up by name through the bus). */
 	services?: { capabilities?: Record<string, unknown> };
 	/** Channel-widget hub (widget modules). */

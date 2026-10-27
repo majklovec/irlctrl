@@ -4,6 +4,7 @@
  */
 import { Elysia } from "elysia";
 import { createFrontend } from "../../shared/frontend";
+import { pwaRoutes } from "../../shared/pwa";
 import { devicePagesPlugin } from "./api/pages";
 import { deviceRpcPlugin } from "./api/rpc";
 import { API_HOST, API_PORT } from "./config";
@@ -14,6 +15,7 @@ export async function createDeviceApiApp() {
 		new URL("../../frontend/", import.meta.url),
 	);
 	return new Elysia({ name: "device-api" })
+		.use(pwaRoutes())
 		.use(devicePagesPlugin(frontend))
 		.use(deviceRpcPlugin());
 }

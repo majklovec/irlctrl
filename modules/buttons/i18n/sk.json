@@ -1,0 +1,22 @@
+{
+	"wtype.buttons": "Tlačidlá",
+	"buttons.empty": "Zatiaľ žiadne tlačidlá - pridajte ich v nastaveniach widgetu.",
+	"buttons.waiting": "Čakám na stav zariadenia…",
+	"buttons.unavailable": "Nedostupné - modul je vypnutý alebo odstránený",
+	"buttons.confirm": "Spustiť „{{label}}“ na {{device}}?",
+	"buttons.failed": "{{label}} zlyhalo: {{error}}",
+	"buttons.catalogue": "Dostupné akcie",
+	"buttons.none_available": "Toto zariadenie neponúka žiadne akcie - zapnite modul, ktorý nejaké deklaruje.",
+	"buttons.configured": "Nastavené tlačidlá",
+	"buttons.label_override": "Popis",
+	"buttons.icon_override": "Ikona",
+	"buttons.params_override": "Prepísanie parametrov (JSON)",
+	"buttons.params_invalid": "Tlačidlo {{index}}: parametre musia byť JSON objekt",
+	"buttons.orphan_blocks_save": "Pred uložením odstráňte nedostupné tlačidlá",
+	"buttons.move_up": "Posunúť hore",
+	"buttons.move_down": "Posunúť dole",
+	"buttons.remove": "Odstrániť",
+	"buttons.preview": "Náhľad",
+	"buttons.badge_online": "{{online}}/{{total}} online",
+	"buttons.no_devices": "Zatiaľ žiadne zariadenia – pripojte zariadenie a vyberte jeho akcie."
+}

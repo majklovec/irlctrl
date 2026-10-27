@@ -93,5 +93,10 @@
 	"ui.optional": "Необязательно",
 	"ui.remove": "Удалить",
 	"wtype.combined": "Энкодер + ретранслятор",
-	"wtype.encoder": "Энкодер"
+	"wtype.encoder": "Энкодер",
+	"act.encoder.stop": "Остановить энкодер",
+	"act.encoder.bitrate_low": "Битрейт 1,5 Мбит/с",
+	"act.encoder.bitrate_high": "Битрейт 6 Мбит/с",
+	"act.encoder.start": "Запустить энкодер",
+	"act.encoder.stream_stop": "Остановить стрим"
 }

@@ -16,13 +16,19 @@ import { configFieldName, visibleWidgetConfigFields } from "../types";
 import { Badge, Button } from "./components/ui";
 import { createCardHost, type DeviceCard } from "./device/store";
 import { t } from "./i18n";
-import type { DeviceDashboardContext } from "./module-contracts";
+import type {
+	DeviceDashboardContext,
+	DeviceLink,
+	FleetDashboardContext,
+} from "./module-contracts";
 import {
 	destroyDeviceWidget,
 	deviceWidgetForType,
 	deviceWidgetsForType,
 	deviceWidgetTypesFor,
 	dispatchWidgetFrame,
+	fleetWidgetForType,
+	fleetWidgetTypes,
 	type WidgetContext,
 	widgetConfigFieldsForType,
 	widgetModuleForType,
@@ -31,12 +37,14 @@ import {
 import { RpcClient, socketUrl } from "./services/rpc";
 import { serverLive } from "./services/serverws";
 
-/** Device-independent widget types: their data (the widget's channel, fetched
- * by the control server) is not tied to any device connection. The widget
- * modules declare their own types; the core routes through the registry. */
-const INDEPENDENT: ReadonlySet<WidgetType> = new Set<WidgetType>(
-	widgetModuleTypes() as WidgetType[],
-);
+/** Device-independent widget types — offered once, with no device of their
+ * own: the channel widgets (their data is fetched by the control server) and
+ * the fleet widgets (their config names the devices they drive). The modules
+ * declare their own types; the core routes through the registry. */
+const INDEPENDENT: ReadonlySet<WidgetType> = new Set<WidgetType>([
+	...widgetModuleTypes(),
+	...fleetWidgetTypes(),
+] as WidgetType[]);
 export const isIndependent = (type: WidgetType): boolean =>
 	INDEPENDENT.has(type);
 
@@ -141,10 +149,10 @@ export function widgetTypesFor(d: DeviceSummary): WidgetType[] {
 	return deviceWidgetTypesFor(d);
 }
 
-/** Widget types that are not tied to a device: always offered; their data
- * (the channel name in the widget config) is fetched by the server. */
+/** Widget types that are not tied to a device: always offered — channel
+ * widgets (their data is fetched by the server) and fleet widgets. */
 export function independentTypes(): WidgetType[] {
-	return widgetModuleTypes() as WidgetType[];
+	return [...widgetModuleTypes(), ...fleetWidgetTypes()] as WidgetType[];
 }
 
 /** The device a widget's data comes from — its own for device-bound widgets;
@@ -157,12 +165,50 @@ export function effectiveDeviceId(w: ServerDashboardWidget): string {
 
 const connections = new Map<string, Connection>();
 const activeDeviceWidgets = new Map<string, string>();
+/** The dashboard the connections were last synced for (see `pruneConnections`). */
+let syncedDash: ServerDashboard | undefined;
+
+/** Open the viewer websocket of one device (no-op when already open). */
+function openConnection(id: string): Connection {
+	const existing = connections.get(id);
+	if (existing) return existing;
+	const live: DeviceLive = {};
+	const rpc = new RpcClient(() =>
+		socketUrl(`/d/${encodeURIComponent(id)}/ws`),
+	);
+	const conn: Connection = { rpc, live, card: createCardHost({ rpc }) };
+	connections.set(id, conn);
+	rpc.on("device", (data) => {
+		const info = data as DeviceInfo;
+		live.device = info;
+		if (!info.online) conn.card.clearEvents();
+	});
+	rpc.on("status", (data) => {
+		live.status = data as Status;
+		conn.card.applyStatus(live.status!);
+	});
+	rpc.onAny((event, data) => {
+		if (event !== "status" && event !== "open" && event !== "close")
+			conn.card.handleEvent(event, data);
+		m.redraw();
+	});
+	rpc.on("close", () => conn.card.clearEvents());
+	// Warm start: pull last snapshots once the socket is open (a 409 means the
+	// module is not enabled there). `call` rejects before the socket is OPEN, so
+	// this must run from the "open" event — initial connect and every reconnect.
+	rpc.on("open", () => {
+		conn.card.handleEvent("open", undefined);
+		void rpc.call("status").catch(() => undefined);
+	});
+	return conn;
+}
 
 /** One viewer websocket per device referenced by the dashboard's widgets. */
 export function syncConnectionsFor(dash: ServerDashboard | undefined): void {
+	syncedDash = dash;
 	const nextWidgets = new Map(
 		(dash?.widgets ?? [])
-			.filter((w) => !isIndependent(w.type))
+			.filter((w) => !isIndependent(w.type) || fleetWidgetForType(w.type))
 			.map((w) => [widgetKey(w), w.type]),
 	);
 	for (const [id, type] of activeDeviceWidgets)
@@ -170,8 +216,12 @@ export function syncConnectionsFor(dash: ServerDashboard | undefined): void {
 	activeDeviceWidgets.clear();
 	for (const [id, type] of nextWidgets) activeDeviceWidgets.set(id, type);
 
+	// Device widgets need their own device; fleet widgets every device they name.
 	const wanted = new Set(
-		(dash?.widgets ?? []).map((w) => effectiveDeviceId(w)),
+		(dash?.widgets ?? []).flatMap((w) => [
+			effectiveDeviceId(w),
+			...(fleetWidgetForType(w.type)?.devicesFor(w) ?? []),
+		]),
 	);
 	for (const [id, conn] of connections) {
 		if (!wanted.has(id) || !id) {
@@ -179,58 +229,57 @@ export function syncConnectionsFor(dash: ServerDashboard | undefined): void {
 			connections.delete(id);
 		}
 	}
-	for (const id of wanted) {
-		if (!id || connections.has(id)) continue;
-		const live: DeviceLive = {};
-		const rpc = new RpcClient(() =>
-			socketUrl(`/d/${encodeURIComponent(id)}/ws`),
-		);
-		const conn: Connection = { rpc, live, card: createCardHost({ rpc }) };
-		connections.set(id, conn);
-		rpc.on("device", (data) => {
-			const info = data as DeviceInfo;
-			live.device = info;
-			if (!info.online) conn.card.clearEvents();
-		});
-		rpc.on("status", (data) => {
-			live.status = data as Status;
-			conn.card.applyStatus(live.status!);
-		});
-		rpc.onAny((event, data) => {
-			if (event !== "status" && event !== "open" && event !== "close")
-				conn.card.handleEvent(event, data);
-			m.redraw();
-		});
-		rpc.on("close", () => conn.card.clearEvents());
-		// Warm start: pull last snapshots once the socket is open (a 409 means the
-		// module is not enabled there). `call` rejects before the socket is OPEN, so
-		// this must run from the "open" event — initial connect and every reconnect.
-		rpc.on("open", () => {
-			conn.card.handleEvent("open", undefined);
-			void rpc.call("status").catch(() => undefined);
-		});
-	}
+	for (const id of wanted) if (id) openConnection(id);
 	if ((dash?.widgets ?? []).some((w) => isIndependent(w.type)))
 		ensureDashboardsConn();
 }
+
+/** Drop the connections a fleet widget's editor opened on demand (`connect`)
+ * that no saved widget needs — run when the editor closes. */
+const pruneConnections = (): void => syncConnectionsFor(syncedDash);
 
 const connectionFor = (deviceId: string): Connection | undefined =>
 	connections.get(deviceId);
 
 // ---------------------------------------------------------------------- widgets
 
-function deviceWidgetContext(
-	w: ServerDashboardWidget,
-	device: DeviceSummary,
-): DeviceDashboardContext | undefined {
+function deviceLink(device: DeviceSummary): DeviceLink | undefined {
 	const conn = connectionFor(device.id);
 	if (!conn) return undefined;
 	return {
-		widget: w,
 		device,
 		status: conn.card.st.status ?? undefined,
 		card: conn.card,
 		rpc: conn.rpc,
+	};
+}
+
+function deviceWidgetContext(
+	w: ServerDashboardWidget,
+	device: DeviceSummary,
+): DeviceDashboardContext | undefined {
+	const link = deviceLink(device);
+	return link ? { widget: w, ...link } : undefined;
+}
+
+/** The render context of a fleet widget: the user's devices plus a live link
+ * per device the widget named (once the page connected to it). `connect`
+ * opens a link to any other device of the user on demand (the editor's
+ * catalogue); those extra links are pruned when the editor closes. */
+function fleetContext(w: ServerDashboardWidget): FleetDashboardContext {
+	return {
+		widget: w,
+		devices: devices.list ?? [],
+		link(deviceId) {
+			const device = deviceById(deviceId);
+			return device ? deviceLink(device) : undefined;
+		},
+		connect(deviceId) {
+			const device = deviceById(deviceId);
+			if (!device) return undefined;
+			openConnection(deviceId);
+			return deviceLink(device);
+		},
 	};
 }
 
@@ -255,6 +304,8 @@ function deviceWidget(w: ServerDashboardWidget): m.Children {
 function widgetBadge(w: ServerDashboardWidget): m.Children {
 	const channelModule = widgetModuleForType(w.type);
 	if (channelModule) return channelModule.badge(w, widgetCtx(w)) as m.Children;
+	const fleet = fleetWidgetForType(w.type);
+	if (fleet) return fleet.badge?.(fleetContext(w)) ?? null;
 
 	const device = deviceById(w.deviceId);
 	if (!device) return <Badge text={t("dash.widget_missing")} kind="warn" />;
@@ -321,9 +372,38 @@ export function onDashboardsChanged(data: unknown): void {
 	);
 }
 
+/** A device widget's own config editor (its module's `configEditor` hook), or
+ * null when the type uses the generic per-field form. */
+function customConfigEditor(
+	w: ServerDashboardWidget,
+	values: Record<string, string>,
+): { editor: m.Children; error?: string } | null {
+	const fleet = fleetWidgetForType(w.type);
+	if (fleet) {
+		const context = fleetContext(w);
+		return {
+			editor: fleet.configEditor(context, values),
+			error: fleet.configError?.(context, values),
+		};
+	}
+	const widget = isIndependent(w.type) ? undefined : deviceWidgetForType(w.type);
+	if (!widget?.configEditor) return null;
+	const device = deviceById(w.deviceId);
+	const context = device ? deviceWidgetContext(w, device) : undefined;
+	if (!context) {
+		const error = t("dash.widget_missing");
+		return { editor: <p class="muted">{error}</p>, error };
+	}
+	return {
+		editor: widget.configEditor(context, values),
+		error: widget.configError?.(context, values),
+	};
+}
+
 /** The inline editor that opens from the pencil icon on a configurable widget.
  * One field per parameter in the widget module's `configFields` (labels and
- * placeholders come from `dash.widget_<name>` i18n keys). */
+ * placeholders come from `dash.widget_<name>` i18n keys), unless the widget
+ * brings its own editor. */
 function configEditorForm(w: ServerDashboardWidget): m.Vnode {
 	const fields = widgetConfigFieldsForType(w.type);
 	const key = widgetKey(w);
@@ -331,10 +411,18 @@ function configEditorForm(w: ServerDashboardWidget): m.Vnode {
 		editing: true,
 		values: { ...(w.config ?? {}) },
 	};
-	const visibleFields = visibleWidgetConfigFields(fields);
+	const custom = customConfigEditor(w, s.values);
+	const visibleFields = custom ? [] : visibleWidgetConfigFields(fields);
 	return (
 		<div class="dash-config-form">
 			{[
+				...(custom
+					? [
+							<div class="dash-config-custom" key="custom">
+								{custom.editor}
+							</div>,
+						]
+					: []),
 				...visibleFields.map((field) => {
 					const name = configFieldName(field);
 					const isSelect = typeof field !== "string" && field.type === "select";
@@ -377,10 +465,15 @@ function configEditorForm(w: ServerDashboardWidget): m.Vnode {
 				}),
 				<div class="dash-config-actions" key="actions">
 					{[
+						custom?.error ? (
+							<span class="dash-config-error">{custom.error}</span>
+						) : null,
 						<Button
 							label={t("ui.save")}
+							disabled={!!custom?.error}
 							onclick={(e: Event) => {
 								e.preventDefault();
+								if (custom?.error) return;
 								w.config = Object.fromEntries(
 									fields.map((field) => {
 										const nm = configFieldName(field);
@@ -397,6 +490,7 @@ function configEditorForm(w: ServerDashboardWidget): m.Vnode {
 								);
 								widgetConfigState.delete(key);
 								widgetConfigSaver?.(w);
+								pruneConnections();
 								m.redraw();
 							}}
 						/>,
@@ -404,6 +498,7 @@ function configEditorForm(w: ServerDashboardWidget): m.Vnode {
 							label={t("ui.cancel")}
 							onclick={() => {
 								widgetConfigState.delete(widgetKey(w));
+								pruneConnections();
 								m.redraw();
 							}}
 						/>,
@@ -452,6 +547,8 @@ function widgetVersion(w: ServerDashboardWidget): m.Vnode | null {
 function bodyFor(w: ServerDashboardWidget): m.Children {
 	const mod = widgetModuleForType(w.type);
 	if (mod) return mod.body(w, widgetCtx(w)) as m.Children;
+	const fleet = fleetWidgetForType(w.type);
+	if (fleet) return fleet.body(fleetContext(w));
 	return deviceWidget(w);
 }
 
@@ -464,7 +561,7 @@ export function widgetSize(type: WidgetType): {
 } {
 	const wm = widgetModuleForType(type);
 	if (wm) return { default: wm.defaultSize, min: wm.defaultSize };
-	const widget = deviceWidgetForType(type);
+	const widget = fleetWidgetForType(type) ?? deviceWidgetForType(type);
 	if (widget)
 		return {
 			default: widget.defaultSize,
@@ -532,6 +629,7 @@ export function widgetInner(
 												};
 												s.editing = !s.editing;
 												widgetConfigState.set(key, s);
+												if (!s.editing) pruneConnections();
 												m.redraw();
 											}}
 										>

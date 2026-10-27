@@ -9,5 +9,6 @@
 	"mlog.done.modem_disconnected": "モデム #{{index}} を切断しました",
 	"mlog.done.modem_enabled": "モデム #{{index}} を有効化しました",
 	"mlog.done.modem_reset": "モデム #{{index}} をリセットしました",
-	"mlog.done.reconfigured": "再設定済み"
+	"mlog.done.reconfigured": "再設定済み",
+	"act.modems.reconfigure": "モデム再設定"
 }

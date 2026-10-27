@@ -9,5 +9,6 @@
 	"mlog.done.modem_disconnected": "调制解调器 #{{index}} 已断开",
 	"mlog.done.modem_enabled": "调制解调器 #{{index}} 已启用",
 	"mlog.done.modem_reset": "调制解调器 #{{index}} 已重置",
-	"mlog.done.reconfigured": "已重新配置"
+	"mlog.done.reconfigured": "已重新配置",
+	"act.modems.reconfigure": "重新配置调制解调器"
 }

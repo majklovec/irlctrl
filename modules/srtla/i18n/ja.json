@@ -58,5 +58,7 @@
 	"mlog.done.reloaded": "リロード済み",
 	"setup.step.relay_sub": "SRTLA 設定",
 	"ui.off": "オフ",
-	"wtype.relay": "Relay"
+	"wtype.relay": "Relay",
+	"act.srtla.stop": "SRTLA 停止",
+	"act.srtla.reload": "アップリンク再読込"
 }

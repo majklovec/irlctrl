@@ -58,5 +58,7 @@
 	"mlog.done.reloaded": "Recarregado",
 	"setup.step.relay_sub": "Definições SRTLA",
 	"ui.off": "off",
-	"wtype.relay": "Relay"
+	"wtype.relay": "Relay",
+	"act.srtla.stop": "Parar SRTLA",
+	"act.srtla.reload": "Recarregar uplinks"
 }

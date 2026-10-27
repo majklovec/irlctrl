@@ -360,6 +360,44 @@ const encoderModule: BackendModule<ModuleCore> = {
 		{ type: "encoder", defaultSize: { w: 6, h: 5 } },
 		{ type: "combined", defaultSize: { w: 6, h: 10 } },
 	],
+	dashboardActions: [
+		{
+			id: "stop",
+			label: "act.encoder.stop",
+			icon: "⏹",
+			method: "encoder.stop",
+			confirm: true,
+		},
+		{
+			id: "bitrate-low",
+			label: "act.encoder.bitrate_low",
+			icon: "▽",
+			method: "encoder.bitrate",
+			params: { maxBitrate: 1500 },
+		},
+		{
+			id: "bitrate-high",
+			label: "act.encoder.bitrate_high",
+			icon: "△",
+			method: "encoder.bitrate",
+			params: { maxBitrate: 6000 },
+		},
+		// Needs `pipeline`, `host` and `port` — set them in the button's params override.
+		{
+			id: "start",
+			label: "act.encoder.start",
+			icon: "▶",
+			method: "encoder.start",
+		},
+		// Combined boxes: stop the bonded stream (encoder + srtla) in one go.
+		{
+			id: "stream-stop",
+			label: "act.encoder.stream_stop",
+			icon: "⏹",
+			method: "stream.stop",
+			confirm: true,
+		},
+	],
 };
 
 export default encoderModule;

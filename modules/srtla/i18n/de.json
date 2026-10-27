@@ -58,5 +58,7 @@
 	"mlog.done.reloaded": "Neu geladen",
 	"setup.step.relay_sub": "SRTLA-Einstellungen",
 	"ui.off": "aus",
-	"wtype.relay": "Relay"
+	"wtype.relay": "Relay",
+	"act.srtla.stop": "SRTLA stoppen",
+	"act.srtla.reload": "Uplinks neu laden"
 }

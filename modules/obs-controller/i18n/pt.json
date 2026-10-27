@@ -59,5 +59,9 @@
 	"lowbs.scene_privacy": "Privacidade (opcional)",
 	"lowbs.instantly_recover": "Repor imediatamente quando recuperar",
 	"lowbs.only_streaming": "Comutar apenas durante a transmissão",
-	"lowbs.log_to_file": "Escrever o registo num ficheiro"
+	"lowbs.log_to_file": "Escrever o registo num ficheiro",
+	"act.obs.stream_start": "OBS: iniciar transmissão",
+	"act.obs.stream_stop": "OBS: parar transmissão",
+	"act.obs.record_start": "OBS: iniciar gravação",
+	"act.obs.record_stop": "OBS: parar gravação"
 }

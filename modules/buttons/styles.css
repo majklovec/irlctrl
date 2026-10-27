@@ -1,0 +1,259 @@
+/* Buttons widget (virtual StreamDeck): the key grid in the dashboard card and
+ * the layout editor behind the pencil icon. Scoped under .buttons-*. */
+
+.buttons-widget {
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.buttons-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+    gap: 0.5rem;
+    align-content: start;
+}
+
+.buttons-key {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    min-height: 3.2rem;
+    padding: 0.4rem 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1.15;
+    text-align: center;
+    background: color-mix(in srgb, var(--accent) 22%, var(--card-solid));
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    box-shadow: none;
+}
+.buttons-key:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent) 38%, var(--card-solid));
+    border-color: var(--accent);
+}
+.buttons-key.is-confirm {
+    background: color-mix(in srgb, var(--bad) 18%, var(--card-solid));
+    border-color: color-mix(in srgb, var(--bad) 45%, var(--border));
+}
+.buttons-key.is-confirm:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--bad) 32%, var(--card-solid));
+    border-color: var(--bad);
+}
+.buttons-key:disabled {
+    cursor: default;
+    opacity: 0.55;
+    transform: none;
+}
+.buttons-key.is-orphan {
+    background: transparent;
+    border-style: dashed;
+    color: var(--muted);
+    text-decoration: line-through;
+}
+.buttons-key.is-busy {
+    opacity: 0.85;
+}
+
+.buttons-icon {
+    font-size: 1.25rem;
+    line-height: 1;
+}
+.buttons-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.buttons-spinner {
+    width: 1.1rem;
+    height: 1.1rem;
+    border: 2px solid color-mix(in srgb, currentColor 35%, transparent);
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: buttons-spin 0.8s linear infinite;
+}
+@keyframes buttons-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Failure toast: bottom of the card, auto-hides. */
+.buttons-toast {
+    position: sticky;
+    bottom: 0;
+    margin-top: auto;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
+    color: var(--text);
+    background: color-mix(in srgb, var(--bad) 30%, var(--card-solid));
+    border: 1px solid color-mix(in srgb, var(--bad) 60%, var(--border));
+    border-radius: var(--radius-xs);
+}
+
+.buttons-empty {
+    font-size: 0.85rem;
+}
+
+/* ---------------------------------------------------------------- editor */
+
+.buttons-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.buttons-editor-section h4 {
+    margin: 0 0 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.buttons-catalogue-group {
+    margin-bottom: 0.4rem;
+}
+.buttons-catalogue-module {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+}
+.buttons-catalogue-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+.buttons-catalogue-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+.buttons-catalogue-action .buttons-icon {
+    font-size: 1rem;
+}
+.buttons-add {
+    color: var(--accent);
+    font-weight: 700;
+}
+
+.buttons-rows {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.buttons-row {
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--card-subtle);
+}
+.buttons-row.is-orphan {
+    border-color: color-mix(in srgb, var(--warn) 55%, var(--border));
+}
+.buttons-row-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+}
+.buttons-row-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+}
+.buttons-row-actions {
+    display: inline-flex;
+    gap: 0.15rem;
+}
+.buttons-row-actions .icon-btn {
+    font-size: 0.85rem;
+    line-height: 1;
+    padding: 0.15rem 0.4rem;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    box-shadow: none;
+}
+.buttons-row-actions .icon-btn:hover:not(:disabled) {
+    background: var(--border);
+    color: var(--text);
+}
+.buttons-row-actions .icon-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+.buttons-orphan-tag {
+    font-size: 0.75rem;
+    color: var(--warn);
+}
+
+.buttons-row-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 4.5rem;
+    gap: 0.4rem 0.5rem;
+    margin-top: 0.4rem;
+}
+.buttons-row-fields label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    font-size: 0.75rem;
+    color: var(--muted);
+}
+.buttons-field-params {
+    grid-column: 1 / -1;
+}
+.buttons-row-fields textarea {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.75rem;
+    resize: vertical;
+}
+.buttons-row-fields .is-invalid {
+    border-color: var(--bad);
+}
+
+/* Which device a key fires on (one widget drives several). */
+.buttons-device {
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: color-mix(in srgb, currentColor 70%, transparent);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+/* Editor: the catalogue is grouped per device, then per module. */
+.buttons-catalogue-device {
+    margin-bottom: 0.6rem;
+    padding-left: 0.5rem;
+    border-left: 2px solid var(--border);
+}
+.buttons-catalogue-device-name {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.3rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+.buttons-catalogue-note {
+    margin: 0 0 0.3rem;
+    font-size: 0.8rem;
+}

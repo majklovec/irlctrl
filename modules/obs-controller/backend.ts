@@ -465,6 +465,40 @@ const registration: BackendModule<ModuleCore> = {
 	],
 	events: ["obs.event", "lowBitrateSwitcher.state"],
 	dashboardWidgets: [{ type: "obs", defaultSize: { w: 6, h: 6 } }],
+	// Parameterless obs-websocket requests; a scene switch is one params
+	// override away: `{ "requestType": "SetCurrentProgramScene", "requestData": { "sceneName": "…" } }`.
+	dashboardActions: [
+		{
+			id: "stream-start",
+			label: "act.obs.stream_start",
+			icon: "▶",
+			method: "obs.request",
+			params: { requestType: "StartStream" },
+		},
+		{
+			id: "stream-stop",
+			label: "act.obs.stream_stop",
+			icon: "⏹",
+			method: "obs.request",
+			params: { requestType: "StopStream" },
+			confirm: true,
+		},
+		{
+			id: "record-start",
+			label: "act.obs.record_start",
+			icon: "⏺",
+			method: "obs.request",
+			params: { requestType: "StartRecord" },
+		},
+		{
+			id: "record-stop",
+			label: "act.obs.record_stop",
+			icon: "⏹",
+			method: "obs.request",
+			params: { requestType: "StopRecord" },
+			confirm: true,
+		},
+	],
 	bind(c) {
 		core = c;
 	},

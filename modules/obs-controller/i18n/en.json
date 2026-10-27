@@ -59,5 +59,9 @@
 	"lowbs.scene_privacy": "Privacy (optional)",
 	"lowbs.instantly_recover": "Switch back instantly on recovery",
 	"lowbs.only_streaming": "Only switch while streaming",
-	"lowbs.log_to_file": "Write log to file"
+	"lowbs.log_to_file": "Write log to file",
+	"act.obs.stream_start": "OBS: start streaming",
+	"act.obs.stream_stop": "OBS: stop streaming",
+	"act.obs.record_start": "OBS: start recording",
+	"act.obs.record_stop": "OBS: stop recording"
 }

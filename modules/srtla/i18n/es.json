@@ -58,5 +58,7 @@
 	"mlog.done.reloaded": "Recargado",
 	"setup.step.relay_sub": "Ajustes SRTLA",
 	"ui.off": "desactivado",
-	"wtype.relay": "Relay"
+	"wtype.relay": "Relay",
+	"act.srtla.stop": "Detener SRTLA",
+	"act.srtla.reload": "Recargar enlaces"
 }

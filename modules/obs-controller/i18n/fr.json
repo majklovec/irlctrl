@@ -59,5 +59,9 @@
 	"lowbs.scene_privacy": "Confidentialité (facultatif)",
 	"lowbs.instantly_recover": "Revenir immédiatement après le rétablissement",
 	"lowbs.only_streaming": "Basculer uniquement pendant la diffusion",
-	"lowbs.log_to_file": "Écrire le journal dans un fichier"
+	"lowbs.log_to_file": "Écrire le journal dans un fichier",
+	"act.obs.stream_start": "OBS : démarrer le direct",
+	"act.obs.stream_stop": "OBS : arrêter le direct",
+	"act.obs.record_start": "OBS : démarrer l’enregistrement",
+	"act.obs.record_stop": "OBS : arrêter l’enregistrement"
 }

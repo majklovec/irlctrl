@@ -58,5 +58,7 @@
 	"mlog.done.reloaded": "Obnovené",
 	"setup.step.relay_sub": "Nastavenia SRTLA",
 	"ui.off": "vypnuté",
-	"wtype.relay": "Relay"
+	"wtype.relay": "Relay",
+	"act.srtla.stop": "Zastaviť SRTLA",
+	"act.srtla.reload": "Znovu načítať uplinky"
 }

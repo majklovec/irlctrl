@@ -10,9 +10,11 @@
  * to this file.
  */
 import type { Language } from "./languages";
+import type { DashboardActionEntry } from "./module-contract";
 import type { Role } from "./validate";
 
 export type { Role };
+export type { DashboardAction, DashboardActionEntry } from "./module-contract";
 
 /** One module's slice of the modules view: its enabled flag plus its non-secret settings. */
 export interface ModuleSliceView {
@@ -33,6 +35,9 @@ export interface Status {
 	modules: ModulesView;
 	/** Device-list summary fields contributed by the modules (the control server copies them). */
 	summary?: Record<string, unknown>;
+	/** Operator actions of the enabled modules — merged in by the control server
+	 * from the module registrations (absent on a status read straight from the device). */
+	actions?: readonly DashboardActionEntry[];
 	[key: string]: unknown;
 }
 
@@ -137,9 +142,9 @@ export interface ServerDashboardWidget {
 	h: number;
 	/** Hidden widgets keep their position/size; they are not rendered. */
 	visible: boolean;
-	/** Channel-widget modules only: their own data source parameters. The
-	 * parameter names are declared by the widget module's `configFields` (the
-	 * core stores an opaque record and never names its fields). */
+	/** The widget's own parameters, declared by its module's `configFields`
+	 * (channel widgets: their data source; device widgets: optional, e.g. the
+	 * Buttons layout). The core stores an opaque record and never names its fields. */
 	config?: Record<string, string>;
 }
 export interface ServerDashboard {

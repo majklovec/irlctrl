@@ -1,13 +1,21 @@
 import type { Database } from "bun:sqlite";
 import { randomUUID } from "node:crypto";
 import {
+	deviceWidgetConfigFields,
 	initWidgetHub,
 	isChannelWidgetType,
+	isFleetWidgetType,
 	syncWidgetHub,
+	validateDeviceWidgetConfig,
 	WIDGET_SIZES,
 	widgetConfigFields,
 } from "../../shared/registry";
-import type { ServerDashboard, ServerDashboardWidget } from "../../shared/types";
+import type {
+	ServerDashboard,
+	ServerDashboardWidget,
+	Status,
+	WidgetConfigField,
+} from "../../shared/types";
 import { configFieldName } from "../../shared/types";
 import {
 	dashboardsTopic,
@@ -36,6 +44,7 @@ export function createDashboards({
 	publish,
 	ownsDevice,
 	deviceExists,
+	deviceStatus,
 }: {
 	db: Database | null;
 	databaseFile: string;
@@ -45,9 +54,39 @@ export function createDashboards({
 	 * longer exists at all. Lets a save keep widgets bound to pruned devices
 	 * (they simply cannot connect) instead of rejecting the whole dashboard. */
 	deviceExists?: (id: string) => boolean | null | undefined;
+	/** The device's last cached status (undefined before it reported one);
+	 * device widgets with a config validate against it (e.g. the Buttons
+	 * widget checks its action keys against `status.actions`). */
+	deviceStatus?: (id: string) => Status | undefined;
 }) {
 	const DB_FILE = databaseFile;
 	let dashboards: ServerDashboard[] = [];
+
+	/** Parse the string-valued config of a widget against its module's declared fields. */
+	function parseConfig(
+		raw: unknown,
+		fields: readonly WidgetConfigField[],
+	): Record<string, string> {
+		const cfg = (raw && typeof raw === "object" ? raw : {}) as Record<
+			string,
+			unknown
+		>;
+		const fieldNames = fields.map(configFieldName);
+		const config: Record<string, string> = {};
+		for (const name of fieldNames) {
+			const v = cfg[name];
+			if (v !== undefined) {
+				if (typeof v !== "string")
+					throw new ApiError(`config.${name} must be a string`);
+				config[name] = v.trim();
+			} else config[name] = "";
+		}
+		for (const key of Object.keys(cfg)) {
+			if (!fieldNames.includes(key))
+				throw new ApiError(`Unknown config field: ${key}`);
+		}
+		return config;
+	}
 
 	/** Read `{x, y, w, h}` from an inbound widget payload (missing fields fall back to the type default). */
 	function parseGrid(
@@ -105,24 +144,6 @@ export function createDashboards({
 				// source parameters, declared by the widget module (the dashboard
 				// API owns their hub). Values may be missing/empty — they can be
 				// set in the add form and edited later in the widget config editor.
-				const cfg = (
-					item.config && typeof item.config === "object" ? item.config : {}
-				) as Record<string, unknown>;
-				const fields = widgetConfigFields(type);
-				const fieldNames = fields.map(configFieldName);
-				const config: Record<string, string> = {};
-				for (const name of fieldNames) {
-					const v = cfg[name];
-					if (v !== undefined) {
-						if (typeof v !== "string")
-							throw new ApiError(`config.${name} must be a string`);
-						config[name] = v.trim();
-					} else config[name] = "";
-				}
-				for (const key of Object.keys(cfg)) {
-					if (!fieldNames.includes(key))
-						throw new ApiError(`Unknown config field: ${key}`);
-				}
 				return {
 					id,
 					deviceId: typeof deviceId === "string" ? deviceId : "",
@@ -130,9 +151,47 @@ export function createDashboards({
 					name,
 					...grid,
 					visible,
-					config,
+					config: parseConfig(item.config, widgetConfigFields(type)),
 				};
 			}
+			// A device widget carries a config only when its module declares the
+			// fields; the module may additionally validate it (strictly when the
+			// dashboard is created, leniently on later saves). Fleet widgets are
+			// offered once and name their devices in that config instead of
+			// binding to one.
+			const deviceFields = deviceWidgetConfigFields(type);
+			const fleet = isFleetWidgetType(type);
+			if (item.config !== undefined && deviceFields.length === 0)
+				throw new ApiError(`The ${type} widget accepts no config`);
+			const validate = (boundDevice: string): Record<string, string> => {
+				const config = parseConfig(item.config, deviceFields);
+				try {
+					validateDeviceWidgetConfig(type, config, {
+						strict,
+						status: boundDevice ? deviceStatus?.(boundDevice) : undefined,
+						deviceStatus: (id) => deviceStatus?.(id),
+						ownsDevice: (id) => ownsDevice(id, owner),
+						// Without a registry lookup every device counts as existing (so
+						// a foreign id is rejected), like the device-bound branch below.
+						deviceExists: (id) => !deviceExists || !!deviceExists(id),
+					});
+				} catch (err) {
+					throw new ApiError(
+						err instanceof Error ? err.message : "Invalid widget config",
+					);
+				}
+				return config;
+			};
+			if (fleet)
+				return {
+					id,
+					deviceId: "",
+					type,
+					name,
+					...grid,
+					visible,
+					config: validate(""),
+				};
 			if (typeof deviceId !== "string" || deviceId === "")
 				throw new ApiError("Widget needs a deviceId");
 			// A widget may only bind to a device assigned to the dashboard's owner.
@@ -149,8 +208,7 @@ export function createDashboards({
 				(strict || !deviceExists || deviceExists(deviceId))
 			)
 				throw new ApiError(`Device not available: ${deviceId}`);
-			if (item.config !== undefined)
-				throw new ApiError("Only channel widgets accept a config");
+			const config = deviceFields.length > 0 ? validate(deviceId) : undefined;
 			return {
 				id,
 				deviceId,
@@ -158,6 +216,7 @@ export function createDashboards({
 				name,
 				...grid,
 				visible,
+				...(config ? { config } : {}),
 			};
 		});
 	}

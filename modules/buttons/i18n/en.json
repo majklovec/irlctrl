@@ -1,0 +1,22 @@
+{
+	"wtype.buttons": "Buttons",
+	"buttons.empty": "No buttons yet - open the widget settings to add some.",
+	"buttons.waiting": "Waiting for the device status…",
+	"buttons.unavailable": "Unavailable - module disabled or removed",
+	"buttons.confirm": "Run “{{label}}” on {{device}}?",
+	"buttons.failed": "{{label}} failed: {{error}}",
+	"buttons.catalogue": "Available actions",
+	"buttons.none_available": "This device offers no actions - enable a module that declares some.",
+	"buttons.configured": "Configured buttons",
+	"buttons.label_override": "Label",
+	"buttons.icon_override": "Icon",
+	"buttons.params_override": "Params override (JSON)",
+	"buttons.params_invalid": "Button {{index}}: params must be a JSON object",
+	"buttons.orphan_blocks_save": "Remove the unavailable buttons before saving",
+	"buttons.move_up": "Move up",
+	"buttons.move_down": "Move down",
+	"buttons.remove": "Remove",
+	"buttons.preview": "Preview",
+	"buttons.badge_online": "{{online}}/{{total}} online",
+	"buttons.no_devices": "No devices yet – connect a device to pick its actions."
+}

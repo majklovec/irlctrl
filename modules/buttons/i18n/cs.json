@@ -1,0 +1,22 @@
+{
+	"wtype.buttons": "Tlačítka",
+	"buttons.empty": "Zatím žádná tlačítka - přidejte je v nastavení widgetu.",
+	"buttons.waiting": "Čekám na stav zařízení…",
+	"buttons.unavailable": "Nedostupné - modul je vypnutý nebo odebrán",
+	"buttons.confirm": "Spustit „{{label}}“ na {{device}}?",
+	"buttons.failed": "{{label}} selhalo: {{error}}",
+	"buttons.catalogue": "Dostupné akce",
+	"buttons.none_available": "Toto zařízení nenabízí žádné akce - zapněte modul, který nějaké deklaruje.",
+	"buttons.configured": "Nastavená tlačítka",
+	"buttons.label_override": "Popisek",
+	"buttons.icon_override": "Ikona",
+	"buttons.params_override": "Přepsání parametrů (JSON)",
+	"buttons.params_invalid": "Tlačítko {{index}}: parametry musí být JSON objekt",
+	"buttons.orphan_blocks_save": "Před uložením odeberte nedostupná tlačítka",
+	"buttons.move_up": "Posunout nahoru",
+	"buttons.move_down": "Posunout dolů",
+	"buttons.remove": "Odebrat",
+	"buttons.preview": "Náhled",
+	"buttons.badge_online": "{{online}}/{{total}} online",
+	"buttons.no_devices": "Zatím žádná zařízení – připojte zařízení a vyberte jeho akce."
+}

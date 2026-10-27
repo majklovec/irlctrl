@@ -22,14 +22,22 @@ import { registerLogWording } from "./logMessages";
 import type {
 	BackendModule,
 	ChannelHub,
+	DashboardAction,
+	DashboardActionEntry,
 	ModulePage,
+	ModuleWidget,
+	WidgetConfigContext,
 } from "./module-contract";
-import type { ServerDashboard, WidgetConfigField } from "./types";
+import type { ServerDashboard, Status, WidgetConfigField } from "./types";
 import { isCompiledBinary } from "./util";
 
 const MODULES_DIR = fileURLToPath(new URL("../modules", import.meta.url));
 
-export type { BackendModule } from "./module-contract";
+export type {
+	BackendModule,
+	DashboardAction,
+	DashboardActionEntry,
+} from "./module-contract";
 
 /**
  * Deterministic order: topological over declared `dependencies` (a module comes
@@ -112,6 +120,31 @@ function validate(mod: unknown, file: string): asserts mod is BackendModule {
 			)
 		)
 			throw new Error(`module ${id}: pages must be { match: RegExp, page }[]`);
+	}
+	if (m.dashboardActions !== undefined) {
+		const methods = new Set(isStringArray(m.methods) ? m.methods : []);
+		if (!Array.isArray(m.dashboardActions))
+			throw new Error(`module ${id}: dashboardActions must be an array`);
+		const seen = new Set<string>();
+		for (const a of m.dashboardActions as DashboardAction[]) {
+			if (
+				!(a instanceof Object) ||
+				typeof a.id !== "string" ||
+				!a.id ||
+				typeof a.label !== "string" ||
+				typeof a.method !== "string"
+			)
+				throw new Error(
+					`module ${id}: dashboardActions entries need string id, label and method`,
+				);
+			if (seen.has(a.id))
+				throw new Error(`module ${id}: duplicate dashboard action ${a.id}`);
+			seen.add(a.id);
+			if (!methods.has(a.method))
+				throw new Error(
+					`module ${id}: dashboard action ${a.id} fires ${a.method}, which is not one of the module's methods`,
+				);
+		}
 	}
 }
 
@@ -212,6 +245,68 @@ export const WIDGET_SIZES: ReadonlyMap<string, { w: number; h: number }> =
 			...(m.hub ? [[m.hub.widgetType, m.hub.defaultSize] as const] : []),
 		]),
 	);
+
+/** Device-bound widget declarations by type (the module's server-side contract). */
+const DEVICE_WIDGETS: ReadonlyMap<string, ModuleWidget> = new Map(
+	ALL_MODULES.flatMap((m) =>
+		(m.dashboardWidgets ?? []).map((w) => [w.type, w] as const),
+	),
+);
+
+/** Config parameter names of a device-bound widget type (none for most). */
+export const deviceWidgetConfigFields = (
+	type: string,
+): readonly WidgetConfigField[] =>
+	DEVICE_WIDGETS.get(type)?.configFields ?? [];
+
+/** Whether `type` is a fleet widget (offered once; its config names its devices). */
+export const isFleetWidgetType = (type: string): boolean =>
+	DEVICE_WIDGETS.get(type)?.fleet === true;
+
+/** Run a device widget's module-declared config validation (throws to reject). */
+export function validateDeviceWidgetConfig(
+	type: string,
+	config: Record<string, string>,
+	context: WidgetConfigContext,
+): void {
+	DEVICE_WIDGETS.get(type)?.validateConfig?.(config, context);
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard actions (the Buttons widget's catalogue)
+// ---------------------------------------------------------------------------
+
+/** `<module>.<action>` — the key a Buttons widget config stores per button. */
+export const dashboardActionKey = (moduleId: string, actionId: string) =>
+	`${moduleId}.${actionId}`;
+
+/**
+ * The operator actions a device offers right now, from the registrations of
+ * every module that is enabled in `status.modules` and serves the device's
+ * role (an action's own `roles`, else the method's role override, else the
+ * module's roles). The control server merges this into the cached status so
+ * the dashboard reads the catalogue off `status.actions` without another RPC.
+ */
+export function dashboardActionsFor(status: Status): DashboardActionEntry[] {
+	const role = status.role;
+	const out: DashboardActionEntry[] = [];
+	for (const m of ALL_MODULES) {
+		if (!m.dashboardActions?.length) continue;
+		if (m.roles && !m.roles.includes(role)) continue;
+		if (status.modules?.[m.configKey ?? m.id]?.enabled !== true) continue;
+		for (const a of m.dashboardActions) {
+			const roles = a.roles ?? m.methodRoles?.[a.method] ?? m.roles;
+			if (roles && !roles.includes(role)) continue;
+			out.push({
+				...a,
+				key: dashboardActionKey(m.id, a.id),
+				module: m.id,
+				moduleTitle: m.title,
+			});
+		}
+	}
+	return out;
+}
 
 // ---------------------------------------------------------------------------
 // Dashboard widget hub (channel widgets — device-independent).

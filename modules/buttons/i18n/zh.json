@@ -1,0 +1,22 @@
+{
+	"wtype.buttons": "按钮",
+	"buttons.empty": "还没有按钮 - 在小部件设置中添加。",
+	"buttons.waiting": "正在等待设备状态…",
+	"buttons.unavailable": "不可用 - 模块已禁用或移除",
+	"buttons.confirm": "在 {{device}} 上执行“{{label}}”？",
+	"buttons.failed": "{{label}} 失败：{{error}}",
+	"buttons.catalogue": "可用操作",
+	"buttons.none_available": "此设备没有可用操作 - 请启用声明了操作的模块。",
+	"buttons.configured": "已配置的按钮",
+	"buttons.label_override": "标签",
+	"buttons.icon_override": "图标",
+	"buttons.params_override": "参数覆盖 (JSON)",
+	"buttons.params_invalid": "按钮 {{index}}：参数必须是 JSON 对象",
+	"buttons.orphan_blocks_save": "保存前请移除不可用的按钮",
+	"buttons.move_up": "上移",
+	"buttons.move_down": "下移",
+	"buttons.remove": "移除",
+	"buttons.preview": "预览",
+	"buttons.badge_online": "{{online}}/{{total}} 在线",
+	"buttons.no_devices": "还没有设备 – 连接设备以选择其操作。"
+}

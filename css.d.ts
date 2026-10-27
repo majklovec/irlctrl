@@ -17,3 +17,11 @@ declare module "*.ico" {
 	const url: string;
 	export default url;
 }
+
+/* The service worker source is imported with Bun's `file` loader (shared/pwa.ts):
+ * the import resolves to a path `Bun.file()` can serve, in the compiled binary
+ * to the embedded copy. Declared so `tsc` does not try to type the script. */
+declare module "*/pwa/sw.js" {
+	const path: string;
+	export default path;
+}

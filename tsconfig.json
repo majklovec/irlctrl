@@ -6,6 +6,7 @@
         "skipLibCheck": true,
         "jsx": "react",
         "jsxFactory": "m",
-        "jsxFragmentFactory": "m.Fragment"
+        "jsxFragmentFactory": "m.Fragment",
+        "module": "preserve"
     }
 }

@@ -58,5 +58,7 @@
 	"mlog.done.reloaded": "Przeładowano",
 	"setup.step.relay_sub": "Ustawienia SRTLA",
 	"ui.off": "wył.",
-	"wtype.relay": "Relay"
+	"wtype.relay": "Relay",
+	"act.srtla.stop": "Zatrzymaj SRTLA",
+	"act.srtla.reload": "Przeładuj uplinki"
 }

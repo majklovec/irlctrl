@@ -1,0 +1,22 @@
+{
+	"wtype.buttons": "Tasten",
+	"buttons.empty": "Noch keine Tasten - in den Widget-Einstellungen hinzufügen.",
+	"buttons.waiting": "Warte auf den Gerätestatus…",
+	"buttons.unavailable": "Nicht verfügbar - Modul deaktiviert oder entfernt",
+	"buttons.confirm": "„{{label}}“ auf {{device}} ausführen?",
+	"buttons.failed": "{{label}} fehlgeschlagen: {{error}}",
+	"buttons.catalogue": "Verfügbare Aktionen",
+	"buttons.none_available": "Dieses Gerät bietet keine Aktionen - ein Modul aktivieren, das welche deklariert.",
+	"buttons.configured": "Konfigurierte Tasten",
+	"buttons.label_override": "Beschriftung",
+	"buttons.icon_override": "Symbol",
+	"buttons.params_override": "Parameter überschreiben (JSON)",
+	"buttons.params_invalid": "Taste {{index}}: Parameter müssen ein JSON-Objekt sein",
+	"buttons.orphan_blocks_save": "Vor dem Speichern die nicht verfügbaren Tasten entfernen",
+	"buttons.move_up": "Nach oben",
+	"buttons.move_down": "Nach unten",
+	"buttons.remove": "Entfernen",
+	"buttons.preview": "Vorschau",
+	"buttons.badge_online": "{{online}}/{{total}} online",
+	"buttons.no_devices": "Noch keine Geräte – ein Gerät verbinden, um seine Aktionen zu wählen."
+}

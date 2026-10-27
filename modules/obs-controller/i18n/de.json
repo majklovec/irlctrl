@@ -59,5 +59,9 @@
 	"lowbs.scene_privacy": "Privatsphäre (optional)",
 	"lowbs.instantly_recover": "Bei Erholung sofort zurückschalten",
 	"lowbs.only_streaming": "Nur während des Streamings wechseln",
-	"lowbs.log_to_file": "Protokoll in Datei schreiben"
+	"lowbs.log_to_file": "Protokoll in Datei schreiben",
+	"act.obs.stream_start": "OBS: Streaming starten",
+	"act.obs.stream_stop": "OBS: Streaming stoppen",
+	"act.obs.record_start": "OBS: Aufnahme starten",
+	"act.obs.record_stop": "OBS: Aufnahme stoppen"
 }

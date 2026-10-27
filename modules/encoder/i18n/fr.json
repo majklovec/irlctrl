@@ -93,5 +93,10 @@
 	"ui.optional": "Facultatif",
 	"ui.remove": "Supprimer",
 	"wtype.combined": "Encodeur + relais",
-	"wtype.encoder": "Encodeur"
+	"wtype.encoder": "Encodeur",
+	"act.encoder.stop": "Arrêter l’encodeur",
+	"act.encoder.bitrate_low": "Débit 1,5 Mbit/s",
+	"act.encoder.bitrate_high": "Débit 6 Mbit/s",
+	"act.encoder.start": "Démarrer l’encodeur",
+	"act.encoder.stream_stop": "Arrêter le flux"
 }

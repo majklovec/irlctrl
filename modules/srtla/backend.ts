@@ -429,6 +429,21 @@ const registration: BackendModule<ModuleCore> = {
 		};
 	},
 	dashboardWidgets: [{ type: "relay", defaultSize: { w: 4, h: 4 } }],
+	dashboardActions: [
+		{
+			id: "stop",
+			label: "act.srtla.stop",
+			icon: "⏹",
+			method: "srtla.stop",
+			confirm: true,
+		},
+		{
+			id: "reload",
+			label: "act.srtla.reload",
+			icon: "↻",
+			method: "srtla.reload",
+		},
+	],
 	services: { capabilities: { "stream.srtla": capability } },
 };
 

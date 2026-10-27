@@ -6,6 +6,7 @@ import { Elysia } from "elysia";
 import { createFrontend } from "../../shared/frontend";
 import { notFound } from "../../shared/http";
 import { i18nReady } from "../../shared/i18n";
+import { pwaRoutes } from "../../shared/pwa";
 import { createAuth } from "./auth";
 import type { Publish } from "./contracts";
 import { createDashboards } from "./dashboards";
@@ -50,10 +51,12 @@ export async function createControlServer(options: ControlServerOptions) {
 		publish,
 		ownsDevice: devices.ownsDevice,
 		deviceExists: (id) => !!devices.getDevice(id),
+		deviceStatus: (id) => devices.getDevice(id)?.status,
 	});
 
 	app
 		.use(publicRoutes(auth, frontend))
+		.use(pwaRoutes())
 		.use(accountRoutes(auth, frontend))
 		.use(dashboardRoutes(auth, dashboards, devices, frontend))
 		.use(deviceListRoutes(auth, devices))

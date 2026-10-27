@@ -59,5 +59,9 @@
 	"lowbs.scene_privacy": "Súkromie (voliteľné)",
 	"lowbs.instantly_recover": "Po obnovení sa okamžite vrátiť",
 	"lowbs.only_streaming": "Prepínať iba počas streamovania",
-	"lowbs.log_to_file": "Zapisovať protokol do súboru"
+	"lowbs.log_to_file": "Zapisovať protokol do súboru",
+	"act.obs.stream_start": "OBS: spustiť vysielanie",
+	"act.obs.stream_stop": "OBS: zastaviť vysielanie",
+	"act.obs.record_start": "OBS: spustiť nahrávanie",
+	"act.obs.record_stop": "OBS: zastaviť nahrávanie"
 }

@@ -1,0 +1,22 @@
+{
+	"wtype.buttons": "Przyciski",
+	"buttons.empty": "Brak przycisków - dodaj je w ustawieniach widżetu.",
+	"buttons.waiting": "Oczekiwanie na stan urządzenia…",
+	"buttons.unavailable": "Niedostępne - moduł wyłączony lub usunięty",
+	"buttons.confirm": "Wykonać „{{label}}” na {{device}}?",
+	"buttons.failed": "{{label}} nie powiodło się: {{error}}",
+	"buttons.catalogue": "Dostępne akcje",
+	"buttons.none_available": "To urządzenie nie oferuje akcji - włącz moduł, który je deklaruje.",
+	"buttons.configured": "Skonfigurowane przyciski",
+	"buttons.label_override": "Etykieta",
+	"buttons.icon_override": "Ikona",
+	"buttons.params_override": "Nadpisanie parametrów (JSON)",
+	"buttons.params_invalid": "Przycisk {{index}}: parametry muszą być obiektem JSON",
+	"buttons.orphan_blocks_save": "Usuń niedostępne przyciski przed zapisem",
+	"buttons.move_up": "W górę",
+	"buttons.move_down": "W dół",
+	"buttons.remove": "Usuń",
+	"buttons.preview": "Podgląd",
+	"buttons.badge_online": "{{online}}/{{total}} online",
+	"buttons.no_devices": "Brak urządzeń – podłącz urządzenie, aby wybrać jego akcje."
+}

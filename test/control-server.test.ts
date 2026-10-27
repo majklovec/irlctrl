@@ -164,6 +164,37 @@ describe("control server HTTP contracts", () => {
 		expect(health.status).toBe(200);
 		expect(await health.text()).toBe("ok\n");
 
+		// PWA: the service worker answers at the origin root (scope "/"), the
+		// icons at their fixed manifest paths, and the manifest rides with the
+		// bundled pages — all without a session.
+		const serviceWorker = await fetch(`${baseUrl}/sw.js`);
+		expect(serviceWorker.status).toBe(200);
+		expect(serviceWorker.headers.get("content-type")).toContain(
+			"application/javascript",
+		);
+		expect(await serviceWorker.text()).toContain("addEventListener(\"fetch\"");
+		const icon = await fetch(`${baseUrl}/icons/icon-192.png`);
+		expect(icon.status).toBe(200);
+		expect(icon.headers.get("content-type")).toBe("image/png");
+		expect((await fetch(`${baseUrl}/icons/missing.png`)).status).toBe(404);
+		const registerPage = await (await fetch(`${baseUrl}/register`)).text();
+		const manifestPath = registerPage.match(
+			/href="(\/assets\/manifest-[^"]+\.webmanifest)"/,
+		)?.[1];
+		expect(manifestPath).toBeDefined();
+		const manifest = await fetch(`${baseUrl}${manifestPath}`);
+		expect(manifest.status).toBe(200);
+		expect(manifest.headers.get("content-type")).toContain(
+			"application/manifest+json",
+		);
+		expect(await manifest.json()).toMatchObject({
+			name: "IRLCTRL",
+			scope: "/",
+			start_url: "/",
+			display: "standalone",
+		});
+		expect(registerPage).toContain('serviceWorker.register("/sw.js")');
+
 		const privateList = await fetch(`${baseUrl}/api/devices`);
 		expect(privateList.status).toBe(401);
 

@@ -1,0 +1,22 @@
+{
+	"wtype.buttons": "Boutons",
+	"buttons.empty": "Aucun bouton pour l’instant - ajoutez-en dans les réglages du widget.",
+	"buttons.waiting": "En attente de l’état de l’appareil…",
+	"buttons.unavailable": "Indisponible - module désactivé ou supprimé",
+	"buttons.confirm": "Exécuter « {{label}} » sur {{device}} ?",
+	"buttons.failed": "{{label}} a échoué : {{error}}",
+	"buttons.catalogue": "Actions disponibles",
+	"buttons.none_available": "Cet appareil n’offre aucune action - activez un module qui en déclare.",
+	"buttons.configured": "Boutons configurés",
+	"buttons.label_override": "Libellé",
+	"buttons.icon_override": "Icône",
+	"buttons.params_override": "Paramètres (JSON)",
+	"buttons.params_invalid": "Bouton {{index}} : les paramètres doivent être un objet JSON",
+	"buttons.orphan_blocks_save": "Supprimez les boutons indisponibles avant d’enregistrer",
+	"buttons.move_up": "Monter",
+	"buttons.move_down": "Descendre",
+	"buttons.remove": "Supprimer",
+	"buttons.preview": "Aperçu",
+	"buttons.badge_online": "{{online}}/{{total}} en ligne",
+	"buttons.no_devices": "Aucun appareil pour l’instant – connectez-en un pour choisir ses actions."
+}

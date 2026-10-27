@@ -9,5 +9,6 @@
 	"mlog.done.modem_disconnected": "Modem #{{index}} odpojený",
 	"mlog.done.modem_enabled": "Modem #{{index}} povolený",
 	"mlog.done.modem_reset": "Modem #{{index}} resetovaný",
-	"mlog.done.reconfigured": "Prekonfigurované"
+	"mlog.done.reconfigured": "Prekonfigurované",
+	"act.modems.reconfigure": "Prekonfigurovať modemy"
 }

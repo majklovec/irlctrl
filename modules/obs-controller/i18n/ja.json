@@ -59,5 +59,9 @@
 	"lowbs.scene_privacy": "プライバシー (任意)",
 	"lowbs.instantly_recover": "回復時にすぐ元に戻す",
 	"lowbs.only_streaming": "配信中のみ切り替える",
-	"lowbs.log_to_file": "ログをファイルに書き込む"
+	"lowbs.log_to_file": "ログをファイルに書き込む",
+	"act.obs.stream_start": "OBS: 配信開始",
+	"act.obs.stream_stop": "OBS: 配信停止",
+	"act.obs.record_start": "OBS: 録画開始",
+	"act.obs.record_stop": "OBS: 録画停止"
 }

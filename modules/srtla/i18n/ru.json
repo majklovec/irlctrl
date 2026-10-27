@@ -58,5 +58,7 @@
 	"mlog.done.reloaded": "Перезагружено",
 	"setup.step.relay_sub": "Настройки SRTLA",
 	"ui.off": "выкл.",
-	"wtype.relay": "Relay"
+	"wtype.relay": "Relay",
+	"act.srtla.stop": "Остановить SRTLA",
+	"act.srtla.reload": "Перезагрузить аплинки"
 }

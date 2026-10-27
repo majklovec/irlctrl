@@ -93,5 +93,10 @@
 	"ui.optional": "Opcional",
 	"ui.remove": "Eliminar",
 	"wtype.combined": "Codificador + relay",
-	"wtype.encoder": "Codificador"
+	"wtype.encoder": "Codificador",
+	"act.encoder.stop": "Detener codificador",
+	"act.encoder.bitrate_low": "Bitrate 1,5 Mbps",
+	"act.encoder.bitrate_high": "Bitrate 6 Mbps",
+	"act.encoder.start": "Iniciar codificador",
+	"act.encoder.stream_stop": "Detener transmisión"
 }
