@@ -94,7 +94,9 @@ async function buildI18nManifest(): Promise<void> {
 	const files: string[] = [];
 	for (const pattern of ["i18n/*.json", "modules/*/i18n/*.json"])
 		for await (const p of new Bun.Glob(pattern).scan({ cwd: baseDir }))
-			files.push(p);
+			// Glob yields OS separators; normalise so the language key and the
+			// import specifiers come out identical on Windows.
+			files.push(p.split(sep).join("/"));
 	files.sort();
 	const byLang = new Map<string, string[]>();
 	files.forEach((path, i) => {
