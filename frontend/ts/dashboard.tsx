@@ -414,7 +414,10 @@ function configEditorForm(w: ServerDashboardWidget): m.Vnode {
 	const custom = customConfigEditor(w, s.values);
 	const visibleFields = custom ? [] : visibleWidgetConfigFields(fields);
 	return (
-		<div class="dash-config-form">
+		// Keyed so Mithril replaces it wholesale when the widget swaps
+		// between body (`key="buttons-live"` & co.) and config form — an
+		// in-place patch would repurpose a live GridStack host node.
+		<div class="dash-config-form" key="dash-config-form">
 			{[
 				...(custom
 					? [
@@ -591,7 +594,11 @@ export function widgetInner(
 	return (
 		<div
 			key={key}
-			class={["dash-widget", editing ? "is-editing" : undefined]
+			class={[
+				"dash-widget",
+				editMode ? "is-edit-mode" : undefined,
+				editing ? "is-editing" : undefined,
+			]
 				.filter(Boolean)
 				.join(" ")}
 		>
@@ -614,7 +621,7 @@ export function widgetInner(
 						editMode ? (
 							<span class="dash-widget-actions">
 								{[
-									configurable ? (
+									configurable && !editing ? (
 										<button
 											class="icon-btn dash-widget-config"
 											title={t("dash.widget_settings")}
@@ -633,7 +640,7 @@ export function widgetInner(
 												m.redraw();
 											}}
 										>
-											{editing ? "✓" : "⚙"}
+											⚙
 										</button>
 									) : null,
 									<button

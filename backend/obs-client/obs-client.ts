@@ -52,6 +52,7 @@
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { AudioSourceTracker } from "../../modules/obs-controller/audio-sources";
+import { SceneTracker } from "../../modules/obs-controller/scenes";
 import {
 	collectSrtSample,
 	type SrtBaseline,
@@ -376,9 +377,10 @@ async function main(): Promise<void> {
 			DEFAULT_EVENT_SUBSCRIPTIONS | EventSubscription.InputVolumeMeters,
 		log: (msg, ...rest) => console.log(`[obs] ${msg}`, ...rest),
 	});
-	// Audio sources → `status.obs.audioSources` → the obs-controller module's
-	// dashboard mute buttons. Attached before the forwarding listeners so a
-	// mute event updates the set before the status push it triggers.
+	// Scenes / audio sources → `status.obs` → the obs-controller module's
+	// dashboard scene + mute buttons. Attached before the forwarding listeners
+	// so an event updates the lists before the status push it triggers.
+	const scenes = new SceneTracker(obs, () => pushStatus());
 	const audioSources = new AudioSourceTracker(obs, () => pushStatus());
 
 	// The switcher engine runs here (this is the box that talks to OBS and is
@@ -635,7 +637,11 @@ async function main(): Promise<void> {
 		// Live switcher state (replayed to newly-connected dashboard viewers;
 		// the lowBitrateSwitcher.state events carry the live updates)
 		lowBitrateSwitcher: engine?.status() ?? null,
-		obs: { audioSources: audioSources.list() },
+		obs: {
+			scenes: scenes.list(),
+			currentScene: scenes.current(),
+			audioSources: audioSources.list(),
+		},
 		modules: moduleState(),
 	});
 

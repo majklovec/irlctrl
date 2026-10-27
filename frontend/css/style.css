@@ -1332,11 +1332,11 @@ td.num {
 .dash-widget-badge {
     flex-shrink: 0;
 }
-.is-editing .dash-grip {
+.is-edit-mode .dash-grip {
     cursor: pointer;
     user-select: none;
 }
-.is-editing .dash-grip:active {
+.is-edit-mode .dash-grip:active {
     cursor: pointer;
 }
 .dash-widget-actions {

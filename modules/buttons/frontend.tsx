@@ -15,6 +15,7 @@ import type {
 	FleetDashboardWidget,
 } from "../../frontend/ts/module-contracts";
 import type { DeviceSummary } from "../../shared/types";
+import { ButtonsGrid, type GridItem } from "./grids";
 import {
 	type ButtonConfig,
 	BUTTONS_DEFAULT_SIZE,
@@ -26,6 +27,8 @@ import {
 	buttonDevices,
 	type DashboardActionEntry,
 	mergedParams,
+	layoutButtons,
+	nextButtonSlot,
 	parseButtons,
 	serializeButtons,
 } from "./types";
@@ -139,62 +142,97 @@ const stateTitle = (r: Resolved): string => {
 	return t("buttons.unavailable");
 };
 
-/** The button grid; `live` wires the presses (the editor preview is inert). */
-function grid(
-	ctx: FleetDashboardContext,
-	buttons: readonly ButtonConfig[],
-	live: boolean,
-): m.Children {
+/** The configured layout, every key guaranteed a slot (legacy layouts — no
+ * stored positions — are packed into the first free cells). */
+function laidOutButtons(
+	config: Record<string, string> | undefined,
+): ButtonConfig[] {
+	return layoutButtons(configuredButtons(config));
+}
+
+/** The inner content of one key (icon, label, device) — shared by the live
+ * body and the editor canvas. Carries the press-state classes. */
+function keyContent(ctx: FleetDashboardContext, b: ButtonConfig, index: number) {
 	const run = runFor(ctx.widget.id);
+	const r = resolve(ctx, b);
+	const busy = run.inflight.has(index);
+	const icon = iconOf(r, b);
+	const cls = [
+		"buttons-key",
+		r.state === "orphan" ? "is-orphan" : undefined,
+		busy ? "is-busy" : undefined,
+		r.state !== "ok" && !busy && r.state !== "orphan" ? "is-inert" : undefined,
+		r.action?.confirm ? "is-confirm" : undefined,
+	]
+		.filter(Boolean)
+		.join(" ");
 	return (
-		<div class="buttons-grid">
-			{buttons.map((b, i) => {
-				const r = resolve(ctx, b);
-				const busy = run.inflight.has(i);
-				const icon = iconOf(r, b);
-				return (
-					<button
-						type="button"
-						key={`${i}:${b.deviceId}:${b.actionId}`}
-						class={[
-							"buttons-key",
-							r.state === "orphan" ? "is-orphan" : undefined,
-							busy ? "is-busy" : undefined,
-							r.action?.confirm ? "is-confirm" : undefined,
-						]
-							.filter(Boolean)
-							.join(" ")}
-						disabled={!live || r.state !== "ok" || busy}
-						title={stateTitle(r)}
-						onclick={() => {
-							if (live) void press(ctx, i, b, r);
-						}}
-					>
-						{busy ? (
-							<span class="buttons-spinner" aria-hidden="true" />
-						) : icon ? (
-							<span class="buttons-icon" aria-hidden="true">
-								{icon}
-							</span>
-						) : null}
-						<span class="buttons-label">{labelOf(r, b)}</span>
-						<span class="buttons-device">
-							{deviceLabel(r.device, b.deviceId)}
-						</span>
-					</button>
-				);
-			})}
+		<div class={cls} title={stateTitle(r)}>
+			{busy ? (
+				<span class="buttons-spinner" aria-hidden="true" />
+			) : icon ? (
+				<span class="buttons-icon" aria-hidden="true">
+					{icon}
+				</span>
+			) : null}
+			<span class="buttons-label">{labelOf(r, b)}</span>
+			<span class="buttons-device">
+				{deviceLabel(r.device, b.deviceId)}
+			</span>
 		</div>
 	);
 }
 
+/**
+ * The key layout as an internal GridStack grid (12 cells wide). `live` wires
+ * cell clicks to presses (the live body); `interactive` enables drag/resize
+ * (the editor canvas) and routes clicks to `onSelectButton` instead.
+ */
+function grid(
+	ctx: FleetDashboardContext,
+	buttons: readonly ButtonConfig[],
+	live: boolean,
+	interactive = false,
+	onLayout?: (updated: readonly GridItem[]) => void,
+	selectedIndex?: number,
+	onSelectButton?: (index: number) => void,
+): m.Children {
+	const items: GridItem[] = buttons.map((b, i) => ({
+		id: String(i),
+		x: b.x ?? 0,
+		y: b.y ?? 0,
+		w: b.w ?? 2,
+		h: b.h ?? 2,
+	}));
+	return (
+		<ButtonsGrid
+			items={items}
+			interactive={interactive}
+			selectedId={
+				selectedIndex === undefined ? null : String(selectedIndex)
+			}
+			onLayout={(updated) => onLayout?.(updated)}
+			onSelect={(id) => {
+				const i = Number(id);
+				if (i < 0 || i >= buttons.length) return;
+				if (live) void press(ctx, i, buttons[i], resolve(ctx, buttons[i]));
+				else onSelectButton?.(i);
+			}}
+			renderCell={(id) => {
+				const i = Number(id);
+				return i >= 0 && i < buttons.length ? keyContent(ctx, buttons[i], i) : null;
+			}}
+		/>
+	);
+}
+
 function body(ctx: FleetDashboardContext): m.Children {
-	const buttons = configuredButtons(ctx.widget.config);
+	const buttons = laidOutButtons(ctx.widget.config);
 	const run = runFor(ctx.widget.id);
 	if (buttons.length === 0)
 		return <p class="muted buttons-empty">{t("buttons.empty")}</p>;
 	return (
-		<div class="buttons-widget">
+		<div class="buttons-widget" key="buttons-live">
 			{grid(ctx, buttons, true)}
 			{run.error ? (
 				<div class="buttons-toast" role="alert">
@@ -231,7 +269,10 @@ interface EditorButton extends ButtonConfig {
 	paramsText: string;
 }
 interface EditorState {
+	/** The layout, every button carrying a slot (x/y/w/h). */
 	buttons: EditorButton[];
+	/** The button whose fields the form edits (undefined = none selected). */
+	selected?: number;
 }
 // One editor state per edit session: the dashboard shell hands the same
 // `values` object to every redraw of one session and a fresh one per session.
@@ -246,13 +287,16 @@ function editorFor(values: Record<string, string>): EditorState {
 		} catch {
 			// unparsable stored layout — start over
 		}
+		// Guarantee every key a slot before the canvas renders it (legacy
+		// layouts carry no positions).
 		state = {
-			buttons: buttons.map((b) => ({
+			buttons: layoutButtons(buttons).map((b) => ({
 				...b,
 				paramsText: b.paramsOverride
 					? JSON.stringify(b.paramsOverride, null, 1)
 					: "",
 			})),
+			selected: 0,
 		};
 		editors.set(values, state);
 	}
@@ -274,7 +318,7 @@ function parseParamsText(
 	}
 }
 
-/** Write the editor rows back into the config field (invalid params are left out until fixed). */
+/** Write the editor layout back into the config field (invalid params are left out until fixed). */
 function commit(values: Record<string, string>, state: EditorState): void {
 	values[BUTTONS_FIELD] = serializeButtons(
 		state.buttons.map(({ paramsText, ...b }) => {
@@ -283,6 +327,11 @@ function commit(values: Record<string, string>, state: EditorState): void {
 			if (b.iconOverride) out.iconOverride = b.iconOverride;
 			const { params } = parseParamsText(paramsText);
 			if (params) out.paramsOverride = params;
+			// The key's slot in the internal grid.
+			if (b.x !== undefined) out.x = b.x;
+			if (b.y !== undefined) out.y = b.y;
+			if (b.w !== undefined) out.w = b.w;
+			if (b.h !== undefined) out.h = b.h;
 			return out;
 		}),
 	);
@@ -336,11 +385,15 @@ function catalogueFor(
 						title={a.method}
 						disabled={state.buttons.length >= BUTTONS_MAX}
 						onclick={() => {
+							// New keys land in the first free cell and are
+							// selected so the form edits them right away.
 							state.buttons.push({
 								deviceId: device.id,
 								actionId: a.key,
 								paramsText: "",
+								...nextButtonSlot(state.buttons),
 							});
+							state.selected = state.buttons.length - 1;
 							update();
 						}}
 					>
@@ -363,17 +416,12 @@ function configEditor(
 		commit(values, state);
 		m.redraw();
 	};
-	const move = (i: number, by: number) => {
-		const j = i + by;
-		if (j < 0 || j >= state.buttons.length) return;
-		const [row] = state.buttons.splice(i, 1);
-		state.buttons.splice(j, 0, row);
-		update();
-	};
 	const devices = [...ctx.devices].sort(
 		(a, b) => Number(b.online) - Number(a.online),
 	);
-	const previewCtx: FleetDashboardContext = {
+	// The canvas is a live, draggable/resizable copy of the layout: it reads
+	// the same config field, so a drag/resize edits the stored positions.
+	const canvasCtx: FleetDashboardContext = {
 		...ctx,
 		widget: {
 			...ctx.widget,
@@ -403,136 +451,141 @@ function configEditor(
 			</section>
 			<section class="buttons-editor-section">
 				<h4>{t("buttons.configured")}</h4>
+				<p class="muted buttons-layout-hint">{t("buttons.layout_hint")}</p>
 				{state.buttons.length === 0 ? (
 					<p class="muted">{t("buttons.empty")}</p>
 				) : (
-					<ol class="buttons-rows">
-						{state.buttons.map((b, i) => {
-							const r = resolve(ctx, b);
-							const paramsBad = !!parseParamsText(b.paramsText).error;
-							return (
-								<li
-									key={`${i}:${b.deviceId}:${b.actionId}`}
-									class={[
-										"buttons-row",
-										r.state === "orphan" ? "is-orphan" : undefined,
-									]
-										.filter(Boolean)
-										.join(" ")}
-								>
-									<div class="buttons-row-head">
-										<span class="buttons-row-title">
-											{iconOf(r, b) ? (
-												<span class="buttons-icon">{iconOf(r, b)}</span>
-											) : null}
-											<span>
-												{r.action ? t(r.action.label) : b.actionId}{" "}
-												<span class="muted">
-													· {r.action?.moduleTitle ?? ""}
-													{r.action ? " @ " : "@ "}
-													{deviceLabel(r.device, b.deviceId)}
-												</span>{" "}
-												{r.state === "orphan" ? (
-													<span class="buttons-orphan-tag">
-														{t("buttons.unavailable")}
-													</span>
-												) : null}
-											</span>
-										</span>
-										<span class="buttons-row-actions">
-											<button
-												type="button"
-												class="icon-btn"
-												title={t("buttons.move_up")}
-												aria-label={t("buttons.move_up")}
-												disabled={i === 0}
-												onclick={() => move(i, -1)}
-											>
-												↑
-											</button>
-											<button
-												type="button"
-												class="icon-btn"
-												title={t("buttons.move_down")}
-												aria-label={t("buttons.move_down")}
-												disabled={i === state.buttons.length - 1}
-												onclick={() => move(i, 1)}
-											>
-												↓
-											</button>
-											<button
-												type="button"
-												class="icon-btn"
-												title={t("buttons.remove")}
-												aria-label={t("buttons.remove")}
-												onclick={() => {
-													state.buttons.splice(i, 1);
-													update();
-												}}
-											>
-												×
-											</button>
-										</span>
-									</div>
-									<div class="buttons-row-fields">
-										<label>
-											<span>{t("buttons.label_override")}</span>
-											<input
-												class="dash-config-input"
-												value={b.labelOverride ?? ""}
-												placeholder={r.action ? t(r.action.label) : ""}
-												oninput={(e: Event) => {
-													b.labelOverride = (e.target as HTMLInputElement).value;
-													update();
-												}}
-											/>
-										</label>
-										<label class="buttons-field-icon">
-											<span>{t("buttons.icon_override")}</span>
-											<input
-												class="dash-config-input"
-												value={b.iconOverride ?? ""}
-												placeholder={r.action?.icon ?? ""}
-												maxlength={4}
-												oninput={(e: Event) => {
-													b.iconOverride = (e.target as HTMLInputElement).value;
-													update();
-												}}
-											/>
-										</label>
-										<label class="buttons-field-params">
-											<span>{t("buttons.params_override")}</span>
-											<textarea
-												class={[
-													"dash-config-input",
-													paramsBad ? "is-invalid" : undefined,
-												]
-													.filter(Boolean)
-													.join(" ")}
-												rows={2}
-												value={b.paramsText}
-												placeholder={
-													r.action?.params ? JSON.stringify(r.action.params) : "{}"
-												}
-												oninput={(e: Event) => {
-													b.paramsText = (e.target as HTMLTextAreaElement).value;
-													update();
-												}}
-											/>
-										</label>
-									</div>
-								</li>
-							);
-						})}
-					</ol>
+					<>
+						{grid(
+							canvasCtx,
+							laidOutButtons(canvasCtx.widget.config),
+							false,
+							true,
+							(updated) => {
+								for (const it of updated) {
+									const i = Number(it.id);
+									if (i < 0 || i >= state.buttons.length) continue;
+									state.buttons[i].x = it.x;
+									state.buttons[i].y = it.y;
+									state.buttons[i].w = it.w;
+									state.buttons[i].h = it.h;
+								}
+								update();
+							},
+							state.selected,
+							(i) => {
+								state.selected = i;
+								m.redraw();
+							},
+						)}
+						{state.selected != null ? buttonForm(ctx, state, update) : null}
+					</>
 				)}
 			</section>
-			{state.buttons.length > 0 ? (
-				<section class="buttons-editor-section">
-					<h4>{t("buttons.preview")}</h4>
-					{grid(previewCtx, configuredButtons(previewCtx.widget.config), false)}
-				</section>
-			) : null}
+		</div>
+	);
+}
+
+/** The override form for the one selected key (with a remove action). */
+function buttonForm(
+	ctx: FleetDashboardContext,
+	state: EditorState,
+	update: () => void,
+): m.Children {
+	const i = state.selected ?? 0;
+	const b = state.buttons[i];
+	if (!b) return null;
+	const r = resolve(ctx, b);
+	const paramsBad = !!parseParamsText(b.paramsText).error;
+	return (
+		<div
+			class={[
+				"buttons-form",
+				r.state === "orphan" ? "is-orphan" : undefined,
+			]
+				.filter(Boolean)
+				.join(" ")}
+		>
+			<span class="buttons-form-title">
+				{iconOf(r, b) ? <span class="buttons-icon">{iconOf(r, b)}</span> : null}
+				<span>
+					{r.action ? t(r.action.label) : b.actionId}{" "}
+					<span class="muted">
+						· {r.action?.moduleTitle ?? ""}
+						{r.action ? " @ " : "@ "}
+						{deviceLabel(r.device, b.deviceId)}
+					</span>{" "}
+					{r.state === "orphan" ? (
+						<span class="buttons-orphan-tag">
+							{t("buttons.unavailable")}
+						</span>
+					) : null}
+				</span>
+			</span>
+			<div class="buttons-form-fields">
+				<label>
+					<span>{t("buttons.label_override")}</span>
+					<input
+						class="dash-config-input"
+						value={b.labelOverride ?? ""}
+						placeholder={r.action ? t(r.action.label) : ""}
+						oninput={(e: Event) => {
+							b.labelOverride = (e.target as HTMLInputElement).value;
+							update();
+						}}
+					/>
+				</label>
+				<label class="buttons-field-icon">
+					<span>{t("buttons.icon_override")}</span>
+					<input
+						class="dash-config-input"
+						value={b.iconOverride ?? ""}
+						placeholder={r.action?.icon ?? ""}
+						maxlength={4}
+						oninput={(e: Event) => {
+							b.iconOverride = (e.target as HTMLInputElement).value;
+							update();
+						}}
+					/>
+				</label>
+				<label class="buttons-field-params">
+					<span>{t("buttons.params_override")}</span>
+					<textarea
+						class={[
+							"dash-config-input",
+							paramsBad ? "is-invalid" : undefined,
+						]
+							.filter(Boolean)
+							.join(" ")}
+						rows={2}
+						value={b.paramsText}
+						placeholder={
+							r.action?.params ? JSON.stringify(r.action.params) : "{}"
+						}
+						oninput={(e: Event) => {
+							b.paramsText = (e.target as HTMLTextAreaElement).value;
+							update();
+						}}
+					/>
+				</label>
+			</div>
+			<span class="buttons-form-actions">
+				<button
+					type="button"
+					class="icon-btn"
+					title={t("buttons.remove")}
+					aria-label={t("buttons.remove")}
+					onclick={() => {
+						state.buttons.splice(i, 1);
+						state.selected = state.buttons.length
+							? Math.min(i, state.buttons.length - 1)
+							: undefined;
+						update();
+					}}
+				>
+					×
+				</button>
+			</span>
 		</div>
 	);
 }

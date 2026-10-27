@@ -28,6 +28,7 @@ import {
 } from "../../shared/obs/client";
 import { ApiError, optionalStringList, requireString } from "../../shared/params";
 import { type AudioSource, AudioSourceTracker } from "./audio-sources";
+import { SceneTracker } from "./scenes";
 import { collectSrtSample, type SrtBaseline } from "./srt-metrics";
 import { type ObsSnapshot, SwitcherEngine } from "./switcher-engine";
 import type { Emit, ObsSlice, SwitcherConfig, SwitcherMetrics } from "./types";
@@ -178,7 +179,9 @@ async function teardown(): Promise<void> {
 	obsClient?.disconnect();
 	obsClient = null;
 	audioSources?.dispose();
+	scenes?.dispose();
 	audioSources = null;
+	scenes = null;
 }
 
 // ============================================================================
@@ -452,19 +455,20 @@ function applyConfig(raw: Record<string, unknown>): SwitcherConfig {
 }
 
 // ============================================================================
-// Audio sources → dashboard mute buttons.
+// Scenes + audio sources → dashboard buttons.
 //
-// The tracker (./audio-sources, shared with the standalone obs-client box)
-// publishes every OBS input with a mute state as `status.obs.audioSources`;
-// the control server feeds that status back into the `dashboardActions`
-// factory below — one mute toggle per source, so the buttons track OBS itself.
+// The trackers (./scenes, ./audio-sources — shared with the standalone
+// obs-client box) publish the scene list as `status.obs.scenes` and every
+// input with a mute state as `status.obs.audioSources`; the control server
+// feeds that status back into the `dashboardActions` factory below — one
+// switch button per scene and one mute toggle per source, tracking OBS itself.
 // ============================================================================
 
-/** The live client's audio-source tracker (null: module not running). */
+/** The live client's trackers (null: module not running). */
 let audioSources: AudioSourceTracker | null = null;
+let scenes: SceneTracker | null = null;
 
-// Parameterless obs-websocket requests; a scene switch is one params override
-// away: `{ "requestType": "SetCurrentProgramScene", "requestData": { "sceneName": "…" } }`.
+// Parameterless obs-websocket requests, offered whatever OBS currently has.
 const BASE_ACTIONS: readonly DashboardAction[] = [
 	{
 		id: "stream-start",
@@ -514,11 +518,34 @@ const muteAction = ({ name, muted }: AudioSource): DashboardAction => ({
 	},
 });
 
-/**
- * `status().obs.audioSources` narrowed from the `Status` index signature.
- * The factory runs on the control server (which never starts the device
- * module), so it reads the source list off the status, not this map.
- */
+/** A scene's switch button (🔴 = the live scene); the label is the raw scene name. */
+const sceneAction = (name: string, live: boolean): DashboardAction => ({
+	id: `scene:${name}`,
+	label: name,
+	icon: live ? "🔴" : "🎬",
+	method: "obs.request",
+	params: {
+		requestType: "SetCurrentProgramScene",
+		requestData: { sceneName: name },
+	},
+});
+
+// The factory runs on the control server (which never starts the device
+// module), so it reads the lists off the status — narrowed from the `Status`
+// index signature — not off the trackers.
+
+function readScenes(status: Status): string[] {
+	const list = record(status.obs)?.scenes;
+	return Array.isArray(list)
+		? list.filter((n): n is string => typeof n === "string" && n !== "")
+		: [];
+}
+
+function readCurrentScene(status: Status): string | null {
+	const name = record(status.obs)?.currentScene;
+	return typeof name === "string" ? name : null;
+}
+
 function readAudioSources(status: Status): AudioSource[] {
 	const list = record(status.obs)?.audioSources;
 	if (!Array.isArray(list)) return [];
@@ -557,12 +584,19 @@ const registration: BackendModule<ModuleCore> = {
 	],
 	events: ["obs.event", "lowBitrateSwitcher.state"],
 	dashboardWidgets: [{ type: "obs", defaultSize: { w: 6, h: 6 } }],
-	// Base stream/record actions + one mute toggle per live audio source: a
+	// Base stream/record actions + one switch per scene + one mute toggle per
+	// live audio source: a
 	// factory of the device status, so the buttons track OBS itself.
 	dashboardActions(status) {
+		const sceneNames = readScenes(status);
+		const live = readCurrentScene(status);
 		const sources = readAudioSources(status);
-		return sources.length
-			? [...BASE_ACTIONS, ...sources.map(muteAction)]
+		return sceneNames.length || sources.length
+			? [
+					...BASE_ACTIONS,
+					...sceneNames.map((n) => sceneAction(n, n === live)),
+					...sources.map(muteAction),
+				]
 			: BASE_ACTIONS;
 	},
 	bind(c) {
@@ -597,10 +631,10 @@ const registration: BackendModule<ModuleCore> = {
 		obsClient.on(OBS_DISCONNECTED_EVENT, () =>
 			ctx.emit("obs.event", { disconnected: true }),
 		);
-		// Audio sources for the dashboard mute buttons (re-seeded on each identify).
-		audioSources = new AudioSourceTracker(obsClient, () =>
-			core.notifyStateChange(),
-		);
+		// Scenes + audio sources for the dashboard buttons (re-seeded on each identify).
+		const changed = () => core.notifyStateChange();
+		scenes = new SceneTracker(obsClient, changed);
+		audioSources = new AudioSourceTracker(obsClient, changed);
 		// The low-bitrate switcher rides on this client. It is on by default
 		// (the module's enabled flag is the master switch) and can be turned
 		// off with its own switcherEnabled flag.
@@ -625,6 +659,8 @@ const registration: BackendModule<ModuleCore> = {
 		return {
 			lowBitrateSwitcher: engine?.status() ?? null,
 			obs: {
+				scenes: scenes?.list() ?? [],
+				currentScene: scenes?.current() ?? null,
 				audioSources: audioSources?.list() ?? [],
 			},
 		};

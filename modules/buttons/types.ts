@@ -10,7 +10,8 @@ import type { DashboardActionEntry } from "../../shared/types";
 
 export type { DashboardActionEntry };
 
-/** One configured button: a device, an action of its catalogue, optional overrides. */
+/** One configured button: a device, an action of its catalogue, optional
+ * overrides, and its slot in the widget's internal grid (cells, 12 wide). */
 export interface ButtonConfig {
 	/** The device the action fires on. */
 	deviceId: string;
@@ -20,6 +21,90 @@ export interface ButtonConfig {
 	iconOverride?: string;
 	/** Merged over the action's default params (`paramsOverride` wins). */
 	paramsOverride?: Record<string, unknown>;
+	x?: number;
+	y?: number;
+	/** The key's extent in grid cells (always present together with `x`/`y`). */
+	w?: number;
+	h?: number;
+}
+
+// The internal grid a layout is arranged on: 12 columns (a 4-cells-wide widget
+// hosts 60 px cells, exactly like the dashboard grid) and 60 px-tall cells.
+export const BUTTONS_GRID_COLUMNS = 12;
+export const BUTTONS_CELL_PX = 60;
+/** A freshly added key spans 2×2 cells; it can grow to a quarter of the grid. */
+export const BUTTONS_CELL_DEFAULT = { w: 2, h: 2 } as const;
+export const BUTTONS_CELL_MIN = { w: 1, h: 1 } as const;
+export const BUTTONS_CELL_MAX = { w: 6, h: 6 } as const;
+
+const isCount = (v: unknown, min: number): v is number =>
+	typeof v === "number" && Number.isInteger(v) && v >= min;
+
+const hasPosition = (b: ButtonConfig): boolean =>
+	b.x !== undefined && b.y !== undefined && b.w !== undefined && b.h !== undefined;
+
+/** Which cells a key occupies. */
+function cells(b: ButtonConfig): { x: number; y: number; w: number; h: number } {
+	return { x: b.x ?? 0, y: b.y ?? 0, w: b.w ?? 0, h: b.h ?? 0 };
+}
+
+const cellKey = (x: number, y: number): string => `${x}\0${y}`;
+
+/** First free slot (row-major, top to bottom) in `occupied` that fits `w`×`h`. */
+function firstFreeSlot(
+	occupied: ReadonlySet<string>,
+	w: number,
+	h: number,
+): { x: number; y: number; w: number; h: number } {
+	for (let y = 0; ; y++)
+		for (let x = 0; x + w <= BUTTONS_GRID_COLUMNS; x++) {
+			let free = true;
+			for (let dy = 0; dy < h && free; dy++)
+				for (let dx = 0; dx < w && free; dx++)
+					free = !occupied.has(cellKey(x + dx, y + dy));
+			if (free) return { x, y, w, h };
+		}
+}
+
+/** First free slot (row-major) not covered by the given keys' stored slots. */
+export function nextButtonSlot(
+	buttons: readonly ButtonConfig[],
+	w: number = BUTTONS_CELL_DEFAULT.w,
+	h: number = BUTTONS_CELL_DEFAULT.h,
+): { x: number; y: number; w: number; h: number } {
+	const occupied = new Set<string>();
+	for (const b of buttons)
+		if (hasPosition(b)) {
+			const c = cells(b);
+			for (let dy = 0; dy < c.h; dy++)
+				for (let dx = 0; dx < c.w; dx++)
+					occupied.add(cellKey(c.x + dx, c.y + dy));
+		}
+	return firstFreeSlot(occupied, w, h);
+}
+
+/**
+ * Every key guaranteed a slot: stored positions are kept, the rest are filled
+ * in layout order into the first free slots. Pure — returns new objects.
+ */
+export function layoutButtons(
+	buttons: readonly ButtonConfig[],
+): ButtonConfig[] {
+	const occupied = new Set<string>();
+	const claim = (x: number, y: number, w: number, h: number): void => {
+		for (let dy = 0; dy < h; dy++)
+			for (let dx = 0; dx < w; dx++) occupied.add(cellKey(x + dx, y + dy));
+	};
+	return buttons.map((b) => {
+		if (hasPosition(b)) {
+			const c = cells(b);
+			claim(c.x, c.y, c.w, c.h);
+			return { ...b };
+		}
+		const c = firstFreeSlot(occupied, BUTTONS_CELL_DEFAULT.w, BUTTONS_CELL_DEFAULT.h);
+		claim(c.x, c.y, c.w, c.h);
+		return { ...b, x: c.x, y: c.y, w: c.w, h: c.h };
+	});
 }
 
 /** The name of the widget's single (hidden) config field. */
@@ -38,6 +123,10 @@ const BUTTON_FIELDS = new Set([
 	"labelOverride",
 	"iconOverride",
 	"paramsOverride",
+	"x",
+	"y",
+	"w",
+	"h",
 ]);
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -78,6 +167,28 @@ export function parseButtons(raw: string | undefined): ButtonConfig[] {
 				throw new Error(`buttons[${i}]: paramsOverride must be an object`);
 			if (Object.keys(item.paramsOverride).length > 0)
 				out.paramsOverride = item.paramsOverride;
+		}
+		// Position in the internal grid: optional (legacy layouts have none —
+		// the frontend fills the first free slots), but when present it must be
+		// four sane grid coordinates. Absent fields are omitted from the output.
+		if (
+			item.x !== undefined ||
+			item.y !== undefined ||
+			item.w !== undefined ||
+			item.h !== undefined
+		) {
+			if (!isCount(item.x, 0) || !isCount(item.y, 0))
+				throw new Error(`buttons[${i}]: position must be a non-negative integer`);
+			if (
+				!isCount(item.w, 1) ||
+				!isCount(item.h, 1) ||
+				item.x + item.w > BUTTONS_GRID_COLUMNS
+			)
+				throw new Error(`buttons[${i}]: size must fit the ${BUTTONS_GRID_COLUMNS}-column grid`);
+			out.x = item.x;
+			out.y = item.y;
+			out.w = item.w;
+			out.h = item.h;
 		}
 		for (const key of Object.keys(item))
 			if (!BUTTON_FIELDS.has(key))

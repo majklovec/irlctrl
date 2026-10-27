@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
 	BUTTONS_FIELD,
+	BUTTONS_GRID_COLUMNS,
 	buttonDevices,
+	layoutButtons,
 	mergedParams,
+	nextButtonSlot,
 	orphanedButtons,
 	parseButtons,
 	serializeButtons,
@@ -134,6 +137,28 @@ describe("dashboard action catalogue (status.actions)", () => {
 		expect(mic.icon).toBe("🔇");
 	});
 
+	test("emits one scene-switch action per OBS scene", () => {
+		const st = status("combined", { "obs-controller": true });
+		st.obs = { scenes: ["Live", "BRB"], currentScene: "Live" };
+		const scenes = dashboardActionsFor(st).filter((a) =>
+			a.id.startsWith("scene:"),
+		);
+		expect(scenes.map((a) => a.key)).toEqual([
+			dashboardActionKey("obs-controller", "scene:Live"),
+			dashboardActionKey("obs-controller", "scene:BRB"),
+		]);
+		// the live scene is marked
+		expect(scenes.map((a) => a.icon)).toEqual(["🔴", "🎬"]);
+		expect(scenes[1]).toMatchObject({
+			label: "BRB",
+			method: "obs.request",
+			params: {
+				requestType: "SetCurrentProgramScene",
+				requestData: { sceneName: "BRB" },
+			},
+		});
+	});
+
 	test("the OBS factory hides mute buttons when no sources are reported", () => {
 		// enabled module with no obs fragment → base actions only
 		const keys = dashboardActionsFor(
@@ -182,6 +207,85 @@ describe("buttons widget config", () => {
 		]);
 		expect(parseButtons(serializeButtons(buttons))).toEqual(buttons);
 		expect(buttonDevices([...buttons, buttons[0]])).toEqual(["d1", "d2"]);
+	});
+
+	test("round-trips the internal-grid position (x/y/w/h) when present", () => {
+		const buttons = parseButtons(
+			JSON.stringify([
+				{
+					deviceId: "d1",
+					actionId: "encoder.stop",
+					x: 4,
+					y: 2,
+					w: 3,
+					h: 2,
+				},
+			]),
+		);
+		expect(buttons).toEqual([
+			{
+				deviceId: "d1",
+				actionId: "encoder.stop",
+				x: 4,
+				y: 2,
+				w: 3,
+				h: 2,
+			},
+		]);
+		expect(parseButtons(serializeButtons(buttons))).toEqual(buttons);
+	});
+
+	test("rejects positions that are not sane grid coordinates", () => {
+		const at = (x?: number, y?: number, w?: number, h?: number) =>
+			JSON.stringify([
+				{ deviceId: "d", actionId: "a", ...(x !== undefined ? { x } : {}), ...(y !== undefined ? { y } : {}), ...(w !== undefined ? { w } : {}), ...(h !== undefined ? { h } : {}) },
+			]);
+		// negative / non-integer origin
+		expect(() => parseButtons(at(-1, 0, 2, 2))).toThrow("position");
+		expect(() => parseButtons(at(0, 0.5, 2, 2))).toThrow("position");
+		// a key must have a size (w/h >= 1) when it has an origin
+		expect(() => parseButtons(at(0, 0, 0, 2))).toThrow("size");
+		expect(() => parseButtons(at(0, 0, 2, 0))).toThrow("size");
+		// a key must not run past the last column
+		expect(() =>
+			parseButtons(at(BUTTONS_GRID_COLUMNS - 1, 0, 2, 2)),
+		).toThrow("size");
+		// fits exactly in the last column
+		expect(() =>
+			parseButtons(at(10, 0, 2, 2)),
+		).not.toThrow();
+	});
+
+	test("nextButtonSlot returns the first free cell, skipping occupied ones", () => {
+		// empty layout → top-left 2×2
+		expect(nextButtonSlot([])).toEqual({ x: 0, y: 0, w: 2, h: 2 });
+		const withOne = [
+			{ deviceId: "d", actionId: "a", x: 0, y: 0, w: 2, h: 2 },
+		];
+		// the 2×2 at the origin is taken → next is at x:2
+		expect(nextButtonSlot(withOne)).toEqual({ x: 2, y: 0, w: 2, h: 2 });
+		// a wide key forces a wrap to the next row
+		const wide = [
+			{ deviceId: "d", actionId: "a", x: 0, y: 0, w: 11, h: 1 },
+			{ deviceId: "d", actionId: "b", x: 11, y: 0, w: 1, h: 1 },
+		];
+		expect(nextButtonSlot(wide)).toEqual({ x: 0, y: 1, w: 2, h: 2 });
+	});
+
+	test("layoutButtons keeps stored positions and fills the rest in order", () => {
+		const input = [
+			{ deviceId: "d", actionId: "a", x: 4, y: 0, w: 2, h: 2 },
+			{ deviceId: "d", actionId: "b" }, // no position → first free (0,0)
+			{ deviceId: "d", actionId: "c" }, // no position → next free (2,0)
+		];
+		const out = layoutButtons(input);
+		expect(out).toEqual([
+			{ deviceId: "d", actionId: "a", x: 4, y: 0, w: 2, h: 2 },
+			{ deviceId: "d", actionId: "b", x: 0, y: 0, w: 2, h: 2 },
+			{ deviceId: "d", actionId: "c", x: 2, y: 0, w: 2, h: 2 },
+		]);
+		// pure: the input is not mutated
+		expect(input[1].x).toBeUndefined();
 	});
 
 	test("rejects malformed layouts", () => {

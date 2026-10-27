@@ -8,30 +8,58 @@
     flex-direction: column;
 }
 
-.buttons-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
-    gap: 0.5rem;
-    align-content: start;
+/* The layout is an internal GridStack grid (12 cells wide). GridStack owns
+ * the .grid-stack-item / -content DOM; we skin the cell inside it. Like the
+ * dashboard grid, .grid-stack-item-content is absolutely inset by the margin
+ * (so it is never given height:100%) and .buttons-cell fills it. */
+.buttons-grid-stack {
+    --buttons-row-h: 56px;
+}
+/* .buttons-cell fills the (absolute) item-content and hosts the click. */
+.buttons-grid-stack .buttons-cell {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    cursor: pointer;
+}
+.buttons-grid-stack.grid-stack-resizable .buttons-cell {
+    cursor: grab;
+}
+.buttons-grid-stack .buttons-cell .buttons-key {
+    flex: 1;
+}
+/* Resize handle, reskinned; only shown on the interactive (editor) grid. */
+.buttons-grid-stack .grid-stack-item .grid-stack-resize-handle {
+    border-color: var(--muted);
+}
+.buttons-grid-stack:not(.grid-stack-resizable) .grid-stack-resize-handle {
+    display: none;
+}
+/* The selected key (editor) is outlined above the grid chrome. */
+.buttons-grid-stack .buttons-cell.is-selected {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+    border-radius: var(--radius-xs);
 }
 
 .buttons-key {
+    height: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 0.25rem;
-    min-height: 3.2rem;
     padding: 0.4rem 0.4rem;
     font-size: 0.85rem;
     font-weight: 600;
     line-height: 1.15;
     text-align: center;
     background: color-mix(in srgb, var(--accent) 22%, var(--card-solid));
-    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+    border-radius: var(--radius-xs);
     box-shadow: none;
 }
-.buttons-key:hover:not(:disabled) {
+.buttons-cell:hover .buttons-key:not(.is-orphan):not(.is-inert) {
     background: color-mix(in srgb, var(--accent) 38%, var(--card-solid));
     border-color: var(--accent);
 }
@@ -39,14 +67,14 @@
     background: color-mix(in srgb, var(--bad) 18%, var(--card-solid));
     border-color: color-mix(in srgb, var(--bad) 45%, var(--border));
 }
-.buttons-key.is-confirm:hover:not(:disabled) {
+.buttons-cell:hover .buttons-key.is-confirm:not(.is-inert) {
     background: color-mix(in srgb, var(--bad) 32%, var(--card-solid));
     border-color: var(--bad);
 }
-.buttons-key:disabled {
+/* Non-pressable keys (waiting / offline) on the live grid. */
+.buttons-key.is-inert {
     cursor: default;
     opacity: 0.55;
-    transform: none;
 }
 .buttons-key.is-orphan {
     background: transparent;
@@ -116,6 +144,10 @@
     text-transform: uppercase;
     color: var(--muted);
 }
+.buttons-layout-hint {
+    margin: 0 0 0.4rem;
+    font-size: 0.75rem;
+}
 
 .buttons-catalogue-group {
     margin-bottom: 0.4rem;
@@ -147,41 +179,57 @@
     font-weight: 700;
 }
 
-.buttons-rows {
-    list-style: none;
-    margin: 0;
-    padding: 0;
+/* The override form for the one selected key (below the canvas). */
+.buttons-form {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-}
-.buttons-row {
+    gap: 0.4rem;
+    margin-top: 0.4rem;
     padding: 0.5rem 0.6rem;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--card-subtle);
 }
-.buttons-row.is-orphan {
+.buttons-form.is-orphan {
     border-color: color-mix(in srgb, var(--warn) 55%, var(--border));
 }
-.buttons-row-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    font-size: 0.85rem;
-}
-.buttons-row-title {
+.buttons-form-title {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
     min-width: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
 }
-.buttons-row-actions {
+.buttons-form-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 4.5rem;
+    gap: 0.4rem 0.5rem;
+}
+.buttons-form-fields label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    font-size: 0.75rem;
+    color: var(--muted);
+}
+.buttons-form-fields textarea {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.75rem;
+    resize: vertical;
+}
+.buttons-form-fields .is-invalid {
+    border-color: var(--bad);
+}
+.buttons-field-params {
+    grid-column: 1 / -1;
+}
+.buttons-form-actions {
     display: inline-flex;
     gap: 0.15rem;
+    align-self: flex-end;
 }
-.buttons-row-actions .icon-btn {
+.buttons-form-actions .icon-btn {
     font-size: 0.85rem;
     line-height: 1;
     padding: 0.15rem 0.4rem;
@@ -190,42 +238,13 @@
     color: var(--muted);
     box-shadow: none;
 }
-.buttons-row-actions .icon-btn:hover:not(:disabled) {
+.buttons-form-actions .icon-btn:hover {
     background: var(--border);
-    color: var(--text);
-}
-.buttons-row-actions .icon-btn:disabled {
-    opacity: 0.35;
-    cursor: default;
+    color: var(--danger, #ef4444);
 }
 .buttons-orphan-tag {
     font-size: 0.75rem;
     color: var(--warn);
-}
-
-.buttons-row-fields {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 4.5rem;
-    gap: 0.4rem 0.5rem;
-    margin-top: 0.4rem;
-}
-.buttons-row-fields label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    font-size: 0.75rem;
-    color: var(--muted);
-}
-.buttons-field-params {
-    grid-column: 1 / -1;
-}
-.buttons-row-fields textarea {
-    font-family: var(--font-mono, monospace);
-    font-size: 0.75rem;
-    resize: vertical;
-}
-.buttons-row-fields .is-invalid {
-    border-color: var(--bad);
 }
 
 /* Which device a key fires on (one widget drives several). */
