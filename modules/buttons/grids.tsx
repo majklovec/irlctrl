@@ -181,6 +181,24 @@ function setInteractive(mgr: Manager, interactive: boolean): void {
 	mgr.grid?.enableResize(interactive);
 }
 
+/** In the editor, keep one empty row open below the content so a key can be
+ * dragged one row down. The count is a CSS custom property, not inline
+ * min-height: GridStack's layout passes strip *inline* min-height/height but
+ * honor the stylesheet `min-height` (`.buttons-grid-edit`) driven by this
+ * property, so the reserved row survives every re-layout. */
+function setEditReserve(mgr: Manager, interactive: boolean): void {
+	const host = mgr.host;
+	const grid = mgr.grid;
+	if (!grid) return;
+	if (!interactive) {
+		host.classList.remove("buttons-grid-edit");
+		host.style.removeProperty("--edit-min-rows");
+		return;
+	}
+	host.style.setProperty("--edit-min-rows", String(Math.max(grid.getRow(), 1) + 1));
+	host.classList.add("buttons-grid-edit");
+}
+
 function teardown(host: HTMLElement): void {
 	const mgr = managers.get(host);
 	if (!mgr) return;
@@ -204,7 +222,10 @@ export const ButtonsGrid = {
 						column: 12,
 						cellHeight: 56,
 						margin: 4,
-						float: false,
+						// Let a dragged key stay where it is dropped (persistent
+						// gaps) so "move one row down" onto the reserved row sticks;
+						// auto-compact would snap it back up and close the gap.
+						float: true,
 						disableDrag: !props.interactive,
 						disableResize: !props.interactive,
 						resizable: { handles: "all" },
@@ -234,6 +255,7 @@ export const ButtonsGrid = {
 					managers.set(host, mgr);
 					setInteractive(mgr, props.interactive);
 					reconcile(mgr);
+					setEditReserve(mgr, props.interactive);
 				}}
 				onupdate={(vd: m.VnodeDOM) => {
 					const mgr = managers.get(vd.dom as HTMLElement);
@@ -241,9 +263,15 @@ export const ButtonsGrid = {
 					const changed =
 						mgr.current.interactive !== props.interactive ||
 						mgr.current.items !== props.items;
+					const prevRows = mgr.grid?.getRow() ?? 0;
 					mgr.current = props;
 					if (changed) reconcile(mgr);
 					setInteractive(mgr, props.interactive);
+					if (
+						changed &&
+						(mgr.grid?.getRow() ?? 0) !== prevRows
+					)
+						setEditReserve(mgr, props.interactive);
 				}}
 				onremove={(vd: m.VnodeDOM) => teardown(vd.dom as HTMLElement)}
 			/>

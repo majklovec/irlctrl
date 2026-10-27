@@ -15,6 +15,13 @@
 .buttons-grid-stack {
     --buttons-row-h: 56px;
 }
+/* Editor only: hold the grid one row taller than its content so a key can be
+ * dragged into the empty bottom row. `--edit-min-rows` is set by grids.tsx;
+ * GridStack keeps the container at least this min-height (it reads stylesheet
+ * min-height, unlike the inline values it wipes on re-layout). */
+.buttons-grid-stack.buttons-grid-edit {
+    min-height: calc(var(--edit-min-rows, 2) * var(--buttons-row-h));
+}
 /* .buttons-cell fills the (absolute) item-content and hosts the click. */
 .buttons-grid-stack .buttons-cell {
     position: absolute;
