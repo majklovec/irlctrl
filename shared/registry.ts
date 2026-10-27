@@ -37,6 +37,7 @@ export type {
 	BackendModule,
 	DashboardAction,
 	DashboardActionEntry,
+	DashboardActions,
 } from "./module-contract";
 
 /**
@@ -122,9 +123,14 @@ function validate(mod: unknown, file: string): asserts mod is BackendModule {
 			throw new Error(`module ${id}: pages must be { match: RegExp, page }[]`);
 	}
 	if (m.dashboardActions !== undefined) {
+		// A function of the live status can't be validated until it runs; its
+		// entries are validated at publish time in `dashboardActionsFor`.
+		if (typeof m.dashboardActions === "function") return;
 		const methods = new Set(isStringArray(m.methods) ? m.methods : []);
 		if (!Array.isArray(m.dashboardActions))
-			throw new Error(`module ${id}: dashboardActions must be an array`);
+			throw new Error(
+				`module ${id}: dashboardActions must be an array (or a function of status)`,
+			);
 		const seen = new Set<string>();
 		for (const a of m.dashboardActions as DashboardAction[]) {
 			if (
@@ -291,10 +297,32 @@ export function dashboardActionsFor(status: Status): DashboardActionEntry[] {
 	const role = status.role;
 	const out: DashboardActionEntry[] = [];
 	for (const m of ALL_MODULES) {
-		if (!m.dashboardActions?.length) continue;
+		if (m.dashboardActions === undefined) continue;
 		if (m.roles && !m.roles.includes(role)) continue;
 		if (status.modules?.[m.configKey ?? m.id]?.enabled !== true) continue;
-		for (const a of m.dashboardActions) {
+		// A factory resolves against the device's live status. The control
+		// server calls this on every status push, so dynamic action sets
+		// (e.g. one mute button per OBS audio source) track the device itself.
+		// The cheap checks above run first so the factory isn't invoked for a
+		// module that is disabled or not serving this device's role.
+		const decl = m.dashboardActions;
+		const actions: readonly DashboardAction[] =
+			typeof decl === "function" ? decl(status) : decl;
+		if (actions.length === 0) continue;
+		const methods = new Set(m.methods ?? []);
+		for (const a of actions) {
+			// Dynamic entries can drift (a factory minting an action whose id
+			// the module no longer declares, or a malformed shape): skip them
+			// rather than publishing a broken button.
+			if (
+				!(a instanceof Object) ||
+				typeof a.id !== "string" ||
+				!a.id ||
+				typeof a.label !== "string" ||
+				typeof a.method !== "string" ||
+				!methods.has(a.method)
+			)
+				continue;
 			const roles = a.roles ?? m.methodRoles?.[a.method] ?? m.roles;
 			if (roles && !roles.includes(role)) continue;
 			out.push({

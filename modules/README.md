@@ -92,7 +92,7 @@ beyond the contracts, components, store, i18n and util helpers a card needs.
 | `configure?(config, slice)`         | apply a `modules.configure` payload to the slice (default: only `enabled`); the module is restarted afterwards                                                                                                                                           |
 | `pages?`                            | `{ match: RegExp, page }[]` — the device-relative paths that serve `pages/<page>.html` (the control server mirrors them under `/d/<id>/`)                                                                                                                 |
 | `dashboardWidgets?`                 | dashboard widget types with their default grid size (the server validates dashboards against them); a widget may declare `configFields` and a `validateConfig(config, context)` hook for a server-validated config, and `fleet: true` for a widget offered once that names its devices in that config instead of binding to one                                                                                                                                         |
-| `dashboardActions?`                 | operator actions offered to the dashboard **Buttons** widget: `{ id, label, icon?, method, params?, confirm?, roles? }[]` — `method` must be one of `methods`; the control server merges the enabled modules' actions into the device's cached status as `status.actions` (see [Dashboard actions](#dashboard-actions)) |
+| `dashboardActions?`                 | operator actions offered to the dashboard **Buttons** widget: `{ id, label, icon?, method, params?, confirm?, roles? }[]` — `method` must be one of `methods`. May instead be a `status => …` factory for actions that depend on live device state (e.g. one button per OBS audio source); the registry resolves it against the freshest status. The control server merges the enabled modules' actions into the device's cached status as `status.actions` (see [Dashboard actions](#dashboard-actions)) |
 | `services?.capabilities`            | `{ "<name>": impl }` offered to other modules over the bus                                                                                                                                                                                              |
 | `hub?`                              | channel-widget hub (`widgetType`, `snapshotKey`, `defaultSize`, `configFields`, `channelSpec`, `create`)                                                                                                                                                 |
 
@@ -192,6 +192,30 @@ const registration: BackendModule<ModuleCore> = {
     is no longer the user's) as unavailable and refuses to fire them. A
     dashboard save keeps them; creating a dashboard with unknown actions or
     foreign devices is rejected.
+
+A `dashboardActions` factory is an alternative to a fixed list, for actions
+that depend on the device's live state. The registry calls it with the device's
+`status` on every status push, so the result tracks the device:
+
+```ts
+// modules/obs-controller/backend.ts — one mute button per live audio source
+dashboardActions: (status) => [
+	{ id: "stream-start", label: "act.obs.stream_start", icon: "▶", method: "obs.request", params: { requestType: "StartStream" } },
+	// …
+	...status.obs.audioSources.map((s) => ({
+		id: `mute:${s.name}`,
+		label: s.name, // a raw source name; the widget's t() renders it verbatim
+		icon: s.muted ? "🔊" : "🔇",
+		method: "obs.request",
+		params: { requestType: "SetInputMute", requestData: { inputName: s.name, inputMuted: !s.muted } },
+	})),
+],
+```
+
+The factory runs on the **control server** (which never starts the device
+module), so it must read the source list off `status` — the module publishes it
+from `status()` (a module's `status()` fragments land at the top level of the
+status). Return `[]` to hide a module from the catalogue for a given status.
 
 ## Discovery (the core names no module)
 

@@ -51,6 +51,7 @@
 
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
+import { AudioSourceTracker } from "../../modules/obs-controller/audio-sources";
 import {
 	collectSrtSample,
 	type SrtBaseline,
@@ -375,6 +376,10 @@ async function main(): Promise<void> {
 			DEFAULT_EVENT_SUBSCRIPTIONS | EventSubscription.InputVolumeMeters,
 		log: (msg, ...rest) => console.log(`[obs] ${msg}`, ...rest),
 	});
+	// Audio sources → `status.obs.audioSources` → the obs-controller module's
+	// dashboard mute buttons. Attached before the forwarding listeners so a
+	// mute event updates the set before the status push it triggers.
+	const audioSources = new AudioSourceTracker(obs, () => pushStatus());
 
 	// The switcher engine runs here (this is the box that talks to OBS and is
 	// where the card renders), so the OBS SRT numbers reach the dashboard.
@@ -630,6 +635,7 @@ async function main(): Promise<void> {
 		// Live switcher state (replayed to newly-connected dashboard viewers;
 		// the lowBitrateSwitcher.state events carry the live updates)
 		lowBitrateSwitcher: engine?.status() ?? null,
+		obs: { audioSources: audioSources.list() },
 		modules: moduleState(),
 	});
 

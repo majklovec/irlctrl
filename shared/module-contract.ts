@@ -47,6 +47,17 @@ export interface DashboardActionEntry extends DashboardAction {
 	moduleTitle: string;
 }
 
+/**
+ * The actions a module offers to the Buttons widget. Either a fixed list, or a
+ * factory of the device's live `status` — for actions that depend on runtime
+ * state (e.g. one mute button per OBS audio source, only as many as OBS
+ * currently has). A factory resolves to the actions for the device's current
+ * status; returning `[]` hides the module from the catalogue.
+ */
+export type DashboardActions =
+	| readonly DashboardAction[]
+	| ((status: Status) => readonly DashboardAction[]);
+
 /** Options of a module-emitted push (`ctx.emit`). */
 export interface EmitOptions {
 	/** Rate-limit per sink (remote links push these less often). */
@@ -202,8 +213,14 @@ export interface BackendModule<TCore = unknown> {
 	pages?: readonly ModulePage[];
 	/** Device-bound dashboard widgets the module renders. */
 	dashboardWidgets?: readonly ModuleWidget[];
-	/** Operator actions offered to the dashboard's Buttons widget (each fires one of `methods`). */
-	dashboardActions?: readonly DashboardAction[];
+	/**
+	 * Operator actions offered to the dashboard's Buttons widget (each fires one
+	 * of `methods`). Either a fixed list, or a factory of the device's live
+	 * `status` for actions that depend on runtime state (e.g. one mute button
+	 * per OBS audio source) — the registry resolves the factory against the
+	 * freshest status it holds.
+	 */
+	dashboardActions?: DashboardActions;
 	/** Capabilities offered to other modules (looked up by name through the bus). */
 	services?: { capabilities?: Record<string, unknown> };
 	/** Channel-widget hub (widget modules). */

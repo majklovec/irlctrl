@@ -32,9 +32,24 @@ const status = (
 
 describe("dashboard action catalogue (status.actions)", () => {
 	test("every declared action fires one of its module's methods", () => {
-		for (const mod of ALL_MODULES)
-			for (const action of mod.dashboardActions ?? [])
-				expect(mod.methods, `${mod.id}.${action.id}`).toContain(action.method);
+		for (const mod of ALL_MODULES) {
+			if (mod.dashboardActions === undefined) continue;
+			// A status factory's action set depends on the status, so resolve
+			// it for a minimal status before checking its methods.
+			const actions =
+				typeof mod.dashboardActions === "function"
+					? mod.dashboardActions(
+							status("combined", {
+								[mod.configKey ?? mod.id]: true,
+							}),
+						)
+					: mod.dashboardActions;
+			for (const action of actions)
+				expect(
+					mod.methods,
+					`${mod.id}.${action.id}`,
+				).toContain(action.method);
+		}
 	});
 
 	test("merges the actions of the enabled modules that serve the role", () => {
@@ -80,6 +95,52 @@ describe("dashboard action catalogue (status.actions)", () => {
 			method: "encoder.bitrate",
 			params: { maxBitrate: 1500 },
 		});
+	});
+
+	test("emits one mute/toggle action per live OBS audio source", () => {
+		const st = status("combined", { "obs-controller": true });
+		// status() spreads module fragments to the top level, so the source
+		// list lands at status.obs.audioSources (as the device reports it).
+		st.obs = {
+			audioSources: [
+				{ name: "Mic", muted: false },
+				{ name: "Desktop", muted: true },
+			],
+		};
+		const actions = dashboardActionsFor(st);
+		const keys = actions.map((a) => a.key);
+		// base actions are always present
+		expect(keys).toContain(dashboardActionKey("obs-controller", "stream-start"));
+		// one toggle per source, keyed by the raw source name
+		expect(keys).toContain(dashboardActionKey("obs-controller", "mute:Desktop"));
+		// a muted source offers to UNMUTE (sets inputMuted:false, 🔊)
+		const desktop = actions.find((a) => a.id === "mute:Desktop")!;
+		expect(desktop).toMatchObject({
+			method: "obs.request",
+			params: {
+				requestType: "SetInputMute",
+				requestData: { inputName: "Desktop", inputMuted: false },
+			},
+		});
+		expect(desktop.icon).toBe("🔊");
+		// an unmuted source offers to MUTE (sets inputMuted:true, 🔇)
+		const mic = actions.find((a) => a.id === "mute:Mic")!;
+		expect(mic).toMatchObject({
+			params: {
+				requestType: "SetInputMute",
+				requestData: { inputName: "Mic", inputMuted: true },
+			},
+		});
+		expect(mic.icon).toBe("🔇");
+	});
+
+	test("the OBS factory hides mute buttons when no sources are reported", () => {
+		// enabled module with no obs fragment → base actions only
+		const keys = dashboardActionsFor(
+			status("combined", { "obs-controller": true }),
+		).map((a) => a.id);
+		expect(keys).toContain("stream-start");
+		expect(keys.some((k) => k.startsWith("mute:"))).toBe(false);
 	});
 });
 
