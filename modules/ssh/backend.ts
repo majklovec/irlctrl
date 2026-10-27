@@ -6,25 +6,26 @@
  * Works both on a systemd host (systemctl ssh) and in the test container
  * (plain sshd daemon with a pid file, no init system).
  */
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
-import { z } from "zod";
-import type {
-	Mctx,
-	SshCore,
-	SshHostStatus,
-	SshPasswordReset,
-} from "./types";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import type { ModuleCore } from "../../backend/client/module-core";
+import { t } from "../../shared/i18n";
+import type { BackendModule } from "../../shared/module-contract";
+import log from "./log";
+import type { SshHostStatus, SshModuleConfig, SshPasswordReset } from "./types";
 
-/** Core bag, filled at bind (discovery) and re-filled at start (a module may not import the core directly). */
-let core: SshCore;
+/** Core bag, bound at discovery and re-filled at start (a module never imports the core). */
+let core: ModuleCore;
 
 const PID_FILE = "/run/sshd.pid";
 
+/** This module's settings slice (created by the core from the role defaults). */
+const slice = (): SshModuleConfig | undefined =>
+	core.state.settings.modules?.ssh as SshModuleConfig | undefined;
+
 const hasSystemd = (): boolean => existsSync("/run/systemd/system");
 
-const sshUser = (): string =>
-	core.state.settings.modules?.ssh?.user ?? "root";
+const sshUser = (): string => slice()?.user ?? "root";
 
 function daemonPid(): number | null {
 	try {
@@ -71,8 +72,8 @@ async function waitActive(want: boolean, timeoutMs = 5000): Promise<boolean> {
 }
 
 async function sshStatus(): Promise<SshHostStatus> {
-	const slice = core.state.settings.modules?.ssh;
-	const password = slice?.password;
+	const s = slice();
+	const password = s?.password;
 	return {
 		user: sshUser(),
 		active: await isActive(),
@@ -80,7 +81,7 @@ async function sshStatus(): Promise<SshHostStatus> {
 		passwordConfigured: Boolean(password),
 		// A staged password that has not reached the account yet — it is
 		// applied when sshd starts.
-		pendingPassword: Boolean(password && password !== slice?.appliedPassword),
+		pendingPassword: Boolean(password && password !== s?.appliedPassword),
 	};
 }
 
@@ -89,17 +90,17 @@ async function sshStatus(): Promise<SshHostStatus> {
  * applied baseline. Callers handle persistence; this only changes the slice.
  */
 async function applyStagedPassword(user: string): Promise<void> {
-	const slice = core.state.settings.modules?.ssh;
-	const password = slice?.password;
-	if (!slice || !password) return;
-	if (slice.appliedPassword === password) return;
+	const s = slice();
+	const password = s?.password;
+	if (!s || !password) return;
+	if (s.appliedPassword === password) return;
 	// Ensure the account exists (idempotent) — chpasswd needs it.
 	const uid = await core.run("id", ["-u", user], true);
 	if (!uid.trim()) {
 		await core.run("useradd", ["-m", "-s", "/bin/bash", user]);
 	}
 	await setAccountPassword(user, password);
-	slice.appliedPassword = password;
+	s.appliedPassword = password;
 }
 
 /**
@@ -107,29 +108,27 @@ async function applyStagedPassword(user: string): Promise<void> {
  * one the operator sees in the UI; it reaches the account when sshd starts.
  */
 function stagePassword(user: string, password: string): void {
-	const settings = core.state.settings;
-	if (!settings.modules) settings.modules = {};
-	if (!settings.modules.ssh) settings.modules.ssh = { enabled: false };
-	const slice = settings.modules.ssh;
-	slice.user = user;
-	slice.password = password;
+	const modules = (core.state.settings.modules ??= {});
+	const s = (modules.ssh ??= { enabled: false }) as SshModuleConfig;
+	s.user = user;
+	s.password = password;
 }
 
 async function startSsh(params: Record<string, unknown>): Promise<SshHostStatus> {
 	// Starting also saves the SSH card's settings: the enabled flag and the
 	// login account persist under modules.ssh before the daemon comes up.
-	const slice = core.state.settings.modules?.ssh;
+	const s = slice();
 	let user = sshUser();
-	if (slice) {
-		slice.enabled = true;
+	if (s) {
+		s.enabled = true;
 		if (typeof params.user === "string" && params.user.trim())
-			slice.user = params.user.trim();
-		user = slice.user || user;
+			s.user = params.user.trim();
+		user = s.user || user;
 		// A password staged while sshd was stopped reaches the account now —
 		// the change is made on start, never while the daemon is down.
 		await applyStagedPassword(user);
+		await core.saveState();
 	}
-	if (slice) await core.saveState();
 	if (hasSystemd()) {
 		await core.run("systemctl", ["start", "ssh"]);
 	} else {
@@ -202,7 +201,7 @@ async function resetPassword(
 	// Staging is only meaningful with sshd down — while it runs, the account
 	// password may not change.
 	if (await isActive())
-		throw new Error(core.t("ssh.reset_blocked"));
+		throw new Error(t("ssh.reset_blocked"));
 
 	const password = generatePassword();
 	stagePassword(user, password);
@@ -210,7 +209,7 @@ async function resetPassword(
 	core.logEvent(
 		"info",
 		"ssh",
-		core.t("mlog.done.ssh_password_reset", { user }),
+		t("mlog.done.ssh_password_reset", { user }),
 	);
 	return { user, password };
 }
@@ -224,44 +223,49 @@ async function setPassword(params: Record<string, unknown>): Promise<{ user: str
 	if (!user) throw new Error("user is required");
 	if (!password) throw new Error("password is required");
 	if (await isActive())
-		throw new Error(core.t("ssh.reset_blocked"));
+		throw new Error(t("ssh.reset_blocked"));
 
 	stagePassword(user, password);
 	await core.saveState();
 	core.logEvent(
 		"info",
 		"ssh",
-		core.t("mlog.done.ssh_password_set", { user }),
+		t("mlog.done.ssh_password_set", { user }),
 	);
 	return { user };
 }
 
-const methods = [
-	"ssh.status",
-	"ssh.start",
-	"ssh.stop",
-	"ssh.reset_password",
-	"ssh.set_password",
-] as const;
-
-export default {
+const registration: BackendModule<ModuleCore> = {
 	kind: "device",
 	id: "ssh",
 	title: "SSH",
-	configSchema: z.object({}).passthrough(),
+	// Every box but an obs-only one has an sshd to manage.
+	roles: ["relay", "encoder", "combined"],
 	// No secret fields — the generated password is intentionally visible in
 	// the status so the operator can always read it from the UI.
-	secretFields: [] as string[],
-	bind(c: SshCore) {
+	methods: [
+		"ssh.status",
+		"ssh.start",
+		"ssh.stop",
+		"ssh.reset_password",
+		"ssh.set_password",
+	],
+	events: [],
+	log,
+	bind(c) {
 		core = c;
 	},
-	async start(ctx: Mctx) {
+	async start(ctx) {
 		core = ctx.core;
 	},
 	async stop() {},
-	methods,
-	events: [] as string[],
-	async dispatch(method: string, params: Record<string, unknown>) {
+	/** `modules.configure`: the enabled flag and the login account. */
+	configure(config, s) {
+		if (typeof config.enabled === "boolean") s.enabled = config.enabled;
+		if (typeof config.user === "string" && config.user.trim())
+			s.user = config.user.trim();
+	},
+	async dispatch(method, params) {
 		switch (method) {
 			case "ssh.status":
 				return sshStatus();
@@ -280,3 +284,5 @@ export default {
 		return { ssh: await sshStatus() };
 	},
 };
+
+export default registration;

@@ -32,8 +32,8 @@ export async function startApiServer(): Promise<void> {
 	});
 
 	const url = `ws://${API_HOST}:${server.port}/ws`;
-	console.log(`SRTLA web UI on http://${API_HOST}:${server.port}/`);
-	console.log(`SRTLA bonding WebSocket API listening on ${url}`);
+	console.log(`Web UI on http://${API_HOST}:${server.port}/`);
+	console.log(`WebSocket API listening on ${url}`);
 	console.log(
 		`Try:  bunx wscat -c ${url}  then send {"id":1,"method":"status"}`,
 	);

@@ -4,8 +4,7 @@ import { socketMessage } from "../../../shared/socket-message";
 import { errorMessage } from "../../../shared/util";
 import { ALLOWED_ORIGINS } from "../config";
 import { handleRequest } from "../methods";
-import { logHistoryEvent, statsEvent, statusEvent } from "../push";
-import { latestSrtlaStats } from "../srtlaControl";
+import { logHistoryEvent, retainedEvents, statusEvent } from "../push";
 
 export function deviceRpcPlugin() {
 	return new Elysia({ name: "device-api-rpc" })
@@ -24,7 +23,7 @@ export function deviceRpcPlugin() {
 				try {
 					ws.send(logHistoryEvent());
 					ws.send(await statusEvent());
-					if (latestSrtlaStats().stats) ws.send(statsEvent());
+					for (const msg of retainedEvents()) ws.send(msg);
 				} catch (err: unknown) {
 					console.error("Initial status failed:", errorMessage(err));
 				}

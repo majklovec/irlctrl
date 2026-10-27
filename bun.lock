@@ -13,7 +13,6 @@
         "mithril": "^2.3.8",
         "tiktok-live-connector": "^2.5.0",
         "youtube-chat-next": "^3.1.0",
-        "zod": "^4.6.5",
       },
       "devDependencies": {
         "@semantic-release/git": "^11.0.1",
@@ -710,8 +709,6 @@
     "yoctocolors": ["yoctocolors@2.2.0", "", {}, "sha512-xYqdZFUK/VYazNl/oCDYN+3WloWQwMfZxBoiNt6qNyk+xfOdi598muWE42rNZFp1kNOiqW936q5RhUdnpqElSg=="],
 
     "youtube-chat-next": ["youtube-chat-next@3.1.0", "", { "dependencies": { "axios": "^1.18.1", "typed-emitter": "^2.1.0" } }, "sha512-hkGL7YVurYjfQ2tBcBN/q38BaXlZ5iwccZVMEPXZH3CGaTL5Li25XjhofGp+sDeqVMSZ5ccuEOZUCiKNLsSNrw=="],
-
-    "zod": ["zod@4.6.5", "", {}, "sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q=="],
 
     "@actions/http-client/undici": ["undici@6.29.1", "", {}, "sha512-EvRlUt/QqAEvXdQeRMYUfwOQsfzpDztykrG2owGEE/rBOBoYv9uF39ZzsNDh4lTFHhTr2XOZjKkYgueD12ZmGA=="],
 

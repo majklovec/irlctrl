@@ -152,6 +152,7 @@ export default {
 	hub: {
 		widgetType: "stats",
 		snapshotKey: "stats",
+		defaultSize: { w: 3, h: 3 },
 		configFields: HUB_CONFIG_FIELDS,
 		channelSpec: statsSpecsFromConfig,
 		create: (publish: PublishFn): StatsChannelManager =>

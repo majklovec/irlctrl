@@ -1,0 +1,13 @@
+{
+	"log.reconfigure_failed": "Počiatočná rekonfigurácia zlyhala: {{error}}",
+	"mlog.action.bond_selection": "Výber bondu",
+	"mlog.action.bond_toggle": "Prepnutie bondu",
+	"mlog.done.bond_toggled": "{{iface}} prepnuté v bonde",
+	"mlog.done.bond_updated": "Výber bondu aktualizovaný",
+	"mlog.done.modem_connected": "Modem #{{index}} pripojený",
+	"mlog.done.modem_disabled": "Modem #{{index}} zakázaný",
+	"mlog.done.modem_disconnected": "Modem #{{index}} odpojený",
+	"mlog.done.modem_enabled": "Modem #{{index}} povolený",
+	"mlog.done.modem_reset": "Modem #{{index}} resetovaný",
+	"mlog.done.reconfigured": "Prekonfigurované"
+}

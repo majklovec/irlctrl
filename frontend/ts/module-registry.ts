@@ -6,7 +6,7 @@
  * (`generated/modules.frontend.ts`, emitted by `scripts/gen-modules.ts`): one
  * static import per frontend.tsx inside a modules subdirectory, in sorted path
  * order, default-exporting the array. The browser bundle therefore never uses
- * Glob and every module is statically resolved (see REFACTOR-modules.md §4.1).
+ * Glob and every module is statically resolved.
  * Adding a module directory with a `frontend.tsx` default export registers it
  * here — no frontend-registry edits (regeneration happens automatically).
  *
@@ -14,8 +14,9 @@
  * at module init). Kept in frontend/ts so the module code stays out of the core import
  * graph.
  */
-import m from "mithril";
+import type m from "mithril";
 import MANIFEST from "../../generated/modules.frontend";
+import { registerLogWording } from "../../shared/logMessages";
 import type {
 	DeviceSummary,
 	Role,
@@ -25,66 +26,15 @@ import type {
 } from "../../shared/types";
 import { type DeviceCard, setFrontendEventSink } from "./device/store";
 import type {
+	ChannelWidgetModule,
 	DeviceDashboardWidget,
 	DeviceSummaryColumn,
-	FrontendModuleContributions,
+	FrontendModule,
+	FrontendRegistration,
 	ModuleSetupStep,
 } from "./module-contracts";
 
-/** Render context the core hands a widget module: the widget's normalized
- * channel key, the live state bag of its own device (undefined for
- * device-independent widgets) and its device info. Lets a module read the
- * device state it composes (e.g. srtla stats) without the core naming a
- * module's renderer. `deviceLive` is the core's per-device live data (its own
- * `DeviceLive` bag, read structurally); `device` is the device info. */
-export interface WidgetContext {
-	/** The widget's normalized channel key ("" when not configured). */
-	channel: string;
-	deviceLive?: Record<string, unknown> | null;
-	device?: Record<string, unknown> | null;
-}
-
-/** Frontend descriptor of a self-contained widget module (local copy of the
- * documented shape; the core names the shape, modules never import it).
- *
- * The module owns its live state (its own per-channel map), fed by `onFrame`;
- * `body`/`badge` render from it plus, where relevant, the widget's device state
- * in `ctx`. `body`/`badge` take the widget only — no separate `live` argument —
- * so the core never has to resolve which live map a widget type reads. */
-interface ChannelWidgetModule<TWidget = unknown> {
-	id: string;
-	kind: "widget";
-	/** Widget types this module composes; the core routes by this, not by a
-	 * hard-coded type→module table. */
-	widgetTypes: readonly string[];
-	/** Grid cell count for a widget of this module's types (grid policy). */
-	defaultSize: { w: number; h: number };
-	configFields: readonly WidgetConfigField[];
-	body(w: TWidget, ctx: WidgetContext): unknown;
-	badge(w: TWidget, ctx: WidgetContext): unknown;
-	/** Optional: receive one dashboard-websocket frame and fold it into the
-	 * module's own live state (chat modules are fed this way; device-liveness
-	 * widgets read `ctx` instead and omit it). */
-	onFrame?(event: string, data: unknown): void;
-}
-
-/** A browser-side module registration (device card). Local copy: the core
- * names the shape, modules never import across boundaries. */
-export interface FrontendModule extends FrontendModuleContributions {
-	id: string;
-	title: string;
-	icon?: string;
-	kind: "device-card";
-	order?: number;
-	component: (status: Status) => m.Vnode;
-	defaultSize: { w: number; h: number };
-	minSize: { w: number; h: number };
-	maxSize?: { w: number; h: number };
-}
-
-type FrontendRegistration =
-	| FrontendModule
-	| ChannelWidgetModule<ServerDashboardWidget>;
+export type { FrontendModule, WidgetContext } from "./module-contracts";
 
 const isRegistration = (mod: unknown): mod is FrontendRegistration =>
 	typeof mod === "object" &&
@@ -102,6 +52,9 @@ const registrations = (
 	.filter(isRegistration);
 
 export const FRONTS = registrations;
+
+// Module log wording (browser-side failure messages, section labels)
+for (const reg of FRONTS) if (reg.log) registerLogWording(reg.log);
 
 export const FRONTEND_MODULES: FrontendModule[] = FRONTS.filter(
 	(mod): mod is FrontendModule => mod.kind === "device-card",

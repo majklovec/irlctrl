@@ -1,45 +1,64 @@
-/* Local types for the modems module (never imported by the core or other modules). */
+/* Local types of the modems module (never imported by the core or other modules). */
 
-/** One enumerated ModemManager modem (the status `modems` array item). */
+/** One usable network interface (the `interfaces` / `selected` status fragments). */
+export interface Iface {
+	iface: string;
+	ip: string;
+	prefix: number;
+	cidr: string;
+	speed?: number;
+	modemIndex?: number;
+	modemPath?: string;
+	signalQuality?: number;
+	operatorName?: string;
+	accessTech?: string;
+	registered?: boolean;
+	connectionState?: string;
+}
+
+/** The persisted uplink selection (`state.selection`): modem paths and/or interface IPs. */
+export interface ModemConfig {
+	modems?: string[];
+	ips?: string[];
+}
+
+/** ModemManager modem as reported by `mmcli` (routing, the `modems` status fragment, the UI). */
 export interface ModemInfo {
 	index: number;
 	path: string;
 	state: string;
 	powerState: string;
+	signalQuality?: number;
+	accessTech?: string;
+	operatorName?: string;
+	registrationState?: string;
 	model?: string;
 	manufacturer?: string;
 	imei?: string;
 	primaryPort?: string;
 	deviceId?: string;
 	simPath?: string;
-	operatorName?: string;
-	registrationState?: string;
-	accessTech?: string;
-	signalQuality?: number;
 }
 
-/** The slice of the core bag this module uses. */
-export interface ModemsCore {
-	run(cmd: string, args: string[], ignoreError?: boolean): Promise<string>;
+/** Outcome of one routing + uplinks-file reconcile (`reconfigure`, the `net.uplinks` capability). */
+export interface ReconfigureResult {
+	ok: boolean;
+	selected: Iface[];
+	uplinksFile: string;
+	ips: string[];
+	/** The uplinks file content actually changed (srtla_send needs a reload). */
+	changed: boolean;
+	error?: string;
 }
 
-/** The context the registry passes to `start`. */
-export interface Mctx {
-	config: Record<string, unknown>;
-	emit(event: string, data: unknown): void;
-	log(section: string, message: string): void;
-	core: ModemsCore;
+/** The `net.uplinks` capability: where the uplinks file is and how to rebuild it. */
+export interface UplinksCapability {
+	file: string;
+	reconfigure(): Promise<ReconfigureResult>;
 }
 
-/** A browser-side module registration (frontend). Local copy so a module never
- * imports across boundaries; the frontend registry narrows it. */
-export interface BridgedModule {
-	id: string;
-	title: string;
-	icon?: string;
-	kind: "device-card";
-	component: unknown;
-	defaultSize: { w: number; h: number };
-	minSize: { w: number; h: number };
-	maxSize?: { w: number; h: number };
+/** ModemManager lookups routing.ts enriches the interface list with. */
+export interface ModemSource {
+	detect(): Promise<ModemInfo[]>;
+	modemIface(modem: ModemInfo): Promise<string | null>;
 }

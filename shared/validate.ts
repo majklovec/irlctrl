@@ -6,30 +6,14 @@
 
 export const HOSTNAME_RE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,62}$/;
 export const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
-export const REPO_RE = /^[\w.-]+\/[\w.-]+$/;
 export const REMOTE_URL_RE = /^wss?:\/\//;
 
-/** Device types: relay bonds SRT out via srtla_send, encoder runs belacoder / ceracoder,
- *  combined does both on one box. */
+/** Device types: relay bonds a stream out over its uplinks, encoder produces the
+ *  stream, combined does both on one box, obs runs the OBS controls. Which modules
+ *  serve a role is declared by the modules themselves (`roles`). */
 export const ROLES = ["relay", "encoder", "combined", "obs"] as const;
 export type Role = (typeof ROLES)[number];
 
-/**
- * Module IDs the role presets pre-select in a fresh device's default dashboard.
- * "obs" exposes the OBS controls.
- */
-export const modulesForRole = (role: Role): string[] => {
-	switch (role) {
-		case "obs":
-			return ["obs-controller"];
-		case "relay":
-			return ["relay", "modems", "ssh"];
-		case "combined":
-			return ["relay", "encoder", "modems", "ssh"];
-		default:
-			return [role, "ssh"];
-	}
-};
 export const isRole = (v: unknown): v is Role =>
 	(ROLES as readonly unknown[]).includes(v);
 

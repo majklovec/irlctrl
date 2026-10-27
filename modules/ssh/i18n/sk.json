@@ -1,0 +1,18 @@
+{
+	"dev.badge.password_none": "žiadne",
+	"dev.card.ssh": "SSH",
+	"dev.row.password": "Heslo",
+	"dev.row.user": "Používateľ",
+	"dev.ssh_new_password": "Nové heslo",
+	"dev.ssh_pending_apply": "sa použije pri spustení SSH",
+	"dev.ssh_reset_confirm": "Obnoviť SSH heslo používateľa {{user}}? Bude vygenerované a zobrazené len raz.",
+	"dev.ssh_stop_confirm": "Zastaviť SSH server? Aktívne SSH pripojenia sa ukončia.",
+	"mlog.done.ssh_password_reset": "SSH heslo používateľa {{user}} obnovené",
+	"mlog.done.ssh_password_set": "Heslo SSH pre {{user}} nastavené",
+	"set.ssh": "SSH",
+	"set.ssh_desc": "Spravujte SSH server tohto zariadenia — spúšťajte a zastavujte ho, vyberte prihlasovací účet a nastavte alebo obnovte heslo.",
+	"set.ssh_reset_done": "Heslo obnovené — nové heslo pre {{user}} je uvedené nižšie.",
+	"set.ssh_saved": "Heslo pre {{user}} uložené — bude použité na účte pri spustení SSH.",
+	"set.ssh_stop_hint": "Heslo sa dá meniť len pri zastavenom SSH — na účet sa použije pri spustení SSH. Najprv SSH zastavte.",
+	"ssh.reset_blocked": "Heslo sa dá generovať len pri zastavenom SSH — najprv SSH zastavte."
+}

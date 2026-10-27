@@ -1,3 +1,5 @@
+// biome-ignore lint/correctness/noUnusedImports: the JSX factory (tsconfig jsxFactory "m")
+import m from "mithril";
 import {
 	Actions,
 	Break,
@@ -8,6 +10,7 @@ import {
 } from "../../frontend/ts/components/ui";
 import { t } from "../../frontend/ts/i18n";
 import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
+import type { ObsModuleView } from "./types";
 
 /**
  * Editable copy of the module's OBS connection; the password is write-only
@@ -39,11 +42,11 @@ export const def: ModuleDef = {
 	titleKey: "set.obs",
 	visible: (ctx) => ctx.role === "obs",
 	refresh: (ctx) => {
-		draft.obsUrl = ctx.modules["obs-controller"].obsUrl;
+		draft.obsUrl = (ctx.modules["obs-controller"] as ObsModuleView).obsUrl;
 		draft.obsPassword = "";
 	},
 	render: (ctx) => {
-		const obsPassword = ctx.modules["obs-controller"].obsPassword;
+		const { obsPassword } = ctx.modules["obs-controller"] as ObsModuleView;
 		const passwordPlaceholder = !obsPassword
 			? t("set.token_ph_unchanged")
 			: typeof obsPassword === "object" && obsPassword.configured

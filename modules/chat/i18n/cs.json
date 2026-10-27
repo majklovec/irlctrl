@@ -1,0 +1,9 @@
+{
+	"chat.empty": "Zatím žádné zprávy",
+	"wtype.chat": "Chat",
+	"dash.widget_tiktok": "TikTok kanál",
+	"dash.widget_history": "Délka historie zpráv",
+	"dash.widget_order": "Nové zprávy nahoru/dolu",
+	"dash.widget_order.top": "Nahoru",
+	"dash.widget_order.bottom": "Dolů"
+}

@@ -6,8 +6,8 @@
  */
 import m from "mithril";
 import { errorMessage } from "../../shared/util";
-import { DEFAULT_COLOR } from "../../shared/validate";
-import type { modulesView, Settings } from "../types";
+import { DEFAULT_COLOR, ROLES } from "../../shared/validate";
+import type { ModulesView, Settings } from "../types";
 import {
 	Actions,
 	Break,
@@ -67,7 +67,7 @@ rpc.on("status", (data) => {
 	if (state.settings)
 		refreshDevice({
 			settings: state.settings,
-			modules: (data as { modules: modulesView }).modules,
+			modules: (data as { modules: ModulesView }).modules,
 			role: draft.role,
 		});
 });
@@ -87,13 +87,13 @@ async function run<T>(call: () => Promise<T>): Promise<T | undefined> {
 async function load(): Promise<void> {
 	// Right after a (re)start the device link to the server is flapping and
 	// the first fetch can time out; retry a few times before giving up.
-	let result: [{ settings: Settings }, { modules: modulesView }] | undefined;
+	let result: [{ settings: Settings }, { modules: ModulesView }] | undefined;
 	for (let attempt = 0; attempt < 5; attempt++) {
 		if (attempt > 0) await new Promise((r) => setTimeout(r, 1500));
 		result = await run(() =>
 			Promise.all([
 				rpc.call<{ settings: Settings }>("settings.get"),
-				rpc.call<{ modules: modulesView }>("modules.list"),
+				rpc.call<{ modules: ModulesView }>("modules.list"),
 			]),
 		);
 		if (result) break;
@@ -164,14 +164,7 @@ function settingsCard(): m.Vnode {
 							prop="role"
 							onChange={() => setDraftRole(draft.role)}
 						>
-							<Options
-								pairs={[
-									["relay", t("role.relay")],
-									["encoder", t("role.encoder")],
-									["combined", t("role.combined")],
-									["obs", t("role.obs")],
-								]}
-							/>
+							<Options pairs={ROLES.map((r) => [r, t(`role.${r}`)] as const)} />
 						</Select>
 					}
 				/>

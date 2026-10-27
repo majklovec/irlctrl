@@ -30,10 +30,10 @@ import type { MithrilJSXComponent } from "../../frontend/ts/jsx";
 import type {
 	DeviceDashboardContext,
 	DeviceDashboardWidget,
+	FrontendModule,
 } from "../../frontend/ts/module-contracts";
 import { since, uuid } from "../../frontend/ts/util";
-import type { ObsModuleView, Status, SwitcherStatus } from "../../shared/types";
-import type { BridgedModule } from "./types";
+import type { ObsModuleView, ObsStatus, SwitcherStatus } from "./types";
 import { VUMeter, type VuLevels } from "./vu-meter";
 
 const SWITCHER_NUMBER_FIELDS = [
@@ -96,7 +96,7 @@ export interface ObsPanelDeps {
 }
 export interface ObsSwitcherContext {
 	host: DeviceCard;
-	status: Status;
+	status: ObsStatus;
 	live: SwitcherStatus | null;
 }
 export interface ObsPanelState {
@@ -972,10 +972,10 @@ interface SwitcherForm {
 }
 
 /** The obs module's persisted slice (the defaults below apply where a field is absent). */
-const slice = (status: Status): ObsModuleView | undefined =>
+const slice = (status: ObsStatus): ObsModuleView | undefined =>
 	status.modules["obs-controller"];
 
-function loadForm(status: Status): SwitcherForm {
+function loadForm(status: ObsStatus): SwitcherForm {
 	const c = slice(status);
 	return {
 		autoSwitch: c?.autoSwitch ?? true,
@@ -1055,7 +1055,8 @@ interface DashboardPanel {
 const dashboardPanels = new Map<string, DashboardPanel>();
 
 function dashboardPanel(context: DeviceDashboardContext): DashboardPanel {
-	const { widget, rpc, status } = context;
+	const { widget, rpc } = context;
+	const status = context.status as ObsStatus | undefined;
 	const existing = dashboardPanels.get(widget.id);
 	if (existing && existing.rpc !== rpc) {
 		existing.panel.destroy();
@@ -1117,7 +1118,7 @@ const obsDashboardWidgets: DeviceDashboardWidget[] = [
 			const { panel, switcher } = dashboardPanel(context);
 			return panel.component({
 				host: context.card,
-				status: context.status,
+				status: context.status as ObsStatus,
 				live: switcher,
 			});
 		},
@@ -1134,7 +1135,7 @@ const obsDashboardWidgets: DeviceDashboardWidget[] = [
 	},
 ];
 
-const obsControllerModule: BridgedModule = (() => {
+const obsControllerModule: FrontendModule = (() => {
 	const panel = createObsPanel({
 		send: obsRequest,
 		onEvent: () => () => {}, // the registry routes obs.event through handleEvent
@@ -1149,14 +1150,16 @@ const obsControllerModule: BridgedModule = (() => {
 		dashboardWidgets: obsDashboardWidgets,
 		defaultSize: { w: 6, h: 13 },
 		minSize: { w: 4, h: 4 },
-		component: (status?: Status) => (
+		component: (status) => (
 			<Card
 				title={t("obs.card")}
 				class="mod-obs-controller"
 				headActions={panel.head()}
 			>
 				{panel.component(
-					status ? { host: card, status, live: null } : undefined,
+					status
+						? { host: card, status: status as ObsStatus, live: null }
+						: undefined,
 				)}
 			</Card>
 		),

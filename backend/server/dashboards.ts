@@ -2,14 +2,12 @@ import type { Database } from "bun:sqlite";
 import { randomUUID } from "node:crypto";
 import {
 	initWidgetHub,
+	isChannelWidgetType,
 	syncWidgetHub,
+	WIDGET_SIZES,
 	widgetConfigFields,
 } from "../../shared/registry";
-import type {
-	ServerDashboard,
-	ServerDashboardWidget,
-	WidgetType,
-} from "../../shared/types";
+import type { ServerDashboard, ServerDashboardWidget } from "../../shared/types";
 import { configFieldName } from "../../shared/types";
 import {
 	dashboardsTopic,
@@ -19,26 +17,8 @@ import {
 	WIDGET_HUB_TOPIC,
 } from "./contracts";
 
-const WIDGET_TYPES: WidgetType[] = [
-	"obs",
-	"relay",
-	"encoder",
-	"combined",
-	"stats",
-	"chat",
-];
 const DASH_PATH_RE = /^\/api\/dashboards(?:\/([\w.-]{1,64}))?$/;
-const INDEPENDENT_WIDGETS: ReadonlySet<WidgetType> = new Set(["stats", "chat"]);
 const DASH_COLUMNS = 12;
-/** Default `{w, h}` per widget type — seeds new widgets and unknown stored rows. */
-const WIDGET_SIZE: Record<WidgetType, { w: number; h: number }> = {
-	obs: { w: 6, h: 6 },
-	relay: { w: 4, h: 4 },
-	encoder: { w: 6, h: 5 },
-	combined: { w: 6, h: 10 },
-	stats: { w: 3, h: 3 },
-	chat: { w: 3, h: 8 },
-};
 
 interface DashboardRow {
 	id: string;
@@ -72,9 +52,10 @@ export function createDashboards({
 	/** Read `{x, y, w, h}` from an inbound widget payload (missing fields fall back to the type default). */
 	function parseGrid(
 		item: Record<string, unknown>,
-		type: WidgetType,
+		type: string,
 	): { x: number; y: number; w: number; h: number } {
-		const size = WIDGET_SIZE[type];
+		// Widget types and their default sizes come from the module registrations
+		const size = WIDGET_SIZES.get(type) ?? { w: 4, h: 4 };
 		const toInt = (v: unknown, fallback: number, name: string) => {
 			const n = v === undefined ? fallback : Number(v);
 			if (!Number.isInteger(n))
@@ -104,18 +85,14 @@ export function createDashboards({
 				unknown
 			>;
 			const type = item.type;
-			if (
-				typeof type !== "string" ||
-				!WIDGET_TYPES.includes(type as WidgetType)
-			) {
+			if (typeof type !== "string" || !WIDGET_SIZES.has(type))
 				throw new ApiError(`Unknown widget type: ${String(type)}`);
-			}
-			const independent = INDEPENDENT_WIDGETS.has(type as WidgetType);
+			const independent = isChannelWidgetType(type);
 			const deviceId = item.deviceId;
 			if (deviceId !== undefined && typeof deviceId !== "string") {
 				throw new ApiError("Widget deviceId must be a string");
 			}
-			const grid = parseGrid(item, type as WidgetType);
+			const grid = parseGrid(item, type);
 			const visible = item.visible === true;
 			const name =
 				typeof item.name === "string" && item.name ? item.name : type;
@@ -149,7 +126,7 @@ export function createDashboards({
 				return {
 					id,
 					deviceId: typeof deviceId === "string" ? deviceId : "",
-					type: type as WidgetType,
+					type,
 					name,
 					...grid,
 					visible,
@@ -177,7 +154,7 @@ export function createDashboards({
 			return {
 				id,
 				deviceId,
-				type: type as WidgetType,
+				type,
 				name,
 				...grid,
 				visible,
@@ -241,10 +218,10 @@ export function createDashboards({
 
 	dashboards = loadDashboards();
 
-	/** Kick channel widgets needed by the persisted dashboards; fans out to dashboard viewers. */
+	/** Channel widget hubs needed by the persisted dashboards; fans out to dashboard viewers. */
 	initWidgetHub((msg) => publish(WIDGET_HUB_TOPIC, msg));
-	const syncKick = (): void => syncWidgetHub(dashboards);
-	syncKick();
+	const syncHub = (): void => syncWidgetHub(dashboards);
+	syncHub();
 
 	class ApiError extends Error {
 		constructor(
@@ -307,7 +284,7 @@ export function createDashboards({
 					};
 					dashboards.push(dashboard);
 					saveDashboards();
-					syncKick();
+					syncHub();
 					broadcastDashboard(dashboard);
 					return Response.json(
 						{ ok: true, dashboard, dashboards: dashboardsFor(user) },
@@ -329,7 +306,7 @@ export function createDashboards({
 				if (!dashboardsById) return dashError(404, "Unknown dashboard");
 				dashboards = dashboards.filter((d) => d.id !== id);
 				saveDashboards();
-				syncKick();
+				syncHub();
 				publish(
 					dashboardsTopic(user),
 					event("dashboards.changed", { id, deleted: true }),
@@ -361,7 +338,7 @@ export function createDashboards({
 				dashboardsById.widgets = parseWidgets(body.widgets, user, false);
 				dashboardsById.version += 1;
 				saveDashboards();
-				syncKick();
+				syncHub();
 				broadcastDashboard(dashboardsById);
 				return Response.json({
 					ok: true,

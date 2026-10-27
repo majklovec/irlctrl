@@ -41,25 +41,8 @@ export type PublishFn = (msg: string) => void;
 export const eventFrame = (event: string, data: unknown): string =>
 	JSON.stringify({ type: "event", event, data });
 
-export interface WidgetContext {
-	channel: string;
-	deviceLive?: Record<string, unknown> | null;
-	device?: Record<string, unknown> | null;
-}
-
 /** A config parameter: free text or a fixed-choice dropdown. */
 export type WidgetConfigField =
 	| string
 	| { name: string; type: "select"; options: readonly string[] }
 	| { name: string; type: "hidden" };
-
-export interface ChannelWidgetModule<TWidget = unknown> {
-	id: string;
-	kind: "widget";
-	widgetTypes: readonly string[];
-	defaultSize: { w: number; h: number };
-	configFields: readonly WidgetConfigField[];
-	body(w: TWidget, ctx: WidgetContext): unknown;
-	badge(w: TWidget, ctx: WidgetContext): unknown;
-	onFrame(event: string, data: unknown): void;
-}

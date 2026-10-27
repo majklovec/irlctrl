@@ -48,37 +48,8 @@ export type PublishFn = (msg: string) => void;
 export const eventFrame = (event: string, data: unknown): string =>
 	JSON.stringify({ type: "event", event, data });
 
-/** Render context passed to a widget by the core: the widget's normalized
- * channel key, the live state of its own device (undefined for
- * device-independent widgets) and its device info. */
-export interface WidgetContext {
-	/** The widget's normalized channel key ("" when not configured). */
-	channel: string;
-	deviceLive?: Record<string, unknown> | null;
-	device?: Record<string, unknown> | null;
-}
-
 /** A config parameter: a bare string (free text) or a `{name, type:"select",
  * options}` fixed-choice field rendered as a dropdown. */
 export type WidgetConfigField =
 	| string
 	| { name: string; type: "select"; options: readonly string[] };
-
-/** Frontend descriptor the dashboard registry renders. The module owns its
- * live state (fed by `onFrame`); `body`/`badge` render from it plus, where
- * relevant, the widget's device state in `ctx`. */
-export interface ChannelWidgetModule<TWidget = unknown> {
-	id: string;
-	kind: "widget";
-	/** Widget types this module composes; the core routes by this table. */
-	widgetTypes: readonly string[];
-	defaultSize: { w: number; h: number };
-	/** Config parameter names this widget accepts, in editor form order. */
-	configFields: readonly WidgetConfigField[];
-	/** Render the widget body from the module's live state. */
-	body(w: TWidget, ctx: WidgetContext): unknown;
-	/** Status badge shown next to the widget title in the card head. */
-	badge(w: TWidget, ctx: WidgetContext): unknown;
-	/** Fold one dashboard-websocket frame into the module's live state. */
-	onFrame(event: string, data: unknown): void;
-}

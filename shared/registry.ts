@@ -1,115 +1,47 @@
 /**
- * Backend module registry — the core's door into module code.
+ * Backend module registry — discovery only, no device-process dependencies.
  *
- * Modules are self-registered: every modules/<id>/backend.ts with a
- * matching-shape default export is a registration. Discovery has two modes:
+ * Every modules/<id>/backend.ts default-exports a BackendModule registration
+ * (shared/module-contract.ts). Discovery has two modes:
  *
- *  - unbundled (bun backend/server/server.ts, bun test): a runtime directory scan anchored
- *    on import.meta.url. Adding a module needs no edit to this file and no
- *    regeneration.
+ *  - unbundled (bun backend/server/server.ts, bun test): a runtime directory
+ *    scan anchored on import.meta.url — adding a module needs no edit here.
  *  - compiled binaries (bun build --compile): the build-time manifest
- *    generated/modules.backend.ts (emitted by scripts/gen-modules.ts,
- *    mirroring the bundled frontend registry's manifest). A compiled
- *    process cannot readdir — import.meta.url lives in Bun's virtual
- *    /$bunfs mount, not on disk.
+ *    generated/modules.backend.ts (scripts/gen-modules.ts); a compiled process
+ *    cannot readdir (import.meta.url lives in Bun's virtual /$bunfs mount).
  *
  * Malformed registrations are rejected at load with the module id in the
- * message (a broken module never boots silently).
- *
- * Each module's `services.capabilities` record is wired into the capability
- * bus at load, so the core reaches module behaviour through
- * requireCapability("stream.encoder") and never names a module id.
+ * message. Both processes share this file: the device lifecycle
+ * (backend/client/modules.ts) drives start/stop/dispatch, the control server
+ * uses the widget hubs, pages and widget declarations.
  */
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { provideCapability } from "../backend/client/capabilities";
-import { logEvent } from "../backend/client/eventlog";
-import {
-	buildModuleCore,
-	type ModuleStatus,
-} from "../backend/client/module-core";
-import { pushModuleEvent } from "../backend/client/push";
-import {
-	MODULE_CONFIG_KEYS,
-	type PersistentState,
-	state,
-} from "../backend/client/state";
+import { registerLogWording } from "./logMessages";
+import type {
+	BackendModule,
+	ChannelHub,
+	ModulePage,
+} from "./module-contract";
 import type { ServerDashboard, WidgetConfigField } from "./types";
 import { isCompiledBinary } from "./util";
 
 const MODULES_DIR = fileURLToPath(new URL("../modules", import.meta.url));
 
-/** Channels a dashboard hub keeps attached (lowercased names). */
-type ChannelSpecs = Set<string>;
-
-/** A module's registration as the registry sees it (structural, loose on purpose). */
-interface ModuleRegistration {
-	kind: string;
-	id: string;
-	title: string;
-	configSchema: unknown;
-	secretFields: string[];
-	start(ctx: {
-		config: Record<string, unknown>;
-		emit: (e: string, d: unknown) => void;
-		log: (s: string, m: string) => void;
-		core: unknown;
-	}): Promise<void>;
-	stop(): Promise<void>;
-	/**
-	 * Bind the process-scoped core bag at discovery, before start: a module's
-	 * lazy objects (encoder instance, srtla supervisor) must be constructible
-	 * and inspectable even when the module is disabled, so the bag — built
-	 * from process config/state, not the module slice — is not start-scoped.
-	 */
-	bind?(core: unknown): void;
-	methods: readonly string[];
-	events: readonly string[];
-	/** ids of modules this one must have started first (topological order). */
-	dependencies?: readonly string[];
-	dispatch(method: string, params: Record<string, unknown>): Promise<unknown>;
-	status?: () => Promise<Record<string, unknown>>;
-	services?: { capabilities?: Record<string, unknown> };
-	/** Dashboard-hub services (channel widget modules only). */
-	hub?: {
-		widgetType: string;
-		snapshotKey: string;
-		configFields: readonly WidgetConfigField[];
-		/** The channels a widget of this type keeps attached (null entries for
-		 * unconfigured sources — the merged chat widget returns one spec per
-		 * platform channel; single-channel widgets return one spec). */
-		channelSpec: (
-			config: Record<string, string> | undefined,
-		) => readonly (string | null)[];
-		create: (publish: (msg: string) => void) => ChannelHub;
-		enabled?(config: Record<string, unknown> | undefined): boolean;
-	};
-}
-
-interface ChannelHub {
-	sync(
-		specs: ChannelSpecs,
-		configs?: readonly (Record<string, string> | undefined)[],
-	): void;
-	startedChannels(): string[];
-	snapshot(): Record<string, unknown>;
-	destroy(): void;
-}
+export type { BackendModule } from "./module-contract";
 
 /**
- * Deterministic start order: topological over declared `dependencies` (a module
- * comes after the modules it depends on). Ties break by id, so the order is
- * stable and independent of readdir order. An unknown dependency id or a
- * dependency cycle throws at load. This replaces the old hard-coded
- * CANONICAL_ORDER list (which named module IDs in the core).
+ * Deterministic order: topological over declared `dependencies` (a module comes
+ * after the modules it depends on), ties broken by id. Unknown dependency ids
+ * and cycles throw at load.
  */
-function resolveOrder(mods: ModuleRegistration[]): ModuleRegistration[] {
+function resolveOrder(mods: BackendModule[]): BackendModule[] {
 	const byId = new Map(mods.map((m) => [m.id, m]));
-	const order: ModuleRegistration[] = [];
+	const order: BackendModule[] = [];
 	const done = new Set<string>();
 	const onStack = new Set<string>();
-	const visit = (mod: ModuleRegistration): void => {
+	const visit = (mod: BackendModule): void => {
 		if (done.has(mod.id)) return;
 		if (onStack.has(mod.id))
 			throw new Error(`module dependency cycle at ${mod.id}`);
@@ -124,68 +56,66 @@ function resolveOrder(mods: ModuleRegistration[]): ModuleRegistration[] {
 		done.add(mod.id);
 		order.push(mod);
 	};
-	for (const mod of [...mods].sort((a, b) =>
-		a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
-	))
+	for (const mod of [...mods].sort((a, b) => a.id.localeCompare(b.id)))
 		visit(mod);
 	return order;
 }
 
-function validate(
-	mod: unknown,
-	file: string,
-): asserts mod is ModuleRegistration {
+const isStringArray = (v: unknown): v is string[] =>
+	Array.isArray(v) && v.every((x) => typeof x === "string");
+
+function validate(mod: unknown, file: string): asserts mod is BackendModule {
 	if (typeof mod !== "object" || mod === null)
 		throw new Error(`module registration in ${file} is not an object`);
 	const m = mod as Record<string, unknown>;
 	const id = typeof m.id === "string" ? m.id : null;
-	if (m.kind !== "device" && m.kind !== "widget") {
+	if (m.kind !== "device" && m.kind !== "widget")
 		throw new Error(`module ${id ?? file}: kind must be "device" or "widget"`);
-	}
-	if (!id || !m.title)
-		throw new Error(
-			`module registration in ${file} needs a string id and title`,
-		);
+	if (!id || typeof m.title !== "string")
+		throw new Error(`module registration in ${file} needs a string id and title`);
+	const fn = (name: string, required = false) => {
+		if (m[name] === undefined ? required : typeof m[name] !== "function")
+			throw new Error(`module ${id}: ${name} must be a method`);
+	};
+	const strings = (name: string, required = false) => {
+		if (m[name] === undefined ? required : !isStringArray(m[name]))
+			throw new Error(`module ${id}: ${name} must be a string array`);
+	};
 	if (m.kind === "device") {
-		if (typeof m.configSchema !== "object" || m.configSchema === null) {
-			throw new Error(
-				`module ${id}: configSchema must be an object (a zod object declaration)`,
-			);
-		}
-		if (typeof m.start !== "function" || typeof m.stop !== "function") {
-			throw new Error(`module ${id}: start/stop must be methods`);
-		}
-		if (m.bind !== undefined && typeof m.bind !== "function") {
-			throw new Error(`module ${id}: bind must be a method`);
-		}
+		fn("start", true);
+		fn("stop", true);
+		fn("dispatch", true);
+		strings("methods", true);
+		strings("events", true);
+	}
+	for (const name of [
+		"bind",
+		"resume",
+		"status",
+		"settings",
+		"setupInfo",
+		"setup",
+		"configure",
+	])
+		fn(name);
+	strings("dependencies");
+	strings("roles");
+	strings("secretFields");
+	if (m.pages !== undefined) {
 		if (
-			!Array.isArray(m.methods) ||
-			!Array.isArray(m.events) ||
-			typeof m.dispatch !== "function"
-		) {
-			throw new Error(
-				`module ${id}: methods/events must be arrays and dispatch a method`,
-			);
-		}
-		if (
-			m.dependencies !== undefined &&
-			(!Array.isArray(m.dependencies) ||
-				(m.dependencies as unknown[]).some((d) => typeof d !== "string"))
-		) {
-			throw new Error(`module ${id}: dependencies must be a string array`);
-		}
+			!Array.isArray(m.pages) ||
+			m.pages.some(
+				(p) =>
+					!(p instanceof Object) ||
+					!((p as ModulePage).match instanceof RegExp) ||
+					typeof (p as ModulePage).page !== "string",
+			)
+		)
+			throw new Error(`module ${id}: pages must be { match: RegExp, page }[]`);
 	}
 }
 
-/**
- * Compiled-binary detection: in `bun build --compile` output import.meta.url
- * points inside Bun's virtual /$bunfs (or ~BUN) filesystem, where the modules
- * directory does not exist on disk.
- */
-const IS_COMPILED_BINARY = isCompiledBinary();
-
-/** Load and validate one registration (shared by both discovery modes). */
-function acceptRegistration(mod: unknown, file: string): ModuleRegistration {
+function acceptRegistration(mod: unknown, file: string): BackendModule {
 	try {
 		validate(mod, file);
 	} catch (err) {
@@ -196,39 +126,34 @@ function acceptRegistration(mod: unknown, file: string): ModuleRegistration {
 	return mod;
 }
 
-const discovered = new Map<string, ModuleRegistration>();
-if (IS_COMPILED_BINARY) {
-	// Compiled binaries read the build-time manifest (one static import per
-	// modules/<id>/backend.ts, emitted by scripts/gen-modules.ts). The
-	// specifier is statically resolvable, so the bundler inlines it.
-	let manifest: unknown[];
-	try {
-		const ns = (await import("../generated/modules.backend")) as {
-			default: unknown[];
-		};
-		manifest = ns.default;
-	} catch (err) {
-		throw new Error(
-			`compiled binary is missing the backend module manifest (generated/modules.backend.ts) — run \`bun run gen:modules\` before building: ${
-				err instanceof Error ? err.message : String(err)
-			}`,
-		);
+async function discover(): Promise<Map<string, BackendModule>> {
+	const found = new Map<string, BackendModule>();
+	const add = (mod: BackendModule) => {
+		if (found.has(mod.id)) throw new Error(`duplicate module id ${mod.id}`);
+		found.set(mod.id, mod);
+	};
+	if (isCompiledBinary()) {
+		let manifest: unknown[];
+		try {
+			manifest = ((await import("../generated/modules.backend")) as {
+				default: unknown[];
+			}).default;
+		} catch (err) {
+			throw new Error(
+				`compiled binary is missing the backend module manifest (generated/modules.backend.ts) — run \`bun run gen:modules\` before building: ${
+					err instanceof Error ? err.message : String(err)
+				}`,
+			);
+		}
+		for (const entry of manifest)
+			add(
+				acceptRegistration(
+					entry,
+					`modules/${(entry as BackendModule).id}/backend.ts`,
+				),
+			);
+		return found;
 	}
-	for (const entry of manifest) {
-		const mod = acceptRegistration(
-			entry,
-			`modules/${(entry as ModuleRegistration).id}/backend.ts`,
-		);
-		if (discovered.has(mod.id))
-			throw new Error(`duplicate module id ${mod.id}`);
-		discovered.set(mod.id, mod);
-	}
-} else {
-	// Self-registering discovery: every modules/<id>/backend.ts is a
-	// registration. The backend runs unbundled (bun backend/server/server.ts), so this is a
-	// runtime directory scan anchored on import.meta.url — not the statically
-	// resolvable manifest the compiled binaries use. Adding a module needs no
-	// edit to this file and no regeneration.
 	for (const entry of readdirSync(MODULES_DIR).sort()) {
 		const backendPath = join(MODULES_DIR, entry, "backend.ts");
 		if (!existsSync(backendPath)) continue;
@@ -241,138 +166,58 @@ if (IS_COMPILED_BINARY) {
 				`failed to load module backend ${file}: ${err instanceof Error ? err.message : String(err)}`,
 			);
 		}
-		const mod: unknown = ns.default;
-		if (mod === undefined)
+		if (ns.default === undefined)
 			throw new Error(`module backend ${file} has no default export`);
-		const reg = acceptRegistration(mod, file);
-		if (discovered.has(reg.id))
-			throw new Error(`duplicate module id ${reg.id}`);
-		discovered.set(reg.id, reg);
+		add(acceptRegistration(ns.default, file));
 	}
+	return found;
 }
 
-/** Registry order: topological over dependencies (stable, id-tie-broken). */
-export const ALL_MODULES: ModuleRegistration[] = resolveOrder([
-	...discovered.values(),
+/** Every registered module in start order (topological, id-tie-broken). */
+export const ALL_MODULES: readonly BackendModule[] = resolveOrder([
+	...(await discover()).values(),
 ]);
 
-/** Wire every module's capability record into the bus (before core modules read them). */
-for (const mod of ALL_MODULES) {
-	const caps = mod.services?.capabilities;
-	if (caps)
-		for (const [name, impl] of Object.entries(caps))
-			provideCapability(name, impl);
-}
+for (const mod of ALL_MODULES) if (mod.log) registerLogWording(mod.log);
 
-/** The live core bag (one instance, handed to every module start). */
-const core = buildModuleCore((id) => {
-	const mod = ALL_MODULES.find((m) => m.id === id);
-	return mod ? { id: mod.id, status: mod.status } : undefined;
-});
+const byId = new Map(ALL_MODULES.map((m) => [m.id, m]));
+const byConfigKey = new Map(
+	ALL_MODULES.map((m) => [m.configKey ?? m.id, m]),
+);
 
-// Bind the process-scoped bag into every module before start (see bind?):
-// the lazy objects a capability builds must work — reporting "stopped" — for
-// modules whose start never ran, not crash on an unbound core.
-for (const mod of ALL_MODULES) mod.bind?.(core);
-
-/** The core's door to a module's persisted settings slice (config key mapping). */
-const moduleConfig = (id: string): Record<string, unknown> => {
-	const m = state.settings.modules as
-		| Record<string, Record<string, unknown>>
-		| undefined;
-	const key = MODULE_CONFIG_KEYS[id] ?? id;
-	const slice = m?.[key];
-	return slice ? { ...slice } : {};
-};
-
-/** Start every registered, settings-enabled module. */
-export async function startModules(): Promise<void> {
-	for (const mod of ALL_MODULES) {
-		if (mod.hub) continue; // widget hubs are wired by initWidgetHub, not started
-		const cfg = moduleConfig(mod.id);
-		if (cfg.enabled !== true) continue;
-		await mod.start({
-			config: cfg,
-			core,
-			emit: (event, data) => pushModuleEvent(event, data, mod.id),
-			log: (section, message) => logEvent("info", section, message),
-		});
-	}
-}
-
-/** Stop every non-hub module (unstarted ones are no-ops: their `stop()` sees a bound core and a stopped process). */
-export async function stopModules(): Promise<void> {
-	for (const mod of ALL_MODULES) {
-		if (mod.hub) continue;
-		await mod.stop();
-	}
-}
-
-/** Restart one registered module (stop, then start when settings-enabled). */
-export async function restartRegisteredModule(id: string): Promise<void> {
-	const mod = ALL_MODULES.find((m) => m.id === id);
-	if (!mod) return;
-	await mod.stop();
-	if (moduleConfig(id).enabled === true) {
-		await mod.start({
-			config: moduleConfig(id),
-			core,
-			emit: (event, data) => pushModuleEvent(event, data, mod.id),
-			log: (section, message) => logEvent("info", section, message),
-		});
-	}
-}
-
-/** Collect each module's status fragment (the keys never collide by design). */
-export async function moduleStatuses(): Promise<Record<string, unknown>> {
-	const out: Record<string, unknown> = {};
-	for (const mod of ALL_MODULES) {
-		if (mod.status) Object.assign(out, await mod.status());
-	}
-	return out;
-}
-
-/** METHOD_OWNER — every module-owned RPC method mapped to its module. */
-const METHOD_OWNER: Record<string, string> = {};
-for (const mod of ALL_MODULES)
-	for (const method of mod.methods ?? []) METHOD_OWNER[method] = mod.id;
-export const methodOwner = (method: string): string | undefined =>
-	METHOD_OWNER[method];
-
-/** Dispatch an RPC method to the module that owns it. */
-export function callModule(
-	method: string,
-	params: Record<string, unknown>,
-): Promise<unknown> {
-	const owner = methodOwner(method);
-	const mod = owner ? ALL_MODULES.find((m) => m.id === owner) : undefined;
-	if (!mod) return Promise.reject(new Error(`unknown method ${method}`));
-	return mod.dispatch(method, params);
-}
+/** A module by id or by its persisted settings key. */
+export const moduleById = (id: string): BackendModule | undefined =>
+	byId.get(id) ?? byConfigKey.get(id);
 
 /** All registered modules (device + widget), for validation/status views. */
 export const allModules = (): { id: string; title: string }[] =>
 	ALL_MODULES.map((m) => ({ id: m.id, title: m.title }));
 
-export const moduleTitles = (): Record<string, string> =>
-	Object.fromEntries(ALL_MODULES.map((m) => [m.id, m.title]));
-
-/** A module's live status fragment by id (the core bag's moduleById). */
-export function moduleStatus(mod: ModuleRegistration): ModuleStatus {
-	return mod.status ?? (async () => ({}));
+/** The module page that serves `path` (device-relative), if any. */
+export function modulePage(path: string): string | undefined {
+	for (const mod of ALL_MODULES)
+		for (const page of mod.pages ?? [])
+			if (page.match.test(path)) return page.page;
+	return undefined;
 }
 
-/** Expose the state bag's modules slice for core views (keeps one mapping). */
-export const settingsModules = ():
-	| PersistentState["settings"]["modules"]
-	| undefined => state.settings.modules;
+/** Dashboard widget types with their default grid size: device widgets
+ * (`dashboardWidgets`) plus one per channel-widget hub. */
+export const WIDGET_SIZES: ReadonlyMap<string, { w: number; h: number }> =
+	new Map(
+		ALL_MODULES.flatMap((m) => [
+			...(m.dashboardWidgets ?? []).map(
+				(w) => [w.type, w.defaultSize] as const,
+			),
+			...(m.hub ? [[m.hub.widgetType, m.hub.defaultSize] as const] : []),
+		]),
+	);
 
 // ---------------------------------------------------------------------------
 // Dashboard widget hub (channel widgets — device-independent).
 //
-// One hub instance per widget type serves every widget of that type; the
-// registries wire it generically from each widget module's `hub` field, so
-// adding a widget type needs no core edits.
+// One hub instance per widget type serves every widget of that type; wired
+// generically from each widget module's `hub` field.
 // ---------------------------------------------------------------------------
 
 interface WidgetEntry {
@@ -382,16 +227,28 @@ interface WidgetEntry {
 	spec: (
 		config: Record<string, string> | undefined,
 	) => readonly (string | null)[];
+	create: (publish: (msg: string) => void) => ChannelHub;
 	hub: ChannelHub | null;
 }
 
-const WIDGETS: WidgetEntry[] = ALL_MODULES.filter((m) => m.hub).map((m) => ({
-	type: m.hub?.widgetType,
-	snapshotKey: m.hub?.snapshotKey,
-	configFields: m.hub?.configFields,
-	spec: m.hub?.channelSpec,
-	hub: null,
-}));
+const WIDGETS: WidgetEntry[] = ALL_MODULES.flatMap((m) =>
+	m.hub
+		? [
+				{
+					type: m.hub.widgetType,
+					snapshotKey: m.hub.snapshotKey,
+					configFields: m.hub.configFields,
+					spec: m.hub.channelSpec,
+					create: m.hub.create,
+					hub: null,
+				},
+			]
+		: [],
+);
+
+/** Whether `type` is a device-independent (channel) widget type. */
+export const isChannelWidgetType = (type: string): boolean =>
+	WIDGETS.some((w) => w.type === type);
 
 /** Config parameter names per widget type (server validation + dashboard editor). */
 export const widgetConfigFields = (
@@ -401,12 +258,7 @@ export const widgetConfigFields = (
 
 /** Wire the channel widget backends to the dashboard websocket topic. */
 export function initWidgetHub(publish: (msg: string) => void): void {
-	for (const w of WIDGETS) {
-		const mod =
-			discovered.get(w.type) ??
-			ALL_MODULES.find((m) => m.hub?.widgetType === w.type);
-		w.hub = mod?.hub ? mod.hub.create(publish) : null;
-	}
+	for (const w of WIDGETS) w.hub = w.create(publish);
 }
 
 /** Sync the widget backends with the dashboard configs (the dashboards write path). */
@@ -417,10 +269,7 @@ export function syncWidgetHub(dashboards: ServerDashboard[]): void {
 				.filter((widget) => widget.type === w.type)
 				.map((widget) => widget.config),
 		);
-		w.hub?.sync(
-			widgetChannelSpecs(dashboards, w.type, w.spec),
-			configs,
-		);
+		w.hub?.sync(widgetChannelSpecs(dashboards, w.type, w.spec), configs);
 	}
 }
 
@@ -447,13 +296,12 @@ export function widgetChannelSpecs(
 	spec: (
 		config: Record<string, string> | undefined,
 	) => readonly (string | null)[],
-): ChannelSpecs {
+): Set<string> {
 	const channels = new Set<string>();
-	for (const dash of dashboards) {
+	for (const dash of dashboards)
 		for (const w of dash.widgets) {
 			if (w.type !== type) continue;
 			for (const name of spec(w.config)) if (name) channels.add(name);
 		}
-	}
 	return channels;
 }

@@ -610,10 +610,6 @@ textarea {
         color var(--t);
 }
 
-select[name="pipeline"] {
-    width: 100%;
-}
-
 /* Color picker: thin padding so the swatch fills the control, same height as text inputs */
 input[type="color"] {
     padding: 0.2rem;
@@ -1067,18 +1063,6 @@ fieldset.group > legend {
     width: 100%;
 }
 
-/* srtla_send link telemetry */
-.iface-sub {
-    display: block;
-    font-size: 0.8rem;
-}
-.no-stats .link-col {
-    display: none;
-}
-td meter.share {
-    width: 50px;
-    margin-right: 0.35rem;
-}
 td.num {
     font-variant-numeric: tabular-nums;
 }

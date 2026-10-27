@@ -1,7 +1,7 @@
 /* The control server's shared live feed (WS /dashboards/ws): the live device
  * list (devices.snapshot on connect, devices.changed on every state change),
  * the dashboard list (dashboards.snapshot / dashboards.changed) and the
- * kick/chat widget frames the dashboard pages subscribe to separately. One
+ * channel-widget frames the dashboard pages subscribe to separately. One
  * auto-reconnecting socket per page; pages register the events they need.
  * Handlers are plain subscribers — callers redraw themselves. */
 import type { DeviceSummary, ServerDashboard } from "../../types";

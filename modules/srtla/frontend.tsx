@@ -26,25 +26,28 @@ import {
 } from "../../frontend/ts/components/ui";
 import { card, type DeviceCard } from "../../frontend/ts/device/store";
 import { t } from "../../frontend/ts/i18n";
-import type { DeviceDashboardWidget } from "../../frontend/ts/module-contracts";
+import type {
+	DeviceDashboardWidget,
+	FrontendModule,
+} from "../../frontend/ts/module-contracts";
 import {
 	formatBitrate,
 	formatSpeed,
 	inRange,
 	since,
 } from "../../frontend/ts/util";
+import type { DeviceSummary, SetupInfo } from "../../shared/types";
+import log from "./log";
 import type {
-	DeviceSummary,
 	ModemInfo,
-	SetupInfo,
+	SrtlaDeviceSummary,
 	SrtlaLinkStats,
+	SrtlaOptions,
 	SrtlaStats,
 	SrtlaStatsEvent,
-	Status,
-} from "../../shared/types";
-import type { BridgedModule } from "./types";
+	SrtlaStatus,
+} from "./types";
 
-type SrtlaOptions = Status["state"]["srtlaOptions"];
 type EncoderStart = (
 	host: DeviceCard,
 	target: { remoteHost: string; remotePort: string },
@@ -138,7 +141,7 @@ function prefillString(current: string, value: unknown, field: string): string {
 	return String(value);
 }
 
-function syncSrtlaForm(host: DeviceCard, status: Status): void {
+function syncSrtlaForm(host: DeviceCard, status: SrtlaStatus): void {
 	status.state.srtla ??= { running: false };
 	const { fields } = srtlaState(host);
 	const combined = status.role === "combined";
@@ -160,7 +163,7 @@ const srtlaDashboardWidgets: DeviceDashboardWidget[] = [
 		defaultSize: { w: 4, h: 4 },
 		minSize: { w: 3, h: 3 },
 		body: ({ card: host, status }) =>
-			status ? srtlaComposite(host, status) : null,
+			status ? srtlaComposite(host, status as SrtlaStatus) : null,
 		badge: ({ status }) => (
 			<Badge
 				text={status ? t("dev.badge.online") : t("dev.badge.offline")}
@@ -176,7 +179,7 @@ const srtlaDashboardWidgets: DeviceDashboardWidget[] = [
 		defaultSize: { w: 6, h: 10 },
 		minSize: { w: 4, h: 8 },
 		body: ({ card: host, status }) =>
-			status ? srtlaComposite(host, status) : null,
+			status ? srtlaComposite(host, status as SrtlaStatus) : null,
 	},
 ];
 
@@ -189,9 +192,10 @@ const srtlaSummaryColumns = [
 		header: () => t("mgmt.th.stream"),
 		cell: (device: DeviceSummary) => {
 			if (!device.online) return "—";
-			if (!device.srtla?.running)
+			const { srtla, activeLinks } = device as SrtlaDeviceSummary;
+			if (!srtla?.running)
 				return <Badge text={t("dev.badge.stopped")} kind="off" />;
-			if (device.activeLinks === 0)
+			if (activeLinks === 0)
 				return <Badge text={t("dev.badge.no_links")} kind="warn" />;
 			return <Badge text={t("dev.badge.live")} kind="on" />;
 		},
@@ -201,10 +205,12 @@ const srtlaSummaryColumns = [
 		order: 20,
 		available: () => true,
 		header: () => t("mgmt.th.links"),
-		cell: (device: DeviceSummary) =>
-			device.online && device.totalLinks !== undefined
-				? `${device.activeLinks ?? 0}/${device.totalLinks}`
-				: "—",
+		cell: (device: DeviceSummary) => {
+			const { activeLinks, totalLinks } = device as SrtlaDeviceSummary;
+			return device.online && totalLinks !== undefined
+				? `${activeLinks ?? 0}/${totalLinks}`
+				: "—";
+		},
 	},
 	{
 		id: "relay",
@@ -212,7 +218,7 @@ const srtlaSummaryColumns = [
 		available: (device: DeviceSummary) => device.role !== "encoder",
 		header: () => [icon("relay"), ` ${t("setup.step.relay")}`],
 		cell: (device: DeviceSummary) => {
-			const srtla = device.srtla;
+			const { srtla } = device as SrtlaDeviceSummary;
 			if (!srtla) return "—";
 			return srtla.running ? (
 				<Badge text={`→ ${srtla.remoteHost}:${srtla.remotePort}`} kind="on" />
@@ -244,25 +250,29 @@ async function setOption(
 		{ [key]: value },
 	);
 	// The status push is debounced; do not flash the old value until it arrives
-	if (result && host.st.status)
-		host.st.status.state.srtlaOptions = result.options;
+	const status = currentStatus(host);
+	if (result && status) status.state.srtlaOptions = result.options;
 }
+
+/** The card's last status push, as the srtla module reads it. */
+const currentStatus = (host: DeviceCard): SrtlaStatus | null =>
+	host.st.status as SrtlaStatus | null;
 
 // Scheduler options: the saved settings, else what the running srtla_send reports, else its defaults
 const liveStats = (host: DeviceCard) =>
-	host.st.status?.state.srtla.running
+	currentStatus(host)?.state.srtla.running
 		? (statsFrame(host)?.value.stats ?? null)
 		: null;
 const modeValue = (host: DeviceCard): string =>
-	host.st.status?.state.srtlaOptions?.mode ??
+	currentStatus(host)?.state.srtlaOptions?.mode ??
 	liveStats(host)?.mode ??
 	"enhanced";
 const qualityValue = (host: DeviceCard): boolean =>
-	host.st.status?.state.srtlaOptions?.quality ??
+	currentStatus(host)?.state.srtlaOptions?.quality ??
 	liveStats(host)?.quality_enabled ??
 	true;
 
-function controlBadge(status: Status): Child {
+function controlBadge(status: SrtlaStatus): Child {
 	const c = status.srtlaControl;
 	if (c?.connected) return <Badge text={t("dev.connected")} kind="on" />;
 	if (c?.supported)
@@ -274,7 +284,7 @@ function controlBadge(status: Status): Child {
 	);
 }
 
-export function srtlaCardBody(host: DeviceCard, status: Status): m.Vnode {
+export function srtlaCardBody(host: DeviceCard, status: SrtlaStatus): m.Vnode {
 	const { fields } = srtlaState(host);
 	const { busy } = host;
 	const s = status.state.srtla;
@@ -545,7 +555,7 @@ function linkHeader(): m.Vnode {
 	);
 }
 
-function interfacesCard(host: DeviceCard, status: Status): m.Vnode {
+function interfacesCard(host: DeviceCard, status: SrtlaStatus): m.Vnode {
 	const selected = new Set(status.selected.map((i) => i.iface));
 	const frame = statsFrame(host);
 	const live = frame?.value.stats ?? null;
@@ -655,7 +665,7 @@ function modemPanel(host: DeviceCard, modem: ModemInfo): m.Vnode {
 			class={cls}
 			disabled={
 				host.busy.has(`modem:${method}:${modem.index}`) ||
-				!!host.st.status?.state.srtla.running
+				!!currentStatus(host)?.state.srtla.running
 			}
 			onclick={() => modemAction(host, method, modem.index)}
 		/>
@@ -692,7 +702,7 @@ function modemPanel(host: DeviceCard, modem: ModemInfo): m.Vnode {
 	);
 }
 
-function modemsCard(host: DeviceCard, status: Status): m.Vnode {
+function modemsCard(host: DeviceCard, status: SrtlaStatus): m.Vnode {
 	return (
 		<Card title={t("dev.card.modems")} class="mod-modems">
 			{status.modems.length ? (
@@ -709,7 +719,7 @@ function modemsCard(host: DeviceCard, status: Status): m.Vnode {
 /** The relay device's full card set (device page and dashboard widgets): the
  * SRTLA state card, the interfaces table with the live link stats, and the
  * modem panels. */
-export function srtlaComposite(host: DeviceCard, status: Status): m.Vnode {
+export function srtlaComposite(host: DeviceCard, status: SrtlaStatus): m.Vnode {
 	return (
 		<>
 			{srtlaCardBody(host, status)}
@@ -719,11 +729,12 @@ export function srtlaComposite(host: DeviceCard, status: Status): m.Vnode {
 	);
 }
 
-const srtlaModule: BridgedModule = {
+const srtlaModule: FrontendModule = {
 	id: "srtla",
 	kind: "device-card",
 	title: "SRTLA",
 	order: 20,
+	log,
 	available: (status) => status.role !== "encoder" && status.role !== "obs",
 	dashboardWidgets: srtlaDashboardWidgets,
 	deviceSummaryColumns: srtlaSummaryColumns,
@@ -810,10 +821,10 @@ const srtlaModule: BridgedModule = {
 	],
 	defaultSize: { w: 4, h: 4 },
 	minSize: { w: 3, h: 3 },
-	component: (status: Status) => srtlaComposite(card, status),
+	component: (status) => srtlaComposite(card, status as SrtlaStatus),
 	handleEvent(event, _data, host) {
-		if (event === "status" && host?.st.status)
-			syncSrtlaForm(host, host.st.status);
+		const status = host ? currentStatus(host) : null;
+		if (event === "status" && host && status) syncSrtlaForm(host, status);
 	},
 };
 

@@ -1,0 +1,13 @@
+{
+	"log.reconfigure_failed": "Первичная перенастройка не удалась: {{error}}",
+	"mlog.action.bond_selection": "Выбор бондинга",
+	"mlog.action.bond_toggle": "Переключение бондинга",
+	"mlog.done.bond_toggled": "{{iface}} переключен в бондинге",
+	"mlog.done.bond_updated": "Выбор бондинга обновлен",
+	"mlog.done.modem_connected": "Модем #{{index}} подключен",
+	"mlog.done.modem_disabled": "Модем #{{index}} отключен",
+	"mlog.done.modem_disconnected": "Модем #{{index}} отсоединен",
+	"mlog.done.modem_enabled": "Модем #{{index}} включен",
+	"mlog.done.modem_reset": "Модем #{{index}} сброшен",
+	"mlog.done.reconfigured": "Перенастроено"
+}

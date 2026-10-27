@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /*
- * SRTLA control server: browser sessions, per-user devices and dashboards.
+ * irlctrl control server: browser sessions, per-user devices and dashboards.
  * Devices connect with `backend/client/client.ts --remote ws(s)://host:port/device`.
  *
  * Usage: bun backend/server/server.ts --port 8090
@@ -24,7 +24,7 @@ const app = await createControlServer({
 const port = app.server?.port;
 if (port === undefined)
 	throw new Error("Elysia failed to start the control server");
-console.log(`SRTLA control server on http://${HOST}:${port}/`);
+console.log(`irlctrl control server on http://${HOST}:${port}/`);
 console.log(`Relays connect with: --remote ws://<this-host>:${port}/device`);
 if (NO_AUTH)
 	console.warn(

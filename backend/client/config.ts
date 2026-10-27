@@ -1,8 +1,10 @@
 /*
- * Device process settings: CLI arguments (with env / config-file fallbacks) and derived values.
+ * Device process settings: the core's CLI arguments (with env / config-file
+ * fallbacks) and derived values. Modules parse their own arguments with
+ * shared/args.
  */
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 
 import { arg, argFail, argv, enumArg, flag, intArg } from "../../shared/args";
 import { isRole, REMOTE_URL_RE, ROLES, type Role } from "../../shared/validate";
@@ -11,8 +13,8 @@ export { argv, ROLES, type Role };
 
 const TMP = tmpdir();
 
-// Device config: permanent parameters (settings, encoder, srtla target, autostart) plus the
-// `modems` bonding-selection section; live process state is memory-only and never persisted.
+// Device config: the core settings plus every module's own sections; live
+// process state is memory-only and never persisted.
 export const CONFIG_FILE = arg("--config", join(TMP, "config.json"));
 // A fresh device (no config file) shows the setup wizard first
 export const CONFIG_EXISTS = await Bun.file(CONFIG_FILE).exists();
@@ -28,7 +30,6 @@ const persisted = (
 
 // Event log shown in the web UI
 export const LOG_FILE = arg("--log-file", join(TMP, "srtla_log.json"));
-export const UPLINKS_FILE = arg("--uplinks", join(TMP, "srtla_ips.txt"));
 export const DRY_RUN = flag("--dry-run");
 export const API_PORT = intArg("--port", 8085, 1, 65535);
 export const API_HOST = arg("--host", "127.0.0.1");
@@ -49,7 +50,8 @@ export const REMOTE_TOKEN = arg(
 	process.env.CONTROL_SERVER_TOKEN ?? persisted("remoteToken") ?? "",
 );
 export const REMOTE_INTERVAL = intArg("--remote-interval", 30); // periodic status push, seconds (0 = off)
-export const REMOTE_STATS_INTERVAL = intArg("--remote-stats-interval", 2); // srtla_send link stats push, seconds (0 = off)
+// Throttled module pushes (e.g. link telemetry) to the control server, seconds (0 = off)
+export const REMOTE_STATS_INTERVAL = intArg("--remote-stats-interval", 2);
 if (REMOTE_URL && !REMOTE_URL_RE.test(REMOTE_URL))
 	argFail("--remote", REMOTE_URL, "ws:// or wss:// URL");
 
@@ -59,32 +61,3 @@ export const ROLE: Role = enumArg(
 	(persisted("role") ?? process.env.ROLE ?? "relay") as Role,
 );
 if (!isRole(ROLE)) argFail("ROLE", ROLE, ROLES.join(" | "));
-export const HAS_RELAY = ROLE !== "encoder";
-
-export const ENCODER_BIN = arg(
-	"--encoder",
-	process.env.ENCODER_BIN ?? "belacoder",
-);
-export const PIPELINES_DIR = arg(
-	"--pipelines",
-	process.env.PIPELINES_DIR ?? "/usr/share/belacoder/pipelines",
-);
-export const BITRATE_FILE = arg("--bitrate-file", join(TMP, "belacoder_br"));
-// ceracoder replaces belacoder's bitrate file (-b) with a config file (-c); see modules/encoder/backend.ts
-export const IS_CERA = basename(ENCODER_BIN).includes("ceracoder");
-export const CERACODER_CONF = arg(
-	"--ceracoder-conf",
-	join(TMP, "ceracoder.conf"),
-);
-
-export const RELOAD_MODE = enumArg(
-	"--srtla-reload",
-	["signal", "restart"] as const,
-	"signal",
-);
-// srtla_send JSON-RPC control socket (link stats, mode / quality switching); "" disables it
-export const SRTLA_SOCKET = arg(
-	"--srtla-socket",
-	process.env.SRTLA_CONTROL_SOCKET ?? join(TMP, "srtla_send.sock"),
-);
-export const DEBOUNCE_MS = intArg("--debounce-ms", 1500);

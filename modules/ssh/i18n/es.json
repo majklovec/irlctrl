@@ -1,0 +1,18 @@
+{
+	"dev.badge.password_none": "ninguna",
+	"dev.card.ssh": "SSH",
+	"dev.row.password": "Contraseña",
+	"dev.row.user": "Usuario",
+	"dev.ssh_new_password": "Nueva contraseña",
+	"dev.ssh_pending_apply": "se aplica al iniciar SSH",
+	"dev.ssh_reset_confirm": "¿Restablecer la contraseña SSH de {{user}}? Se generará una nueva contraseña que se mostrará una sola vez.",
+	"dev.ssh_stop_confirm": "¿Detener el servidor SSH? Las conexiones SSH activas se cierran.",
+	"mlog.done.ssh_password_reset": "Contraseña SSH de {{user}} restablecida",
+	"mlog.done.ssh_password_set": "Contraseña SSH de {{user}} establecida",
+	"set.ssh": "SSH",
+	"set.ssh_desc": "Administre el servidor SSH de este dispositivo: inicie y detenga, elija la cuenta de inicio de sesión y establezca o restablezca su contraseña.",
+	"set.ssh_reset_done": "Contraseña restablecida — la nueva contraseña de {{user}} se muestra a continuación.",
+	"set.ssh_saved": "Contraseña de {{user}} guardada — se aplicará a la cuenta al iniciar SSH.",
+	"set.ssh_stop_hint": "La contraseña solo se puede cambiar mientras SSH está detenido: se aplica a la cuenta al iniciar SSH. Deténgalo primero.",
+	"ssh.reset_blocked": "La contraseña solo se puede generar mientras SSH está detenido: deténgalo primero."
+}

@@ -1,111 +1,170 @@
 /*
  * srtla module: srtla_send process management — start / stop / reload (SIGHUP
- * or restart) and the scheduler options applied over the control socket.
+ * or restart), the scheduler options applied over the control socket
+ * (control.ts) and the per-link stats push.
  *
- * Self-contained: the only core edge is the `core` bag handed in at start.
+ * Self-contained: the core bag is bound at discovery; the uplinks file comes
+ * from the `net.uplinks` capability (modems module).
  */
-import { z } from "zod";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { ModuleCore } from "../../backend/client/module-core";
+import { arg, argv, enumArg } from "../../shared/args";
+import { t } from "../../shared/i18n";
+import type { BackendModule, Emit } from "../../shared/module-contract";
 import {
-	type Mctx,
+	ApiError,
+	oneOf,
+	requireBoolean,
+	requireHost,
+	requirePort,
+	requireString,
+} from "../../shared/params";
+import { errorMessage } from "../../shared/util";
+import * as control from "./control";
+import log from "./log";
+import {
 	SRTLA_MODES,
-	type SrtlaCapabilities,
-	type SrtlaCore,
+	type SrtlaCapability,
+	type SrtlaConfig,
 	type SrtlaOptions,
 	type SrtlaOptionsResult,
 	type SrtlaState,
+	type SrtlaStatsEvent,
+	type SrtlaTarget,
 } from "./types";
 
 const RESTART_DELAY_MS = 2_000;
+/** How an uplinks change reaches srtla_send: SIGHUP (re-read) or a respawn. */
+const RELOAD_MODE = enumArg(
+	"--srtla-reload",
+	["signal", "restart"] as const,
+	"signal",
+);
+/** srtla_send JSON-RPC control socket (link stats, mode / quality switching); "" disables it. */
+const SRTLA_SOCKET = arg(
+	"--srtla-socket",
+	process.env.SRTLA_CONTROL_SOCKET ?? join(tmpdir(), "srtla_send.sock"),
+);
 
-/** Core bag, filled at bind (discovery) and re-filled at start (a module may not import the core directly). */
-let core: SrtlaCore;
+/** Core bag, bound at discovery and re-filled at start (a module never imports the core). */
+let core: ModuleCore;
+/** Push channel, available from start on. */
+let emit: Emit | undefined;
 
-const sc = () => core.srtlaControl;
+const uplinksFile = (): string =>
+	core.requireCapability<{ file: string }>("net.uplinks").file;
 
-// The core bag is bound at discovery (bind) and re-filled at start, so the
-// supervisor can be built at any time — even for a never-started module,
-// where it simply reports a stopped state.
-type Sup = InstanceType<SrtlaCore["Supervisor"]>;
-let sup: Sup | undefined;
+// ----------------------------------------------------------------------
+// Persisted section (`state.data.srtla`): receiver target + scheduler options
+// ----------------------------------------------------------------------
+const stored = (): Partial<SrtlaConfig> =>
+	(core.state.data.srtla ?? {}) as Partial<SrtlaConfig>;
 
-function supervisorRef(): Sup {
-	if (!sup) sup = new core.Supervisor("SRTLA", RESTART_DELAY_MS, onSrtlaExit);
-	return sup;
+function target(): SrtlaTarget | undefined {
+	const { listenPort, remoteHost, remotePort } = stored();
+	if (!listenPort && !remoteHost && !remotePort) return undefined;
+	return {
+		listenPort: listenPort ?? "",
+		remoteHost: remoteHost ?? "",
+		remotePort: remotePort ?? "",
+	};
 }
 
-// Target of the last startSrtla(); state.srtlaTarget may already hold a newer, not yet started one
-let startedTarget:
-	| [listenPort: string, remoteHost: string, remotePort: string]
-	| null = null;
+function options(): SrtlaOptions | undefined {
+	const { mode, quality } = stored();
+	return mode !== undefined || quality !== undefined
+		? { mode, quality }
+		: undefined;
+}
+
+/** Merge `patch` into the section and write it out complete, for a stable config file. */
+async function save(patch: Partial<SrtlaConfig>): Promise<void> {
+	const s = { ...stored(), ...patch };
+	core.state.data.srtla = {
+		listenPort: s.listenPort ?? "",
+		mode: s.mode ?? "enhanced",
+		quality: s.quality ?? false,
+		remoteHost: s.remoteHost ?? "",
+		remotePort: s.remotePort ?? "",
+	} satisfies SrtlaConfig;
+	await core.saveState();
+}
+
+// ----------------------------------------------------------------------
+// Process
+// ----------------------------------------------------------------------
+let sup: InstanceType<ModuleCore["Supervisor"]> | undefined;
+const supervisor = () =>
+	(sup ??= new core.Supervisor("SRTLA", RESTART_DELAY_MS, onSrtlaExit));
+
+/** The running (or last) srtla_send: pid, target, counters. */
+let live: SrtlaState = { running: false };
 let dryRunActive = false; // --dry-run has no process to track
 
 const isRunning = (): boolean =>
-	core.config.DRY_RUN ? dryRunActive : supervisorRef().running;
+	core.config.DRY_RUN ? dryRunActive : supervisor().running;
 
 function srtlaStatus(): SrtlaState {
-	if (isRunning()) return core.state.srtla;
+	if (isRunning()) return live;
 	// Keep the last target so the UI can prefill the form after a stop
-	const live = core.state.srtla;
-	const target = core.state.srtlaTarget ?? {
+	const last = target() ?? {
 		listenPort: live.listenPort ?? "",
 		remoteHost: live.remoteHost ?? "",
 		remotePort: live.remotePort ?? "",
 	};
 	return {
 		running: false,
-		...target,
+		...last,
 		reloadCount: live.reloadCount,
 		lastReloadAt: live.lastReloadAt,
 	};
 }
 
-/**
- * Send SIGHUP to srtla_send (asking it to re-read the uplinks file).
- * Returns true if the signal was delivered, false otherwise.
- */
+/** Send SIGHUP to srtla_send (asking it to re-read the uplinks file); true when delivered. */
 function signalSrtlaReload(): boolean {
 	if (core.config.DRY_RUN) {
 		console.log("[DRY-RUN] SIGHUP srtla_send");
 		return true;
 	}
-	const pid = isRunning() ? supervisorRef().pid : undefined;
+	const pid = isRunning() ? supervisor().pid : undefined;
 	if (!pid) return false;
 	try {
 		process.kill(pid, "SIGHUP");
 		console.log(`Sent SIGHUP to srtla_send (pid ${pid})`);
 		return true;
 	} catch (err: unknown) {
-		console.warn(`Failed to signal srtla_send: ${core.errorMessage(err)}`);
+		console.warn(`Failed to signal srtla_send: ${errorMessage(err)}`);
 		return false;
 	}
 }
 
-/**
- * Reload srtla_send after an uplinks-file change.
- * Default strategy: SIGHUP.  Fallback / explicit: restart.
- */
+/** Reload srtla_send after an uplinks-file change: SIGHUP by default, restart as fallback / on request. */
 async function reloadSrtla(): Promise<void> {
 	if (!isRunning()) return;
 
-	if (core.config.RELOAD_MODE === "signal") {
+	if (RELOAD_MODE === "signal") {
 		if (signalSrtlaReload()) {
-			core.state.srtla.lastReloadAt = Date.now();
-			core.state.srtla.reloadCount = (core.state.srtla.reloadCount ?? 0) + 1;
-			await core.saveState();
+			live = {
+				...live,
+				lastReloadAt: Date.now(),
+				reloadCount: (live.reloadCount ?? 0) + 1,
+			};
+			core.notifyStateChange();
 			return;
 		}
 		console.warn("SIGHUP failed — falling back to restart");
 	}
 
-	const target = startedTarget;
-	if (!target) {
+	const { listenPort, remoteHost, remotePort } = live;
+	if (!listenPort || !remoteHost || !remotePort) {
 		console.warn("No srtla_send args cached — cannot restart");
 		return;
 	}
 	console.log("Restarting srtla_send to pick up new uplinks file...");
 	await stopSrtla();
 	await Bun.sleep(200);
-	await startSrtla(...target);
+	await startSrtla(listenPort, remoteHost, remotePort);
 }
 
 async function startSrtla(
@@ -116,101 +175,75 @@ async function startSrtla(
 	const bin = process.env.SRTLA_SEND_BIN ?? "srtla_send";
 	// Only pass flags this srtla_send build understands (the BELABOX C version has none of them).
 	// Probed before the running check so check → spawn stays free of awaits.
-	const caps = core.config.DRY_RUN ? null : await sc().srtlaCapabilities(bin);
-	if (isRunning()) {
-		throw new Error("srtla_send is already running");
-	}
+	const caps = core.config.DRY_RUN
+		? null
+		: await control.srtlaCapabilities(bin);
+	if (isRunning()) throw new Error("srtla_send is already running");
 
 	// Save the requested receiver before spawning so failed starts still
 	// leave the UI with a complete target to restore.
-	core.state.srtlaTarget = { listenPort, remoteHost, remotePort };
-	await core.saveState();
-	startedTarget = [listenPort, remoteHost, remotePort];
+	await save({ listenPort, remoteHost, remotePort });
+	const uplinks = uplinksFile();
 	console.log(
-		`Starting ${bin} listen: ${listenPort} target: ${remoteHost}:${remotePort} ${core.config.UPLINKS_FILE}`,
+		`Starting ${bin} listen: ${listenPort} target: ${remoteHost}:${remotePort} ${uplinks}`,
 	);
 
-	const s: SrtlaState = {
+	const started = (pid?: number): SrtlaState => ({
 		running: true,
 		listenPort,
 		remoteHost,
 		remotePort,
 		startedAt: Date.now(),
-	};
+		...(pid === undefined ? {} : { pid, reloadCount: live.reloadCount ?? 0 }),
+	});
 	if (caps) {
-		await supervisorRef().start(() =>
-			spawnSrtla(bin, listenPort, remoteHost, remotePort, caps),
-		);
-		Object.assign(s, {
-			pid: supervisorRef().pid,
-			reloadCount: core.state.srtla.reloadCount ?? 0,
+		// The starter runs again on supervisor restarts, so the record follows every spawn.
+		await supervisor().start(() => {
+			const opts = options() ?? {};
+			const withControl = !!SRTLA_SOCKET && caps.controlSocket;
+			const flags: string[] = [];
+			if (withControl) flags.push("--control-socket", SRTLA_SOCKET);
+			if (caps.mode && opts.mode) flags.push("--mode", opts.mode);
+			if (caps.quality && opts.quality === false) flags.push("--no-quality");
+			control.prepareSrtlaControl(SRTLA_SOCKET, withControl);
+			const proc = Bun.spawn(
+				[bin, ...flags, listenPort, remoteHost, remotePort, uplinks],
+				{ stdout: "inherit", stderr: "inherit", stdin: "inherit" },
+			);
+			if (withControl) control.startSrtlaControl(SRTLA_SOCKET);
+			live = started(proc.pid);
+			return proc;
 		});
 	} else {
 		dryRunActive = true;
+		live = started();
 	}
-	core.state.srtla = s;
-	await core.saveState();
-	return s;
-}
-
-function spawnSrtla(
-	bin: string,
-	listenPort: string,
-	remoteHost: string,
-	remotePort: string,
-	caps: SrtlaCapabilities,
-): Bun.Subprocess {
-	const opts = core.state.srtlaOptions ?? {};
-	const control = !!core.config.SRTLA_SOCKET && caps.controlSocket;
-	const flags: string[] = [];
-	if (control) flags.push("--control-socket", core.config.SRTLA_SOCKET);
-	if (caps.mode && opts.mode) flags.push("--mode", opts.mode);
-	if (caps.quality && opts.quality === false) flags.push("--no-quality");
-	sc().prepareSrtlaControl(core.config.SRTLA_SOCKET, control);
-
-	const proc = Bun.spawn(
-		[
-			bin,
-			...flags,
-			listenPort,
-			remoteHost,
-			remotePort,
-			core.config.UPLINKS_FILE,
-		],
-		{ stdout: "inherit", stderr: "inherit", stdin: "inherit" },
-	);
-	if (control) sc().startSrtlaControl(core.config.SRTLA_SOCKET);
-	return proc;
+	core.notifyStateChange();
+	return live;
 }
 
 /** srtla_send died on its own (e.g. all uplinks lost): keep retrying like belaUI does. */
 function onSrtlaExit(code: number | null): void {
 	console.log(`srtla_send exited with code ${code}`);
-	sc().stopSrtlaControl();
-	core.state.srtla = {
-		running: false,
-		reloadCount: core.state.srtla.reloadCount,
-	};
-	core.saveState().catch(() => {});
-	if (!supervisorRef().wanted) return;
+	control.stopSrtlaControl();
+	live = { running: false, reloadCount: live.reloadCount };
+	core.notifyStateChange();
+	if (!supervisor().wanted) return;
 	core.logEvent(
 		"warn",
 		"SRTLA",
-		core.t("log.srtla_exited", {
-			code,
-			delay: RESTART_DELAY_MS / 1000,
-		}),
+		t("log.srtla_exited", { code, delay: RESTART_DELAY_MS / 1000 }),
 	);
-	supervisorRef().scheduleRestart();
+	supervisor().scheduleRestart();
 }
 
 async function stopSrtla(): Promise<void> {
-	if (!sup) return; // srtla_send was never started in this role — nothing to stop
-	await supervisorRef().stop();
-	sc().stopSrtlaControl();
+	if (!sup && !dryRunActive) return; // never started in this process — nothing to stop
+	await sup?.stop();
+	control.stopSrtlaControl();
 	dryRunActive = false;
-	core.state.srtla = { ...core.state.srtla, running: false };
-	await core.saveState();
+	live = { ...live, running: false };
+	core.notifyStateChange();
 }
 
 /**
@@ -220,106 +253,183 @@ async function stopSrtla(): Promise<void> {
 async function setSrtlaOptions(
 	opts: SrtlaOptions,
 ): Promise<SrtlaOptionsResult> {
-	core.state.srtlaOptions = { ...core.state.srtlaOptions, ...opts };
-	await core.saveState();
+	await save(opts);
+	const result = (applied: boolean) => ({ options: options() ?? {}, applied });
 	if (core.config.DRY_RUN) {
 		console.log(`[DRY-RUN] srtla_send options ${JSON.stringify(opts)}`);
-		return { options: core.state.srtlaOptions, applied: isRunning() };
+		return result(isRunning());
 	}
-	if (!isRunning() || !sc().srtlaControlState().connected)
-		return { options: core.state.srtlaOptions, applied: false };
-	if (opts.mode) await sc().rpc("set_mode", { mode: opts.mode });
+	if (!isRunning() || !control.srtlaControlState().connected)
+		return result(false);
+	if (opts.mode) await control.rpc("set_mode", { mode: opts.mode });
 	if (opts.quality !== undefined)
-		await sc().rpc("set_quality", { enabled: opts.quality });
-	return { options: core.state.srtlaOptions, applied: true };
+		await control.rpc("set_quality", { enabled: opts.quality });
+	return result(true);
 }
 
 /** Honor `--start-srtla <listenPort> <remoteHost> <remotePort>` if present. */
-async function maybeStartSrtla(argv: string[]): Promise<boolean> {
-	const startIdx = argv.indexOf("--start-srtla");
-	if (startIdx === -1) return false;
-	if (startIdx + 3 >= argv.length) {
+async function maybeStartSrtla(): Promise<void> {
+	const i = argv.indexOf("--start-srtla");
+	if (i === -1) return;
+	if (i + 3 >= argv.length) {
 		console.warn(
 			"--start-srtla requires <listenPort> <remoteHost> <remotePort>",
 		);
-		return false;
+		return;
 	}
-	await startSrtla(argv[startIdx + 1], argv[startIdx + 2], argv[startIdx + 3]);
-	return true;
+	await startSrtla(argv[i + 1], argv[i + 2], argv[i + 3]);
 }
 
-const methods = [
-	"srtla.status",
-	"srtla.start",
-	"srtla.stop",
-	"srtla.reload",
-	"srtla.stats",
-	"srtla.options",
-] as const;
+// ----------------------------------------------------------------------
+// Pushes: link stats (throttled, retained while flowing) + control up/down
+// ----------------------------------------------------------------------
+const statsSummary = ({ stats }: SrtlaStatsEvent) =>
+	stats
+		? {
+				bitrate: stats.links.reduce(
+					(sum, l) => sum + (l.bitrate_bytes_per_sec || 0),
+					0,
+				),
+				activeLinks: stats.active_links,
+				totalLinks: stats.total_links,
+			}
+		: {};
 
-/**
- * SRTLA services consumed by the core (stream orchestration, shutdown,
- * autostart) — exposed through the capability bus under "stream.srtla".
- */
-const srtlaServices = {
+control.onSrtlaStats((ev) =>
+	emit?.("srtla.stats", ev, {
+		throttle: true,
+		retain: !!ev.stats,
+		summary: statsSummary(ev),
+	}),
+);
+control.onSrtlaControlChange(() => core.notifyStateChange());
+
+// ----------------------------------------------------------------------
+// Registration
+// ----------------------------------------------------------------------
+const capability: SrtlaCapability = {
 	srtlaStatus,
 	startSrtla,
 	stopSrtla,
 	reloadSrtla,
-	setSrtlaOptions,
-	maybeStartSrtla,
-	/** srtla_send control-socket state for the status build. */
-	controlState: () => sc().srtlaControlState(),
-	/** Latest srtla_send stats snapshot (the `srtla.stats` method). */
-	latestStats: () => sc().latestSrtlaStats(),
-	/** Valid scheduler modes (for the core's parameter validation). */
-	modes: SRTLA_MODES,
+	target,
 };
 
-export default {
+const registration: BackendModule<ModuleCore> = {
 	kind: "device",
 	id: "srtla",
 	title: "SRTLA",
-	configSchema: z.object({}).passthrough(),
-	secretFields: [] as string[],
-	bind(c: SrtlaCore) {
+	configKey: "relay",
+	roles: ["relay", "combined"],
+	dependencies: ["modems"],
+	methods: [
+		"srtla.status",
+		"srtla.start",
+		"srtla.stop",
+		"srtla.reload",
+		"srtla.stats",
+		"srtla.options",
+	],
+	events: ["srtla.stats"],
+	log,
+	bind(c) {
 		core = c;
 	},
-	async start(ctx: Mctx) {
+	async start(ctx) {
 		core = ctx.core;
+		emit = ctx.emit;
+		await maybeStartSrtla();
 	},
 	async stop() {
 		await stopSrtla();
 	},
-	methods,
-	events: [] as string[],
-	async dispatch(method: string, params: Record<string, unknown>) {
+	/** Relay autostart: bring srtla_send back with the saved target (combined devices resume via the encoder module). */
+	async resume() {
+		if (core.role() !== "relay") return false;
+		const last = target();
+		if (!last) return false;
+		if (!isRunning())
+			await startSrtla(last.listenPort, last.remoteHost, last.remotePort);
+		return true;
+	},
+	async dispatch(method, p) {
 		switch (method) {
 			case "srtla.status":
-				return srtlaStatus();
-			case "srtla.start":
-				return startSrtla(
-					String(params.listenPort),
-					String(params.remoteHost),
-					String(params.remotePort),
-				);
+				return { srtla: srtlaStatus() };
+			case "srtla.start": {
+				core.cancelAutostart();
+				const listenPort = requirePort(p, "listenPort");
+				const remoteHost = requireHost(p, "remoteHost");
+				const remotePort = requirePort(p, "remotePort");
+				try {
+					return {
+						srtla: await startSrtla(listenPort, remoteHost, remotePort),
+					};
+				} catch (e: unknown) {
+					throw new ApiError(errorMessage(e), 409);
+				}
+			}
 			case "srtla.stop":
+				core.cancelAutostart();
 				await stopSrtla();
-				return srtlaStatus();
+				return { srtla: srtlaStatus() };
 			case "srtla.reload":
 				await reloadSrtla();
-				return srtlaStatus();
+				return { srtla: srtlaStatus() };
 			case "srtla.stats":
-				return sc().latestSrtlaStats();
-			case "srtla.options":
-				return setSrtlaOptions(params as unknown as SrtlaOptions);
-			default:
-				throw new Error(`unknown method ${method}`);
+				return control.latestSrtlaStats();
+			case "srtla.options": {
+				const opts: SrtlaOptions = {};
+				if (p.mode !== undefined)
+					opts.mode = oneOf(p.mode, "mode", SRTLA_MODES);
+				if (p.quality !== undefined)
+					opts.quality = requireBoolean(p, "quality");
+				if (opts.mode === undefined && opts.quality === undefined)
+					throw new ApiError("mode or quality is required");
+				let result: SrtlaOptionsResult;
+				try {
+					result = await setSrtlaOptions(opts);
+				} catch (e: unknown) {
+					throw new ApiError(errorMessage(e), 502);
+				}
+				if (!result.applied && srtlaStatus().running)
+					core.logEvent("warn", "SRTLA", t("log.no_control_socket"));
+				return result;
+			}
 		}
+		throw new Error(`unknown method ${method}`);
 	},
-	services: {
-		capabilities: {
-			"stream.srtla": srtlaServices,
-		},
+	async status() {
+		return {
+			state: {
+				srtla: srtlaStatus(),
+				srtlaTarget: target(),
+				srtlaOptions: options() ?? {},
+			},
+			srtlaControl: control.srtlaControlState(),
+			monitor: { reloadMode: RELOAD_MODE },
+			summary: { srtla: srtlaStatus() },
+		};
 	},
+	/** Setup wizard (relay / combined): the receiver target and scheduler options. */
+	async setup(p) {
+		const listenPort = requirePort(p, "listenPort");
+		const remoteHost = requireHost(p, "srtlaRemoteHost");
+		const remotePort = requirePort(p, "srtlaRemotePort");
+		const mode = oneOf(requireString(p, "srtlaMode"), "srtlaMode", SRTLA_MODES);
+		const quality = requireBoolean(p, "srtlaQuality");
+		return () => {
+			core.state.data.srtla = {
+				listenPort,
+				mode,
+				quality,
+				remoteHost,
+				remotePort,
+			} satisfies SrtlaConfig;
+		};
+	},
+	dashboardWidgets: [{ type: "relay", defaultSize: { w: 4, h: 4 } }],
+	services: { capabilities: { "stream.srtla": capability } },
 };
+
+export default registration;

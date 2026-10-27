@@ -13,7 +13,11 @@ import {
 } from "./config";
 import { LineChart } from "./graph-linechart";
 import { currentViewerTotal, mergeViewerSeries } from "./series";
-import type { ChannelWidgetModule, StatsLive, WidgetContext } from "./types";
+import type {
+	ChannelWidgetModule,
+	WidgetContext,
+} from "../../frontend/ts/module-contracts";
+import type { StatsLive } from "./types";
 import "./styles.css";
 
 const live = new Map<string, StatsLive>();

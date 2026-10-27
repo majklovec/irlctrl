@@ -15,7 +15,7 @@
  */
 import { randomUUID } from "node:crypto";
 
-import type { SwitcherMetrics } from "../../shared/types";
+import type { SwitcherMetrics } from "./types";
 
 /** The SRTLA source's obs-websocket vendor (registered when obs-websocket 5 is loaded). */
 const SRT_VENDOR_NAME = "obs-srtla-source";

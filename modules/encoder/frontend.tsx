@@ -24,6 +24,7 @@ import { t } from "../../frontend/ts/i18n";
 import type { MithrilJSXComponent } from "../../frontend/ts/jsx";
 import type {
 	DeviceDashboardWidget,
+	FrontendModule,
 	ModuleSetupStep,
 } from "../../frontend/ts/module-contracts";
 import {
@@ -33,17 +34,22 @@ import {
 	since,
 } from "../../frontend/ts/util";
 import type {
-	CeraBalancer,
 	DeviceSummary,
-	EncoderState,
-	Pipeline,
 	Role,
 	SetupInfo,
-	SrtlaState,
 	Status,
 } from "../../shared/types";
-import { BITRATE_KBPS } from "../../shared/types";
-import type { BridgedModule } from "./types";
+import log from "./log";
+import type {
+	CeraBalancer,
+	EncoderDeviceSummary,
+	EncoderSetupInfo,
+	EncoderState,
+	EncoderStatus,
+	Pipeline,
+	SrtlaState,
+} from "./types";
+import { BITRATE_KBPS } from "./types";
 import "./styles.css";
 
 interface EncoderFields {
@@ -75,6 +81,10 @@ interface EncoderCardState {
 }
 
 const encoderStates = new WeakMap<DeviceCard, EncoderCardState>();
+
+/** The card's last status push, as the encoder module reads it. */
+const currentStatus = (host: DeviceCard): EncoderStatus | null =>
+	host.st.status as EncoderStatus | null;
 
 function encoderState(host: DeviceCard): EncoderCardState {
 	let state = encoderStates.get(host);
@@ -184,7 +194,8 @@ const encoderSetupStep: ModuleSetupStep = {
 					inRange(setupFields.encoderPort, 1, 65535)))
 		);
 	},
-	render(role: Status["role"], info: SetupInfo) {
+	render(role: Status["role"], setupInfo: SetupInfo) {
+		const info = setupInfo as EncoderSetupInfo;
 		const standalone = role === "encoder";
 		return (
 			<>
@@ -312,9 +323,11 @@ const encoderDashboardWidgets: DeviceDashboardWidget[] = [
 		defaultSize: { w: 6, h: 5 },
 		minSize: { w: 4, h: 4 },
 		body: ({ card: host, status }) =>
-			status ? encoderCardBody(host, status) : null,
+			status ? encoderCardBody(host, status as EncoderStatus) : null,
 		badge: ({ device, status }) => {
-			const encoder = device.encoder ?? status?.state.encoder;
+			const encoder =
+				(device as EncoderDeviceSummary).encoder ??
+				(status as EncoderStatus | undefined)?.state.encoder;
 			if (!encoder)
 				return (
 					<Badge
@@ -340,7 +353,7 @@ const encoderDashboardWidgets: DeviceDashboardWidget[] = [
 		defaultSize: { w: 6, h: 10 },
 		minSize: { w: 4, h: 8 },
 		body: ({ card: host, status }) =>
-			status ? encoderCardBody(host, status) : null,
+			status ? encoderCardBody(host, status as EncoderStatus) : null,
 	},
 ];
 
@@ -353,17 +366,13 @@ const encoderSummaryColumns = [
 		header: () => t("mgmt.th.stream"),
 		cell: (device: DeviceSummary) => {
 			if (!device.online) return "—";
-			const encoder = device.encoder;
+			const { encoder, srtla, activeLinks } = device as EncoderDeviceSummary;
 			if (!encoder) return "—";
-			if (hasEncoderIssue(device.role, encoder, device.srtla))
+			if (hasEncoderIssue(device.role, encoder, srtla))
 				return (
-					<EncoderIssueBadge
-						role={device.role}
-						e={encoder}
-						srtla={device.srtla}
-					/>
+					<EncoderIssueBadge role={device.role} e={encoder} srtla={srtla} />
 				);
-			if (device.activeLinks === 0)
+			if (activeLinks === 0)
 				return <Badge text={t("dev.badge.no_links")} kind="warn" />;
 			return <Badge text={t("dev.badge.live")} kind="on" />;
 		},
@@ -374,14 +383,13 @@ const encoderSummaryColumns = [
 		available: () => true,
 		header: () => t("mgmt.th_bitrate"),
 		cell: (device: DeviceSummary) => {
+			const { bitrate, maxBitrate } = device as EncoderDeviceSummary;
 			const live =
-				device.online && device.bitrate !== undefined
-					? formatBitrate(device.bitrate)
-					: null;
+				device.online && bitrate !== undefined ? formatBitrate(bitrate) : null;
 			const max =
-				device.maxBitrate !== undefined
+				maxBitrate !== undefined
 					? t("dev.max_value", {
-							value: formatBitrate(device.maxBitrate * 125),
+							value: formatBitrate(maxBitrate * 125),
 						})
 					: null;
 			if (live && max)
@@ -400,7 +408,7 @@ const encoderSummaryColumns = [
 			device.role === "encoder" || device.role === "combined",
 		header: () => [icon("encoder"), ` ${t("setup.step.encoder")}`],
 		cell: (device: DeviceSummary) => {
-			const encoder = device.encoder;
+			const { encoder } = device as EncoderDeviceSummary;
 			if (!encoder) return "—";
 			return encoder.running ? (
 				<Badge
@@ -421,7 +429,7 @@ function prefillString(current: string, value: unknown, field: string): string {
 	return String(value);
 }
 
-function syncEncoderForm(host: DeviceCard, status: Status): void {
+function syncEncoderForm(host: DeviceCard, status: EncoderStatus): void {
 	const state = encoderState(host);
 	const { fields, touched, cera } = state;
 	const config = status.state.encoder.config;
@@ -509,7 +517,7 @@ async function loadPipelines(host: DeviceCard): Promise<void> {
 	if (state.pipelines.length === 0) state.pipelinesLoaded = false;
 	const current =
 		state.fields.pipeline ||
-		host.st.status?.state.encoder.config?.pipeline ||
+		currentStatus(host)?.state.encoder.config?.pipeline ||
 		"";
 	state.fields.pipeline = state.pipelines.some(
 		(pipeline) => pipeline.id === current,
@@ -519,7 +527,7 @@ async function loadPipelines(host: DeviceCard): Promise<void> {
 	m.redraw();
 }
 
-const hasEncoderRole = (status: Status) =>
+const hasEncoderRole = (status: EncoderStatus) =>
 	status.role !== "relay" && status.role !== "obs";
 
 // ----------------------------------------------------------------------
@@ -574,7 +582,7 @@ function encoderStart(
 
 /** Start / Stop buttons for a stream (encoder card, or the SRTLA card of a combined device). */
 function streamButtons(host: DeviceCard, stopMethod: string): m.Children {
-	const status = host.st.status;
+	const status = currentStatus(host);
 	const canStart = !!status && !status.state.encoder.running;
 	const canStop =
 		!!status &&
@@ -686,7 +694,10 @@ function ceracoderControls(host: DeviceCard): m.Children {
 // ----------------------------------------------------------------------
 // Card
 // ----------------------------------------------------------------------
-const stateBadge = ({ role, state: { encoder, srtla } }: Status): m.Vnode =>
+const stateBadge = ({
+	role,
+	state: { encoder, srtla },
+}: EncoderStatus): m.Vnode =>
 	hasEncoderIssue(role, encoder, srtla) ? (
 		<EncoderIssueBadge role={role} e={encoder} srtla={srtla} />
 	) : (
@@ -722,7 +733,10 @@ function pipelineOptions(host: DeviceCard): m.Children {
 	});
 }
 
-function statusRows(host: DeviceCard, status: Status): [string, Child][] {
+function statusRows(
+	host: DeviceCard,
+	status: EncoderStatus,
+): [string, Child][] {
 	const { fields } = encoderState(host);
 	const { encoder: e } = status.state;
 	const cfg = e.config;
@@ -770,7 +784,10 @@ function statusRows(host: DeviceCard, status: Status): [string, Child][] {
 	];
 }
 
-export function encoderCardBody(host: DeviceCard, status: Status): m.Vnode {
+export function encoderCardBody(
+	host: DeviceCard,
+	status: EncoderStatus,
+): m.Vnode {
 	const { fields, touched } = encoderState(host);
 	const combined = status.role === "combined";
 	const pipeline = selectedPipeline(host);
@@ -946,7 +963,7 @@ export function encoderCardBody(host: DeviceCard, status: Status): m.Vnode {
 	);
 }
 
-const encoderModule: BridgedModule = {
+const encoderModule: FrontendModule = {
 	id: "encoder",
 	kind: "device-card",
 	title: "Encoder",
@@ -955,15 +972,16 @@ const encoderModule: BridgedModule = {
 	dashboardWidgets: encoderDashboardWidgets,
 	setupSteps: [encoderSetupStep],
 	deviceSummaryColumns: encoderSummaryColumns,
+	log,
 	defaultSize: { w: 6, h: 5 },
 	minSize: { w: 4, h: 4 },
-	component: (status: Status) => encoderCardBody(card, status),
+	component: (status) => encoderCardBody(card, status as EncoderStatus),
 	handleEvent(event, _data, host) {
 		if (!host) return;
 		host.provideCapability("encoder.start", encoderStart);
 		host.provideCapability("encoder.streamButtons", streamButtons);
 		const state = encoderState(host);
-		const status = host.st.status;
+		const status = currentStatus(host);
 		if (event === "open") state.pipelinesLoaded = false;
 		if (event === "status" && status) {
 			status.state.encoder ??= { running: false };

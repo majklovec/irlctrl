@@ -210,7 +210,7 @@ The cog in the device header opens a settings page. It uses `settings.get` / `se
 
 ## Modules
 
-Every capability is a **self-contained module** under [`modules/`](modules/README.md) — a backend registration, a frontend card, local types, and styles. The core (`backend/` + `frontend/`) never imports a module by id: it discovers, routes, and renders everything through the registries and the capability bus. The boundary is enforced by [`test/registries.test.ts`](test/registries.test.ts).
+Every capability is a **self-contained module** under [`modules/`](modules/README.md) — a backend registration, a frontend card, local types, and styles. The core (`backend/` + `frontend/` + `shared/`) contains no module-specific code: it discovers, routes, and renders everything through the registration contract, the registries and the capability bus. The boundary is enforced by [`test/registries.test.ts`](test/registries.test.ts).
 
 The browser application lives in `frontend/`; service entrypoints are
 separated under `backend/client/`, `backend/obs-client/`, and `backend/server/`.
@@ -224,7 +224,8 @@ and frontend implementation remain co-located. Cross-layer wire types live in
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `encoder`        | Runs and supervises the encoder process for encoder/combined devices: pipeline discovery (ids are paths under `--pipelines`, e.g. `rk3588/h265_hdmi_1440p25`), start/stop with automatic restart, and live bitrate changes. Supports **belacoder** (bitrate via a min/max file, re-read on SIGHUP) and **ceracoder** (INI config with balancer tuning).                                                 |
 | `srtla`          | Manages the `srtla_send` process for relay/combined devices: start/stop/reload (SIGHUP or restart), and applies scheduler options (mode, quality) over the control socket live.                                                                                                                                                                                                                         |
-| `modems`         | ModemManager (`mmcli`) integration: enumeration, per-modem state, signal quality, operator, and enable/disable/reset/connect/disconnect actions — wired into the bonding selection.                                                                                                                                                                                                                     |
+| `modems`         | Bonding uplinks for relay/combined devices: interface detection, the bonding selection, source routing tables, the uplinks file `srtla_send` reads and the netlink monitor that keeps it current — plus ModemManager (`mmcli`) integration: enumeration, per-modem state, signal quality, operator, and enable/disable/reset/connect/disconnect actions.                                                 |
+| `ssh`            | Manages the box's sshd (start/stop) and the SSH login account password.                                                                                                                                                                                                                                                                                                                                 |
 | `obs-controller` | Owns the [obs-websocket](https://github.com/obsproject/obs-websocket) (v5) connection to a paired OBS Studio instance and forwards its events into the device event stream. Also runs the **low-bitrate switcher**: a pure state machine ([`switcher-engine.ts`](modules/obs-controller/switcher-engine.ts)) that watches SRT/OBS metrics and switches OBS between `normal` / `low` / `offline` scenes. |
 
 **Channel widgets** — dashboard-only, run on the control server (device-independent); one hub per module serves all widgets of its kind:
@@ -238,22 +239,21 @@ Chat widgets keep rolling message history so reconnects don't re-send, and a `se
 
 ### How the module system works
 
-Each `modules/<id>/` ships exactly four files:
+Each `modules/<id>/` is a plugin the core discovers by directory; it ships:
 
--   `backend.ts` — backend registration (runs in Bun on the host; no DOM)
--   `frontend.tsx` — frontend registration (mithril components; no backend imports)
--   `types.ts` — this module's local types only (may import core types, never another module)
--   `styles.css` — scoped under `.mod-<id>` (device card) or `.dash-card` (widget)
+-   `backend.ts` — the backend registration (runs in Bun on the host; no DOM). It parses its own CLI arguments, owns its config sections, validates and answers its own RPC methods, and contributes status / settings / setup / log wording / pages / widgets through the hooks of the contract in [`shared/module-contract.ts`](shared/module-contract.ts).
+-   `frontend.tsx` — the frontend registration (mithril components; no backend imports): the device card, dashboard widgets, setup steps, device-list columns and event handlers (contract in [`frontend/ts/module-contracts.ts`](frontend/ts/module-contracts.ts)).
+-   `types.ts` (its own wire types), `styles.css`, `i18n/<lang>.json` (its own translations), optional `settings.tsx` (settings-page card), `log.ts` (log wording shared by both sides), `pages/*.html` (module-owned pages), and any private helpers.
 
-The **registration contract** is structural: the backend declares its `id`, a `configSchema` the UI renders its config form from, `secretFields` to mask, the ordered `methods` it answers and `events` it emits, `start`/`stop`/`dispatch`, an optional `status()` fragment, an optional `services.capabilities` map, an optional widget `hub`, and `dependencies`. The frontend mirrors the identity and adds the widget `component`, the device `cardBody(host, status)`, and widget hub/sink hooks. Field-by-field tables are in [`modules/README.md`](modules/README.md).
+**Discovery** — the backend is a runtime `readdirSync` scan of `modules/*/` in [`shared/registry.ts`](shared/registry.ts) (compiled binaries use the generated manifest): add a directory and it appears. The browser bundle cannot glob at runtime, so `scripts/gen-modules.ts` writes the gitignored `generated/modules.*.ts` manifests from the same scan (wired into `predev`).
 
-**Discovery** — the backend is a runtime `readdirSync` scan of `modules/*/` in [`shared/registry.ts`](shared/registry.ts): add a directory and it appears. The browser bundle cannot glob at runtime, so `scripts/gen-modules.ts` writes the gitignored `generated/modules.frontend.ts` manifest from the same scan (wired into `predev`).
+**Core ↔ module** — the core knows only the contract. The device lifecycle ([`backend/client/modules.ts`](backend/client/modules.ts)) starts the modules that serve the current role (`roles`), routes every non-core RPC method to its owner's `dispatch` (rejecting it with 409 outside the module's roles, or while a `requireEnabled` module is disabled), deep-merges the modules' `status()` fragments into the `status` payload, seeds and backfills their settings slices from `configDefaults`, runs their `setup()` validators in the first-run wizard and their `resume()` on autostart. Modules receive one process-services bag ([`backend/client/module-core.ts`](backend/client/module-core.ts): state, saveState, logEvent, run, Supervisor, …) and talk to each other only over the **capability bus** by name (`stream.srtla`, `net.uplinks`) — never by import. Module pushes go through `ctx.emit(event, data, { throttle, retain, summary })`; the control server stores retained frames and merges `summary` fields into its device list without knowing the event.
 
-**Core ↔ module** — RPC methods are routed through the registry's method-owner map (built from each module's `methods` array), the UI fetches cards and widgets through accessors in [`frontend/ts/module-registry.ts`](frontend/ts/module-registry.ts), and cross-module services go over the **capability bus**: a module registers a capability under a dotted name (`stream.encoder`, `stream.srtla`) and consumers look it up by name through [`backend/client/capabilities.ts`](backend/client/capabilities.ts) instead of importing it. Each module side-effect-imports its own `styles.css`, so the core never pulls module CSS by id.
+**Persistence** — `config.json` holds the core settings plus every module's own sections verbatim (`state.data.<section>`, e.g. `encoder`, `srtla`, `modems`); existing config files keep working unchanged.
 
-**Ordering** — `resolveOrder` topologically sorts modules by their `dependencies` (cycle-safe, id-sorted when no edges); `startModules`/`stopModules`/`buildStatus` all iterate that order, never a hand-maintained list.
+**Ordering** — `resolveOrder` topologically sorts modules by their `dependencies` (cycle-safe, id-sorted when no edges); start/stop/status/resume all iterate that order, never a hand-maintained list.
 
-**Adding a module** — `mkdir modules/<id>` with the four files above, register `cardBody` (device) or `component` + `createHub` (widget), optionally `dependencies`. No core edits for discovery — the scan and `predev` pick it up. Method and event names are frozen: renaming one is a breaking API change.
+**Adding a module** — `mkdir modules/<id>` with `backend.ts` + `frontend.tsx` (+ `types.ts`, `styles.css`), declare `roles`, `methods`, hooks and capabilities as needed. No core edits — the scan and `predev` pick it up. Method and event names are frozen: renaming one is a breaking API change.
 
 ### OBS client
 
@@ -284,7 +284,7 @@ bun run build:server     # → dist/server
 bun run build:obs-client # → dist/obs-client
 ```
 
-Modules are discovered by a runtime scan of `modules/`; generated manifests in `generated/` are produced by `scripts/gen-modules.ts` (wired into `predev`/`pretest`/`prebuild:*`). The UI is localized via the JSON catalogs in `i18n/` (12 languages), served to the browser on demand from `/i18n/<lang>.json`. The language is chosen in the first-run wizard and can be switched at any time from the header select; the device persists the choice in its config file.
+Modules are discovered by a runtime scan of `modules/`; generated manifests in `generated/` are produced by `scripts/gen-modules.ts` (wired into `predev`/`pretest`/`prebuild:*`). The UI is localized via JSON catalogs (12 languages): the core strings in `i18n/` and each module's own in `modules/<id>/i18n/`, merged and served to the browser on demand as `/i18n/<lang>.json` (compiled binaries inline them through the generated `generated/i18n.ts`). The language is chosen in the first-run wizard and can be switched at any time from the header select; the device persists the choice in its config file.
 
 The control-server build hook bundles the browser pages and embeds their generated assets in the standalone server binary; source-mode startup continues to bundle the UI from `frontend/`.
 

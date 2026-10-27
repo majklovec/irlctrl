@@ -51,7 +51,8 @@ export interface MethodLog {
 	done: (p: Params) => string; // resolves the current language at call time
 }
 
-const log = (
+/** Build one method's log wording; `done` is an i18n key or a function of the params. */
+export const wording = (
 	section: string,
 	action: string,
 	done: string | ((p: Params) => string),
@@ -61,158 +62,43 @@ const log = (
 	done: typeof done === "string" ? () => translate(done) : done,
 });
 
-/** Methods that change something; read-only ones (status, *.list, …) are not logged. */
+/** Translate with the installed runtime translator (for module `done` functions). */
+export const logTranslate = (
+	key: string,
+	options?: Record<string, unknown>,
+): string => translate(key, options);
+
+/** Core methods that change something; module methods register theirs (registerLogWording). */
 const METHOD_LOG: Record<string, MethodLog> = {
-	"encoder.start": log("Encoder", "Start", "mlog.done.started"),
-	"encoder.stop": log("Encoder", "Stop", "mlog.done.stopped"),
-	"encoder.bitrate": log("Encoder", "Bitrate change", (p) =>
-		translate("mlog.done.bitrate", {
-			minBitrate: p.minBitrate,
-			maxBitrate: p.maxBitrate,
-		}),
-	),
-	"ceracoder.set": log("Encoder", "Bitrate control", "mlog.done.cera_settings"),
-	"stream.start": log("Stream", "Start", "mlog.done.started"),
-	"stream.stop": log("Stream", "Stop", "mlog.done.stopped"),
-	"srtla.start": log("SRTLA", "Start", "mlog.done.started"),
-	"srtla.stop": log("SRTLA", "Stop", "mlog.done.stopped"),
-	"srtla.reload": log("SRTLA", "Reload", "mlog.done.reloaded"),
-	"srtla.options": log("SRTLA", "Options update", (p) =>
-		[
-			p.mode !== undefined && translate("mlog.done.mode", { mode: p.mode }),
-			p.quality !== undefined &&
-				translate(p.quality ? "mlog.done.quality_on" : "mlog.done.quality_off"),
-		]
-			.filter(Boolean)
-			.join(", "),
-	),
-	"ssh.start": log("SSH", "Start", "mlog.done.started"),
-	"ssh.stop": log("SSH", "Stop", "mlog.done.stopped"),
-	"ssh.reset_password": log("SSH", "Password reset", (p) =>
-		translate("mlog.done.ssh_password_reset", { user: p.user }),
-	),
-	"ssh.set_password": log("SSH", "Password set", (p) =>
-		translate("mlog.done.ssh_password_set", { user: p.user }),
-	),
-	"modems.select": log(
-		"Interfaces",
-		"Bond selection",
-		"mlog.done.bond_updated",
-	),
-	"modems.toggle": log("Interfaces", "Bond toggle", (p) =>
-		translate("mlog.done.bond_toggled", { iface: p.iface }),
-	),
-	reconfigure: log("Interfaces", "Reconfigure", "mlog.done.reconfigured"),
-	"modems.enable": log("Modems", "Enable", (p) =>
-		translate("mlog.done.modem_enabled", { index: p.index }),
-	),
-	"modems.disable": log("Modems", "Disable", (p) =>
-		translate("mlog.done.modem_disabled", { index: p.index }),
-	),
-	"modems.connect": log("Modems", "Connect", (p) =>
-		translate("mlog.done.modem_connected", { index: p.index }),
-	),
-	"modems.disconnect": log("Modems", "Disconnect", (p) =>
-		translate("mlog.done.modem_disconnected", { index: p.index }),
-	),
-	"modems.reset": log("Modems", "Reset", (p) =>
-		translate("mlog.done.modem_reset", { index: p.index }),
-	),
-	"autostart.set": log("Autostart", "Update", (p) =>
+	"autostart.set": wording("Autostart", "Update", (p) =>
 		translate(p.enabled ? "mlog.done.enabled" : "mlog.done.disabled"),
 	),
-	"modules.enable": log("Modules", "Enable", (p) =>
+	"modules.enable": wording("Modules", "Enable", (p) =>
 		translate("mlog.done.module_enabled", { id: p.id }),
 	),
-	"modules.disable": log("Modules", "Disable", (p) =>
+	"modules.disable": wording("Modules", "Disable", (p) =>
 		translate("mlog.done.module_disabled", { id: p.id }),
 	),
-	"modules.configure": log("Modules", "Configuration", (p) =>
+	"modules.configure": wording("Modules", "Configuration", (p) =>
 		translate("mlog.done.module_configured", { id: p.id }),
 	),
-	"pipelines.create": log("Pipelines", "Create", (p) =>
-		translate("mlog.done.pipeline_created", { id: p.id }),
-	),
-	"pipelines.update": log("Pipelines", "Update", (p) =>
-		translate("mlog.done.pipeline_updated", { id: p.id }),
-	),
-	"pipelines.delete": log("Pipelines", "Delete", (p) =>
-		translate("mlog.done.pipeline_deleted", { id: p.id }),
-	),
-	"pipelines.repositories.add": log("Pipelines", "Import repository", (p) =>
-		translate("mlog.done.repo_imported", {
-			repository: p.repository,
-		}),
-	),
-	"pipelines.repositories.update": log("Pipelines", "Import repository", (p) =>
-		translate("mlog.done.repo_imported", {
-			repository: p.repository,
-		}),
-	),
-	"pipelines.repositories.remove": log("Pipelines", "Delete repository", (p) =>
-		translate("mlog.done.repo_removed", { repository: p.repository }),
-	),
-	"pipelines.repositories.updateAll": log(
-		"Pipelines",
-		"Import all repositories",
-		() => translate("mlog.done.repos_imported"),
-	),
 };
 
-/** Whether the device records this method in its event log. */
-export const isLoggedMethod = (method: string): boolean =>
-	Object.hasOwn(METHOD_LOG, method);
-
-/** Read-only methods still need wording for (browser-side) failures. */
-const READ_LOG: Record<string, MethodLog> = {
-	"pipelines.list": log("Pipelines", "Load", "mlog.done.loaded"),
-};
-
-/** Section for unknown methods, by prefix. */
+/** Section for unknown methods, by prefix (modules add theirs). */
 const SECTIONS: Record<string, string> = {
-	encoder: "Encoder",
-	stream: "Stream",
-	srtla: "SRTLA",
-	ssh: "SSH",
-	modems: "Modems",
-	interfaces: "Interfaces",
-	pipelines: "Pipelines",
 	autostart: "Autostart",
 	modules: "Modules",
 };
-
-/**
- * Log wording for an API method. `done` self-resolves the current language. On
- * failure the caller renders the localized "<action> failed: <reason>" (mlog.failed).
- */
-export function methodLog(method: string): MethodLog {
-	const own = (table: Record<string, MethodLog>) =>
-		Object.hasOwn(table, method) ? table[method] : undefined;
-	return (
-		own(METHOD_LOG) ??
-		own(READ_LOG) ??
-		log(SECTIONS[method.split(".")[0]] ?? method, method, () =>
-			translate("mlog.done.generic", { method }),
-		)
-	);
-}
 
 /** Canonical label (section / action) → i18n key. Labels are English constants so log
  *  entries keep stable, filterable values; the UI localizes them at display time. */
 const LABEL_KEYS: Record<string, string> = {
 	// sections
-	Encoder: "mlog.section.encoder",
-	Modems: "dev.card.modems",
-	Interfaces: "dev.card.interfaces",
-	Pipelines: "mlog.section.pipelines",
 	Autostart: "ui.autostart",
 	Settings: "mlog.section.settings",
 	Service: "mlog.section.service",
 	Connection: "mlog.section.connection",
 	Device: "mgmt.th.device",
-	SRTLA: "dev.card.srtla",
-	SSH: "dev.card.ssh",
-	Stream: "mgmt.th.stream",
 	Setup: "mlog.section.setup",
 	Unknown: "mlog.section.unknown",
 	Modules: "mlog.section.modules",
@@ -226,10 +112,6 @@ const LABEL_KEYS: Record<string, string> = {
 	Disconnect: "ui.disconnect",
 	Reset: "ui.reset",
 	Reconfigure: "ui.reconfigure",
-	"Bitrate change": "mlog.action.bitrate",
-	"Options update": "mlog.action.options",
-	"Bond selection": "mlog.action.bond_selection",
-	"Bond toggle": "mlog.action.bond_toggle",
 	Load: "mlog.action.load",
 	Configuration: "mlog.action.configuration",
 	Create: "mlog.action.create",
@@ -237,6 +119,47 @@ const LABEL_KEYS: Record<string, string> = {
 	Activate: "mlog.action.activate",
 	Update: "mlog.action.update",
 };
+
+/** Log wording a module contributes (both registries call this at load). */
+export interface LogWording {
+	/** Methods that change something (recorded in the event log). */
+	methods?: Record<string, MethodLog>;
+	/** Read-only methods that still need wording for browser-side failures. */
+	reads?: Record<string, MethodLog>;
+	/** Method prefix → section, for methods without explicit wording. */
+	sections?: Record<string, string>;
+	/** Canonical label → i18n key. */
+	labels?: Record<string, string>;
+}
+
+const READ_LOG: Record<string, MethodLog> = {};
+
+export function registerLogWording(w: LogWording): void {
+	Object.assign(METHOD_LOG, w.methods);
+	Object.assign(READ_LOG, w.reads);
+	Object.assign(SECTIONS, w.sections);
+	Object.assign(LABEL_KEYS, w.labels);
+}
+
+/** Whether the device records this method in its event log. */
+export const isLoggedMethod = (method: string): boolean =>
+	Object.hasOwn(METHOD_LOG, method);
+
+/**
+ * Log wording for an API method. `done` self-resolves the current language. On
+ * failure the caller renders the localized "<action> failed: <reason>" (mlog.failed).
+ */
+export function methodLog(method: string): MethodLog {
+	const own = (table: Record<string, MethodLog>) =>
+		Object.hasOwn(table, method) ? table[method] : undefined;
+	return (
+		own(METHOD_LOG) ??
+		own(READ_LOG) ??
+		wording(SECTIONS[method.split(".")[0]] ?? method, method, () =>
+			translate("mlog.done.generic", { method }),
+		)
+	);
+}
 
 /** Localize a canonical log section/action label for display (unknown labels pass through). */
 export function label(name: string): string {

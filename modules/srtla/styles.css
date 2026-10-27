@@ -82,3 +82,16 @@
 		overflow-wrap: break-word;
 	}
 }
+
+/* srtla_send link telemetry */
+.iface-sub {
+    display: block;
+    font-size: 0.8rem;
+}
+.no-stats .link-col {
+    display: none;
+}
+td meter.share {
+    width: 50px;
+    margin-right: 0.35rem;
+}

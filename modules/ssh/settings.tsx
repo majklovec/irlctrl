@@ -20,6 +20,7 @@ import { Actions, Button, Field, Input } from "../../frontend/ts/components/ui";
 import { t } from "../../frontend/ts/i18n";
 import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
 import "./styles.css";
+import type { SshSliceView } from "./types";
 
 /** Editable copy of the module's SSH login account and password. */
 const draft = {
@@ -113,7 +114,7 @@ export const def: ModuleDef = {
 		ctx.role === "encoder" ||
 		ctx.role === "combined",
 	refresh: (ctx) => {
-		const s = ctx.modules.ssh;
+		const s = ctx.modules.ssh as SshSliceView;
 		draft.user = s.user ?? "root";
 		draft.password = ""; // the plain value arrives with the ssh.status fetch
 		// The modules view masks the password as `{configured}` — the plain

@@ -6,13 +6,7 @@ import {
 	type LogEvent,
 	type LogLevel,
 } from "../../shared/logMessages";
-import type {
-	DeviceInfo,
-	DeviceSummary,
-	SrtlaStats,
-	SrtlaStatsEvent,
-	Status,
-} from "../../shared/types";
+import type { DeviceInfo, DeviceSummary, Status } from "../../shared/types";
 import { parseJsonObject, textOf } from "../../shared/util";
 import { COLOR_RE, isRole, type Role } from "../../shared/validate";
 import {
@@ -47,8 +41,10 @@ interface Device {
 	connectedAt?: number;
 	lastSeen?: number;
 	statusMsg?: string; // last serialized status event, replayed to new viewers
-	statsMsg?: string; // last srtla.stats event, likewise
-	stats?: SrtlaStats | null;
+	/** Last retained module frame per event (`retain: true`), replayed to new viewers */
+	retained: Map<string, string>;
+	/** Device-list summary fields carried by module frames (`summary`), per module, live only */
+	liveSummary: Map<string, Record<string, unknown>>;
 	status?: Status;
 	statusAt?: number;
 	log: LogEntry[]; // the device's own event log, as last pushed
@@ -78,6 +74,8 @@ export function createDevices({
 	const newDevice = (id: string): Device => ({
 		id,
 		ws: null,
+		retained: new Map(),
+		liveSummary: new Map(),
 		log: [],
 		serverLog: [],
 	});
@@ -259,10 +257,6 @@ export function createDevices({
 					return;
 				}
 				publishDeviceList();
-			} else if (msg.event === "srtla.stats") {
-				d.statsMsg = text;
-				d.stats = (msg.data as SrtlaStatsEvent | undefined)?.stats ?? null;
-				publishDeviceList();
 			} else if (msg.event === "log") {
 				const forward = updateDeviceLog(
 					d,
@@ -271,6 +265,17 @@ export function createDevices({
 				);
 				if (forward) publishToDevice(d, forward);
 				return;
+			}
+			if (typeof msg.event === "string") {
+				if (msg.retain === true) d.retained.set(msg.event, text);
+				const summary = msg.summary;
+				if (summary && typeof summary === "object") {
+					d.liveSummary.set(
+						String(msg.module ?? ""),
+						summary as Record<string, unknown>,
+					);
+					publishDeviceList();
+				}
 			}
 			publishToDevice(d, text);
 			return;
@@ -382,20 +387,11 @@ export function createDevices({
 	const deviceSummary = (d: Device): DeviceSummary => ({
 		...deviceInfo(d),
 		statusAt: d.statusAt,
-		srtla: d.status?.state?.srtla,
-		encoder: d.status?.state?.encoder,
 		modules: d.status?.modules,
-		maxBitrate: d.status?.state?.encoder?.config?.maxBitrate,
-		...(d.stats
-			? {
-					bitrate: d.stats.links.reduce(
-						(sum, l) => sum + (l.bitrate_bytes_per_sec || 0),
-						0,
-					),
-					activeLinks: d.stats.active_links,
-					totalLinks: d.stats.total_links,
-				}
-			: {}),
+		// Module-contributed summary fields: from the status (`summary`) and
+		// from live module frames (`summary` on the frame)
+		...(d.status?.summary ?? {}),
+		...Object.assign({}, ...d.liveSummary.values()),
 	});
 
 	/** Device list scoped to one user's assignments. */
@@ -535,7 +531,7 @@ export function createDevices({
 		ws.send(deviceEvent(d));
 		ws.send(logHistory(d));
 		if (d.statusMsg) ws.send(d.statusMsg);
-		if (d.statsMsg) ws.send(d.statsMsg);
+		for (const frame of d.retained.values()) ws.send(frame);
 	}
 
 	function message(ws: Socket, raw: unknown): void {
@@ -557,8 +553,8 @@ export function createDevices({
 		const d = devices.get(data.id);
 		if (!d || d.ws !== ws) return; // an older, replaced connection
 		d.ws = null;
-		d.statsMsg = undefined; // live telemetry; viewers clear it on the offline device event
-		d.stats = undefined;
+		d.retained.clear(); // live telemetry; viewers clear it on the offline device event
+		d.liveSummary.clear();
 		const why = `${code}${reason ? `: ${reason}` : ""}`;
 		console.log(`[device ${d.id}] disconnected (${why})`);
 		failPending((p) => p.deviceId === d.id, "device disconnected", 503);

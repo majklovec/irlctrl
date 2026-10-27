@@ -1,34 +1,32 @@
 // i18n core for the Bun runtimes (control server, compiled device binary),
 // built on i18next.
 //
-// Translations live as JSON catalogs in i18n/ (the source of truth, English
-// in i18n/en.json). Only the default language is loaded eagerly; every other
-// language is read on demand the first time it is requested and cached, so no
-// catalog is loaded up front.
+// A language's catalog is the merge of the core catalog (`i18n/<lang>.json`,
+// English in i18n/en.json is the source of truth) and every module's own
+// catalog (`modules/<id>/i18n/<lang>.json`): modules ship their translations
+// next to their code and the core never names a module. Keys are flat and
+// disjoint by construction (test/i18n.test.ts pins it). Only the default
+// language is loaded eagerly; every other language is read on demand the
+// first time it is requested and cached.
 //
-// A catalog is resolved from two candidate locations:
-//   * `../i18n/<lang>.json` relative to this file — the real directory, for
-//     the unbundled control server (bun backend/server/server.ts) and dev;
-//   * `./i18n/<lang>.json` relative to this file — the embedded copy, for
-//     compiled binaries. `bun build --compile --asset i18n` embeds the whole
-//     directory at the binary root, so this path finds it with no filesystem
-//     access (a compiled binary is a flat file and cannot reach disk).
-// The first candidate that resolves wins, which is why one resolver serves
-// both contexts.
+// The catalogs are resolved in two ways:
+//   * unbundled (bun backend/server/server.ts, dev, tests): read from disk —
+//     the core file plus a scan of modules/*/i18n/;
+//   * compiled binaries (bun build --compile): the build-time manifest
+//     generated/i18n.ts (scripts/gen-modules.ts) inlines every catalog, as a
+//     flat binary cannot scan a directory.
 //
-// The browser loads the same catalogs on demand from /i18n/<lang>.json (see
-// frontend/ts/i18n.tsx) using the i18next-http-backend plugin over HTTP. This
-// core deliberately does not: the plugin routes only http(s) URLs through
-// fetch (its request dispatcher in node_modules/i18next-http-backend/lib/
-// request.js skips fetch for file: URLs and falls back to XHR, which this
-// runtime lacks), and it has nothing to fetch from before the HTTP server
-// starts — including the synchronous `--help` path, where i18next is already
-// initialized (initGate) and no catalog is loaded at all.
+// The browser loads the same merged catalogs on demand from /i18n/<lang>.json
+// (see frontend/ts/i18n.tsx) using the i18next-http-backend plugin over HTTP.
+// This core deliberately does not: the plugin routes only http(s) URLs through
+// fetch, and it has nothing to fetch from before the HTTP server starts —
+// including the synchronous `--help` path.
 //
 // t()/translate() use i18next's options-object API with named interpolation
-// values. Missing keys fall back to English, then to the raw key — the same
-// behavior the PO implementation had.
+// values. Missing keys fall back to English, then to the raw key.
 
+import { existsSync, readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import i18next, { type TOptions } from "i18next";
 import {
 	asLanguage,
@@ -37,6 +35,7 @@ import {
 	type Language,
 } from "./languages";
 import { setLogTranslator } from "./logMessages";
+import { isCompiledBinary } from "./util";
 
 export type { Language } from "./languages";
 export {
@@ -49,16 +48,39 @@ export {
 
 const i18n = i18next.createInstance();
 
-/** Unbundled (disk) path first, then the embedded copy in a compiled binary. */
-function candidateUrls(lng: Language): URL[] {
-	return [
-		new URL(`../i18n/${lng}.json`, import.meta.url),
-		new URL(`./i18n/${lng}.json`, import.meta.url),
-	];
+const MODULES_DIR = fileURLToPath(new URL("../modules/", import.meta.url));
+
+type Catalog = Record<string, string>;
+
+/** The core catalog file plus every module's catalog for `lng` (unbundled). */
+function catalogFiles(lng: Language): string[] {
+	const files = [fileURLToPath(new URL(`../i18n/${lng}.json`, import.meta.url))];
+	for (const entry of readdirSync(MODULES_DIR).sort()) {
+		const file = `${MODULES_DIR}${entry}/i18n/${lng}.json`;
+		if (existsSync(file)) files.push(file);
+	}
+	return files;
 }
 
-const cached = new Map<Language, Record<string, string>>();
-const inFlight = new Map<Language, Promise<Record<string, string>>>();
+/** Every catalog contributing to `lng`, in merge order (core first). */
+async function catalogParts(lng: Language): Promise<Catalog[]> {
+	if (isCompiledBinary()) {
+		const manifest = (
+			(await import("../generated/i18n")) as {
+				default: Record<string, Catalog[]>;
+			}
+		).default;
+		const parts = manifest[lng];
+		if (!parts) throw new Error(`missing i18n catalog for ${lng}`);
+		return parts;
+	}
+	return Promise.all(
+		catalogFiles(lng).map((file) => Bun.file(file).json() as Promise<Catalog>),
+	);
+}
+
+const cached = new Map<Language, Catalog>();
+const inFlight = new Map<Language, Promise<Catalog>>();
 
 /** The English catalog, loaded once at startup so i18next has a fallback. */
 const initGate: Promise<void> = (async () => {
@@ -78,31 +100,16 @@ const initGate: Promise<void> = (async () => {
 
 export const i18nReady: Promise<void> = initGate;
 
-/**
- * Read a catalog, trying each candidate location in turn.
- * @internal
- */
-function readRaw(lng: Language): Promise<Record<string, string>> {
-	return (async () => {
-		let last: unknown;
-		for (const url of candidateUrls(lng)) {
-			try {
-				return (await Bun.file(url).json()) as Record<string, string>;
-			} catch (error) {
-				last = error;
-			}
-		}
-		throw last instanceof Error
-			? last
-			: new Error(`missing i18n catalog for ${lng}`);
-	})();
+/** Read and merge a language's catalogs. */
+async function readRaw(lng: Language): Promise<Catalog> {
+	return Object.assign({}, ...(await catalogParts(lng))) as Catalog;
 }
 
 /**
  * Load a catalog into i18next, caching it and deduplicating concurrent reads.
  * The default language is served from the cache populated by `initGate`.
  */
-function readCatalog(lng: Language): Promise<Record<string, string>> {
+function readCatalog(lng: Language): Promise<Catalog> {
 	const hit = cached.get(lng);
 	if (hit) return Promise.resolve(hit);
 	const pending = inFlight.get(lng);
@@ -163,6 +170,6 @@ setLogTranslator(t);
  * server (server.ts) to serve as /i18n/<lang>.json. Loads on demand and
  * caches. null for unknown codes.
  */
-export function catalog(lang: string): Promise<Record<string, string> | null> {
+export function catalog(lang: string): Promise<Catalog | null> {
 	return isLanguage(lang) ? readCatalog(lang) : Promise.resolve(null);
 }

@@ -1,12 +1,11 @@
 /*
- * Static assets (images and i18n catalogs) for the control server, served with
- * the @elysia/static plugin.
+ * Static assets for the control server: `/img/*` (frontend/img: role
+ * diagrams, brand logo, favicon) through @elysia/static, and `/i18n/*` from
+ * the in-memory merged catalogs (core + every module's; see shared/i18n.ts).
  *
- * @elysia/static reads files from a directory on disk. A compiled binary only
- * embeds `i18n/` (`--asset i18n`); the image assets are not embedded and a
- * flat binary cannot reach disk at all. So in a compiled binary we skip the
- * plugin and serve i18n from the in-memory `catalog` (images were unservable in
- * a compiled binary before, too).
+ * @elysia/static reads files from a directory on disk; a compiled binary is a
+ * flat file and cannot, so the image routes are only mounted unbundled (the
+ * images were never embedded).
  */
 import { Elysia } from "elysia";
 import staticPlugin from "@elysia/static";
@@ -24,30 +23,16 @@ const STATIC_OPTIONS = {
 	silent: true,
 };
 
-/**
- * `/img/*` (frontend/img: role diagrams, brand logo, favicon) and `/i18n/*`
- * (i18n catalogs). Unbundled → @elysia/static from disk; compiled → i18n from
- * the embedded catalog (images are not embedded and were unservable anyway).
- */
 export async function staticRoutes(frontendDirectory: URL) {
-	const app = new Elysia({ name: "control-static" });
-	if (isCompiledBinary()) {
-		app.get("/i18n/*", ({ request }) =>
-			i18nResponse(new URL(request.url).pathname, catalog),
-		);
-		return app;
-	}
+	const app = new Elysia({ name: "control-static" }).get(
+		"/i18n/*",
+		({ request }) => i18nResponse(new URL(request.url).pathname, catalog),
+	);
+	if (isCompiledBinary()) return app;
 	app.use(
 		await staticPlugin({
 			assets: new URL("img", frontendDirectory).pathname,
 			prefix: "/img",
-			...STATIC_OPTIONS,
-		}),
-	);
-	app.use(
-		await staticPlugin({
-			assets: new URL("../../../i18n", import.meta.url).pathname,
-			prefix: "/i18n",
 			...STATIC_OPTIONS,
 		}),
 	);

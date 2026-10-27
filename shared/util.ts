@@ -61,6 +61,29 @@ export function stableStringify(value: unknown): string {
 	return `${fmt(value, "")}\n`;
 }
 
+/** A non-null, non-array object (the shape deepMerge recurses into). */
+export const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+	v !== null && typeof v === "object" && !Array.isArray(v);
+
+/**
+ * Recursively merge `patch` over `base` (plain objects only; arrays and
+ * scalars are replaced). Returns a new object; neither input is mutated.
+ */
+export function deepMerge<T extends Record<string, unknown>>(
+	base: T,
+	patch: Record<string, unknown> | undefined,
+): T {
+	const out: Record<string, unknown> = { ...base };
+	for (const [key, value] of Object.entries(patch ?? {})) {
+		const prev = out[key];
+		out[key] =
+			isPlainObject(prev) && isPlainObject(value)
+				? deepMerge(prev, value)
+				: value;
+	}
+	return out as T;
+}
+
 /** URL with credentials and query removed, for logging; invalid input comes back unchanged. */
 export function scrubUrl(url: string): string {
 	try {

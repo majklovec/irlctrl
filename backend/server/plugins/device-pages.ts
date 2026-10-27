@@ -6,6 +6,7 @@ import {
 	text,
 	upgradeRequired,
 } from "../../../shared/http";
+import { modulePage } from "../../../shared/registry";
 import type { createAuth } from "../auth";
 import { ID_RE, LOCAL_USER } from "../contracts";
 import type { createDevices } from "../devices";
@@ -16,7 +17,8 @@ type Devices = ReturnType<typeof createDevices>;
 type Frontend = Awaited<ReturnType<typeof createFrontend>>;
 
 const DEVICE_PATH_RE = /^\/d\/([^/]+)(?:(\/)(?:(ws)|(settings|setup)(\/)?)?)?$/;
-const PIPELINE_EDIT_RE = /^\/d\/([^/]+)\/pipelines\/(new|edit\/[^/]+)\/?$/;
+/** `/d/<id>/<rest>` — `rest` is matched against the module-declared page routes. */
+const DEVICE_SUBPATH_RE = /^\/d\/([^/]+)(\/.+)$/;
 
 function deviceId(rawId: string): string | Response {
 	let id: string;
@@ -38,13 +40,14 @@ export function devicePageRoutes(
 		authenticatedHandler(auth, (request, user) => {
 			const url = new URL(request.url);
 			const path = url.pathname;
-			const pipeline = path.match(PIPELINE_EDIT_RE);
-			if (pipeline) {
-				const id = deviceId(pipeline[1]);
+			const sub = path.match(DEVICE_SUBPATH_RE);
+			const modulePageName = sub ? modulePage(sub[2]) : undefined;
+			if (sub && modulePageName) {
+				const id = deviceId(sub[1]);
 				if (id instanceof Response) return id;
 				const device = devices.getDevice(id);
 				if (!device || (device.owner ?? LOCAL_USER) !== user) return notFound();
-				return frontend.htmlResponse("pipelineedit");
+				return frontend.htmlResponse(modulePageName);
 			}
 
 			const match = path.match(DEVICE_PATH_RE);

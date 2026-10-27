@@ -1,0 +1,9 @@
+{
+	"chat.empty": "No messages yet",
+	"wtype.chat": "Chat",
+	"dash.widget_tiktok": "TikTok channel",
+	"dash.widget_history": "History lines",
+	"dash.widget_order": "New messages",
+	"dash.widget_order.top": "On top",
+	"dash.widget_order.bottom": "At the bottom"
+}

@@ -1,0 +1,9 @@
+{
+	"chat.empty": "メッセージはまだありません",
+	"wtype.chat": "チャット",
+	"dash.widget_tiktok": "TikTokチャンネル",
+	"dash.widget_history": "履歴行数",
+	"dash.widget_order": "新しいメッセージ",
+	"dash.widget_order.top": "上",
+	"dash.widget_order.bottom": "下"
+}

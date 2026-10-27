@@ -5,7 +5,7 @@
  * transport reversed: this device dials out, then
  *   - pushes `{ "type": "event", "event": "status", ... }` on connect, on
  *     every state change and every REMOTE_INTERVAL seconds;
- *   - pushes `srtla.stats` link telemetry at most every REMOTE_STATS_INTERVAL seconds;
+ *   - pushes throttled module events (link telemetry) at most every REMOTE_STATS_INTERVAL seconds;
  *   - pushes the event log (`log`): full history on connect, then each new entry;
  *   - answers requests `{ "id", "method", "params" }` sent by the server
  *     with `{ "type": "response", ... }`;
@@ -39,10 +39,10 @@ import { handleRequest } from "./methods";
 import {
 	addStatusSink,
 	logHistoryEvent,
-	statsEvent,
+	retainedEvents,
+	type StatusSink,
 	statusEvent,
 } from "./push";
-import { latestSrtlaStats } from "./srtlaControl";
 import { state } from "./state";
 
 const BACKOFF_MIN_MS = 1_000;
@@ -68,6 +68,13 @@ let lastSeen = 0;
 let removeSink: (() => void) | null = null;
 
 const isOpen = (): boolean => ws !== null && ws.readyState === WebSocket.OPEN;
+
+/** The link as a push target; throttled module events honour REMOTE_STATS_INTERVAL. */
+const sink: StatusSink = {
+	active: isOpen,
+	send: (msg) => send(msg),
+	throttleMs: REMOTE_STATS_INTERVAL > 0 ? REMOTE_STATS_INTERVAL * 1000 : -1,
+};
 
 // Outgoing requests (answered by the server itself, or forwarded to a target
 // device by it); shorter than the server's forward timeout so we fail first.
@@ -194,16 +201,12 @@ function connect(): void {
 				color: state.settings.color ?? "",
 				language: asLanguage(state.settings.language),
 				version: APP_VERSION,
-				...(state.encoder.config?.maxBitrate !== undefined
-					? { maxBitrate: state.encoder.config.maxBitrate }
-					: {}),
 				...(target.token ? { token: target.token } : {}),
 			}),
 		);
 		send(logHistoryEvent());
 		void sendStatus();
-		if (REMOTE_STATS_INTERVAL > 0 && latestSrtlaStats().stats)
-			send(statsEvent());
+		for (const msg of retainedEvents(sink)) send(msg);
 
 		pingTimer = setInterval(() => {
 			if (Date.now() - lastSeen > LIVENESS_TIMEOUT_MS) {
@@ -263,12 +266,7 @@ export function startRemote(): void {
 		);
 	}
 	stopped = false;
-	removeSink = addStatusSink({
-		active: isOpen,
-		send,
-		statsIntervalMs:
-			REMOTE_STATS_INTERVAL > 0 ? REMOTE_STATS_INTERVAL * 1000 : -1,
-	});
+	removeSink = addStatusSink(sink);
 	connect();
 }
 

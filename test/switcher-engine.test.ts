@@ -5,7 +5,10 @@ import {
 	type SwitcherDeps,
 	SwitcherEngine,
 } from "../modules/obs-controller/switcher-engine";
-import { type SwitcherConfig, type SwitcherMetrics } from "../shared/types";
+import type {
+	SwitcherConfig,
+	SwitcherMetrics,
+} from "../modules/obs-controller/types";
 
 interface DepsOpts {
 	obs?: ObsSnapshot | null;

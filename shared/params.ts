@@ -94,10 +94,11 @@ export function optionalSettingString(
 	return value.trim() || undefined;
 }
 
-export function requireModemIndex(p: Params): number {
-	const n = Number(p.index);
-	if (p.index === undefined || !Number.isInteger(n) || n < 0) {
-		throw new ApiError("index must be a non-negative integer");
+/** A non-negative integer parameter (indexes, counts). */
+export function requireIndex(p: Params, key = "index"): number {
+	const n = Number(p[key]);
+	if (p[key] === undefined || !Number.isInteger(n) || n < 0) {
+		throw new ApiError(`${key} must be a non-negative integer`);
 	}
 	return n;
 }

@@ -1,14 +1,19 @@
 /* Local types for the encoder module (never imported by the core or other modules). */
-import type { FrontendModuleContributions } from "../../frontend/ts/module-contracts";
+import type {
+	DeviceSummary,
+	Settings,
+	SetupInfo,
+	Status,
+} from "../../shared/types";
 
 /** One GStreamer pipeline file found under the pipelines dir. */
 export interface Pipeline {
-	id: string;
-	group: string;
-	name: string;
-	asrc: boolean;
-	acodec: boolean;
-	overlay: boolean;
+	id: string; // path relative to PIPELINES_DIR
+	group: string; // first directory component ("" for top-level files)
+	name: string; // file name
+	asrc: boolean; // captures from an ALSA card (source can be changed / removed)
+	acodec: boolean; // encodes AAC (can be switched to Opus)
+	overlay: boolean; // has the bitrate text overlay
 }
 
 /** One ALSA capture card (or the "default" / "none" pseudo sources). */
@@ -17,116 +22,123 @@ export interface AudioSource {
 	name: string;
 }
 
-/** Persisted encoder settings (`encoder.start` params, the `encoder` status slice). */
+/** Complete encoder start / restart configuration (`encoder.start` params; the last used one is kept in state). */
 export interface EncoderConfig {
 	pipeline: string;
-	host: string;
+	host: string; // SRT destination (the relay, or 127.0.0.1 when combined)
 	port: string;
-	delay: number;
-	latency: number;
+	minBitrate: number; // kbps
+	maxBitrate: number; // kbps
+	latency: number; // SRT latency, ms
+	delay: number; // audio delay, ms
 	streamid?: string;
-	minBitrate?: number;
-	maxBitrate?: number;
-	audioSource?: string;
-	audioCodec?: string;
+	audioSource?: string; // ALSA card id, "default" or "none"
+	audioCodec?: "aac" | "opus";
 	bitrateOverlay?: boolean;
 }
 
-/** Live encoder process state (the status `encoder` slice). */
+/** Live encoder process state (the status `state.encoder` slice). */
 export interface EncoderState {
 	running: boolean;
-	config?: EncoderConfig;
-	startedAt?: number;
 	pid?: number;
+	config?: EncoderConfig; // last used; kept after stop so the UI can prefill
+	startedAt?: number;
 	restarts?: number;
 	lastError?: string;
 }
 
 export type CeraBalancer = "adaptive" | "fixed" | "aimd";
 
+/** Tuning of the adaptive (default) ceracoder balancer. */
 export interface AdaptiveTuning {
-	incrStep: number;
-	decrStep: number;
-	incrInterval: number;
-	decrInterval: number;
+	incrStep: number; // Kbps
+	decrStep: number; // Kbps
+	incrInterval: number; // ms
+	decrInterval: number; // ms
 }
 
+/** Tuning of the AIMD ceracoder balancer. */
 export interface AimdTuning {
-	incrStep: number;
-	decrMult: number;
-	incrInterval: number;
-	decrInterval: number;
+	incrStep: number; // Kbps
+	decrMult: number; // fraction of the bitrate kept on congestion (0-1)
+	incrInterval: number; // ms
+	decrInterval: number; // ms
 }
 
 /** ceracoder bitrate-control settings (the persisted `ceracoder` section). */
 export interface CeraConfig {
 	balancer: CeraBalancer;
-	minBitrate: number;
+	minBitrate: number; // Kbps
 	adaptive: AdaptiveTuning;
 	aimd: AimdTuning;
 }
 
+/** Bitrate bounds (kbps) shared by wire validation and the UI, single source. */
 export const BITRATE_KBPS = { min: 300, max: 30_000 } as const;
 
-/** The slice of the core bag this module uses. */
-export interface EncoderCore {
-	config: {
-		BITRATE_FILE: string;
-		CERACODER_CONF: string;
-		DRY_RUN: boolean;
-		ENCODER_BIN: string;
-		IS_CERA: boolean;
-		PIPELINES_DIR: string;
-	};
+/** srtla_send target (the srtla module's persisted `srtlaTarget`); combined devices stream into it. */
+export interface SrtlaTarget {
+	listenPort: string;
+	remoteHost: string;
+	remotePort: string;
+}
+
+/** Live srtla_send state as the `stream.srtla` capability reports it. */
+export interface SrtlaState {
+	running: boolean;
+	pid?: number;
+	listenPort?: string;
+	remoteHost?: string;
+	remotePort?: string;
+	startedAt?: number;
+	lastReloadAt?: number;
+	reloadCount?: number;
+}
+
+/** The `stream.srtla` capability (provided by the srtla module) combined streaming drives. */
+export interface SrtlaCapability {
+	srtlaStatus(): SrtlaState;
+	startSrtla(
+		listenPort: string,
+		remoteHost: string,
+		remotePort: string,
+	): Promise<SrtlaState>;
+	stopSrtla(): Promise<void>;
+	reloadSrtla(): Promise<void>;
+	/** The persisted target (undefined before the first start / setup). */
+	target(): SrtlaTarget | undefined;
+}
+
+/** The status envelope as the encoder card reads it (encoder fragment + the srtla state it mirrors). */
+export type EncoderStatus = Status & {
 	state: {
 		encoder: EncoderState;
-		ceracoder?: CeraConfig;
+		srtla: SrtlaState;
+		stream?: SrtlaTarget;
 	};
-	saveState(): Promise<void>;
-	notifyStateChange(): void;
-	logEvent(
-		level: "info" | "warn" | "error",
-		section: string,
-		message: string,
-	): void;
-	t(key: string, options?: Record<string, unknown>): string;
-	writeFileAtomic(path: string, data: string): Promise<void>;
-	Supervisor: new (
-		name: string,
-		delayMs: number,
-		onExit: (code: number | null) => void,
-	) => {
-		running: boolean;
-		pid?: number;
-		wanted: boolean;
-		markWanted(): void;
-		start(
-			starter: () => Bun.Subprocess | Promise<Bun.Subprocess>,
-		): Promise<void>;
-		stop(escalateAfterMs?: number): Promise<void>;
-		scheduleRestart(): void;
-	};
-	errorMessage(err: unknown): string;
-	readLines(stream: ReadableStream<Uint8Array>): AsyncGenerator<string>;
-}
+	audioSources: AudioSource[];
+	ceracoder: CeraConfig | null;
+};
 
-/** The context the registry passes to `start`. */
-export interface Mctx {
-	config: Record<string, unknown>;
-	emit(event: string, data: unknown): void;
-	log(section: string, message: string): void;
-	core: EncoderCore;
-}
+/** The first-run response with the encoder's resources. */
+export type EncoderSetupInfo = SetupInfo & {
+	pipelines: Pipeline[];
+	audioSources: AudioSource[];
+};
 
-/** A browser-side module registration (frontend). Local copy so a module never
- * imports across boundaries; the frontend registry narrows it. */
-export interface BridgedModule extends FrontendModuleContributions {
-	id: string;
-	title: string;
-	icon?: string;
-	kind: "device-card";
-	component: unknown;
-	defaultSize: { w: number; h: number };
-	minSize: { w: number; h: number };
-	maxSize?: { w: number; h: number };
-}
+/** Device settings with the encoder's pipeline repositories. */
+export type EncoderSettings = Settings & {
+	pipelineRepositories?: string[];
+};
+
+/** The device-list row with the encoder's summary fields (plus the srtla ones its columns read). */
+export type EncoderDeviceSummary = DeviceSummary & {
+	encoder?: EncoderState;
+	/** Configured encoder maximum (kbps), available even without SRTLA telemetry. */
+	maxBitrate?: number;
+	/** Live srtla_send total, bytes/s across all links (the srtla module's summary). */
+	bitrate?: number;
+	srtla?: SrtlaState;
+	activeLinks?: number;
+	totalLinks?: number;
+};

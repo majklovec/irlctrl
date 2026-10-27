@@ -59,6 +59,10 @@ import {
 	type ObsSnapshot,
 	SwitcherEngine,
 } from "../../modules/obs-controller/switcher-engine";
+import type {
+	SwitcherConfig,
+	SwitcherMetrics,
+} from "../../modules/obs-controller/types";
 import { arg, argFail, flag, intArg } from "../../shared/args";
 import {
 	ApiError,
@@ -69,7 +73,6 @@ import {
 	optionalStringList,
 	requireString,
 } from "../../shared/params";
-import type { SwitcherConfig, SwitcherMetrics } from "../../shared/types";
 import { errorMessage, scrubUrl, textOf } from "../../shared/util";
 import { DEFAULT_COLOR, REMOTE_URL_RE } from "../../shared/validate";
 import { APP_VERSION } from "../../shared/version";
@@ -610,7 +613,7 @@ async function main(): Promise<void> {
 		encoder: { enabled: false },
 		// The card's form (obsSourceName, scenes, triggers) loads from this
 		// slice — the switcher slice rides on the obs module, like on the
-		// core box (modulesView.ObsModuleView).
+		// core box (modules/obs-controller/types ObsModuleView).
 		[OBS_MODULE]: {
 			obsUrl,
 			obsPassword: obsPassword ? { configured: true } : "",

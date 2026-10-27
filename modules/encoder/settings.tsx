@@ -27,8 +27,8 @@ import {
 } from "../../frontend/ts/components/ui";
 import { t } from "../../frontend/ts/i18n";
 import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
-import type { Pipeline } from "../../shared/types";
 import "./styles.css";
+import type { EncoderSettings, Pipeline } from "./types";
 
 const REPO_PATTERN = "[A-Za-z0-9_.\\-]+/[A-Za-z0-9_.\\-]+";
 
@@ -198,7 +198,9 @@ export const def: ModuleDef = {
 		ctx.role === "encoder" ||
 		ctx.role === "combined",
 	refresh: (ctx) => {
-		state.repositories = repositoryList(ctx.settings.pipelineRepositories);
+		state.repositories = repositoryList(
+			(ctx.settings as EncoderSettings).pipelineRepositories,
+		);
 		void loadPipelines(ctx);
 	},
 	render: (ctx) => {

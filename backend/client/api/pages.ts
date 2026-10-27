@@ -2,9 +2,8 @@ import { Elysia } from "elysia";
 import type { createFrontend } from "../../../shared/frontend";
 import { i18nResponse, imageResponse, notFound } from "../../../shared/http";
 import { catalog } from "../../../shared/i18n";
+import { modulePage } from "../../../shared/registry";
 import { setupRequired } from "../state";
-
-const PIPELINE_EDIT_RE = /^\/pipelines\/(new|edit\/[^/]+)\/?$/;
 
 type Frontend = Awaited<ReturnType<typeof createFrontend>>;
 
@@ -32,13 +31,6 @@ export function devicePagesPlugin(frontend: Frontend) {
 				? frontend.htmlResponse("setup")
 				: Response.redirect("/setup/", 308),
 		)
-		.get("/pipelines/*", ({ request }) => {
-			const path = new URL(request.url).pathname;
-			if (!PIPELINE_EDIT_RE.test(path)) return notFound();
-			return path.endsWith("/")
-				? frontend.htmlResponse("pipelineedit")
-				: Response.redirect(`${path}/`, 308);
-		})
 		.get("/i18n/*", ({ request }) =>
 			i18nResponse(new URL(request.url).pathname, catalog),
 		)
@@ -46,5 +38,13 @@ export function devicePagesPlugin(frontend: Frontend) {
 			const response = await imageResponse(new URL(request.url).pathname);
 			return response ?? notFound();
 		})
-		.all("*", () => notFound());
+		// Module-owned pages (modules/<id>/pages/*.html) at the paths they declare
+		.all("*", ({ request }) => {
+			const path = new URL(request.url).pathname;
+			const page = modulePage(path);
+			if (!page) return notFound();
+			return path.endsWith("/")
+				? frontend.htmlResponse(page)
+				: Response.redirect(`${path}/`, 308);
+		});
 }

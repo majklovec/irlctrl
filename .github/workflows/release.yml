@@ -114,7 +114,6 @@ jobs:
                     esac
                     bun build --compile --minify --sourcemap \
                       --target=${{ matrix.target }} \
-                      --asset i18n \
                       ${ENTRY} \
                       --outfile ${app}-prof${{ matrix.ext }}
                   done
@@ -143,7 +142,6 @@ jobs:
 
                     ARGS="--compile --minify --sourcemap --format=esm --bytecode \
                       --target=${{ matrix.target }} \
-                      --asset i18n \
                       ${ENTRY} \
                       --outfile ${OUTIF}${{ matrix.ext }}"
 

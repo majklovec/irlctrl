@@ -133,6 +133,7 @@ export default {
 	hub: {
 		widgetType: "chat",
 		snapshotKey: "chat",
+		defaultSize: { w: 3, h: 8 },
 		configFields: CHAT_CONFIG_FIELDS,
 		channelSpec: chatSpecsFromConfig,
 		create: (publish: PublishFn): ChatChannelManager =>

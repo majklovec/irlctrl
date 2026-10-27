@@ -1,13 +1,16 @@
 /*
  * Persistent storage:
- *   config.json      permanent parameters only — device settings, encoder config,
- *                     the srtla target (+ scheduler options), the modems bonding
- *                     selection and autostart. Stable key order, 2-space indent.
- *   in memory        live process state — running flags, pids, counters. Never
- *                     written to disk; a restarted process starts fresh.
+ *   config.json      permanent parameters only — the core device settings
+ *                     (identity, role, control link, language, per-module
+ *                     settings slices) plus every module's own config
+ *                     sections, kept verbatim under `state.data`. Stable key
+ *                     order, 2-space indent.
+ *   in memory        live process state (running flags, pids, counters) is
+ *                     module-owned and never written to disk.
  *
- * Modules mutate the merged in-memory `state` below and call `saveState()`,
- * which persists the permanent part to the config file.
+ * Modules mutate their `state.data.<section>` objects and their settings slice,
+ * then call `saveState()`, which persists the permanent part. The core knows
+ * no section by name.
  */
 import { randomUUID } from "node:crypto";
 import {
@@ -16,23 +19,14 @@ import {
 	type Language,
 	setCurrentLanguage,
 } from "../../shared/i18n";
-import type {
-	CeraConfig,
-	EncoderConfig,
-	EncoderState,
-	SrtlaState,
-	SwitcherConfig,
-} from "../../shared/types";
+import type { ModuleSlice } from "../../shared/module-contract";
 import { stableStringify } from "../../shared/util";
-import {
-	DEFAULT_COLOR,
-	modulesForRole,
-	type Role,
-} from "../../shared/validate";
+import { DEFAULT_COLOR, type Role } from "../../shared/validate";
 import { CONFIG_EXISTS, CONFIG_FILE, DRY_RUN, INITIAL_CONFIG } from "./config";
 import { writeFileAtomic } from "./files";
-import type { ModemConfig } from "./routing";
-import type { SrtlaMode } from "./srtlaControl";
+
+/** Per-module persisted settings, keyed by the module's `configKey` (default: id). */
+export type ModulesState = Record<string, ModuleSlice>;
 
 /** Device settings that can be changed from the control UI and used on restart. */
 export interface DeviceSettings {
@@ -43,108 +37,26 @@ export interface DeviceSettings {
 	remoteUrl?: string;
 	remoteToken?: string;
 	color?: string;
-	pipelineRepositories?: string[];
 	/** UI language (see LANGUAGE_INFO in i18n.ts); defaults to "en". */
 	language?: Language;
-	/** Per-module settings (relay/encoder/obs-controller). */
 	modules?: ModulesState;
 }
 
-import type {
-	SrtlaOptions,
-	SrtlaOptionsResult,
-	SrtlaTarget,
-	StreamTarget,
-} from "../../shared/types";
-
-export type { SrtlaOptions, SrtlaOptionsResult, SrtlaTarget, StreamTarget };
-
-/** srtla section of the config file: target and scheduler options. */
-export interface SrtlaConfig {
-	listenPort: string;
-	mode: SrtlaMode;
-	quality: boolean;
-	remoteHost: string;
-	remotePort: string;
-}
-
-/** New-style per-module settings (config key "modules"). */
-export interface ObsModuleConfig {
-	enabled: boolean;
-	obsUrl: string;
-	obsPassword: string;
-	sceneEvents: boolean;
-	// The low-bitrate switcher, merged into this module: it rides on the OBS
-	// client above and shares its lifecycle. `switcherEnabled` defaults to on.
-	switcherEnabled?: boolean;
-	obsSourceName?: string;
-	failBehaviour?: "pause" | "ignore";
-	autoSwitch?: boolean;
-	onlySwitchWhenStreaming?: boolean;
-	instantlySwitchOnRecover?: boolean;
-	retryAttempts?: number;
-	pollIntervalMs?: number;
-	triggers?: SwitcherConfig["triggers"];
-	scenes?: SwitcherConfig["scenes"];
-	optionalScenes?: SwitcherConfig["optionalScenes"];
-	logToFile?: boolean;
-}
-/** All module keys the registry knows, and their on-disk shape. */
-export const ALL_MODULES = [
-	"relay",
-	"encoder",
-	"obs-controller",
-	"ssh",
+/** The core's own keys in the config file; everything else is a module section. */
+const CORE_KEYS = [
+	"autostart",
+	"color",
+	"hostname",
+	"language",
+	"modules",
+	"remoteToken",
+	"remoteUrl",
+	"role",
+	"uuid",
 ] as const;
 
-/**
- * Registry module ID → persisted settings key. `srtla` persists under the
- * original "relay" key. Kept here so methods and the registry both resolve
- * the same persisted slice.
- */
-export const MODULE_CONFIG_KEYS: Record<string, string> = {
-	encoder: "encoder",
-	srtla: "relay",
-	modems: "modems",
-	"obs-controller": "obs-controller",
-	ssh: "ssh",
-};
-
-export type ModuleId = (typeof ALL_MODULES)[number];
-
-export const OBS_MODULE = "obs-controller" as const;
-
-/**
- * The switcher's core-side defaults — the same values the frontend form
- * carries, so the obs slice seeded (or backfilled) on first run is complete
- * and the engine can start before the card form has ever saved. The switcher
- * rides on the OBS module (no separate `enabled` flag; `switcherEnabled`
- * defaults to on).
- */
-const SWITCHER_DEFAULTS = {
-	obsSourceName: "",
-	failBehaviour: "pause" as const,
-	autoSwitch: true,
-	onlySwitchWhenStreaming: false,
-	instantlySwitchOnRecover: true,
-	retryAttempts: 5,
-	pollIntervalMs: 1000,
-	triggers: { low: 500, offline: 400, rtt: 1500 },
-	scenes: { normal: "", low: "", offline: "" },
-	optionalScenes: { starting: "", ending: "", privacy: "" },
-	logToFile: true,
-};
-
-export interface ModulesState {
-	relay: { enabled: boolean };
-	encoder: { enabled: boolean };
-	modems: { enabled: boolean };
-	"obs-controller": ObsModuleConfig;
-	ssh: { enabled: boolean; user?: string; password?: string };
-}
-
-/** Permanent device parameters persisted to the config file (no process state). */
-export interface DeviceConfig {
+/** Permanent device parameters persisted to the config file. */
+export interface DeviceConfig extends Record<string, unknown> {
 	autostart: boolean;
 	color: string;
 	hostname: string;
@@ -153,42 +65,29 @@ export interface DeviceConfig {
 	role: Role;
 	uuid: string;
 	remoteToken?: string;
-	pipelineRepositories?: string[];
-	encoder?: EncoderConfig;
-	/** ceracoder bitrate-control settings (only with the ceracoder encoder). */
-	ceracoder?: CeraConfig;
-	/** Bonding selection (old modems.json). */
-	modems?: ModemConfig;
-	srtla: SrtlaConfig;
 	modules?: ModulesState;
 }
 
-/** Merged in-memory view of config (persisted) + runtime (memory only). */
+/** Merged in-memory view of the persisted config. */
 export interface PersistentState {
 	settings: DeviceSettings;
-	selection: ModemConfig;
-	srtla: SrtlaState;
-	srtlaTarget?: SrtlaTarget;
-	srtlaOptions?: SrtlaOptions;
-	encoder: EncoderState;
-	ceracoder?: CeraConfig; // only with the ceracoder encoder
-	stream?: StreamTarget;
-	autostart?: boolean; // resume the last stream when the service starts
+	/** Resume the last run when the service starts (modules implement `resume`). */
+	autostart: boolean;
+	/** Module-owned config sections (`data.<section>`), persisted verbatim. */
+	data: Record<string, unknown>;
 }
 
 // A fresh device (no config file) shows the setup wizard first.
 export let setupRequired = !CONFIG_EXISTS;
 
 // ----------------------------------------------------------------------
-// Projection between the merged in-memory state and the two files
+// Projection between the merged in-memory state and the config file
 // ----------------------------------------------------------------------
 
 function projectConfig(s: PersistentState): DeviceConfig {
 	const { settings } = s;
-	const target = s.srtlaTarget ??
-		s.stream ?? { listenPort: "", remoteHost: "", remotePort: "" };
-	const options = s.srtlaOptions ?? {};
 	const cfg: DeviceConfig = {
+		...s.data,
 		autostart: !!s.autostart,
 		color: settings.color ?? DEFAULT_COLOR,
 		hostname: settings.hostname ?? "",
@@ -196,122 +95,32 @@ function projectConfig(s: PersistentState): DeviceConfig {
 		remoteUrl: settings.remoteUrl ?? "",
 		role: settings.role ?? "relay",
 		uuid: settings.uuid ?? "",
-		encoder: s.encoder.config,
-		modems: s.selection ?? {},
-		srtla: {
-			listenPort: target.listenPort,
-			mode: options.mode ?? "enhanced",
-			quality: options.quality ?? false,
-			remoteHost: target.remoteHost,
-			remotePort: target.remotePort,
-		},
 	};
 	if (settings.remoteToken) cfg.remoteToken = settings.remoteToken;
-	if (settings.pipelineRepositories?.length)
-		cfg.pipelineRepositories = settings.pipelineRepositories;
-	if (s.ceracoder) cfg.ceracoder = s.ceracoder;
 	if (settings.modules) cfg.modules = settings.modules;
 	return cfg;
 }
 
-// Exported for the backfill regression tests (test/state.test.ts)
-export function fromConfig(cfg: Partial<DeviceConfig> | null): PersistentState {
-	const section: Partial<SrtlaConfig> = cfg?.srtla ?? {};
-	const hasTarget = !!(
-		section.listenPort ||
-		section.remoteHost ||
-		section.remotePort
-	);
-	const target = hasTarget
-		? {
-				listenPort: section.listenPort ?? "",
-				remoteHost: section.remoteHost ?? "",
-				remotePort: section.remotePort ?? "",
-			}
-		: undefined;
+/** Split a config file into the core settings and the module sections. */
+export function fromConfig(cfg: Record<string, unknown> | null): PersistentState {
+	const c = cfg ?? {};
+	const data: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(c))
+		if (!(CORE_KEYS as readonly string[]).includes(key)) data[key] = value;
 	return {
 		settings: {
-			uuid: cfg?.uuid,
-			hostname: cfg?.hostname ?? "",
-			role: cfg?.role,
-			remoteUrl: cfg?.remoteUrl ?? "",
-			remoteToken: cfg?.remoteToken,
-			color: cfg?.color,
-			pipelineRepositories: cfg?.pipelineRepositories,
-			language: cfg?.language,
-			// Backfill: pre-module configs get the role's preset modules
-			// enabled; modules added later get their defaults merged in.
-			modules: backfillModules(cfg?.modules, cfg?.role),
+			uuid: c.uuid as string | undefined,
+			hostname: (c.hostname as string | undefined) ?? "",
+			role: c.role as Role | undefined,
+			remoteUrl: (c.remoteUrl as string | undefined) ?? "",
+			remoteToken: c.remoteToken as string | undefined,
+			color: c.color as string | undefined,
+			language: c.language as Language | undefined,
+			modules: c.modules as ModulesState | undefined,
 		},
-		selection: cfg?.modems ?? {},
-		srtla: { running: false },
-		srtlaTarget: target,
-		srtlaOptions:
-			section.mode !== undefined || section.quality !== undefined
-				? { mode: section.mode, quality: section.quality }
-				: undefined,
-		encoder: { running: false, config: cfg?.encoder },
-		ceracoder: cfg?.ceracoder,
-		stream: target,
-		autostart: cfg?.autostart,
+		autostart: c.autostart === true,
+		data,
 	};
-}
-
-/**
- * Default per-module settings for configs written before the module system:
- * the role's pre-selected modules are enabled, all others disabled. The relay
- * and encoder modules mirror the flat config fields (targets/URLs live on the
- * existing settings fields, so only `enabled` is carried here).
- */
-export function defaultModules(role?: Role): ModulesState {
-	const on = new Set(role ? modulesForRole(role) : []);
-	return {
-		relay: { enabled: on.has("relay") },
-		encoder: { enabled: on.has("encoder") },
-		modems: { enabled: on.has("modems") },
-		// The low-bitrate switcher rides on this slice (its fields default
-		// here); the card form refines them on first save.
-		"obs-controller": {
-			enabled: false,
-			obsUrl: "",
-			obsPassword: "",
-			sceneEvents: true,
-			...SWITCHER_DEFAULTS,
-		},
-		ssh: { enabled: on.has("ssh") },
-	};
-}
-
-/**
- * Stored module maps predate the switcher's merge into obs-controller: missing
- * switcher fields are filled with the defaults here (stored values win), so
- * the obs slice always carries a complete switcher set.
- */
-function backfillModules(
-	stored: Partial<ModulesState> | undefined,
-	role?: Role,
-): ModulesState {
-	if (!stored) return defaultModules(role);
-	const out: ModulesState = { ...defaultModules(role), ...stored };
-	// Complete the switcher fields; stored values win over the defaults.
-	const obs: Record<string, unknown> = { ...out["obs-controller"] };
-	const rec = (v: unknown): Record<string, unknown> | undefined =>
-		v && typeof v === "object" ? (v as Record<string, unknown>) : undefined;
-	for (const key of ["triggers", "scenes", "optionalScenes"] as const)
-		obs[key] = { ...SWITCHER_DEFAULTS[key], ...rec(obs[key]) };
-	for (const key of [
-		"obsSourceName",
-		"failBehaviour",
-		"autoSwitch",
-		"onlySwitchWhenStreaming",
-		"instantlySwitchOnRecover",
-		"retryAttempts",
-		"pollIntervalMs",
-		"logToFile",
-	] as const)
-		obs[key] ??= SWITCHER_DEFAULTS[key];
-	out["obs-controller"] = obs as unknown as ObsModuleConfig;
-	return out;
 }
 
 // ----------------------------------------------------------------------
@@ -342,25 +151,16 @@ export async function saveState(): Promise<void> {
 	await writeFileAtomic(CONFIG_FILE, config);
 }
 
+/** Leave the setup wizard; the caller has seeded the module slices. */
 export async function completeSetup(): Promise<void> {
-	// A fresh device had no config, so its in-memory state has no modules yet:
-	// seed them from the role picked in the wizard.
-	if (!state.settings.modules) {
-		state.settings.modules = defaultModules(state.settings.role);
-	}
 	setupRequired = false;
 	await saveState();
 }
 
-/** Shared mutable state; modules mutate its fields and call `saveState()`. */
+/** Shared mutable state; modules mutate their sections and call `saveState()`. */
 export const state: PersistentState = CONFIG_EXISTS
-	? fromConfig(INITIAL_CONFIG as Partial<DeviceConfig> | null)
-	: {
-			settings: {},
-			selection: {},
-			srtla: { running: false },
-			encoder: { running: false },
-		};
+	? fromConfig(INITIAL_CONFIG)
+	: { settings: {}, autostart: false, data: {} };
 
 // Hostnames change; the uuid is the device's permanent identity on the control server.
 // It is auto-assigned here (backfilled into older config files) and never changes.

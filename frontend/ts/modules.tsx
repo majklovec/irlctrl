@@ -13,7 +13,7 @@
 import m from "mithril";
 import SETTINGS_MANIFEST from "../../generated/modules.settings";
 import { errorMessage } from "../../shared/util";
-import type { modulesView, Settings } from "../types";
+import type { ModulesView, Settings } from "../types";
 import { Card } from "./components/ui";
 import { t } from "./i18n";
 import type { RpcClient } from "./services/rpc";
@@ -24,7 +24,7 @@ export interface ModuleContext {
 	/** The role currently being edited ("" = keep current). */
 	role: string;
 	settings: Settings;
-	modules: modulesView;
+	modules: ModulesView;
 	/** Status line rendered below the module's body. */
 	message: string;
 	/** True while one of the module's RPC calls is in flight. */
@@ -32,7 +32,7 @@ export interface ModuleContext {
 	/** Set the module's status line. */
 	note(message: string): void;
 	/** Adopt the server's module list (e.g. after modules.configure). */
-	setModules(modules: modulesView): void;
+	setModules(modules: ModulesView): void;
 	/**
 	 * Run an RPC call: clears the status, tracks busy state, routes
 	 * errors into the status line and rethrows.
@@ -76,7 +76,7 @@ const device = {
 	rpc: undefined as RpcClient | undefined,
 	role: "" as string,
 	settings: undefined as Settings | undefined,
-	modules: {} as modulesView,
+	modules: {} as ModulesView,
 };
 
 export function registerModule(def: ModuleDef): void {
@@ -106,7 +106,7 @@ export function bind(rpc: RpcClient): void {
 /** Push fresh server data into the framework and refresh every module. */
 export function refreshDevice(input: {
 	settings: Settings;
-	modules: modulesView;
+	modules: ModulesView;
 	/** The draft role from the device settings form (live preview). */
 	role: string;
 }): void {
@@ -119,7 +119,7 @@ export function refreshDevice(input: {
 	m.redraw();
 }
 
-export function setModules(modules: modulesView): void {
+export function setModules(modules: ModulesView): void {
 	device.modules = modules;
 	m.redraw();
 }

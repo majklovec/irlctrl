@@ -1,19 +1,20 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { safeModules } from "../backend/client/module-core";
-import { defaultModules, state } from "../backend/client/state";
-import { allModules } from "../shared/registry";
-import { modulesForRole } from "../shared/validate";
+import {
+	defaultModules,
+	ensureModuleSlices,
+	safeModules,
+} from "../backend/client/modules";
+import { state } from "../backend/client/state";
+import { ALL_MODULES, allModules } from "../shared/registry";
 
 /**
- * Registry order of the device modules: the result of the registry's topological
- * sort over declared `dependencies` (id-sorted within equal ranks). The
- * low-bitrate switcher no longer has its own module — it rides on the
- * obs-controller module — so it no longer appears here. A new start dependency
- * shifts the positions accordingly and this expectation must be revisited.
+ * Registry order of the device modules: the registry's topological sort over
+ * declared `dependencies` (srtla after modems, encoder after srtla), ids
+ * visited alphabetically. A new start dependency shifts the positions.
  */
-const DEVICE_ORDER = ["encoder", "modems", "obs-controller", "srtla", "ssh"];
+const DEVICE_ORDER = ["modems", "srtla", "encoder", "obs-controller", "ssh"];
 /** The channel widget modules (device-independent dashboard widgets). */
 const WIDGET_IDS = ["stats", "chat"];
 
@@ -350,20 +351,27 @@ describe("module registries", () => {
 	});
 });
 
-// modems feeds routing's detectInterfaces, so it must be enabled wherever
-// the relay half runs; encoder-only never boots it (regression: boot crashed
-// on the unbound modems core after the self-contained-modules refactor).
-describe("modems role presets", () => {
-	test("relay and combined roles enable the modems module", () => {
-		expect(modulesForRole("relay")).toEqual(["relay", "modems", "ssh"]);
-		expect(modulesForRole("combined")).toEqual(["relay", "encoder", "modems", "ssh"]);
-		expect(modulesForRole("encoder")).toEqual(["encoder", "ssh"]);
+// Role presets come from the registrations (`roles`, `enabledByDefault`): the
+// bonding modules serve relay and combined, the encoder serves encoder and
+// combined, the obs controller is opt-in everywhere.
+describe("role presets from the registrations", () => {
+	test("default modules follow the roles each module serves", () => {
+		const on = (role: Parameters<typeof defaultModules>[0]) =>
+			Object.entries(defaultModules(role))
+				.filter(([, slice]) => slice.enabled)
+				.map(([key]) => key)
+				.sort();
+		expect(on("relay")).toEqual(["modems", "relay", "ssh"]);
+		expect(on("combined")).toEqual(["encoder", "modems", "relay", "ssh"]);
+		expect(on("encoder")).toEqual(["encoder", "ssh"]);
+		expect(on("obs")).toEqual([]);
 	});
 
-	test("default modules mirror the role presets", () => {
-		expect(defaultModules("relay").modems.enabled).toBe(true);
-		expect(defaultModules("combined").modems.enabled).toBe(true);
-		expect(defaultModules("encoder").modems.enabled).toBe(false);
+	test("a module's stored slice key follows its configKey", () => {
+		const srtla = ALL_MODULES.find((m) => m.id === "srtla");
+		expect(srtla?.configKey).toBe("relay");
+		expect(defaultModules("relay")).toHaveProperty("relay");
+		expect(defaultModules("relay")).not.toHaveProperty("srtla");
 	});
 
 	test("status view exposes the modems module flag", () => {
@@ -374,6 +382,27 @@ describe("modems role presets", () => {
 			expect(view.modems).toEqual({ enabled: true });
 		} finally {
 			state.settings.modules = saved;
+		}
+	});
+
+	test("ensureModuleSlices backfills new fields and keeps stored values", () => {
+		const saved = state.settings.modules;
+		const role = state.settings.role;
+		try {
+			state.settings.modules = {
+				"obs-controller": { enabled: true, obsUrl: "ws://1.2.3.4:4455" },
+			};
+			const modules = ensureModuleSlices("relay");
+			expect(modules["obs-controller"]).toMatchObject({
+				enabled: true,
+				obsUrl: "ws://1.2.3.4:4455",
+				sceneEvents: true,
+			});
+			expect(modules.relay).toEqual({ enabled: true });
+			expect(modules.encoder).toEqual({ enabled: false });
+		} finally {
+			state.settings.modules = saved;
+			state.settings.role = role;
 		}
 	});
 });

@@ -1,19 +1,17 @@
 /*
  * obs-controller module: owns the ObsClient connection to the paired OBS
- * Studio and forwards its events into the irlctrl event stream (pushed with a
- * `module: "obs-controller"` tag). The obs.* API methods in methods.ts
- * dispatch their raw requests straight to this client.
+ * Studio, answers the obs.* API methods (raw obs-websocket passthrough) and
+ * forwards OBS events into the irlctrl event stream (pushed with a
+ * `module: "obs-controller"` tag). The low-bitrate switcher rides on the same
+ * client and lives in this module's settings slice.
  *
- * Its live client is exposed to other modules over the capability bus
- * (the low-bitrate switcher drives scene changes through it — no second
- * OBS websocket).
- *
- * Self-contained: wire types live in shared/types; the only core edge is the bag.
+ * Self-contained: wire types live in ./types; the only core edge is the bag.
  */
 import { randomUUID } from "node:crypto";
 import { appendFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { z } from "zod";
+import type { ModuleCore } from "../../backend/client/module-core";
+import type { BackendModule, Params } from "../../shared/module-contract";
 import {
 	DEFAULT_EVENT_SUBSCRIPTIONS,
 	EventSubscription,
@@ -23,15 +21,40 @@ import {
 	type ObsRequest,
 	type ObsRequestBatch,
 } from "../../shared/obs/client";
-import type { SwitcherConfig, SwitcherMetrics } from "../../shared/types";
+import { ApiError, optionalStringList, requireString } from "../../shared/params";
 import { collectSrtSample, type SrtBaseline } from "./srt-metrics";
 import { type ObsSnapshot, SwitcherEngine } from "./switcher-engine";
-import type { MCore, Mctx } from "./types";
+import type { Emit, ObsSlice, SwitcherConfig, SwitcherMetrics } from "./types";
 
 const SECTION = "LowBitrateSwitcher";
+const MODULE_ID = "obs-controller";
 
-/** Core bag, filled at bind (discovery) and re-filled at start (a module may not import the core directly). */
-let core: MCore;
+/** Core bag, bound at discovery and re-filled at start (a module never imports the core). */
+let core: ModuleCore;
+
+/** This module's settings slice (created by the core from `configDefaults`). */
+const slice = (): ObsSlice | undefined =>
+	core.state.settings.modules?.[MODULE_ID] as ObsSlice | undefined;
+
+/**
+ * Switcher defaults — the same values the card form carries, so the slice
+ * seeded on first run is complete and the engine can start before the form
+ * has ever saved. The switcher rides on the OBS module (`switcherEnabled`
+ * defaults to on).
+ */
+const SWITCHER_DEFAULTS = {
+	obsSourceName: "",
+	failBehaviour: "pause" as const,
+	autoSwitch: true,
+	onlySwitchWhenStreaming: false,
+	instantlySwitchOnRecover: true,
+	retryAttempts: 5,
+	pollIntervalMs: 1000,
+	triggers: { low: 500, offline: 400, rtt: 1500 },
+	scenes: { normal: "", low: "", offline: "" },
+	optionalScenes: { starting: "", ending: "", privacy: "" },
+	logToFile: true,
+};
 
 // op5 events forwarded to the UI; the ones an operator dashboard reacts to.
 // OBS v5 output events carry no "Current" prefix — they are StreamStateChanged /
@@ -87,45 +110,56 @@ let obsClient: ObsClient | null = null;
 /** The live client, or a 409 asking the operator to enable the module. */
 const requiredClient = (): ObsClient => {
 	if (!obsClient)
-		throw new core.ApiError("The obs-controller module is not running", 409);
+		throw new ApiError("The obs-controller module is not running", 409);
 	return obsClient;
 };
 
-/**
- * obs-controller services consumed by the core (the method dispatcher in
- * methods.ts) — exposed through the capability bus under "obs".
- */
-export const obsServices = {
-	/** The live client (null when the module is not running). */
-	client: (): ObsClient | null => obsClient,
-	/** OR of the event bits for the given names (case-insensitive; unknown names are skipped). */
-	subscriptionMask(names: string[]): number {
-		return names.reduce(
-			(acc, name) =>
-				acc |
-				(EVENT_SUBSCRIPTION_LOOKUP[name.toUpperCase()] ??
-					EventSubscription.None),
-			0,
-		);
-	},
-	/**
-	 * Apply persisted config fields (url / password / sceneEvents / enabled);
-	 * caller saves the state. Only fields present in `config` are touched.
-	 */
-	configure(config: Record<string, unknown>): void {
-		const obs = core.state.settings.modules?.["obs-controller"];
-		if (!obs) return;
-		if (typeof config.enabled === "boolean") obs.enabled = config.enabled;
-		if (typeof config.obsUrl === "string") obs.obsUrl = config.obsUrl;
-		if (typeof config.obsPassword === "string")
-			obs.obsPassword = config.obsPassword;
-		if (typeof config.sceneEvents === "boolean")
-			obs.sceneEvents = config.sceneEvents;
-	},
-};
+/** OR of the event bits for the given names (case-insensitive; unknown names are skipped). */
+const subscriptionMask = (names: string[]): number =>
+	names.reduce(
+		(acc, name) =>
+			acc |
+			(EVENT_SUBSCRIPTION_LOOKUP[name.toUpperCase()] ?? EventSubscription.None),
+		0,
+	);
+
+const record = (v: unknown): Record<string, unknown> | undefined =>
+	v && typeof v === "object" && !Array.isArray(v)
+		? (v as Record<string, unknown>)
+		: undefined;
+
+const requestId = (v: unknown): string =>
+	typeof v === "string" && v ? v : randomUUID();
+
+/** Normalize an `obs.requestBatch` body (op9) — validates every request's type. */
+function parseBatch(p: Params): ObsRequestBatch {
+	const requests = p.requests;
+	if (!Array.isArray(requests) || !requests.length)
+		throw new ApiError("requests must be a non-empty array");
+	for (const r of requests)
+		if (typeof record(r)?.requestType !== "string")
+			throw new ApiError("Each request needs a string requestType");
+	return {
+		requestId: requestId(p.requestId),
+		requests: requests.map((r) => {
+			const it = r as Record<string, unknown>;
+			return {
+				requestType: it.requestType as string,
+				requestId: requestId(it.requestId),
+				...(it.requestData ? { requestData: record(it.requestData) } : {}),
+			};
+		}),
+		...(p.haltOnFailure !== undefined
+			? { haltOnFailure: !!p.haltOnFailure }
+			: {}),
+		...(p.executionType !== undefined
+			? { executionType: p.executionType as 0 | 1 | 2 }
+			: {}),
+	} as ObsRequestBatch;
+}
 
 const forward =
-	(name: string, emit: Mctx["emit"]) =>
+	(name: string, emit: Emit) =>
 	(_data: Record<string, unknown>, event: ObsEvent) =>
 		emit("obs.event", {
 			eventType: name,
@@ -159,7 +193,7 @@ let streaming = false;
 let attachedTo: ObsClient | null = null;
 let fileLogBroken = false;
 /** The registry-provided emitter; the engine's status rides on this event. */
-let emit: (event: string, data: unknown) => void = () => {};
+let emit: Emit = () => {};
 
 function moduleLog(level: "info" | "warn" | "error", message: string): void {
 	core.logEvent(level, SECTION, message);
@@ -180,9 +214,7 @@ function moduleLog(level: "info" | "warn" | "error", message: string): void {
  * idles until the card form saves.
  */
 function moduleSlice(): SwitcherConfig | null {
-	const stored = core.state.settings.modules?.["obs-controller"] as
-		| Record<string, unknown>
-		| undefined;
+	const stored = slice();
 	return stored && typeof stored.obsSourceName === "string"
 		? (stored as unknown as SwitcherConfig)
 		: null;
@@ -343,8 +375,8 @@ function stopEngine(): void {
  * not of the expected shape. The form is the source of the defaults.
  */
 function applyConfig(raw: Record<string, unknown>): SwitcherConfig {
-	const slice = (core.state.settings.modules ??= {})["obs-controller"] ?? {};
-	const base: SwitcherConfig = cfg ?? (slice as unknown as SwitcherConfig);
+	const stored = slice() ?? ({} as ObsSlice);
+	const base: SwitcherConfig = cfg ?? (stored as unknown as SwitcherConfig);
 	const out: SwitcherConfig = structuredClone(base);
 	if (typeof raw.obsSourceName === "string")
 		out.obsSourceName = raw.obsSourceName;
@@ -405,49 +437,45 @@ function applyConfig(raw: Record<string, unknown>): SwitcherConfig {
 				key
 			] as string;
 	}
-	// Persist the applied slice (the whole switcher lives in the obs slice now).
-	Object.assign(slice, out);
-	core.state.settings.modules["obs-controller"] = slice;
+	// Persist the applied values (the whole switcher lives in the obs slice).
+	Object.assign(stored, out);
+	(core.state.settings.modules ??= {})[MODULE_ID] = stored;
 	return out;
 }
 
-export default {
+const registration: BackendModule<ModuleCore> = {
 	kind: "device",
-	id: "obs-controller",
+	id: MODULE_ID,
 	title: "OBS",
-	configSchema: z
-		.object({
-			enabled: z.boolean().optional(),
-			obsUrl: z.string().optional(),
-			obsPassword: z.string().optional(),
-			sceneEvents: z.boolean().optional(),
-			// The low-bitrate switcher settings (this module owns the engine).
-			switcherEnabled: z.boolean().optional(),
-			obsSourceName: z.string().optional(),
-			failBehaviour: z.string().optional(),
-			autoSwitch: z.boolean().optional(),
-			onlySwitchWhenStreaming: z.boolean().optional(),
-			instantlySwitchOnRecover: z.boolean().optional(),
-			retryAttempts: z.number().optional(),
-			pollIntervalMs: z.number().optional(),
-			triggers: z.record(z.string(), z.unknown()).optional(),
-			scenes: z.record(z.string(), z.unknown()).optional(),
-			optionalScenes: z.record(z.string(), z.unknown()).optional(),
-			logToFile: z.boolean().optional(),
-		})
-		.passthrough(),
+	// Enabled by the operator (any role); the methods need a running client.
+	enabledByDefault: false,
+	requireEnabled: true,
+	configDefaults: {
+		obsUrl: "",
+		obsPassword: "",
+		sceneEvents: true,
+		...SWITCHER_DEFAULTS,
+	},
 	secretFields: ["obsPassword"],
-	bind(c: MCore) {
+	methods: [
+		"obs.request",
+		"obs.requestBatch",
+		"obs.setEventSubscriptions",
+		"lowBitrateSwitcher.save",
+	],
+	events: ["obs.event", "lowBitrateSwitcher.state"],
+	dashboardWidgets: [{ type: "obs", defaultSize: { w: 6, h: 6 } }],
+	bind(c) {
 		core = c;
 	},
-	async start(ctx: Mctx) {
+	async start(ctx) {
 		core = ctx.core;
 		emit = ctx.emit;
 		await teardown();
 		const cfg = ctx.config;
 		if (cfg.enabled !== true) return;
 		if (typeof cfg.obsUrl !== "string" || !cfg.obsUrl) {
-			ctx.log("obs-controller", "enabled but no obsUrl set; module idle");
+			ctx.log(MODULE_ID, "enabled but no obsUrl set; module idle");
 			return;
 		}
 		const obsPassword = cfg.obsPassword;
@@ -461,7 +489,7 @@ export default {
 					? DEFAULT_EVENT_SUBSCRIPTIONS | EventSubscription.InputVolumeMeters
 					: EventSubscription.None,
 			log: (msg, ...rest) =>
-				ctx.log("obs-controller", [msg, ...rest].map(String).join(" ")),
+				ctx.log(MODULE_ID, [msg, ...rest].map(String).join(" ")),
 		});
 		for (const name of FORWARDED_EVENTS)
 			obsClient.on(name, forward(name, ctx.emit));
@@ -477,48 +505,46 @@ export default {
 	async stop() {
 		await teardown();
 	},
-	methods: [
-		"obs.request",
-		"obs.requestBatch",
-		"obs.setEventSubscriptions",
-		"lowBitrateSwitcher.save",
-	] as const,
-	events: ["obs.event", "lowBitrateSwitcher.state"] as const,
-	status(): Record<string, unknown> {
+	/** `modules.configure`: only the connection fields present in `config` are touched. */
+	configure(config, s) {
+		if (typeof config.enabled === "boolean") s.enabled = config.enabled;
+		if (typeof config.obsUrl === "string") s.obsUrl = config.obsUrl;
+		if (typeof config.obsPassword === "string")
+			s.obsPassword = config.obsPassword;
+		if (typeof config.sceneEvents === "boolean")
+			s.sceneEvents = config.sceneEvents;
+	},
+	async status() {
 		// The low-bitrate switcher's live state (null = not running): the card reads it.
 		return { lowBitrateSwitcher: engine?.status() ?? null };
 	},
-	async dispatch(method: string, params: Record<string, unknown>) {
+	async dispatch(method, params) {
 		switch (method) {
 			case "obs.request": {
 				const request: ObsRequest = {
-					requestType: String(params.requestType),
-					requestId: String(params.requestId),
-					requestData: params.requestData as Record<string, unknown>,
+					requestType: requireString(params, "requestType"),
+					requestId: requestId(params.requestId),
+					requestData: record(params.requestData) ?? {},
 				};
 				// op7 passthrough: the obs-websocket v5 response `d`, statuses unmapped
 				return requiredClient().sendRequest(request);
 			}
 			case "obs.requestBatch": {
 				// op9 passthrough: the obs-websocket v5 batch response `d`
-				return requiredClient().sendBatch(params as unknown as ObsRequestBatch);
+				const batch = parseBatch(params);
+				return requiredClient().sendBatch(batch);
 			}
 			case "obs.setEventSubscriptions": {
-				const intents = Number(params.eventSubscriptions);
+				const intents = subscriptionMask(
+					optionalStringList(params, "eventSubscriptions") ?? [],
+				);
 				requiredClient().setEventSubscriptions(intents);
 				return { ok: true, eventSubscriptions: intents };
 			}
 			case "lowBitrateSwitcher.save": {
 				// The form sends the full flat switcher slice; a field that does
-				// not match its shape keeps the previous value. It is persisted
-				// into this module's slice (the switcher lives on obs-controller).
-				const body =
-					params.config &&
-					typeof params.config === "object" &&
-					!Array.isArray(params.config)
-						? (params.config as Record<string, unknown>)
-						: params;
-				const next = applyConfig(body);
+				// not match its shape keeps the previous value.
+				const next = applyConfig(record(params.config) ?? params);
 				await core.saveState();
 				// Hot-apply: the running engine picks up the new values right away;
 				// when it idled (no source set) it starts now.
@@ -534,15 +560,9 @@ export default {
 				return { ok: true };
 			}
 			default:
-				throw new core.ApiError(`Unknown method: ${method}`, 404);
+				throw new ApiError(`Unknown method: ${method}`, 404);
 		}
 	},
-	services: {
-		capabilities: {
-			// The core consumes the OBS client through the "stream.obs" bus
-			// slot (backend/client/services.ts) — obsServices must be provided under that
-			// name or the settings page can't save the OBS connection info.
-			"stream.obs": obsServices,
-		},
-	},
 };
+
+export default registration;

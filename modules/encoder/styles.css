@@ -66,3 +66,7 @@ a.link-button.secondary:focus-visible {
 .pipe-group-toggle.open svg {
     transform: rotate(90deg);
 }
+
+select[name="pipeline"] {
+	width: 100%;
+}

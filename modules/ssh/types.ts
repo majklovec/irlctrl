@@ -1,6 +1,7 @@
 /*
  * Local types for the ssh module (never imported by the core or other modules).
  */
+import type { ModuleSliceView, Status } from "../../shared/types";
 
 /** The persisted configuration slice of the ssh module (the `modules.ssh` state). */
 export interface SshModuleConfig {
@@ -36,46 +37,14 @@ export interface SshPasswordReset {
 	password: string;
 }
 
-/** The slice of the core bag this module uses. */
-export interface SshCore {
-	config: {
-		DRY_RUN: boolean;
-	};
-	state: {
-		settings: {
-			modules?: { ssh?: SshModuleConfig } & Record<string, unknown>;
-		};
-	};
-	saveState(): Promise<void>;
-	run(cmd: string, args: string[], ignoreError?: boolean): Promise<string>;
-	errorMessage(err: unknown): string;
-	logEvent(
-		level: "info" | "warn" | "error",
-		section: string,
-		message: string,
-	): void;
-	t(key: string, options?: Record<string, unknown>): string;
+/** The module's slice of the modules view — safeModules() masks the password as `{configured}`. */
+export interface SshSliceView extends ModuleSliceView {
+	user?: string;
+	password?: { configured: boolean };
 }
 
-/** The context the registry passes to `start`/`bind`. */
-export interface Mctx {
-	config: Record<string, unknown>;
-	emit(event: string, data: unknown): void;
-	log(section: string, message: string): void;
-	core: SshCore;
-}
-
-/** A browser-side module registration (frontend). Local copy so a module never
- * imports across boundaries; the frontend registry narrows it. */
-export interface BridgedModule extends FrontendModuleContributions {
-	id: string;
-	title: string;
-	icon?: string;
-	kind: "device-card";
-	component: unknown;
-	defaultSize: { w: number; h: number };
-	minSize: { w: number; h: number };
-	maxSize?: { w: number; h: number };
-}
-
-import type { FrontendModuleContributions } from "../../frontend/ts/module-contracts";
+/** The status envelope as the ssh card reads it (the `ssh` fragment is reported in the clear). */
+export type SshStatus = Status & {
+	/** Live state of the local SSH server (null when the module is not enabled). */
+	ssh?: SshHostStatus | null;
+};

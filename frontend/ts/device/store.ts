@@ -4,7 +4,7 @@
 import m from "mithril";
 import { type LogEvent, label, methodLog } from "../../../shared/logMessages";
 import { errorMessage } from "../../../shared/util";
-import type { DeviceInfo, modulesView, Status } from "../../types";
+import type { DeviceInfo, ModulesView, Status } from "../../types";
 import type { Level } from "../components/icons";
 import { t } from "../i18n";
 import { type Params, RpcClient, RpcError, socketUrl } from "../services/rpc";
@@ -161,7 +161,7 @@ export const connectDevice = (): void => rpc.ensureConnected();
 /** The device page's card, bound to the page's device connection. */
 export const card: DeviceCard = createCardHost({ rpc, logFn: log });
 
-/** Page-level state around the card: socket state, device info, the obs mirror. */
+/** Page-level state around the card: socket state, device info, the module settings view. */
 export const st = Object.assign(card.st, {
 	socketOpen: false,
 	connectionLost: false,
@@ -169,7 +169,7 @@ export const st = Object.assign(card.st, {
 	device: null as DeviceInfo | null,
 	autostartBusy: false,
 	// Module system: persisted settings + live module state
-	modules: {} as modulesView,
+	modules: {} as ModulesView,
 });
 
 export const act = card.act;

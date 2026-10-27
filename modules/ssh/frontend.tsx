@@ -12,9 +12,10 @@ import {
 } from "../../frontend/ts/components/ui";
 import { card, type DeviceCard } from "../../frontend/ts/device/store";
 import { t } from "../../frontend/ts/i18n";
-import type { Status } from "../../shared/types";
-import type { BridgedModule } from "./types";
+import type { FrontendModule } from "../../frontend/ts/module-contracts";
+import log from "./log";
 import "./styles.css";
+import type { SshStatus } from "./types";
 
 /** Per-connection card state (the fresh password is shown once, until the card unmounts). */
 interface SshCardState {
@@ -33,7 +34,7 @@ function sshState(host: DeviceCard): SshCardState {
 }
 
 async function resetPassword(host: DeviceCard): Promise<void> {
-	const user = host.st.status?.ssh?.user ?? "root";
+	const user = (host.st.status as SshStatus | null)?.ssh?.user ?? "root";
 	if (!confirm(t("dev.ssh_reset_confirm", { user }))) return;
 	const result = await host.act<{ user: string; password: string }>(
 		"ssh-reset",
@@ -45,7 +46,7 @@ async function resetPassword(host: DeviceCard): Promise<void> {
 	}
 }
 
-function sshCardBody(host: DeviceCard, status: Status): m.Vnode {
+function sshCardBody(host: DeviceCard, status: SshStatus): m.Vnode {
 	const s = status.ssh;
 	const { newPassword } = sshState(host);
 	return (
@@ -109,7 +110,7 @@ function sshCardBody(host: DeviceCard, status: Status): m.Vnode {
 	);
 }
 
-const sshModule: BridgedModule = {
+const sshModule: FrontendModule = {
 	id: "ssh",
 	kind: "device-card",
 	title: "SSH",
@@ -117,7 +118,8 @@ const sshModule: BridgedModule = {
 	available: (status) => status.role !== "obs",
 	defaultSize: { w: 4, h: 4 },
 	minSize: { w: 3, h: 3 },
-	component: (status: Status) => sshCardBody(card, status),
+	component: (status) => sshCardBody(card, status as SshStatus),
+	log,
 };
 
 export default sshModule;
