@@ -60,5 +60,6 @@
     "ui.off": "выкл.",
     "wtype.relay": "Relay",
     "act.srtla.stop": "Остановить SRTLA",
-    "act.srtla.reload": "Перезагрузить аплинки"
+    "act.srtla.reload": "Перезагрузить аплинки",
+    "act.srtla.start": "Запустить SRTLA"
 }

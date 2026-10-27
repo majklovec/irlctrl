@@ -60,5 +60,6 @@
     "ui.off": "vypnuto",
     "wtype.relay": "Relay",
     "act.srtla.stop": "Zastavit SRTLA",
-    "act.srtla.reload": "Znovu načíst uplinky"
+    "act.srtla.reload": "Znovu načíst uplinky",
+    "act.srtla.start": "Spustit SRTLA"
 }

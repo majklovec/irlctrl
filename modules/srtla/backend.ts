@@ -444,6 +444,13 @@ const registration: BackendModule<ModuleCore> = {
     },
     dashboardWidgets: [{ type: "relay", defaultSize: { w: 4, h: 4 } }],
     dashboardActions: [
+        // Needs `listenPort`, `remoteHost` and `remotePort` — set them in the button's params override.
+        {
+            id: "start",
+            label: "act.srtla.start",
+            icon: "▶",
+            method: "srtla.start",
+        },
         {
             id: "stop",
             label: "act.srtla.stop",

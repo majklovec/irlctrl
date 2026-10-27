@@ -60,5 +60,6 @@
     "ui.off": "关闭",
     "wtype.relay": "Relay",
     "act.srtla.stop": "停止 SRTLA",
-    "act.srtla.reload": "重新加载上行链路"
+    "act.srtla.reload": "重新加载上行链路",
+    "act.srtla.start": "启动 SRTLA"
 }

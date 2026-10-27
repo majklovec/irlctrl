@@ -60,5 +60,6 @@
     "ui.off": "オフ",
     "wtype.relay": "Relay",
     "act.srtla.stop": "SRTLA 停止",
-    "act.srtla.reload": "アップリンク再読込"
+    "act.srtla.reload": "アップリンク再読込",
+    "act.srtla.start": "SRTLA 開始"
 }
