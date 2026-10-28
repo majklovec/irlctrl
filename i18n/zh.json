@@ -143,6 +143,7 @@
     "role.encoder": "编码器",
     "role.obs": "obs",
     "role.relay": "中继",
+    "role.srtla2platform": "srtla2platform",
     "set.back": "返回设备",
     "set.color": "强调色",
     "set.description": "保存后，设置会在控制服务器上重新应用。",

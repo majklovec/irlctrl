@@ -188,7 +188,7 @@ Ovládací server používá tentýž vzorec s `server` (root není potřeba). R
 
 #### Docker
 
-`docker-compose.yaml` spustí celou sestavu: ovládací server, relay, encoder a proxy pro OBS Studio:
+`docker-compose.yaml` spustí celou sestavu: ovládací server, relay, encoder, proxy pro OBS Studio a agent SRTLA-to-platform:
 
 ```sh
 docker compose up -d --build
@@ -198,6 +198,7 @@ docker compose up -d --build
 - **obs-client** — proxuje hostitelské OBS Studio (`ws://host.docker.internal:4455`) do serveru.
 - **relay** — `client.ts --role relay`, bonduje SRT ven přes `srtla_send` (`Dockerfile.device`, image `majkl/irlctrl-device`).
 - **encoder** — `client.ts --role encoder`, běží `ceracoder`/GStreamer a posílá SRT do relay; stejný device image, jiná role + `ENCODER_BIN`.
+- **srtla2platform** — `srtla2platform.ts`, de-bonduje SRTLA stream přes `srtla_rec` a přes GStreamer jej zpět vysílá jako RTMP (`RTMP_URL` + stream klíč `RTMP_KEY`) (`Dockerfile.srtla2platform`, image `majkl/irlctrl-srtla2platform`); vystavuje SRTLA přijímač na `5000/udp`.
 
 Kontejner **relay** potřebuje oprávnění `NET_ADMIN`, protože při startu nastavuje směrování podle jednotlivých uplinků (`ip rule add` a tabulky tras) a sleduje rozhraní pomocí `ip monitor`. Bez tohoto oprávnění vypíše `ip rule add … Operation not permitted` a skončí. Encoder je nepotřebuje. Ve výchozí síti bridge se změny směrování relayu projeví pouze v síťovém prostoru kontejneru. Má-li relay používat skutečná síťová rozhraní hostitele pro agregaci připojení, spusťte jej s `network_mode: host`.
 

@@ -203,7 +203,7 @@ Díky tomu lze `backend/client/client.ts --role combined` spustit bez další ko
 
 ### Docker
 
-Soubor `docker-compose.yaml` spouští celý systém — řídicí server, relé, enkodér a proxy pro OBS Studio (viz `Dockerfile` a `Dockerfile.device`):
+Soubor `docker-compose.yaml` spouští celý systém — řídicí server, relé, enkodér, proxy pro OBS Studio a agent SRTLA-to-platform (viz `Dockerfile`, `Dockerfile.device` a `Dockerfile.srtla2platform`):
 
 ```sh
 docker compose up -d --build
@@ -213,6 +213,7 @@ docker compose up -d --build
 -   **obs-client** — `backend/obs-client/obs-client.ts`, zpřístupňuje OBS Studio hostitelského počítače (`ws://host.docker.internal:4455`) prostřednictvím serveru; používá stejný obraz jako řídicí server, ale jiný vstupní bod.
 -   **relay** — `backend/client/client.ts --role relay`, agreguje SRT stream pomocí `srtla_send` (`Dockerfile.device`, obraz `majkl/irlctrl-device`).
 -   **encoder** — `backend/client/client.ts --role encoder`, spouští `ceracoder`/GStreamer a odesílá SRT do relé; používá stejný obraz zařízení, ale jinou roli a proměnnou `ENCODER_BIN`.
+-   **srtla2platform** — `backend/srtla2platform/srtla2platform.ts`, de-bonduje SRTLA stream pomocí `srtla_rec` a přes GStreamer jej zpět vysílá jako RTMP (`RTMP_URL` + stream klíč `RTMP_KEY`) (`Dockerfile.srtla2platform`, obraz `majkl/irlctrl-srtla2platform`); vystavuje SRTLA přijímač na `5000/udp`.
 
 Obraz zařízení pro relé a enkodér obsahuje `backend/client/client.ts`, nativní binární soubory `srtla_send`, `ceracoder` a `belacoder`, definice GStreamer pipeline a nástroje `iproute2`.
 

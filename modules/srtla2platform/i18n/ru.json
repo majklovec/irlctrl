@@ -1,0 +1,13 @@
+{
+    "dev.badge.starting": "запуск",
+    "dev.card.srtla2platform": "SRTLA → RTMP",
+    "dev.row.auto_restarts": "Автоперезапуски",
+    "dev.row.rtmp": "Адрес",
+    "set.rtmp_key": "Ключ потока",
+    "set.rtmp_url": "RTMP(S) URL",
+    "set.srtla2platform": "RTMP-выход",
+    "set.srtla2platform_desc": "Адрес назначения, на который ретранслятор передаёт поток. После сохранения ретранслятор перезапускается.",
+    "set.srtla2platform_no_pipelines": "В {{directory}} нет конвейеров.",
+    "set.srtla2platform_pipeline": "Конвейер",
+    "set.srtla2platform_pipeline_default": "Стандартный (встроенный)"
+}

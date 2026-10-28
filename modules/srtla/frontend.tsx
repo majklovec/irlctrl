@@ -732,7 +732,7 @@ const srtlaModule: FrontendModule = {
 	title: "SRTLA",
 	order: 20,
 	log,
-	available: (status) => status.role !== "encoder" && status.role !== "obs",
+	available: (status) => status.role === "relay" || status.role === "combined",
 	dashboardWidgets: srtlaDashboardWidgets,
 	deviceSummaryColumns: srtlaSummaryColumns,
 	setupSteps: [

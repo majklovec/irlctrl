@@ -316,8 +316,8 @@ export const CheckField = {
 
 /** <button type="button">; pass `type: "submit"` for a form's default action. */
 export const Button = {
-	view: ({ attrs: { label, ...rest } }) => (
-		<button type="button" {...rest}>
+	view: ({ attrs: { label, type = "button", ...rest } }) => (
+		<button type={type} {...rest}>
 			{label}
 		</button>
 	),

@@ -42,6 +42,9 @@ export const def: ModuleDef = {
 	titleKey: "set.obs",
 	visible: (ctx) => ctx.role === "obs",
 	refresh: (ctx) => {
+		// A status push while a save is in flight must not clobber the user's
+		// edits — the in-flight save already carries them.
+		if (ctx.busy) return;
 		draft.obsUrl = (ctx.modules["obs-controller"] as ObsModuleView).obsUrl;
 		draft.obsPassword = "";
 	},

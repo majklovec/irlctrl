@@ -71,15 +71,17 @@ services:
             - "--role"
             - "relay"
             - "--pipelines"
-            - "/app/pipeline"
+            - "/app/relay-pipelines"
             - "--config"
             - "/config/config.json"
         volumes:
             - ./config/relay:/config
-            # Bind-mount the pipeline definitions so the app (uid 1000 in the
-            # encoder) can create directories and files at runtime and edits
-            # survive image rebuilds. The image's baked-in /app/pipeline is
-            # root:755 and not writable.
+            # Relay pipeline definitions (srtla2platform & co.), laid out as
+            # <user-id>/<pipeline>. Mounted so runtime edits survive image
+            # rebuilds.
+            - ./relay-pipelines:/app/relay-pipelines
+            # GStreamer pipeline definitions (encoder role); kept mounted for
+            # parity with the combined role.
             - ./pipeline:/app/pipeline
         environment:
             - CONTROL_SERVER_URL=${CONTROL_SERVER_URL}
@@ -121,6 +123,40 @@ services:
             - CONTROL_SERVER_URL=${CONTROL_SERVER_URL}
             - CONTROL_SERVER_TOKEN=${CONTROL_SERVER_TOKEN}
             - ENCODER_BIN=/app/ceracoder
+        depends_on:
+            server:
+                condition: service_healthy
+
+    # Internal SRT hop inside the platform container: srtla_rec (SRT caller)
+    # → 127.0.0.1:5002 (GStreamer listener).
+    srtla2platform:
+        build:
+            context: .
+            dockerfile: Dockerfile.srtla2platform
+        image: majkl/irlctrl-srtla2platform:latest
+        container_name: irlctrl-srtla2platform
+        restart: unless-stopped
+        user: "1000:1000"
+        # 5001/udp is the externally-facing SRTLA receiver port (the bonded
+        # SRTLA relay streams into it); the port is offset from OBS's SRTLA
+        # input (5000). 5002 is the internal GStreamer SRT listener on
+        # 127.0.0.1, not exposed to the host.
+        ports:
+            - "5001:5001/udp"
+        volumes:
+            # The agent reads its config from and persists its device UUID to
+            # $HOME/.config/srtla2platform/ (HOME=/home/srtla in the image), so
+            # the identity survives container rebuilds/restarts. No --config
+            # flag: this is the agent's default path.
+            - ./config/srtla2platform:/home/srtla/.config/srtla2platform
+            # Mid-fragment pipeline files selectable in the device settings
+            # (matches /app/relay-pipelines, the agent's --pipelines default).
+            - ./relay-pipelines:/app/relay-pipelines:ro
+        environment:
+            - CONTROL_SERVER_URL=${CONTROL_SERVER_URL}
+            - CONTROL_SERVER_TOKEN=${CONTROL_SERVER_TOKEN}
+            - RTMP_URL=${RTMP_URL}
+            - RTMP_KEY=${RTMP_KEY}
         depends_on:
             server:
                 condition: service_healthy

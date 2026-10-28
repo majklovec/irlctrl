@@ -526,7 +526,7 @@ async function loadPipelines(host: DeviceCard): Promise<void> {
 }
 
 const hasEncoderRole = (status: EncoderStatus) =>
-	status.role !== "relay" && status.role !== "obs";
+	status.role === "encoder" || status.role === "combined";
 
 // ----------------------------------------------------------------------
 // Stream control (owns the encoder + stream start logic, shared with SRTLA)
@@ -966,7 +966,8 @@ const encoderModule: FrontendModule = {
 	kind: "device-card",
 	title: "Encoder",
 	order: 10,
-	available: (status) => status.role !== "relay" && status.role !== "obs",
+	available: (status) =>
+		status.role === "encoder" || status.role === "combined",
 	dashboardWidgets: encoderDashboardWidgets,
 	setupSteps: [encoderSetupStep],
 	deviceSummaryColumns: encoderSummaryColumns,

@@ -143,6 +143,7 @@
     "role.encoder": "encodeur",
     "role.obs": "obs",
     "role.relay": "relais",
+    "role.srtla2platform": "srtla2platform",
     "set.back": "Retour à l'appareil",
     "set.color": "Couleur d'accent",
     "set.description": "Les paramètres sont réappliqués sur le serveur de contrôle après l'enregistrement.",

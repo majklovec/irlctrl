@@ -143,6 +143,7 @@
     "role.encoder": "codificador",
     "role.obs": "obs",
     "role.relay": "relay",
+    "role.srtla2platform": "srtla2platform",
     "set.back": "Volver al dispositivo",
     "set.color": "Color de acento",
     "set.description": "Los ajustes se vuelven a aplicar en el servidor de control al guardar.",

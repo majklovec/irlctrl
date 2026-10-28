@@ -520,7 +520,7 @@ const BASE_ACTIONS: readonly DashboardAction[] = [
 const muteAction = ({ name, muted }: AudioSource): DashboardAction => ({
     id: `mute:${name}`,
     label: name,
-    icon: muted ? "🔇" : "🔊",
+    icon: muted ? "🔊" : "🔇",
     method: "obs.request",
     params: {
         requestType: "SetInputMute",

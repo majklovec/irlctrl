@@ -1,0 +1,13 @@
+{
+    "dev.badge.starting": "iniciando",
+    "dev.card.srtla2platform": "SRTLA → RTMP",
+    "dev.row.auto_restarts": "Reinicios automáticos",
+    "dev.row.rtmp": "Destino",
+    "set.rtmp_key": "Clave de transmisión",
+    "set.rtmp_url": "URL RTMP(S)",
+    "set.srtla2platform": "Salida RTMP",
+    "set.srtla2platform_desc": "Destino al que el relay envía el stream. El relay se reinicia después de guardar.",
+    "set.srtla2platform_no_pipelines": "No se encontraron pipelines en {{directory}}.",
+    "set.srtla2platform_pipeline": "Pipeline",
+    "set.srtla2platform_pipeline_default": "Predeterminado (integrado)"
+}

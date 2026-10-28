@@ -1,0 +1,86 @@
+# srtla2platform agent image — runs `backend/srtla2platform/srtla2platform.ts`.
+#
+# The agent relays an SRTLA device's stream into an RTMP ingest:
+#   srtla_rec (SRTLA de-bonder) -> ffmpeg (SRT listener) -> stream-copy TS -> FLV/RTMP(S)
+#
+# Unlike the relay/encoder device image (Dockerfile.device), this:
+#   - bundles only the srtla2platform agent (backend/srtla2platform/ + shared/),
+#   - builds `srtla_rec` from irlserver/srtla (rev b8359bc, the same revision the
+#     OBS SRTLA input plugin embeds) in a separate stage so the runtime image
+#     stays free of the C/C++ toolchain. srtla_rec parses SRTLA packets at the
+#     byte level and links NO SRT library, so no libSRT build is needed here.
+#   - has no npm dependencies: the agent imports only node:* builtins and the
+#     dependency-free shared/args + shared/validate, so there is no bun install.
+#
+# generated/version.ts is gitignored (built by scripts/gen-modules.ts) and is
+# baked below from package.json's version — the agent imports it for its version.
+FROM oven/bun:1 AS srtla_rec-builder
+
+# srtla_rec build dependencies (CMake >= 3.16, g++, make, git for the clone and
+# the deps/argparse submodule, ca-certificates for https fetch of spdlog).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    git \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /srtla
+# Pin to b8359bc (same rev as the OBS plugin). Full clone so the exact SHA
+# resolves; submodules provide deps/argparse.
+RUN git clone --quiet https://github.com/irlserver/srtla.git . \
+    && git checkout --quiet --force b8359bc \
+    && git submodule update --init --recursive --quiet \
+    && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build build --target srtla_rec --parallel "$(nproc)"
+
+# ---- Runtime stage ----
+FROM oven/bun:1
+
+# Runtime dependencies:
+#   - iproute2        -> `ss -uln` (the agent waits for its SRT listener by
+#                        parsing the bound UDP sockets),
+#   - ffmpeg          -> the relay: SRT listener (-listen 1), stream-copy
+#                        remux TS -> FLV, RTMP(S) egress (needs SRT protocol
+#                        + openssl for rtmps://),
+#   - ca-certificates -> TLS for a wss:// control server and rtmps://.
+# NOTE: no libSRT and no git — srtla_rec is copied in from the builder stage.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    iproute2 \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# The SRTLA de-bonder binary (parsed at the byte level, no libSRT).
+COPY --from=srtla_rec-builder /srtla/build/srtla_rec /usr/local/bin/srtla_rec
+RUN chmod +x /usr/local/bin/srtla_rec
+
+# The agent keeps its config + device UUID under $HOME/.config/srtla2platform/
+# (see srtla2platform.ts CONFIG_DIR). Point HOME at a fixed path so a compose
+# volume mounted there persists the config file and the device identity across
+# rebuilds/restarts. No --config flag needed: this is the agent's default path.
+# Pre-create the dir owned by the runtime user (1000) so the agent can persist
+# its UUID even without a volume; a compose bind mount overrides it at runtime.
+# /home/srtla itself stays root-owned; only the subdirs are user-writable.
+ENV HOME=/home/srtla
+RUN mkdir -p /home/srtla/.config/srtla2platform \
+    && chown -R 1000:1000 /home/srtla/.config
+
+WORKDIR /app
+
+# Copy only what the agent runs unbundled (`bun backend/srtla2platform/...`).
+COPY package.json ./
+COPY backend/srtla2platform ./backend/srtla2platform
+COPY shared ./shared
+
+# Bake the gitignored generated/version.ts (APP_VERSION) from package.json.
+RUN mkdir -p generated && bun -e 'const {version}=JSON.parse(require("fs").readFileSync("package.json","utf8")); require("fs").writeFileSync("generated/version.ts", `export const APP_VERSION = ${JSON.stringify(version)};\n`)'
+
+# 5000/udp is the externally-facing SRTLA receiver port (the SRTLA device bonds
+# into it). 5002/udp is the internal GStreamer SRT listener on 127.0.0.1.
+EXPOSE 5000/udp 5002/udp
+
+# Default entrypoint — supply control server URL/token and the RTMP target
+# via environment (see docker-compose.yaml).
+ENTRYPOINT ["bun", "backend/srtla2platform/srtla2platform.ts"]
+CMD []

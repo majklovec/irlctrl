@@ -1,0 +1,13 @@
+{
+    "dev.badge.starting": "spouští se",
+    "dev.card.srtla2platform": "SRTLA → RTMP",
+    "dev.row.auto_restarts": "Automatické restarty",
+    "dev.row.rtmp": "Cíl",
+    "set.rtmp_key": "Klíč streamu",
+    "set.rtmp_url": "RTMP(S) URL",
+    "set.srtla2platform": "RTMP výstup",
+    "set.srtla2platform_desc": "Cíloba, kam relay posílá stream. Po uložení se relay restartuje.",
+    "set.srtla2platform_no_pipelines": "V {{directory}} nebyla nalezena žádná potrubí.",
+    "set.srtla2platform_pipeline": "Potrubí",
+    "set.srtla2platform_pipeline_default": "Výchozí (vestavěné)"
+}

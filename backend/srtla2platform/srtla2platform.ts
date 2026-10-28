@@ -4,8 +4,8 @@
  *
  * Receives a bonded SRTLA stream from an encoder, de-bonds it to standard SRT
  * with `srtla_rec` (built from irlserver/srtla, rev b8359bc — the same
- * receiver the OBS plugin embeds), then transcodes/muxes SRT → RTMP with
- * GStreamer and publishes it to a user-configured platform (e.g. mediamtx).
+ * receiver the OBS plugin embeds), then remuxes SRT (MPEG-TS) → FLV/RTMP with
+ * ffmpeg and publishes it to a user-configured platform (e.g. Kick).
  *
  * `srtla_rec` handles the packet-level bonding (REG1/REG2/REG3, link
  * aggregation, ACK throttling); this agent only orchestrates the processes
@@ -19,28 +19,54 @@
  * on reconnect.
  *
  * Requires `srtla_rec` built from https://github.com/irlserver/srtla
- * (rev b8359bc, pinned by the OBS SRTLA input plugin) and GStreamer on $PATH.
+ * (rev b8359bc, pinned by the OBS SRTLA input plugin) and ffmpeg on $PATH.
  *
  * The irlctrl token is supplied via the CONTROL_SERVER_TOKEN env var (never a
  * CLI flag, so it does not leak into the process list) or config file.
  *
+ * The RTMP stream key (RTMP_KEY) is appended to RTMP_URL as the final path
+ * segment (rtmp://host/live + key → rtmp://host/live/key); like the token it
+ * is never a CLI flag. Precedence: URL = CLI flag > rtmpUrlFile (dynamic
+ * source) > config file > RTMP_URL env var; key = config file > RTMP_KEY env
+ * var. The config file is written by the web UI, so a UI edit stays
+ * authoritative across restarts (the env vars are first-run bootstrap only).
+ *
+ * The `pipeline` config field selects a mid file from the pipelines
+ * directory (--pipelines / PIPELINES_DIR, default /app/relay-pipelines;
+ * layout <user-id>/<pipeline>, same convention as the encoder module). It is
+ * kept for configuration/web-UI compatibility — the ffmpeg relay ignores it
+ * (ffmpeg auto-detects the TS elementary streams and carries both video and
+ * audio, so no mid is needed).
+ *
  * Usage:
- *   CONTROL_SERVER_TOKEN=<t> bun srtla2platform.ts \
+ *   CONTROL_SERVER_TOKEN=<t> RTMP_KEY=<key> bun srtla2platform.ts \
  *     --server-url ws://host:7788/device \
- *     --rtmp-url rtmp://host/live/key --input-format ts
+ *     --rtmp-url rtmp://host/live --input-format ts
  *
  * All options can also be supplied via environment variables or `~/.config/
  * srtla2platform/config.json` (see ConfigFile).
  */
 
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+    type Dirent,
+    existsSync,
+    mkdirSync,
+    readdirSync,
+    readFileSync,
+    writeFileSync,
+} from "node:fs";
 import { homedir, hostname as osHostname } from "node:os";
-import { join } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 import { APP_VERSION } from "../../generated/version";
 import { arg, argFail, enumArg, flag } from "../../shared/args";
-import { DEFAULT_COLOR } from "../../shared/validate";
+import {
+    COLOR_RE,
+    DEFAULT_COLOR,
+    HOSTNAME_RE,
+    REMOTE_URL_RE,
+} from "../../shared/validate";
 
 /** Bun's WebSocket global is typed by lib.dom; Bun's accepts a `headers` option. */
 const BunWebSocket = WebSocket as unknown as new (
@@ -61,7 +87,11 @@ const DEFAULTS = {
     srtlaPort: 5000,
     srtPort: 5002,
     bindHost: "127.0.0.1",
+    // Upstream SRT encoders negotiate ~2000 ms of jitter buffering; ffmpeg's
+    // SRT input defaults to 120 ms, which is too small for the relayed stream.
+    srtLatencyMs: 2000,
     inputFormat: "ts" as InputFormat,
+    pipelinesDir: "/app/relay-pipelines",
 };
 
 const BACKOFF_MIN_MS = 1_000;
@@ -81,26 +111,41 @@ type StreamState = "idle" | "starting" | "running" | "stopping";
 interface ConfigFile {
     controlServerUrl?: string;
     token?: string;
+    hostname?: string;
+    color?: string;
     srtlaPort?: number;
     srtPort?: number;
+    srtLatencyMs?: number;
     metricsPort?: number;
     bindHost?: string;
     rtmpUrl?: string;
     rtmpUrlFile?: string;
+    rtmpKey?: string;
     inputFormat?: InputFormat;
+    pipeline?: string;
+    pipelinesDir?: string;
     autoStart?: boolean;
 }
 
 interface Config {
     controlServerUrl: string;
     token: string;
+    hostname: string;
+    color: string;
     uuid: string;
     srtlaPort: number;
     srtPort: number;
+    srtLatencyMs: number;
     metricsPort: number;
     bindHost: string;
     rtmpUrl: string;
+    rtmpKey: string;
     inputFormat: InputFormat;
+    /** Pipeline mid files (id = path relative to pipelinesDir); the ffmpeg
+     * relay ignores the selection (kept for configuration/UI compatibility). */
+    pipelinesDir: string;
+    /** The selected pipeline id (legacy field; ignored by the ffmpeg relay). */
+    pipeline: string;
     autoStart: boolean;
     dryRun: boolean;
 }
@@ -127,6 +172,12 @@ interface ServerMessage {
 
 let config: Config;
 
+/** Apply a partial change to the live config (web-UI saves go through here;
+ * callers persist with writeConfigFile() afterwards). */
+function applyConfig(partial: Partial<Config>): void {
+    Object.assign(config, partial);
+}
+
 let ws: Bun.WebSocket | null = null;
 let linkStopped = true;
 let backoff = BACKOFF_MIN_MS;
@@ -136,9 +187,20 @@ let statusTimer: ReturnType<typeof setInterval> | null = null;
 
 let streamState: StreamState = "idle";
 let srtlaProc: Bun.Subprocess | null = null;
-let gstProc: Bun.Subprocess | null = null;
+let ffmpegProc: Bun.Subprocess | null = null;
 let epoch = 0;
 let startedAt = 0;
+
+// Operator intent: while a child crashes, a stream the operator started is
+// restarted (with backoff) instead of being left dead; an explicit stop
+// clears it so the stream stays down.
+let wantsRunning = false;
+let streamRestarts = 0;
+let streamBackoff = BACKOFF_MIN_MS;
+let restartTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** A stream that stayed up this long resets the restart backoff. */
+const STREAM_RESTART_STABLE_MS = 60_000;
 
 let logSeq = 0;
 let lastFlushedId = 0;
@@ -158,9 +220,7 @@ function detectLocale(): string {
     return lang === "" ? "en" : lang;
 }
 
-function firstDefined<T>(
-    ...vals: Array<T | null | undefined>
-): T | undefined {
+function firstDefined<T>(...vals: Array<T | null | undefined>): T | undefined {
     for (const v of vals) if (v !== null && v !== undefined) return v;
     return undefined;
 }
@@ -177,6 +237,18 @@ const toPort = (
         : argFail(name, String(value), "a TCP port (1-65535)");
 };
 
+/** SRT latency in ms — clamped to a sane range instead of failing, since it
+ * arrives from the web-UI config file and only affects receive buffering. */
+const toLatency = (
+    value: string | number | null | undefined,
+    fallback: number,
+): number => {
+    if (value === undefined || value === null) return fallback;
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.min(30_000, Math.max(50, Math.trunc(n)));
+};
+
 /** Like `toPort` but 0 (disabled) is a valid value. */
 const toOptionalPort = (
     value: string | number | null | undefined,
@@ -191,11 +263,7 @@ const toOptionalPort = (
 
 // ── Logging ──────────────────────────────────────────────────────────────────
 
-function log(
-    level: LogLevel,
-    message: string,
-    section = ROLE,
-): void {
+function log(level: LogLevel, message: string, section = ROLE): void {
     logSeq += 1;
     const entry: LogEntry = {
         id: logSeq,
@@ -244,17 +312,22 @@ function currentStatus(): Record<string, unknown> {
         state: {
             autostart: config.autoStart,
             stream: streamState,
-            rtmp: config.rtmpUrl === "" ? null : config.rtmpUrl,
+            rtmp: config.rtmpUrl === "" ? null : effectiveRtmpUrl(),
             inputFormat: config.inputFormat,
+            pipeline: config.pipeline,
             srtlaPort: config.srtlaPort,
             srtPort: config.srtPort,
+            srtLatencyMs: config.srtLatencyMs,
             metricsPort: config.metricsPort,
             uptimeMs:
                 streamState === "running" && startedAt > 0
                     ? Date.now() - startedAt
                     : 0,
+            restarts: streamRestarts,
         },
-        modules: {},
+        // The web-UI refreshes its module cards from this push; an empty
+        // object would wipe every card's form values.
+        modules: moduleSliceView(),
     };
 }
 
@@ -335,8 +408,8 @@ function connect(): void {
             type: "hello",
             id: config.uuid,
             role: ROLE,
-            hostname: osHostname(),
-            color: DEFAULT_COLOR,
+            hostname: config.hostname,
+            color: config.color,
             language: detectLocale(),
             version: APP_VERSION,
         });
@@ -348,7 +421,9 @@ function connect(): void {
     socket.addEventListener("message", (ev) => {
         let msg: ServerMessage;
         try {
-            msg = JSON.parse(String((ev as MessageEvent).data)) as ServerMessage;
+            msg = JSON.parse(
+                String((ev as MessageEvent).data),
+            ) as ServerMessage;
         } catch {
             log("warn", "dropping malformed control frame");
             return;
@@ -375,7 +450,9 @@ function handleServerMessage(msg: ServerMessage): void {
     ) {
         const id = msg.id as number;
         handleCommand(msg.method, msg.params ?? {})
-            .then((result) => wsSend({ type: "response", id, ok: true, result }))
+            .then((result) =>
+                wsSend({ type: "response", id, ok: true, result }),
+            )
             .catch((err) =>
                 wsSend({
                     type: "response",
@@ -391,19 +468,141 @@ function handleServerMessage(msg: ServerMessage): void {
 
 async function handleCommand(
     method: string,
-    _params: Record<string, unknown>,
+    params: Record<string, unknown>,
 ): Promise<unknown> {
     switch (method) {
         case "start":
             return startStream();
         case "stop":
-            return stopStream();
+            return explicitStop();
         case "status":
             return currentStatus();
+        case "settings.get":
+            return {
+                settings: {
+                    uuid: config.uuid,
+                    hostname: config.hostname,
+                    role: ROLE,
+                    remoteUrl: config.controlServerUrl,
+                    hasRemoteToken: config.token !== "",
+                    color: config.color,
+                },
+                restartRequired: true,
+            };
+        case "settings.update":
+            return settingsUpdate(params);
+        case "modules.list":
+            return { modules: moduleSliceView() };
+        case "modules.configure":
+            return modulesConfigure(params);
         default:
             log("warn", `ignoring unknown command: ${method}`);
             throw new Error(`Unknown method: ${method}`);
     }
+}
+
+/** Shared settings page save: name / color / remote url + token. The role is
+ * locked (this box is always `srtla2platform`). A remote change re-dials the
+ * socket so the fresh hello carries the new name / color / URL / token. */
+function settingsUpdate(params: Record<string, unknown>): unknown {
+    if (params.uuid !== undefined && params.uuid !== config.uuid)
+        throw new Error("The device uuid can't be changed");
+    if (params.role !== undefined && params.role !== ROLE)
+        throw new Error("The role of this device is always srtla2platform");
+
+    const hostname =
+        typeof params.hostname === "string" && params.hostname !== ""
+            ? params.hostname
+            : config.hostname;
+    if (!HOSTNAME_RE.test(hostname))
+        throw new Error(`Invalid hostname: ${hostname}`);
+
+    const color =
+        typeof params.color === "string" && params.color !== ""
+            ? params.color
+            : config.color;
+    if (!COLOR_RE.test(color)) throw new Error(`Invalid color: ${color}`);
+
+    const remoteUrl =
+        typeof params.remoteUrl === "string" && params.remoteUrl !== ""
+            ? params.remoteUrl
+            : config.controlServerUrl;
+    if (REMOTE_URL_RE.test(remoteUrl) === false)
+        throw new Error(
+            `Remote URL must start with ws:// or wss://: ${remoteUrl}`,
+        );
+
+    let remoteToken = config.token;
+    if (params.remoteToken !== undefined) {
+        if (typeof params.remoteToken !== "string")
+            throw new Error("remoteToken must be a string");
+        remoteToken = params.remoteToken.trim();
+    }
+
+    const remoteChanged =
+        remoteUrl !== config.controlServerUrl || remoteToken !== config.token;
+    const renamed = hostname !== config.hostname;
+    const colorChanged = color !== config.color;
+    config.hostname = hostname;
+    config.color = color;
+    config.controlServerUrl = remoteUrl;
+    config.token = remoteToken;
+    writeConfigFile();
+
+    if (remoteChanged || ((renamed || colorChanged) && remoteUrl !== ""))
+        ws?.close(
+            1001,
+            remoteChanged
+                ? "remote settings changed"
+                : renamed
+                  ? "device renamed"
+                  : "device recoloured",
+        );
+
+    return {
+        settings: {
+            uuid: config.uuid,
+            hostname: config.hostname,
+            role: ROLE,
+            remoteUrl: config.controlServerUrl,
+            hasRemoteToken: config.token !== "",
+            color: config.color,
+        },
+        restartRequired: true,
+    };
+}
+
+/** RTMP destination / stream key from the settings card. The key is
+ * write-only (an empty value keeps the current one) and a running stream is
+ * restarted so it republishes to the new destination. */
+async function modulesConfigure(
+    params: Record<string, unknown>,
+): Promise<unknown> {
+    const id = params.id;
+    if (id !== ROLE) throw new Error(`Unknown module: ${String(id)}`);
+    const cfg = isRecord(params.config) ? params.config : {};
+
+    if (typeof cfg.rtmpUrl === "string") {
+        const url = cfg.rtmpUrl.trim();
+        if (url !== "" && !isRtmpUrl(url))
+            throw new Error(`RTMP URL must be an rtmp(s):// URL: ${url}`);
+        // Apply to the live config — writeConfigFile() persists THAT, not
+        // this temp object.
+        applyConfig({ rtmpUrl: url });
+    }
+    if (typeof cfg.rtmpKey === "string" && cfg.rtmpKey !== "")
+        applyConfig({ rtmpKey: cfg.rtmpKey.trim() });
+    if (typeof cfg.pipeline === "string") {
+        const id = cfg.pipeline.trim();
+        if (id !== "" && !listPipelines().some((p) => p.id === id))
+            throw new Error(`Unknown pipeline: ${id}`);
+        applyConfig({ pipeline: id });
+    }
+
+    writeConfigFile();
+    if (streamState === "running") await restartStream();
+    pushStatus();
+    return { ok: true, modules: moduleSliceView() };
 }
 
 // ── Preflight ────────────────────────────────────────────────────────────────
@@ -424,17 +623,10 @@ function which(bin: string): string | null {
 function preflight(): void {
     const missing: string[] = [];
     if (which("srtla_rec") === null) missing.push("srtla_rec");
-    if (which("gst-launch-1.0") === null) missing.push("gst-launch-1.0");
+    if (which("ffmpeg") === null) missing.push("ffmpeg");
     if (missing.length > 0)
         throw new Error(
             `Missing binaries: ${missing.join(", ")}. Install them and retry.`,
-        );
-
-    const probe = Bun.spawnSync(["gst-inspect-1.0", "srtsrc"]);
-    if (probe.exitCode !== 0)
-        log(
-            "warn",
-            "gst-inspect-1.0 srtsrc failed — the srtsrc plugin may be missing",
         );
 }
 
@@ -454,7 +646,8 @@ async function pumpOutput(
             while (nl >= 0) {
                 const line = buf.slice(0, nl).replace(/\r$/, "").trim();
                 buf = buf.slice(nl + 1);
-                if (line !== "") log(level, `[${label}] ${line.slice(0, 400)}`, label);
+                if (line !== "")
+                    log(level, `[${label}] ${line.slice(0, 400)}`, label);
                 nl = buf.indexOf("\n");
             }
         }
@@ -465,17 +658,26 @@ async function pumpOutput(
 
 function onChildExit(label: string, code: number | null): void {
     const desc = code === null ? "via signal" : `with code ${code}`;
-    if (code === 0 || code === null) log("info", `${label} exited ${desc}`);
+    // An exit is expected (info) when the process exits cleanly, or when we
+    // are not running — i.e. it is a child we just SIGTERM'd during a stop
+    // (143) or the ffmpeg that follows the first child dying. Only an
+    // unclean exit *while running* is a real fault worth a warning.
+    const expected = code === 0 || code === null || streamState !== "running";
+    if (expected) log("info", `${label} exited ${desc}`);
     else log("warn", `${label} exited ${desc}`);
 
     // Either child dying while we believe the stream is up is a real
-    // failure — tear the whole stream down so state stays honest.
+    // failure — tear the whole stream down so state stays honest. If the
+    // operator wants the stream up, bring it back with backoff.
     if (
-        (label === "gst" || label === "srtla_rec") &&
+        (label === "ffmpeg" || label === "srtla_rec") &&
         streamState === "running"
     ) {
-        log("warn", `${label} is down — stopping stream`);
-        stopStream();
+        if (wantsRunning) scheduleStreamRestart(`${label} is down`);
+        else {
+            log("warn", `${label} is down — stopping stream`);
+            stopStream();
+        }
     }
 }
 
@@ -498,7 +700,7 @@ function spawnProc(
 }
 
 function killProcs(): void {
-    for (const p of [srtlaProc, gstProc]) {
+    for (const p of [srtlaProc, ffmpegProc]) {
         if (!p) continue;
         try {
             p.kill("SIGTERM");
@@ -510,7 +712,7 @@ function killProcs(): void {
 
 function resetStreamHandles(): void {
     srtlaProc = null;
-    gstProc = null;
+    ffmpegProc = null;
 }
 
 // 5 s health monitor: srtla_rec's SRTLA UDP port is the liveness signal for
@@ -527,59 +729,97 @@ function startHealthMonitor(): void {
         }
         if (isUdpPortOpen(config.srtlaPort)) {
             healthFails = 0;
+            // A stable run resets the backoff ladder.
+            if (Date.now() - startedAt > STREAM_RESTART_STABLE_MS) {
+                streamBackoff = BACKOFF_MIN_MS;
+                streamRestarts = 0;
+            }
             return;
         }
         healthFails += 1;
         if (healthFails >= HEALTH_CHECK_THRESHOLD) {
             healthFails = 0;
-            log(
-                "warn",
-                `SRTLA port ${config.srtlaPort} not open for ${
-                    (HEALTH_CHECK_THRESHOLD * HEALTH_CHECK_INTERVAL_MS) / 1000
-                } s — stopping stream`,
-            );
-            stopStream();
+            const why = `SRTLA port ${config.srtlaPort} not open for ${
+                (HEALTH_CHECK_THRESHOLD * HEALTH_CHECK_INTERVAL_MS) / 1000
+            } s`;
+            if (wantsRunning) scheduleStreamRestart(why);
+            else {
+                log("warn", `${why} — stopping stream`);
+                stopStream();
+            }
         }
     }, HEALTH_CHECK_INTERVAL_MS);
 }
 
+// ── Pipeline mid files ───────────────────────────────────────────────────────
+
+// Pipeline mid files live under pipelinesDir/<user>/<name> (the
+// relay-pipelines/ directory, mounted read-only into the container), the same
+// layout as the encoder pipelines. They are listed for the web-UI selection —
+// the `pipeline` config field is kept for compatibility, but the ffmpeg relay
+// never consumes a mid (it auto-detects the TS streams and carries audio).
+
+/** All pipeline mid files under pipelinesDir (id + group + name for the UI). */
+function listPipelines(): Array<{ id: string; group: string; name: string }> {
+    const root = resolve(config.pipelinesDir);
+    const out: Array<{ id: string; group: string; name: string }> = [];
+    const walk = (dir: string): void => {
+        let entries: Dirent<string>[];
+        try {
+            entries = readdirSync(dir, { withFileTypes: true });
+        } catch {
+            return; // no directory yet (first run) — nothing to list
+        }
+        for (const e of entries) {
+            if (e.name.startsWith(".")) continue;
+            const p = join(dir, e.name);
+            if (e.isDirectory()) walk(p);
+            else if (e.isFile()) {
+                const id = relative(root, p).split(sep).join("/");
+                const slash = id.indexOf("/");
+                out.push({
+                    id,
+                    group: slash < 0 ? "" : id.slice(0, slash),
+                    name: id.slice(slash + 1),
+                });
+            }
+        }
+    };
+    walk(root);
+    return out.sort((a, b) => a.id.localeCompare(b.id));
+}
+
 // srtla_rec (b8359bc) is the SRT *caller* — it connect()s to the
-// downstream address. GStreamer must therefore listen.
-// gst-launch must receive the pipeline as separate argv tokens — a single
-// quoted string is parsed as one (invalid) element name. flvmux's ghost pads
-// cannot be negotiated from static caps (e.g. mpegts from tsparse), so mpegts
-// input goes through tsdemux (h264 input through h264parse); the flvmux ghost
-// pad is auto-negotiated from the preceding caps. `rtmpsink live=1` is not
-// available in every gst-plugins-bad build, so it is omitted (the mux is
-// already streamable).
+// downstream address, so ffmpeg must be the SRT *listener*
+// (mode=listener in the URI; the standalone -listen option was removed in
+// ffmpeg 7).
+// The input is a plain MPEG-TS over SRT (what srtla_rec forwards); ffmpeg
+// auto-detects the TS and stream-copies the video and audio elementary
+// streams into an FLV over RTMP(S). No filter graph is needed — audio is
+// carried automatically, which the previous GStreamer relay (a single
+// video-only tsdemux branch) did not.
 function buildPipeline(): string[] {
-    const srtUri = `srt://${config.bindHost}:${config.srtPort}?mode=listener`;
-    const mid =
-        config.inputFormat === "h264"
-            ? ["h264parse", "!", "flvmux", "streamable=true"]
-            : [
-                  "tsdemux",
-                  "name=d",
-                  "d.",
-                  "!",
-                  "video/x-h264",
-                  "!",
-                  "flvmux",
-                  "streamable=true",
-              ];
+    // The listener's SRT latency must match what the upstream encoders
+    // negotiate (2000 ms through the relay); ffmpeg's 120 ms default is too
+    // small and errors out mid-stream.
+    const srtUri = `srt://${config.bindHost}:${config.srtPort}?mode=listener&latency=${config.srtLatencyMs}`;
+
     return [
-        "srtsrc",
-        `uri=${srtUri}`,
-        "!",
-        ...mid,
-        "!",
-        "rtmpsink",
-        `location=${config.rtmpUrl}`,
+        "-hide_banner",
+        "-loglevel",
+        "warning",
+        "-i",
+        srtUri,
+        "-c",
+        "copy",
+        "-f",
+        "flv",
+        effectiveRtmpUrl(),
     ];
 }
 
 // SRT runs over UDP, so a TCP connect probe can never detect the
-// GStreamer listener. Parse `ss -uln` for a bound socket on the port
+// ffmpeg SRT listener. Parse `ss -uln` for a bound socket on the port
 // (matches both `*:5000` and `127.0.0.1:5002` style local addresses).
 function isUdpPortOpen(port: number): boolean {
     try {
@@ -618,18 +858,19 @@ async function startStream(): Promise<Record<string, unknown>> {
 
     preflight();
 
+    wantsRunning = true;
     epoch += 1;
     const myEpoch = epoch;
     streamState = "starting";
     pushStatus();
     log(
         "info",
-        `starting stream: srtla:${config.srtlaPort} → srt:${config.bindHost}:${config.srtPort} → ${config.rtmpUrl}`,
+        `starting stream: srtla:${config.srtlaPort} → srt:${config.bindHost}:${config.srtPort} → ${effectiveRtmpUrl()}`,
     );
 
-    // GStreamer is the SRT listener (srtla_rec calls into it), so it has to
+    // ffmpeg is the SRT listener (srtla_rec calls into it), so it has to
     // be up first and its UDP port bound before srtla_rec connects out.
-    gstProc = spawnProc("gst-launch-1.0", ["-q", ...buildPipeline()], "gst");
+    ffmpegProc = spawnProc("ffmpeg", buildPipeline(), "ffmpeg");
 
     const ready = await waitForUdpPort(
         config.srtPort,
@@ -643,9 +884,7 @@ async function startStream(): Promise<Record<string, unknown>> {
             streamState = "idle";
             pushStatus();
         }
-        throw new Error(
-            `GStreamer did not open SRT port ${config.srtPort} in time`,
-        );
+        throw new Error(`ffmpeg did not open SRT port ${config.srtPort} in time`);
     }
 
     // irlserver/srtla (rev b8359bc) flag-based invocation.
@@ -665,7 +904,7 @@ async function startStream(): Promise<Record<string, unknown>> {
     streamState = "running";
     pushStatus();
     log("info", "stream is running");
-    return { state: "running", rtmp: config.rtmpUrl };
+    return { state: "running", rtmp: effectiveRtmpUrl() };
 }
 
 function stopStream(): Record<string, unknown> {
@@ -676,7 +915,7 @@ function stopStream(): Record<string, unknown> {
     log("info", "stopping stream");
 
     killProcs();
-    const dying = [srtlaProc, gstProc];
+    const dying = [srtlaProc, ffmpegProc];
     resetStreamHandles();
 
     setTimeout(() => {
@@ -694,6 +933,57 @@ function stopStream(): Record<string, unknown> {
     streamState = "idle";
     pushStatus();
     return { state: "idle" };
+}
+
+/** Operator-initiated stop: also clears the restart intent so a crashed
+ * child does not bring the stream back. */
+function explicitStop(): Record<string, unknown> {
+    wantsRunning = false;
+    if (restartTimer !== null) {
+        clearTimeout(restartTimer);
+        restartTimer = null;
+    }
+    streamRestarts = 0;
+    streamBackoff = BACKOFF_MIN_MS;
+    return stopStream();
+}
+
+/** A child (or the health check) failed while the operator wants the stream
+ * up: tear it down and respawn with exponential backoff (1 s → 30 s). */
+function scheduleStreamRestart(reason: string): void {
+    if (restartTimer !== null) {
+        clearTimeout(restartTimer);
+        restartTimer = null;
+    }
+    streamRestarts += 1;
+    const delay = streamBackoff;
+    streamBackoff = Math.min(streamBackoff * 2, BACKOFF_MAX_MS);
+    log(
+        "warn",
+        `${reason} — restarting stream in ${Math.round(delay / 1000)}s (restart #${streamRestarts})`,
+    );
+    stopStream();
+    restartTimer = setTimeout(() => {
+        restartTimer = null;
+        if (!wantsRunning) return;
+        startStream().catch((e) => {
+            log("error", `auto-restart failed: ${errMsg(e)}`);
+            scheduleStreamRestart("auto-restart failed");
+        });
+    }, delay);
+    pushStatus();
+}
+
+/** Stop then start again (a config change to the RTMP destination); a failed
+ * restart is logged, not fatal — the operator can start it manually. */
+async function restartStream(): Promise<void> {
+    log("info", "restarting stream to apply new settings");
+    stopStream();
+    try {
+        await startStream();
+    } catch (err) {
+        log("warn", `restart after settings change failed: ${errMsg(err)}`);
+    }
 }
 
 // ── Config ───────────────────────────────────────────────────────────────────
@@ -726,12 +1016,83 @@ function storeUuid(uuid: string): void {
     }
 }
 
+/** Persist the live `config` back to CONFIG_FILE, preserving fields (e.g.
+ * rtmpUrlFile) that are read at load but not kept in the in-memory Config. */
+function writeConfigFile(): void {
+    try {
+        mkdirSync(CONFIG_DIR, { recursive: true });
+        const existing = readConfigFile(CONFIG_FILE) ?? {};
+        const next: ConfigFile = {
+            ...existing,
+            controlServerUrl: config.controlServerUrl,
+            token: config.token,
+            hostname: config.hostname,
+            color: config.color,
+            srtlaPort: config.srtlaPort,
+            srtPort: config.srtPort,
+            srtLatencyMs: config.srtLatencyMs,
+            metricsPort:
+                config.metricsPort > 0 ? config.metricsPort : undefined,
+            bindHost: config.bindHost,
+            rtmpUrl: config.rtmpUrl,
+            rtmpKey: config.rtmpKey,
+            inputFormat: config.inputFormat,
+            pipeline: config.pipeline,
+            autoStart: config.autoStart,
+        };
+        writeFileSync(CONFIG_FILE, `${JSON.stringify(next, null, 4)}\n`);
+    } catch (err) {
+        log("warn", `could not persist config: ${errMsg(err)}`);
+    }
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+    typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** The device's module slice for the settings page: the stream key comes back
+ * masked as {configured}, matching the core's secret handling. */
+function moduleSliceView(): Record<string, unknown> {
+    return {
+        srtla2platform: {
+            enabled: true,
+            rtmpUrl: config.rtmpUrl,
+            rtmpKey: { configured: config.rtmpKey !== "" },
+            pipeline: config.pipeline,
+            pipelines: listPipelines(),
+            pipelinesDir: config.pipelinesDir,
+        },
+    };
+}
+
 function isRtmpUrl(url: string): boolean {
     try {
-        return new URL(url).protocol === "rtmp:";
+        return (
+            new URL(url).protocol === "rtmp:" ||
+            new URL(url).protocol === "rtmps:"
+        );
     } catch {
         return false;
     }
+}
+
+// The stream key is a canonical RTMP path segment (rtmp://host/app/key).
+// Append it to the URL's path; an empty key leaves the URL untouched.
+function resolveRtmpUrl(rtmpUrl: string, rtmpKey: string): string {
+    if (rtmpUrl === "" || rtmpKey === "") return rtmpUrl;
+    try {
+        const u = new URL(rtmpUrl);
+        u.pathname = `${u.pathname.replace(/\/+$/, "")}/${rtmpKey}`;
+        return u.toString();
+    } catch {
+        // Not parseable — fall back to a bare concatenation.
+        return `${rtmpUrl.replace(/\/+$/, "")}/${rtmpKey}`;
+    }
+}
+
+// The RTMP location the pipeline publishes to: RTMP_URL with the RTMP_KEY
+// appended as the final path segment (empty key → unchanged).
+function effectiveRtmpUrl(): string {
+    return resolveRtmpUrl(config.rtmpUrl, config.rtmpKey);
 }
 
 function loadConfig(): Config {
@@ -744,14 +1105,11 @@ function loadConfig(): Config {
 
     const storedUuid = readStoredUuid();
     const uuid =
-        firstDefined(
-            arg("--uuid"),
-            process.env.DEVICE_UUID,
-            storedUuid,
-        ) ?? randomUUID();
+        firstDefined(arg("--uuid"), process.env.DEVICE_UUID, storedUuid) ??
+        randomUUID();
     if (uuid !== storedUuid) storeUuid(uuid);
     if (!ID_RE.test(uuid))
-        argFail("--uuid", uuid, 'a device id matching /^\\w[-\\w.]{0,63}$/');
+        argFail("--uuid", uuid, "a device id matching /^\\w[-\\w.]{0,63}$/");
 
     const rtmpUrlFile = firstDefined(arg("--rtmp-url-file"), file?.rtmpUrlFile);
     let rtmpFromUrlFile: string | undefined;
@@ -767,18 +1125,26 @@ function loadConfig(): Config {
         }
     }
 
+    // Precedence: CLI flag > rtmpUrlFile (dynamic/auto-rotating source) >
+    // config file (written by the web UI, so a UI edit stays authoritative
+    // across restarts) > RTMP_URL env var (first-run bootstrap default).
     const rtmpUrl =
         firstDefined(
             arg("--rtmp-url"),
-            process.env.RTMP_URL,
             rtmpFromUrlFile,
             file?.rtmpUrl,
+            process.env.RTMP_URL,
         ) ?? "";
     if (rtmpUrl !== "" && !isRtmpUrl(rtmpUrl))
         log(
             "warn",
-            `RTMP URL is not an rtmp:// URL and will fail at start: ${rtmpUrl}`,
+            `RTMP URL is not an rtmp(s):// URL and will fail at start: ${rtmpUrl}`,
         );
+
+    // Stream key is never a CLI flag (it is a secret, like the token): config
+    // file (web-UI persisted), then RTMP_KEY env var as a bootstrap default.
+    // It is appended to rtmpUrl as the final path segment.
+    const rtmpKey = firstDefined(file?.rtmpKey, process.env.RTMP_KEY) ?? "";
 
     const inputFormat = enumArg(
         "--input-format",
@@ -786,6 +1152,16 @@ function loadConfig(): Config {
         firstDefined(file?.inputFormat, DEFAULTS.inputFormat) ??
             DEFAULTS.inputFormat,
     );
+
+    // Pipeline mid files (listed for the web-UI selection); the selected
+    // pipeline id comes from the config file (written by the web UI), not a
+    // CLI flag. The ffmpeg relay ignores the selection.
+    const pipelinesDir = firstDefined(
+        arg("--pipelines"),
+        process.env.PIPELINES_DIR,
+        file?.pipelinesDir,
+        DEFAULTS.pipelinesDir,
+    ) as string;
 
     const cfg: Config = {
         controlServerUrl: firstDefined(
@@ -797,10 +1173,9 @@ function loadConfig(): Config {
         // Token is never a CLI flag — it would leak into the process list.
         // Source: CONTROL_SERVER_TOKEN env var, then config file.
         token:
-            firstDefined(
-                process.env.CONTROL_SERVER_TOKEN,
-                file?.token,
-            ) ?? "",
+            firstDefined(process.env.CONTROL_SERVER_TOKEN, file?.token) ?? "",
+        hostname: file?.hostname ?? osHostname(),
+        color: file?.color ?? DEFAULT_COLOR,
         uuid,
         srtlaPort: toPort(
             firstDefined<string | number>(
@@ -820,6 +1195,14 @@ function loadConfig(): Config {
             DEFAULTS.srtPort,
             "--srt-port",
         ),
+        srtLatencyMs: toLatency(
+            firstDefined<string | number>(
+                arg("--srt-latency-ms"),
+                file?.srtLatencyMs,
+                DEFAULTS.srtLatencyMs,
+            ),
+            DEFAULTS.srtLatencyMs,
+        ),
         metricsPort: toOptionalPort(
             firstDefined<string | number>(
                 arg("--metrics-port"),
@@ -836,7 +1219,10 @@ function loadConfig(): Config {
                 DEFAULTS.bindHost,
             ) ?? DEFAULTS.bindHost,
         rtmpUrl,
+        rtmpKey,
         inputFormat,
+        pipelinesDir,
+        pipeline: file?.pipeline ?? "",
         autoStart: flag("--autostart") || file?.autoStart === true,
         dryRun: flag("--dry-run"),
     };
@@ -851,7 +1237,7 @@ function shutdown(): void {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
     }
-    stopStream();
+    explicitStop();
     linkStopped = true;
     stopTimers();
     try {
@@ -874,6 +1260,7 @@ function main(): void {
                     config: {
                         ...config,
                         token: config.token === "" ? "" : "***",
+                        rtmpKey: config.rtmpKey === "" ? "" : "***",
                     },
                 },
                 null,

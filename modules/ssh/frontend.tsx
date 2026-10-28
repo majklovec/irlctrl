@@ -112,7 +112,10 @@ const sshModule: FrontendModule = {
 	kind: "device-card",
 	title: "SSH",
 	order: 40,
-	available: (status) => status.role !== "obs",
+	available: (status) =>
+		status.role === "relay" ||
+		status.role === "encoder" ||
+		status.role === "combined",
 	defaultSize: { w: 4, h: 4 },
 	minSize: { w: 3, h: 3 },
 	component: (status) => sshCardBody(card, status as SshStatus),

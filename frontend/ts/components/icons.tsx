@@ -26,6 +26,12 @@ const ROLE_SHAPES = {
 		["path", { d: "m9 7 5 3.5L9 14z" }],
 		["path", { d: "M8 21h8M12 17v4" }],
 	],
+	srtla2platform: [
+		["rect", { x: "3", y: "14", width: "8", height: "7", rx: "1.5" }],
+		["path", { d: "M17 20V7" }],
+		["path", { d: "m13.5 10.5 3.5-3.5 3.5 3.5" }],
+		["path", { d: "M13 4h8" }],
+	],
 } as const satisfies Record<string, Shape>;
 
 // Four-tile pictogram that marks the dashboard editor page
@@ -80,6 +86,12 @@ const ROLE_CARD_SHAPES = {
 		["rect", { x: "2", y: "3", width: "20", height: "14", rx: "2" }],
 		["path", { d: "m9 7 5 3.5L9 14z" }],
 		["path", { d: "M8 21h8M12 17v4" }],
+	],
+	srtla2platform: [
+		["rect", { x: "2", y: "13", width: "9", height: "9", rx: "1.5" }],
+		["path", { d: "M17.5 21V6" }],
+		["path", { d: "m13.5 10 4-4 4 4" }],
+		["path", { d: "M12.5 3.5h10" }],
 	],
 } as const satisfies Record<Role, Shape>;
 

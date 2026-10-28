@@ -143,6 +143,7 @@
     "role.encoder": "enkodér",
     "role.obs": "obs",
     "role.relay": "relay",
+    "role.srtla2platform": "srtla2platform",
     "set.back": "Zpět na zařízení",
     "set.color": "Barva",
     "set.description": "Nastavení se po uložení znovu použijí na řídicím serveru.",

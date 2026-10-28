@@ -143,6 +143,7 @@
     "role.encoder": "codificador",
     "role.obs": "obs",
     "role.relay": "relay",
+    "role.srtla2platform": "srtla2platform",
     "set.back": "Voltar ao dispositivo",
     "set.color": "Cor de destaque",
     "set.description": "As definições são reaplicadas no servidor de controlo após guardar.",

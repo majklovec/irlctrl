@@ -143,6 +143,7 @@
     "role.encoder": "encoder",
     "role.obs": "obs",
     "role.relay": "relay",
+    "role.srtla2platform": "srtla2platform",
     "set.back": "Back to device",
     "set.color": "Accent color",
     "set.description": "Settings are re-applied on the control server after saving.",
