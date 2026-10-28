@@ -2,6 +2,7 @@ videotestsrc pattern=smpte !
 video/x-raw,width=1920,height=1080,framerate=60/1 ! 
 videoconvert ! 
 textoverlay text='' valignment=top halignment=right font-desc="Monospace, 5" name=overlay ! queue !
+videoconvert ! video/x-raw,format=I420 ! 
 x264enc speed-preset=superfast tune=zerolatency bitrate=6000 key-int-max=60 name=venc_kbps ! 
 h264parse config-interval=1 ! 
 mux. audiotestsrc wave=sine freq=440 ! 
