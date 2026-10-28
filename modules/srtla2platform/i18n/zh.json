@@ -3,6 +3,7 @@
     "dev.card.srtla2platform": "SRTLA → RTMP",
     "dev.row.auto_restarts": "自动重启",
     "dev.row.rtmp": "目标",
+    "dev.row.rtmp_key": "流密钥",
     "set.rtmp_key": "流密钥",
     "set.rtmp_url": "RTMP(S) URL",
     "set.srtla2platform": "RTMP 输出",

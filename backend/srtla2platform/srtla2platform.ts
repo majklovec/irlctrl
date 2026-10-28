@@ -53,16 +53,17 @@
 
 import { randomUUID } from "node:crypto";
 import {
-    type Dirent,
     copyFileSync,
+    type Dirent,
     existsSync,
     mkdirSync,
     readdirSync,
     readFileSync,
+    unlinkSync,
     writeFileSync,
 } from "node:fs";
 import { homedir, hostname as osHostname } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { APP_VERSION } from "../../generated/version";
 import { arg, argFail, enumArg, flag } from "../../shared/args";
@@ -85,7 +86,9 @@ const ROLE = "srtla2platform";
 const ID_RE = /^[\w.-]{1,64}$/;
 const CONFIG_DIR = join(homedir(), ".config", "srtla2platform");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const UUID_FILE = join(CONFIG_DIR, "uuid");
+// Pre-change installs kept the UUID in this standalone file; one-time
+// migration source (merge into config.json, then the file is ignored).
+const LEGACY_UUID_FILE = join(CONFIG_DIR, "uuid");
 
 const DEFAULTS = {
     controlServerUrl: "ws://127.0.0.1:7788/device",
@@ -119,6 +122,7 @@ interface ConfigFile {
     token?: string;
     hostname?: string;
     color?: string;
+    uuid?: string;
     srtlaPort?: number;
     srtPort?: number;
     srtLatencyMs?: number;
@@ -318,7 +322,13 @@ function currentStatus(): Record<string, unknown> {
         state: {
             autostart: config.autoStart,
             stream: streamState,
-            rtmp: config.rtmpUrl === "" ? null : effectiveRtmpUrl(),
+            // The key is never part of the advertised URL — it is reported
+            // separately, masked (logs and status reach the web UI).
+            rtmp: config.rtmpUrl === "" ? null : config.rtmpUrl,
+            rtmpKey:
+                config.rtmpKey === ""
+                    ? null
+                    : "*".repeat(config.rtmpKey.length),
             inputFormat: config.inputFormat,
             profile: config.profile,
             srtlaPort: config.srtlaPort,
@@ -692,7 +702,13 @@ function spawnProc(
     args: string[],
     label: string,
 ): Bun.Subprocess {
-    log("info", `spawning ${label}: ${name} ${args.join(" ")}`);
+    // The child's arguments may carry the stream key in the RTMP URL; logs
+    // reach the web UI, so mask it.
+    const cmdline =
+        config.rtmpKey === ""
+            ? args.join(" ")
+            : args.join(" ").split(config.rtmpKey).join("***");
+    log("info", `spawning ${label}: ${name} ${cmdline}`);
     const proc = Bun.spawn([name, ...args], {
         stdout: "pipe",
         stderr: "pipe",
@@ -861,7 +877,12 @@ function buildPipeline(): string[] {
     // copy-only so the stream still flows.
     const selected =
         findProfile(config.profile) ??
-        ({ id: "copy", name: "Copy", desc: "", args: COPY_ARGS } satisfies FfmpegProfile);
+        ({
+            id: "copy",
+            name: "Copy",
+            desc: "",
+            args: COPY_ARGS,
+        } satisfies FfmpegProfile);
 
     return [
         "-hide_banner",
@@ -923,7 +944,7 @@ async function startStream(): Promise<Record<string, unknown>> {
     pushStatus();
     log(
         "info",
-        `starting stream: srtla:${config.srtlaPort} → srt:${config.bindHost}:${config.srtPort} → ${effectiveRtmpUrl()}`,
+        `starting stream: srtla:${config.srtlaPort} → srt:${config.bindHost}:${config.srtPort} → ${maskedRtmpUrl()}`,
     );
 
     // ffmpeg is the SRT listener (srtla_rec calls into it), so it has to
@@ -942,7 +963,9 @@ async function startStream(): Promise<Record<string, unknown>> {
             streamState = "idle";
             pushStatus();
         }
-        throw new Error(`ffmpeg did not open SRT port ${config.srtPort} in time`);
+        throw new Error(
+            `ffmpeg did not open SRT port ${config.srtPort} in time`,
+        );
     }
 
     // irlserver/srtla (rev b8359bc) flag-based invocation.
@@ -962,7 +985,7 @@ async function startStream(): Promise<Record<string, unknown>> {
     streamState = "running";
     pushStatus();
     log("info", "stream is running");
-    return { state: "running", rtmp: effectiveRtmpUrl() };
+    return { state: "running", rtmp: maskedRtmpUrl() };
 }
 
 function stopStream(): Record<string, unknown> {
@@ -1056,19 +1079,52 @@ function readConfigFile(path: string | undefined): ConfigFile | undefined {
     }
 }
 
-function readStoredUuid(): string | undefined {
+/** Legacy installs stored the UUID in a standalone file; migrate it into
+ * the config file once so the device identity survives the upgrade. */
+function migrateLegacyUuid(
+    configPath: string | undefined,
+    file: ConfigFile | undefined,
+): string | undefined {
+    let legacy: string | undefined;
     try {
-        const v = readFileSync(UUID_FILE, "utf8").trim();
-        return ID_RE.test(v) ? v : undefined;
+        const v = readFileSync(LEGACY_UUID_FILE, "utf8").trim();
+        if (ID_RE.test(v)) legacy = v;
     } catch {
         return undefined;
     }
+    if (legacy !== undefined && file?.uuid !== legacy) {
+        const p = configPath ?? CONFIG_FILE;
+        try {
+            mkdirSync(dirname(p), { recursive: true });
+            writeFileSync(
+                p,
+                `${JSON.stringify({ ...file, uuid: legacy }, null, 4)}\n`,
+            );
+            // Identity now lives in the config file — drop the stale file.
+            try {
+                unlinkSync(LEGACY_UUID_FILE);
+            } catch {
+                /* best effort */
+            }
+        } catch (err) {
+            log("warn", `could not migrate DEVICE_UUID: ${errMsg(err)}`);
+        }
+    }
+    return legacy;
 }
 
-function storeUuid(uuid: string): void {
+/** Persist a freshly assigned UUID into the config file — writeConfigFile()
+ * only runs on settings changes, so a first run with no UI edits would never
+ * land the new UUID in the file. */
+function storeUuid(
+    configPath: string | undefined,
+    uuid: string,
+): void {
+    const p = configPath ?? CONFIG_FILE;
     try {
-        mkdirSync(CONFIG_DIR, { recursive: true });
-        writeFileSync(UUID_FILE, `${uuid}\n`);
+        mkdirSync(dirname(p), { recursive: true });
+        const existing = readConfigFile(p) ?? {};
+        writeFileSync(p, `${JSON.stringify({ ...existing, uuid }, null, 4)}\n`);
     } catch (err) {
         log("warn", `could not persist DEVICE_UUID: ${errMsg(err)}`);
     }
@@ -1086,6 +1142,7 @@ function writeConfigFile(): void {
             token: config.token,
             hostname: config.hostname,
             color: config.color,
+            uuid: config.uuid,
             srtlaPort: config.srtlaPort,
             srtPort: config.srtPort,
             srtLatencyMs: config.srtLatencyMs,
@@ -1154,21 +1211,31 @@ function effectiveRtmpUrl(): string {
     return resolveRtmpUrl(config.rtmpUrl, config.rtmpKey);
 }
 
+// The same location with the key masked — for logs and action results, which
+// reach the web UI.
+function maskedRtmpUrl(): string {
+    return resolveRtmpUrl(config.rtmpUrl, config.rtmpKey === "" ? "" : "***");
+}
+
 function loadConfig(): Config {
     if (flag("--version")) {
         console.log(`srtla2platform ${APP_VERSION}`);
         process.exit(0);
     }
 
-    const file = readConfigFile(arg("--config"));
+    const configPath = arg("--config");
+    const file = readConfigFile(configPath);
 
-    const storedUuid = readStoredUuid();
+    // UUID precedence: CLI flag > DEVICE_UUID env var > config file (with a
+    // one-time migration from the legacy standalone uuid file); a new UUID is
+    // generated and persisted on first run.
+    const storedUuid = file?.uuid ?? migrateLegacyUuid(configPath, file);
     const uuid =
         firstDefined(arg("--uuid"), process.env.DEVICE_UUID, storedUuid) ??
         randomUUID();
-    if (uuid !== storedUuid) storeUuid(uuid);
     if (!ID_RE.test(uuid))
         argFail("--uuid", uuid, "a device id matching /^\\w[-\\w.]{0,63}$/");
+    if (uuid !== storedUuid) storeUuid(configPath, uuid);
 
     const rtmpUrlFile = firstDefined(arg("--rtmp-url-file"), file?.rtmpUrlFile);
     let rtmpFromUrlFile: string | undefined;

@@ -3,6 +3,7 @@
     "dev.card.srtla2platform": "SRTLA → RTMP",
     "dev.row.auto_restarts": "Auto-restarts",
     "dev.row.rtmp": "Destination",
+    "dev.row.rtmp_key": "Stream key",
     "set.rtmp_key": "Stream key",
     "set.rtmp_url": "RTMP(S) URL",
     "set.srtla2platform": "RTMP output",

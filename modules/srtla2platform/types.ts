@@ -10,8 +10,10 @@ export type SrtlaStreamState = "idle" | "starting" | "running" | "stopping";
 export interface SrtlaStreamStateFields {
 	/** The stream lifecycle (`idle` / `starting` / `running` / `stopping`). */
 	stream: SrtlaStreamState;
-	/** The RTMP destination the ffmpeg pipeline publishes to (key masked, null when unset). */
+	/** The RTMP destination URL the ffmpeg pipeline publishes to (key not included, null when unset). */
 	rtmp: string | null;
+	/** The stream key appended to the destination, masked (null when unset). */
+	rtmpKey: string | null;
 	inputFormat: string;
 	/** The selected ffmpeg output profile id (e.g. "copy", "reencode-h264"). */
 	profile: string;

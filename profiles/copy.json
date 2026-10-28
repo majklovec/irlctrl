@@ -1,0 +1,5 @@
+{
+  "name": "Copy",
+  "desc": "Stream-copy the incoming video & audio into FLV (no re-encode).",
+  "args": ["-c", "copy"]
+}

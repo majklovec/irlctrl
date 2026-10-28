@@ -3,6 +3,7 @@
     "dev.card.srtla2platform": "SRTLA → RTMP",
     "dev.row.auto_restarts": "自動再起動",
     "dev.row.rtmp": "送信先",
+    "dev.row.rtmp_key": "ストリームキー",
     "set.rtmp_key": "ストリームキー",
     "set.rtmp_url": "RTMP(S) URL",
     "set.srtla2platform": "RTMP出力",

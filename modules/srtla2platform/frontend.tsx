@@ -42,6 +42,17 @@ function srtla2platformCardBody(host: DeviceCard, status: Srtla2PlatformStatus):
 							<span class="muted">{t("set.srtla2platform_desc")}</span>
 						),
 					],
+					// The stream key is reported separately from the URL, masked.
+					...(s.rtmpKey
+						? [
+								[
+									t("dev.row.rtmp_key"),
+									<code class="srtla2platform-rtmp">
+										{s.rtmpKey}
+									</code>,
+								] as [string, m.Vnode],
+							]
+						: []),
 					// The selected ffmpeg output profile (always present;
 					// "copy" is the default stream-copy profile).
 					...(s.profile

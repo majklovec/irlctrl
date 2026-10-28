@@ -146,6 +146,7 @@ services:
             # config/srtla2platform/profiles/ directory (the agent's default
             # profiles dir).
             - ./config/srtla2platform:/home/srtla/.config/srtla2platform
+            - ./profiles:/home/srtla/.config/srtla2platform/profiles
         environment:
             - CONTROL_SERVER_URL=${CONTROL_SERVER_URL}
             - CONTROL_SERVER_TOKEN=${CONTROL_SERVER_TOKEN}

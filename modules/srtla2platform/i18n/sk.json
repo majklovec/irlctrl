@@ -3,6 +3,7 @@
     "dev.card.srtla2platform": "SRTLA → RTMP",
     "dev.row.auto_restarts": "Automatické reštarty",
     "dev.row.rtmp": "Cieľ",
+    "dev.row.rtmp_key": "Kľúč streamu",
     "set.rtmp_key": "Kľúč streamu",
     "set.rtmp_url": "RTMP(S) URL",
     "set.srtla2platform": "RTMP výstup",

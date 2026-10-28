@@ -3,6 +3,7 @@
     "dev.card.srtla2platform": "SRTLA → RTMP",
     "dev.row.auto_restarts": "Автовозобновление",
     "dev.row.rtmp": "Назначение",
+    "dev.row.rtmp_key": "Ключ потока",
     "set.rtmp_key": "Ключ потока",
     "set.rtmp_url": "RTMP(S) URL",
     "set.srtla2platform": "Вывод RTMP",
