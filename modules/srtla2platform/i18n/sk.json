@@ -1,13 +1,11 @@
 {
-    "dev.badge.starting": "spúšťa sa",
+    "dev.badge.starting": "spúšta",
     "dev.card.srtla2platform": "SRTLA → RTMP",
     "dev.row.auto_restarts": "Automatické reštarty",
     "dev.row.rtmp": "Cieľ",
     "set.rtmp_key": "Kľúč streamu",
     "set.rtmp_url": "RTMP(S) URL",
     "set.srtla2platform": "RTMP výstup",
-    "set.srtla2platform_desc": "Cieľ, kam relay posiela stream. Po uložení sa relay restartuje.",
-    "set.srtla2platform_no_pipelines": "V {{directory}} sa nenašli žiadne potrubia.",
-    "set.srtla2platform_pipeline": "Potrubie",
-    "set.srtla2platform_pipeline_default": "Výchozie (vestavé)"
+    "set.srtla2platform_desc": "Cieľ, kam sa stream publikuje, a ffmpeg profil, ktorý sa použije. Stream sa po uložení reštartuje.",
+    "set.srtla2platform_profile": "Výstupný profil"
 }

@@ -1,3 +1,0 @@
-tsdemux name=d d. ! 
-video/x-h264 ! 
-flvmux streamable=true

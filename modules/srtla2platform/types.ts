@@ -10,11 +10,11 @@ export type SrtlaStreamState = "idle" | "starting" | "running" | "stopping";
 export interface SrtlaStreamStateFields {
 	/** The stream lifecycle (`idle` / `starting` / `running` / `stopping`). */
 	stream: SrtlaStreamState;
-	/** The RTMP destination the pipeline publishes to (key masked, null when unset). */
+	/** The RTMP destination the ffmpeg pipeline publishes to (key masked, null when unset). */
 	rtmp: string | null;
 	inputFormat: string;
-	/** The selected GStreamer pipeline mid file id ("" = built-in for inputFormat). */
-	pipeline: string;
+	/** The selected ffmpeg output profile id (e.g. "copy", "reencode-h264"). */
+	profile: string;
 	srtlaPort: number;
 	srtPort: number;
 	metricsPort: number;

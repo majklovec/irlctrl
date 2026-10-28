@@ -31,12 +31,16 @@
  * var. The config file is written by the web UI, so a UI edit stays
  * authoritative across restarts (the env vars are first-run bootstrap only).
  *
- * The `pipeline` config field selects a mid file from the pipelines
- * directory (--pipelines / PIPELINES_DIR, default /app/relay-pipelines;
- * layout <user-id>/<pipeline>, same convention as the encoder module). It is
- * kept for configuration/web-UI compatibility — the ffmpeg relay ignores it
- * (ffmpeg auto-detects the TS elementary streams and carries both video and
- * audio, so no mid is needed).
+ * The `profile` config field selects an ffmpeg output profile. Profiles are
+ * JSON files in the profiles directory (--profiles / PROFILES_DIR, default
+ * ~/.config/srtla2platform/profiles; ./config/srtla2platform/profiles in the
+ * container) holding the extra ffmpeg arguments to append after `-i`.
+ * Defaults (copy-only, H.264/H.265 re-encode, audio-only) are shipped in the
+ * repo (backend/srtla2platform/defaults/profiles/) and seeded into the
+ * directory on first run (never overwriting user files); it can be edited or
+ * extended by adding more <id>.json files.
+ * The selected profile is appended to the fixed input→FLV→output command
+ * chain.
  *
  * Usage:
  *   CONTROL_SERVER_TOKEN=<t> RTMP_KEY=<key> bun srtla2platform.ts \
@@ -50,6 +54,7 @@
 import { randomUUID } from "node:crypto";
 import {
     type Dirent,
+    copyFileSync,
     existsSync,
     mkdirSync,
     readdirSync,
@@ -57,7 +62,7 @@ import {
     writeFileSync,
 } from "node:fs";
 import { homedir, hostname as osHostname } from "node:os";
-import { join, relative, resolve, sep } from "node:path";
+import { join, resolve } from "node:path";
 
 import { APP_VERSION } from "../../generated/version";
 import { arg, argFail, enumArg, flag } from "../../shared/args";
@@ -91,7 +96,8 @@ const DEFAULTS = {
     // SRT input defaults to 120 ms, which is too small for the relayed stream.
     srtLatencyMs: 2000,
     inputFormat: "ts" as InputFormat,
-    pipelinesDir: "/app/relay-pipelines",
+    profilesDir: join(CONFIG_DIR, "profiles"),
+    profile: "copy",
 };
 
 const BACKOFF_MIN_MS = 1_000;
@@ -122,8 +128,8 @@ interface ConfigFile {
     rtmpUrlFile?: string;
     rtmpKey?: string;
     inputFormat?: InputFormat;
-    pipeline?: string;
-    pipelinesDir?: string;
+    profile?: string;
+    profilesDir?: string;
     autoStart?: boolean;
 }
 
@@ -141,11 +147,11 @@ interface Config {
     rtmpUrl: string;
     rtmpKey: string;
     inputFormat: InputFormat;
-    /** Pipeline mid files (id = path relative to pipelinesDir); the ffmpeg
-     * relay ignores the selection (kept for configuration/UI compatibility). */
-    pipelinesDir: string;
-    /** The selected pipeline id (legacy field; ignored by the ffmpeg relay). */
-    pipeline: string;
+    /** Directory holding user-authored ffmpeg profile files (JSON). */
+    profilesDir: string;
+    /** The selected ffmpeg output profile id (built-in or a file in
+     * profilesDir). */
+    profile: string;
     autoStart: boolean;
     dryRun: boolean;
 }
@@ -314,7 +320,7 @@ function currentStatus(): Record<string, unknown> {
             stream: streamState,
             rtmp: config.rtmpUrl === "" ? null : effectiveRtmpUrl(),
             inputFormat: config.inputFormat,
-            pipeline: config.pipeline,
+            profile: config.profile,
             srtlaPort: config.srtlaPort,
             srtPort: config.srtPort,
             srtLatencyMs: config.srtLatencyMs,
@@ -592,11 +598,11 @@ async function modulesConfigure(
     }
     if (typeof cfg.rtmpKey === "string" && cfg.rtmpKey !== "")
         applyConfig({ rtmpKey: cfg.rtmpKey.trim() });
-    if (typeof cfg.pipeline === "string") {
-        const id = cfg.pipeline.trim();
-        if (id !== "" && !listPipelines().some((p) => p.id === id))
-            throw new Error(`Unknown pipeline: ${id}`);
-        applyConfig({ pipeline: id });
+    if (typeof cfg.profile === "string") {
+        const id = cfg.profile.trim();
+        if (id !== "" && findProfile(id) === undefined)
+            throw new Error(`Unknown profile: ${id}`);
+        applyConfig({ profile: id });
     }
 
     writeConfigFile();
@@ -751,42 +757,91 @@ function startHealthMonitor(): void {
     }, HEALTH_CHECK_INTERVAL_MS);
 }
 
-// ── Pipeline mid files ───────────────────────────────────────────────────────
+// ── ffmpeg output profiles ───────────────────────────────────────────────────
 
-// Pipeline mid files live under pipelinesDir/<user>/<name> (the
-// relay-pipelines/ directory, mounted read-only into the container), the same
-// layout as the encoder pipelines. They are listed for the web-UI selection —
-// the `pipeline` config field is kept for compatibility, but the ffmpeg relay
-// never consumes a mid (it auto-detects the TS streams and carries audio).
+// The ffmpeg output profile is selected via the `profile` config field
+// (written by the web UI). Profiles are JSON files in the profiles directory
+// (one file per profile, named <id>.json) that supply the extra ffmpeg
+// arguments appended after -i. A profile file is:
+//   { "name": "My profile", "desc": "…", "args": ["-c:v","libx264", …] }
+// The id is the file name (without .json); `args` defaults to copy. The
+// default profiles (copy, re-encode, audio-only) are seeded into the
+// directory from backend/srtla2platform/defaults/profiles/ on startup
+// (never overwriting user files) and can be edited or extended.
 
-/** All pipeline mid files under pipelinesDir (id + group + name for the UI). */
-function listPipelines(): Array<{ id: string; group: string; name: string }> {
-    const root = resolve(config.pipelinesDir);
-    const out: Array<{ id: string; group: string; name: string }> = [];
-    const walk = (dir: string): void => {
-        let entries: Dirent<string>[];
+interface FfmpegProfile {
+    id: string;
+    name: string;
+    desc: string;
+    args: string[];
+}
+
+const PROFILE_ID_RE = /^[\w.-]{1,64}$/;
+
+const COPY_ARGS = ["-c", "copy"];
+
+/** Scan the profiles directory for profile files. Returns the valid ones;
+ * invalid files are skipped with a warning. */
+function listProfiles(): FfmpegProfile[] {
+    const dir = resolve(config.profilesDir);
+    let entries: Dirent<string>[];
+    try {
+        entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+        return []; // no directory yet (first run) — nothing to list
+    }
+    const out: FfmpegProfile[] = [];
+    for (const e of entries) {
+        if (!e.isFile() || e.name.startsWith(".") || !e.name.endsWith(".json"))
+            continue;
+        const id = e.name.slice(0, -5);
+        if (!PROFILE_ID_RE.test(id)) continue;
+        const p = join(dir, e.name);
+        let raw: unknown;
         try {
-            entries = readdirSync(dir, { withFileTypes: true });
-        } catch {
-            return; // no directory yet (first run) — nothing to list
+            raw = JSON.parse(readFileSync(p, "utf8"));
+        } catch (err) {
+            log("warn", `profile file ${e.name} is not valid JSON — skipped`);
+            continue;
         }
-        for (const e of entries) {
-            if (e.name.startsWith(".")) continue;
-            const p = join(dir, e.name);
-            if (e.isDirectory()) walk(p);
-            else if (e.isFile()) {
-                const id = relative(root, p).split(sep).join("/");
-                const slash = id.indexOf("/");
-                out.push({
-                    id,
-                    group: slash < 0 ? "" : id.slice(0, slash),
-                    name: id.slice(slash + 1),
-                });
-            }
+        if (!isRecord(raw)) {
+            log("warn", `profile file ${e.name} must be an object — skipped`);
+            continue;
         }
-    };
-    walk(root);
+        const fileArgs = Array.isArray(raw.args)
+            ? raw.args.filter((a): a is string => typeof a === "string")
+            : [];
+        out.push({
+            id,
+            name: typeof raw.name === "string" ? raw.name : id,
+            desc: typeof raw.desc === "string" ? raw.desc : "",
+            args: fileArgs.length > 0 ? fileArgs : COPY_ARGS,
+        });
+    }
     return out.sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function findProfile(id: string): FfmpegProfile | undefined {
+    return listProfiles().find((p) => p.id === id);
+}
+
+/** Seed the profiles directory with the default profile files shipped in the
+ * repo (backend/srtla2platform/defaults/profiles/). Non-destructive: an
+ * existing file is never overwritten, so user edits survive restarts. */
+function seedDefaultProfiles(): void {
+    const src = join(import.meta.dir, "defaults", "profiles");
+    let files: string[];
+    try {
+        files = readdirSync(src).filter((n) => n.endsWith(".json"));
+    } catch {
+        return; // defaults not shipped in this build — nothing to seed
+    }
+    const dst = resolve(config.profilesDir);
+    mkdirSync(dst, { recursive: true });
+    for (const f of files) {
+        const target = join(dst, f);
+        if (!existsSync(target)) copyFileSync(join(src, f), target);
+    }
 }
 
 // srtla_rec (b8359bc) is the SRT *caller* — it connect()s to the
@@ -794,15 +849,19 @@ function listPipelines(): Array<{ id: string; group: string; name: string }> {
 // (mode=listener in the URI; the standalone -listen option was removed in
 // ffmpeg 7).
 // The input is a plain MPEG-TS over SRT (what srtla_rec forwards); ffmpeg
-// auto-detects the TS and stream-copies the video and audio elementary
-// streams into an FLV over RTMP(S). No filter graph is needed — audio is
-// carried automatically, which the previous GStreamer relay (a single
-// video-only tsdemux branch) did not.
+// auto-detects the TS, applies the selected output profile's arguments, and
+// multiplexes into an FLV over RTMP(S).
 function buildPipeline(): string[] {
     // The listener's SRT latency must match what the upstream encoders
     // negotiate (2000 ms through the relay); ffmpeg's 120 ms default is too
     // small and errors out mid-stream.
     const srtUri = `srt://${config.bindHost}:${config.srtPort}?mode=listener&latency=${config.srtLatencyMs}`;
+
+    // Unknown/missing profile (e.g. the file was deleted) → fall back to
+    // copy-only so the stream still flows.
+    const selected =
+        findProfile(config.profile) ??
+        ({ id: "copy", name: "Copy", desc: "", args: COPY_ARGS } satisfies FfmpegProfile);
 
     return [
         "-hide_banner",
@@ -810,8 +869,7 @@ function buildPipeline(): string[] {
         "warning",
         "-i",
         srtUri,
-        "-c",
-        "copy",
+        ...selected.args,
         "-f",
         "flv",
         effectiveRtmpUrl(),
@@ -1037,7 +1095,8 @@ function writeConfigFile(): void {
             rtmpUrl: config.rtmpUrl,
             rtmpKey: config.rtmpKey,
             inputFormat: config.inputFormat,
-            pipeline: config.pipeline,
+            profile: config.profile,
+            profilesDir: config.profilesDir,
             autoStart: config.autoStart,
         };
         writeFileSync(CONFIG_FILE, `${JSON.stringify(next, null, 4)}\n`);
@@ -1057,9 +1116,9 @@ function moduleSliceView(): Record<string, unknown> {
             enabled: true,
             rtmpUrl: config.rtmpUrl,
             rtmpKey: { configured: config.rtmpKey !== "" },
-            pipeline: config.pipeline,
-            pipelines: listPipelines(),
-            pipelinesDir: config.pipelinesDir,
+            profile: config.profile,
+            profiles: listProfiles(),
+            profilesDir: config.profilesDir,
         },
     };
 }
@@ -1153,15 +1212,16 @@ function loadConfig(): Config {
             DEFAULTS.inputFormat,
     );
 
-    // Pipeline mid files (listed for the web-UI selection); the selected
-    // pipeline id comes from the config file (written by the web UI), not a
-    // CLI flag. The ffmpeg relay ignores the selection.
-    const pipelinesDir = firstDefined(
-        arg("--pipelines"),
-        process.env.PIPELINES_DIR,
-        file?.pipelinesDir,
-        DEFAULTS.pipelinesDir,
+    // ffmpeg output profiles: the user-authored JSON profile files live in
+    // the profiles directory; the selected profile id comes from the config
+    // file (written by the web UI), not a CLI flag.
+    const profilesDir = firstDefined(
+        arg("--profiles"),
+        process.env.PROFILES_DIR,
+        file?.profilesDir,
+        DEFAULTS.profilesDir,
     ) as string;
+    const profile = firstDefined(file?.profile, DEFAULTS.profile) as string;
 
     const cfg: Config = {
         controlServerUrl: firstDefined(
@@ -1221,8 +1281,8 @@ function loadConfig(): Config {
         rtmpUrl,
         rtmpKey,
         inputFormat,
-        pipelinesDir,
-        pipeline: file?.pipeline ?? "",
+        profilesDir,
+        profile,
         autoStart: flag("--autostart") || file?.autoStart === true,
         dryRun: flag("--dry-run"),
     };
@@ -1250,6 +1310,7 @@ function shutdown(): void {
 
 function main(): void {
     config = loadConfig();
+    seedDefaultProfiles();
 
     if (config.dryRun) {
         console.log(

@@ -3,11 +3,9 @@
     "dev.card.srtla2platform": "SRTLA → RTMP",
     "dev.row.auto_restarts": "Automatische Neustarts",
     "dev.row.rtmp": "Ziel",
-    "set.rtmp_key": "Stream-Schlüssel",
-    "set.rtmp_url": "RTMP(S)-URL",
-    "set.srtla2platform": "RTMP-Ausgang",
-    "set.srtla2platform_desc": "Ziel, an das das Relay den Stream sendet. Das Relay wird nach dem Speichern neu gestartet.",
-    "set.srtla2platform_no_pipelines": "Keine Pipelines in {{directory}} gefunden.",
-    "set.srtla2platform_pipeline": "Pipeline",
-    "set.srtla2platform_pipeline_default": "Standard (eingebaut)"
+    "set.rtmp_key": "Streamschlüssel",
+    "set.rtmp_url": "RTMP(S) URL",
+    "set.srtla2platform": "RTMP-Ausgabe",
+    "set.srtla2platform_desc": "Ziel, an das der Stream veröffentlicht wird, und das angewendete ffmpeg-Profil. Der Stream wird nach dem Speichern neu gestartet.",
+    "set.srtla2platform_profile": "Ausgabeprofil"
 }

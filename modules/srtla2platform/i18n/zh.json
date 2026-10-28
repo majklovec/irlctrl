@@ -2,12 +2,10 @@
     "dev.badge.starting": "启动中",
     "dev.card.srtla2platform": "SRTLA → RTMP",
     "dev.row.auto_restarts": "自动重启",
-    "dev.row.rtmp": "目标地址",
-    "set.rtmp_key": "推流密钥",
+    "dev.row.rtmp": "目标",
+    "set.rtmp_key": "流密钥",
     "set.rtmp_url": "RTMP(S) URL",
     "set.srtla2platform": "RTMP 输出",
-    "set.srtla2platform_desc": "中继器推送的目标地址。保存后中继器会重启。",
-    "set.srtla2platform_no_pipelines": "{{directory}} 中未找到管道。",
-    "set.srtla2platform_pipeline": "管道",
-    "set.srtla2platform_pipeline_default": "默认（内置）"
+    "set.srtla2platform_desc": "流发布的目的地及应用的 ffmpeg 配置文件。保存后流会重启。",
+    "set.srtla2platform_profile": "输出配置"
 }

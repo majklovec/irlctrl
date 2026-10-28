@@ -14,10 +14,9 @@ import { t } from "../../frontend/ts/i18n";
 import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
 import type { ModuleSliceView } from "../../shared/types";
 
-/** A pipeline mid file on the device (id = path under the pipelines dir). */
-interface Pipeline {
+/** An ffmpeg output profile on the device. */
+interface Profile {
 	id: string;
-	group: string;
 	name: string;
 }
 
@@ -25,20 +24,20 @@ interface Pipeline {
 interface Srtla2PlatformModuleView extends ModuleSliceView {
 	rtmpUrl: string;
 	rtmpKey?: { configured: boolean };
-	pipeline: string;
-	pipelines: Pipeline[];
-	pipelinesDir: string;
+	profile: string;
+	profiles: Profile[];
+	profilesDir: string;
 }
 
 /**
- * Editable copy of the relay's RTMP destination and GStreamer pipeline; the
- * stream key is write-only — the device only ever reports it as
+ * Editable copy of the relay's RTMP destination and ffmpeg output profile;
+ * the stream key is write-only — the device only ever reports it as
  * {configured}.
  */
 const draft = {
 	rtmpUrl: "",
 	rtmpKey: "",
-	pipeline: "",
+	profile: "copy",
 };
 
 async function save(ctx: ModuleContext): Promise<void> {
@@ -48,7 +47,7 @@ async function save(ctx: ModuleContext): Promise<void> {
 			id: "srtla2platform",
 			config: {
 				rtmpUrl: draft.rtmpUrl,
-				pipeline: draft.pipeline,
+				profile: draft.profile,
 				...(rtmpKey ? { rtmpKey } : {}),
 			},
 		}),
@@ -58,34 +57,10 @@ async function save(ctx: ModuleContext): Promise<void> {
 	ctx.note(t("set.saved"));
 }
 
-/** The pipeline options, grouped by the first path segment (like the
- * encoder's pipeline picker). An empty value keeps the built-in mid for the
- * input format. */
-function pipelineOptions(view: Srtla2PlatformModuleView | undefined): m.Children {
-	const pipelines = view?.pipelines ?? [];
-	const groups = new Map<string, Pipeline[]>();
-	for (const p of pipelines)
-		groups.set(p.group, [...(groups.get(p.group) ?? []), p]);
-	return [
-		<option key="" value="">
-			{t("set.srtla2platform_pipeline_default")}
-		</option>,
-		...[...groups].map(([group, list]) => {
-			const opts = (
-				<Options
-					key={group || "ungrouped"}
-					pairs={list.map((p) => [p.id, p.name])}
-				/>
-			);
-			return group ? (
-				<optgroup key={group} label={group}>
-					{opts}
-				</optgroup>
-			) : (
-				opts
-			);
-		}),
-	];
+/** The ffmpeg output profile options: all profile files from the device. */
+function profileOptions(view: Srtla2PlatformModuleView | undefined): m.Children {
+	const profiles = view?.profiles ?? [];
+	return <Options pairs={profiles.map((p) => [p.id, p.name])} />;
 }
 
 export const def: ModuleDef = {
@@ -102,12 +77,11 @@ export const def: ModuleDef = {
 		draft.rtmpUrl = view?.rtmpUrl ?? "";
 		draft.rtmpKey = "";
 		// A selection that no longer exists on the device is reset to the
-		// built-in default.
-		const pipeline = view?.pipeline ?? "";
-		draft.pipeline =
-			pipeline === "" || (view?.pipelines ?? []).some((p) => p.id === pipeline)
-				? pipeline
-				: "";
+		// copy profile.
+		const profile = view?.profile ?? "copy";
+		draft.profile = (view?.profiles ?? []).some((p) => p.id === profile)
+			? profile
+			: "copy";
 	},
 	render: (ctx) => {
 		const view = ctx.modules.srtla2platform as
@@ -141,20 +115,13 @@ export const def: ModuleDef = {
 					}
 				/>
 				<Field
-					label={t("set.srtla2platform_pipeline")}
+					label={t("set.srtla2platform_profile")}
 					control={
-						<Select target={draft} prop="pipeline">
-							{pipelineOptions(view)}
+						<Select target={draft} prop="profile">
+							{profileOptions(view)}
 						</Select>
 					}
 				/>
-				{view?.pipelines.length === 0 && (
-					<p class="muted" key="no-pipelines">
-						{t("set.srtla2platform_no_pipelines", {
-							directory: view.pipelinesDir,
-						})}
-					</p>
-				)}
 				<Break />
 				<Actions>
 					<Button label={t("set.save")} type="submit" disabled={ctx.busy} />

@@ -1,13 +1,11 @@
 {
     "dev.badge.starting": "запуск",
     "dev.card.srtla2platform": "SRTLA → RTMP",
-    "dev.row.auto_restarts": "Автоперезапуски",
-    "dev.row.rtmp": "Адрес",
+    "dev.row.auto_restarts": "Автовозобновление",
+    "dev.row.rtmp": "Назначение",
     "set.rtmp_key": "Ключ потока",
     "set.rtmp_url": "RTMP(S) URL",
-    "set.srtla2platform": "RTMP-выход",
-    "set.srtla2platform_desc": "Адрес назначения, на который ретранслятор передаёт поток. После сохранения ретранслятор перезапускается.",
-    "set.srtla2platform_no_pipelines": "В {{directory}} нет конвейеров.",
-    "set.srtla2platform_pipeline": "Конвейер",
-    "set.srtla2platform_pipeline_default": "Стандартный (встроенный)"
+    "set.srtla2platform": "Вывод RTMP",
+    "set.srtla2platform_desc": "Назначение потока и профиль ffmpeg. Поток перезапускается после сохранения.",
+    "set.srtla2platform_profile": "Профиль вывода"
 }

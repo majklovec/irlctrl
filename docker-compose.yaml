@@ -70,16 +70,10 @@ services:
             - "8085"
             - "--role"
             - "relay"
-            - "--pipelines"
-            - "/app/relay-pipelines"
             - "--config"
             - "/config/config.json"
         volumes:
             - ./config/relay:/config
-            # Relay pipeline definitions (srtla2platform & co.), laid out as
-            # <user-id>/<pipeline>. Mounted so runtime edits survive image
-            # rebuilds.
-            - ./relay-pipelines:/app/relay-pipelines
             # GStreamer pipeline definitions (encoder role); kept mounted for
             # parity with the combined role.
             - ./pipeline:/app/pipeline
@@ -139,7 +133,7 @@ services:
         user: "1000:1000"
         # 5001/udp is the externally-facing SRTLA receiver port (the bonded
         # SRTLA relay streams into it); the port is offset from OBS's SRTLA
-        # input (5000). 5002 is the internal GStreamer SRT listener on
+        # input (5000). 5002 is the internal ffmpeg SRT listener on
         # 127.0.0.1, not exposed to the host.
         ports:
             - "5001:5001/udp"
@@ -147,11 +141,11 @@ services:
             # The agent reads its config from and persists its device UUID to
             # $HOME/.config/srtla2platform/ (HOME=/home/srtla in the image), so
             # the identity survives container rebuilds/restarts. No --config
-            # flag: this is the agent's default path.
+            # flag: this is the agent's default path. User-authored ffmpeg
+            # profile files live alongside the config in the mounted
+            # config/srtla2platform/profiles/ directory (the agent's default
+            # profiles dir).
             - ./config/srtla2platform:/home/srtla/.config/srtla2platform
-            # Mid-fragment pipeline files selectable in the device settings
-            # (matches /app/relay-pipelines, the agent's --pipelines default).
-            - ./relay-pipelines:/app/relay-pipelines:ro
         environment:
             - CONTROL_SERVER_URL=${CONTROL_SERVER_URL}
             - CONTROL_SERVER_TOKEN=${CONTROL_SERVER_TOKEN}

@@ -1,0 +1,5 @@
+{
+  "name": "Audio only",
+  "desc": "Drop the video and stream only the audio (AAC).",
+  "args": ["-map", "0:a:0", "-c:a", "aac"]
+}

@@ -1,7 +1,8 @@
 # srtla2platform agent image — runs `backend/srtla2platform/srtla2platform.ts`.
 #
 # The agent relays an SRTLA device's stream into an RTMP ingest:
-#   srtla_rec (SRTLA de-bonder) -> ffmpeg (SRT listener) -> stream-copy TS -> FLV/RTMP(S)
+#   srtla_rec (SRTLA de-bonder) -> ffmpeg (SRT listener) -> TS -> FLV/RTMP(S)
+# (the ffmpeg output profile — copy, re-encode, … — is selected in the UI)
 #
 # Unlike the relay/encoder device image (Dockerfile.device), this:
 #   - bundles only the srtla2platform agent (backend/srtla2platform/ + shared/),
@@ -40,9 +41,9 @@ FROM oven/bun:1
 # Runtime dependencies:
 #   - iproute2        -> `ss -uln` (the agent waits for its SRT listener by
 #                        parsing the bound UDP sockets),
-#   - ffmpeg          -> the relay: SRT listener (-listen 1), stream-copy
-#                        remux TS -> FLV, RTMP(S) egress (needs SRT protocol
-#                        + openssl for rtmps://),
+#   - ffmpeg          -> the relay: SRT listener (mode=listener), remux
+#                        TS -> FLV per the selected output profile, RTMP(S)
+#                        egress (needs SRT protocol + openssl for rtmps://),
 #   - ca-certificates -> TLS for a wss:// control server and rtmps://.
 # NOTE: no libSRT and no git — srtla_rec is copied in from the builder stage.
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -77,7 +78,7 @@ COPY shared ./shared
 RUN mkdir -p generated && bun -e 'const {version}=JSON.parse(require("fs").readFileSync("package.json","utf8")); require("fs").writeFileSync("generated/version.ts", `export const APP_VERSION = ${JSON.stringify(version)};\n`)'
 
 # 5000/udp is the externally-facing SRTLA receiver port (the SRTLA device bonds
-# into it). 5002/udp is the internal GStreamer SRT listener on 127.0.0.1.
+# into it). 5002/udp is the internal ffmpeg SRT listener on 127.0.0.1.
 EXPOSE 5000/udp 5002/udp
 
 # Default entrypoint — supply control server URL/token and the RTMP target

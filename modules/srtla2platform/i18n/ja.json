@@ -2,12 +2,10 @@
     "dev.badge.starting": "起動中",
     "dev.card.srtla2platform": "SRTLA → RTMP",
     "dev.row.auto_restarts": "自動再起動",
-    "dev.row.rtmp": "配信先",
+    "dev.row.rtmp": "送信先",
     "set.rtmp_key": "ストリームキー",
     "set.rtmp_url": "RTMP(S) URL",
-    "set.srtla2platform": "RTMP 出力",
-    "set.srtla2platform_desc": "中継がストリームを送る先。保存後に中継が再起動します。",
-    "set.srtla2platform_no_pipelines": "{{directory}} にパイプラインが見つかりません。",
-    "set.srtla2platform_pipeline": "パイプライン",
-    "set.srtla2platform_pipeline_default": "既定(内蔵)"
+    "set.srtla2platform": "RTMP出力",
+    "set.srtla2platform_desc": "ストリームを配信する先と適用されるffmpegプロファイル。保存後にストリームを再起動します。",
+    "set.srtla2platform_profile": "出力プロファイル"
 }

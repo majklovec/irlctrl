@@ -2,12 +2,10 @@
     "dev.badge.starting": "uruchamianie",
     "dev.card.srtla2platform": "SRTLA → RTMP",
     "dev.row.auto_restarts": "Automatyczne restarty",
-    "dev.row.rtmp": "Destynacja",
-    "set.rtmp_key": "Klucz transmisji",
+    "dev.row.rtmp": "Miejsce docelowe",
+    "set.rtmp_key": "Klucz strumienia",
     "set.rtmp_url": "RTMP(S) URL",
     "set.srtla2platform": "Wyjście RTMP",
-    "set.srtla2platform_desc": "Adres docelowa, do której relay wysyła transmisję. Po zapisaniu relay zostanie uruchomiony ponownie.",
-    "set.srtla2platform_no_pipelines": "Brak potoków w {{directory}}.",
-    "set.srtla2platform_pipeline": "Potok",
-    "set.srtla2platform_pipeline_default": "Domyślny (wbudowany)"
+    "set.srtla2platform_desc": "Miejsce publikacji strumienia i profil ffmpeg. Strumień jest restartowany po zapisaniu.",
+    "set.srtla2platform_profile": "Profil wyjściowy"
 }

@@ -1,0 +1,11 @@
+{
+  "name": "Re-encode to H.264",
+  "desc": "Decode and re-encode video to H.264 (e.g. H.265 → H.264), audio to AAC.",
+  "args": [
+    "-c:v", "libx264",
+    "-preset", "veryfast",
+    "-tune", "zerolatency",
+    "-pix_fmt", "yuv420p",
+    "-c:a", "aac"
+  ]
+}

@@ -1,6 +1,6 @@
-/* SRTLA → RTMP card: the stream lifecycle (srtla_rec + gstreamer) on this
- * relay and the start / stop actions. The RTMP destination itself is edited
- * on the Settings page (this card shows it, masked). */
+/* SRTLA → RTMP card: the stream lifecycle (srtla_rec + ffmpeg) on this
+ * device and the start / stop actions. The RTMP destination and ffmpeg output
+ * profile are edited on the Settings page (this card shows them). */
 import m from "mithril";
 import {
 	Actions,
@@ -42,14 +42,14 @@ function srtla2platformCardBody(host: DeviceCard, status: Srtla2PlatformStatus):
 							<span class="muted">{t("set.srtla2platform_desc")}</span>
 						),
 					],
-					// Only shown when a pipeline file is selected; "" means the
-					// built-in mid for the input format.
-					...(s.pipeline
+					// The selected ffmpeg output profile (always present;
+					// "copy" is the default stream-copy profile).
+					...(s.profile
 						? [
 								[
-									t("set.srtla2platform_pipeline"),
+									t("set.srtla2platform_profile"),
 									<code class="srtla2platform-rtmp">
-										{s.pipeline}
+										{s.profile}
 									</code>,
 								] as [string, m.Vnode],
 							]
