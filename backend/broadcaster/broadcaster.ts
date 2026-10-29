@@ -370,6 +370,12 @@ function currentStatus(): Record<string, unknown> {
 		// The web-UI refreshes its module cards from this push; an empty
 		// object would wipe every card's form values.
 		modules: moduleSliceView(),
+		// Device-list slice the control server reads (devices.ts spreads it into
+		// each DeviceSummary): the stream lifecycle so the "Stream" column can
+		// show live / starting / stopped. Kept to just the state so the
+		// throttled list fingerprint only re-broadcasts on a real transition,
+		// not on every periodic status push.
+		summary: { stream: streamState },
 	};
 }
 

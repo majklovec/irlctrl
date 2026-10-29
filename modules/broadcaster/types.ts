@@ -2,7 +2,7 @@
  * Local types for the broadcaster module (never imported by the core or
  * other modules).
  */
-import type { Status } from "../../shared/types";
+import type { DeviceSummary, Status } from "../../shared/types";
 
 /** The lifecycle of the srtla_rec + gstreamer stream on the relay. */
 export type SrtlaStreamState = "idle" | "starting" | "running" | "stopping";
@@ -44,4 +44,10 @@ export interface SrtlaStreamStateFields {
 export type BroadcasterStatus = Status & {
 	/** The relay's stream slice (the `state` fragment this card renders). */
 	state: SrtlaStreamStateFields;
+};
+
+/** The broadcaster's slice of the control-server device list: the stream
+ * lifecycle the status `summary` advertises. */
+export type BroadcasterDeviceSummary = DeviceSummary & {
+	stream?: SrtlaStreamState;
 };

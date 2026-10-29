@@ -12,10 +12,11 @@ import {
 import { card, type DeviceCard } from "../../frontend/ts/device/store";
 import { t } from "../../frontend/ts/i18n";
 import type { FrontendModule } from "../../frontend/ts/module-contracts";
+import type { DeviceSummary } from "../../shared/types";
 import log from "./log";
 import { SRTLA_CUSTOM_SERVICE, srtlaService } from "./services";
 import "./styles.css";
-import type { BroadcasterStatus } from "./types";
+import type { BroadcasterDeviceSummary, BroadcasterStatus } from "./types";
 
 function broadcasterCardBody(
 	host: DeviceCard,
@@ -113,6 +114,27 @@ function broadcasterCardBody(
 	);
 }
 
+/** Device-list "Stream" column: the publisher's stream lifecycle, so a
+ * running broadcaster reads as *live* in the fleet list (mirrors the encoder
+ * and srtla stream columns). */
+const broadcasterSummaryColumns = [
+	{
+		id: "stream",
+		order: 0,
+		available: (device: DeviceSummary) => device.role === "broadcaster",
+		header: () => t("mgmt.th.stream"),
+		cell: (device: DeviceSummary) => {
+			if (!device.online) return "—";
+			const { stream } = device as BroadcasterDeviceSummary;
+			if (stream === "running")
+				return <Badge text={t("dev.badge.live")} kind="on" />;
+			if (stream === "starting")
+				return <Badge text={t("dev.badge.starting")} kind="warn" />;
+			return <Badge text={t("dev.badge.stopped")} kind="off" />;
+		},
+	},
+];
+
 const broadcasterModule: FrontendModule = {
 	id: "broadcaster",
 	kind: "device-card",
@@ -122,6 +144,7 @@ const broadcasterModule: FrontendModule = {
 	defaultSize: { w: 4, h: 4 },
 	minSize: { w: 3, h: 3 },
 	component: (status) => broadcasterCardBody(card, status as BroadcasterStatus),
+	deviceSummaryColumns: broadcasterSummaryColumns,
 	log,
 };
 
