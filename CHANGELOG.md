@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/majklovec/irlctrl/compare/v1.11.0...v1.12.0) (2026-10-29)
+
+
+### Features
+
+* **broadcaster:** implement RTMP destination management and UI ([4ef38f9](https://github.com/majklovec/irlctrl/commit/4ef38f9e6998fa27063186f89c7ec7d8eae10d17))
+
 # [1.11.0](https://github.com/majklovec/irlctrl/compare/v1.10.0...v1.11.0) (2026-10-29)
 
 
