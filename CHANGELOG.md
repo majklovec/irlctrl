@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/majklovec/irlctrl/compare/v1.14.0...v1.15.0) (2026-10-29)
+
+
+### Features
+
+* **broadcaster:** implement SRTLA keepalive tracking and UI display ([97b44cc](https://github.com/majklovec/irlctrl/commit/97b44cc79fad124d531991794ee6f1672666b969))
+
 # [1.14.0](https://github.com/majklovec/irlctrl/compare/v1.13.0...v1.14.0) (2026-10-29)
 
 
