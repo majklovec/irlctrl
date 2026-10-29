@@ -530,6 +530,8 @@ async function handleCommand(
 			return { modules: moduleSliceView() };
 		case "modules.configure":
 			return modulesConfigure(params);
+		case "autostart.set":
+			return setAutostart(params);
 		default:
 			log("warn", `ignoring unknown command: ${method}`);
 			throw new Error(`Unknown method: ${method}`);
@@ -653,6 +655,18 @@ async function modulesConfigure(
 	if (streamState === "running") await restartStream();
 	pushStatus();
 	return { ok: true, modules: moduleSliceView() };
+}
+
+/** Toggle the boot autostart flag (`autoStart` in the config file). A
+ * pending `startStream()` on the next service start resumes the saved
+ * outputs; `state.autostart` in the status mirrors the flag. */
+function setAutostart(params: Record<string, unknown>): unknown {
+	if (typeof params.enabled !== "boolean")
+		throw new Error("enabled must be a boolean");
+	config.autoStart = params.enabled;
+	writeConfigFile();
+	pushStatus();
+	return { autostart: config.autoStart };
 }
 
 // ── Preflight ────────────────────────────────────────────────────────────────
