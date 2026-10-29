@@ -1,3 +1,10 @@
+# [1.16.0](https://github.com/majklovec/irlctrl/compare/v1.15.0...v1.16.0) (2026-10-29)
+
+
+### Features
+
+* **broadcaster:** align table headers and data to the right for better readability ([0fdde78](https://github.com/majklovec/irlctrl/commit/0fdde78e81010bf94267ecc5df47195a069bad9f))
+
 # [1.15.0](https://github.com/majklovec/irlctrl/compare/v1.14.0...v1.15.0) (2026-10-29)
 
 
