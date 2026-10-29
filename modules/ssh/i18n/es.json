@@ -1,10 +1,8 @@
 {
-    "dev.badge.password_none": "ninguna",
     "dev.card.ssh": "SSH",
     "dev.row.password": "Contraseña",
     "dev.row.user": "Usuario",
     "dev.ssh_new_password": "Nueva contraseña",
-    "dev.ssh_pending_apply": "se aplica al iniciar SSH",
     "dev.ssh_reset_confirm": "¿Restablecer la contraseña SSH de {{user}}? Se generará una nueva contraseña que se mostrará una sola vez.",
     "dev.ssh_stop_confirm": "¿Detener el servidor SSH? Las conexiones SSH activas se cierran.",
     "mlog.done.ssh_password_reset": "Contraseña SSH de {{user}} restablecida",

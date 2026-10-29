@@ -9,6 +9,7 @@
     "dash.grp_independent": "Nezávislý",
     "dash.empty": "Zatiaľ žiadne dashboardy",
     "dash.name": "Názov",
+    "dash.color": "Farba",
     "dash.new_placeholder": "napr. Stream",
     "dash.no_widgets": "Žiadne widgety — pridajte nižšie",
     "dash.not_found": "Dashboard nenájdený",

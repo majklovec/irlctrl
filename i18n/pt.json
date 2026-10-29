@@ -9,6 +9,7 @@
     "dash.grp_independent": "Independente",
     "dash.empty": "Ainda não há dashboards",
     "dash.name": "Nome",
+    "dash.color": "Cor",
     "dash.new_placeholder": "ex. Streaming",
     "dash.no_widgets": "Sem widgets — adicione um abaixo",
     "dash.not_found": "Dashboard não encontrado",

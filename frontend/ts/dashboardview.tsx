@@ -8,6 +8,7 @@
  * copy and toasts the conflict. Broadcast `dashboards.changed` events rebase
  * the dashboard from the server. */
 import m from "mithril";
+import { DEFAULT_COLOR } from "../../shared/validate";
 import type { ServerDashboard, ServerDashboardWidget } from "../types";
 import { Icon } from "./components/icons";
 import { Page, ServerNav, TitleWithBack } from "./components/ui";
@@ -21,7 +22,7 @@ import {
 } from "./dashboard";
 import { GridDashboard } from "./dashboardgrid";
 import { t } from "./i18n";
-import { mountPage } from "./util";
+import { mountPage, setHeaderColor } from "./util";
 
 const SAVE_DEBOUNCE_MS = 500;
 const PATH_RE = /\/dashboards\/(view|edit)\/([^/]+)\/?$/;
@@ -97,6 +98,7 @@ async function doSave(): Promise<void> {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				name: dash.name,
+				color: dash.color,
 				widgets: dash.widgets,
 				version: dash.version,
 			}),
@@ -125,6 +127,7 @@ async function doSave(): Promise<void> {
 			// keep our local widget objects (live bodies reference them).
 			dash.version = fresh.version;
 			dash.name = fresh.name;
+			dash.color = fresh.color;
 			dash.columns = fresh.columns;
 		}
 		state.saveState = "saved";
@@ -167,6 +170,7 @@ async function resync(prefer?: ServerDashboard): Promise<void> {
 			widgets: fresh.widgets,
 			version: fresh.version,
 			name: fresh.name,
+			color: fresh.color,
 			columns: fresh.columns,
 		};
 		syncConnectionsFor(state.dash);
@@ -223,6 +227,14 @@ function onNameInput(value: string): void {
 	if (value.trim()) scheduleSave();
 }
 
+function onColorInput(value: string): void {
+	const dash = state.dash;
+	if (!dash) return;
+	dash.color = value;
+	setHeaderColor(value);
+	scheduleSave();
+}
+
 async function _newDashboard(): Promise<void> {
 	state.dashMenu = false;
 	const res = await fetch("/api/dashboards", {
@@ -265,6 +277,7 @@ async function _deleteDashboard(): Promise<void> {
 function onDashboardsChanged(
 	data: {
 		id: string;
+		color?: string;
 		widgets: ServerDashboardWidget[];
 		version: number;
 	} | null,
@@ -273,6 +286,7 @@ function onDashboardsChanged(
 	if (!data || data.id !== state.dash?.id) return;
 	void resync({
 		...state.dash!,
+		color: data.color,
 		widgets: data.widgets,
 		version: data.version,
 	});
@@ -315,14 +329,28 @@ const App: m.Component = {
 				}
 				nav={
 					dash ? (
-						<button
-							class="dash-edittoggle"
-							type="button"
-							aria-pressed={state.editMode}
-							onclick={() => setEdit(!state.editMode)}
-						>
-							{t(state.editMode ? "dash.done" : "dash.edit")}
-						</button>
+						<>
+							{state.editMode ? (
+								<input
+									class="dash-color-input"
+									type="color"
+									value={dash.color ?? DEFAULT_COLOR}
+									title={t("dash.color")}
+									aria-label={t("dash.color")}
+									oninput={(e: Event) =>
+										onColorInput((e.target as HTMLInputElement).value)
+									}
+								/>
+							) : null}
+							<button
+								class="dash-edittoggle"
+								type="button"
+								aria-pressed={state.editMode}
+								onclick={() => setEdit(!state.editMode)}
+							>
+								{t(state.editMode ? "dash.done" : "dash.edit")}
+							</button>
+						</>
 					) : undefined
 				}
 				headerRight={[
@@ -419,8 +447,10 @@ void (async () => {
 		ok?: boolean;
 		dashboard?: ServerDashboard;
 	} | null;
-	if (body?.ok && body.dashboard) state.dash = body.dashboard;
-	else state.notFound = true;
+	if (body?.ok && body.dashboard) {
+		state.dash = body.dashboard;
+		setHeaderColor(state.dash.color ?? DEFAULT_COLOR);
+	} else state.notFound = true;
 	setWidgetConfigSaver(() => scheduleSave());
 	setDashboardChangedSink(onDashboardsChanged);
 	await refreshDevices();

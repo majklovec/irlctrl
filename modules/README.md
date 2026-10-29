@@ -35,8 +35,11 @@ A module ships:
     (`shared/args`), owns its persisted sections, validates its own RPC
     parameters (`shared/params`) and reaches the process only through the
     `core` bag it is handed.
--   `frontend.tsx` — default-exports a `FrontendModule` / `ChannelWidgetModule`
-    (see [`frontend/ts/module-contracts.ts`](../frontend/ts/module-contracts.ts)),
+-   `frontend.tsx` — optional (only modules with a device-page card, a
+    dashboard widget or a setup step need one; a settings-only module like
+    `ssh` ships none). Default-exports a `FrontendModule` /
+    `ChannelWidgetModule` (see
+    [`frontend/ts/module-contracts.ts`](../frontend/ts/module-contracts.ts)),
     or an array of them. Runs in the browser; **no** backend imports.
 -   `types.ts` — the module's own types, including its wire shapes (status
     fragment, method results, events). It may import core-owned _types_
@@ -46,7 +49,8 @@ A module ships:
     another module's data (the srtla card shows the modems' interfaces)
     declares the shapes it reads locally — structural duplicates, never imports.
 -   `styles.css` — scoped under `.mod-<id>` (device card) or `.dash-card`
-    (dashboard widget); side-effect-imported by `frontend.tsx`.
+    (dashboard widget); side-effect-imported by `frontend.tsx` /
+    `settings.tsx`.
 -   optional `settings.tsx` — a settings-page card (`ModuleDef`, see
     `frontend/ts/modules.tsx`).
 -   optional `log.ts` — the module's log wording, imported by both sides.
@@ -265,8 +269,11 @@ on it.
 ## Adding a module
 
 1. `mkdir modules/<id>`; write `backend.ts` (default-export a `BackendModule`),
-   `frontend.tsx` (default-export a `FrontendModule`, `ChannelWidgetModule` or
-   `DashboardWidgetModule`), `types.ts`, `styles.css`.
+   optionally `frontend.tsx` (default-export a `FrontendModule`,
+   `ChannelWidgetModule` or `DashboardWidgetModule` — only when the module
+   has a device card, a dashboard widget or a setup step) and/or
+   `settings.tsx` (a settings-page `ModuleDef`), plus `types.ts`,
+   `styles.css`.
 2. Declare `roles`, `methods`, `events`, the hooks you need, `log` wording,
    `pages` / `dashboardWidgets` / `dashboardActions`, and `dependencies` if
    it must start after another module.

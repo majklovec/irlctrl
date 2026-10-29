@@ -1,10 +1,8 @@
 {
-    "dev.badge.password_none": "žádná",
     "dev.card.ssh": "SSH",
     "dev.row.password": "Heslo",
     "dev.row.user": "Uživatel",
     "dev.ssh_new_password": "Nové heslo",
-    "dev.ssh_pending_apply": "se použije při spuštění SSH",
     "dev.ssh_reset_confirm": "Obnovit SSH heslo uživatele {{user}}? Bude vygenerováno a zobrazeno jen jednou.",
     "dev.ssh_stop_confirm": "Zastavit SSH server na tomto zařízení? Aktivní ssh připojení se ukončí.",
     "mlog.done.ssh_password_reset": "SSH heslo uživatele {{user}} obnoveno",

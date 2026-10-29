@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { randomUUID } from "node:crypto";
+import { checkColor } from "../../shared/params";
 import {
     deviceWidgetConfigFields,
     initWidgetHub,
@@ -32,6 +33,7 @@ interface DashboardRow {
     id: string;
     owner: string;
     name: string;
+    color: string | null;
     version: number;
     columns: number;
     widgets: string;
@@ -86,6 +88,22 @@ export function createDashboards({
                 throw new ApiError(`Unknown config field: ${key}`);
         }
         return config;
+    }
+
+    /** Parse a dashboard's optional accent color (a validated hex string, or
+     * `undefined` when absent/empty). */
+    function parseColor(raw: unknown): string | undefined {
+        if (raw === undefined || raw === null || raw === "") return undefined;
+        if (typeof raw !== "string")
+            throw new ApiError("color must be a string");
+        try {
+            return checkColor(raw);
+        } catch (err) {
+            // checkColor throws the shared params ApiError; rethrow as a 400
+            throw new ApiError(
+                err instanceof Error ? err.message : "Invalid color",
+            );
+        }
     }
 
     /** Read `{x, y, w, h}` from an inbound widget payload (missing fields fall back to the type default). */
@@ -247,6 +265,7 @@ export function createDashboards({
                 id: row.id,
                 owner: row.owner,
                 name: row.name,
+                color: row.color ?? undefined,
                 version: row.version,
                 widgets,
                 columns: row.columns,
@@ -262,13 +281,14 @@ export function createDashboards({
             db.transaction(() => {
                 db.prepare("DELETE FROM dashboards").run();
                 const ins = db.prepare(
-                    'INSERT INTO dashboards (id, owner, name, version, "columns", widgets, position) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    'INSERT INTO dashboards (id, owner, name, color, version, "columns", widgets, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                 );
                 dashboards.forEach((d, i) =>
                     ins.run(
                         d.id,
                         d.owner ?? LOCAL_USER,
                         d.name,
+                        d.color ?? null,
                         d.version,
                         d.columns,
                         JSON.stringify(d.widgets),
@@ -339,6 +359,7 @@ export function createDashboards({
                 if (req.method === "POST") {
                     const body = (await req.json()) as {
                         name?: unknown;
+                        color?: unknown;
                         widgets?: unknown;
                     };
                     const name =
@@ -348,6 +369,7 @@ export function createDashboards({
                         id: randomUUID(),
                         owner: user,
                         name,
+                        color: parseColor(body.color),
                         version: 1,
                         columns: DASH_COLUMNS,
                         widgets: parseWidgets(body.widgets, user),
@@ -394,6 +416,7 @@ export function createDashboards({
                 if (!dashboardsById) return dashError(404, "Unknown dashboard");
                 const body = (await req.json()) as {
                     name?: unknown;
+                    color?: unknown;
                     widgets?: unknown;
                     version?: unknown;
                 };
@@ -413,6 +436,8 @@ export function createDashboards({
                     );
                 }
                 dashboardsById.name = name;
+                // Absent/empty color clears it (the list dot falls back to muted)
+                dashboardsById.color = parseColor(body.color);
                 dashboardsById.widgets = parseWidgets(
                     body.widgets,
                     user,

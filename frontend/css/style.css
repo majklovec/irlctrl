@@ -1631,10 +1631,31 @@ header h1 .dash-name-input {
 .dash-name {
     font-weight: 600;
 }
+/* Dashboards list: the dot wears the dashboard's accent color, muted when
+   none is set (the inline style overrides both) */
+.dash-dot {
+    display: inline-block;
+    width: 0.55rem;
+    height: 0.55rem;
+    margin-right: 0.45rem;
+    vertical-align: 0.05rem;
+    border-radius: 50%;
+    background: var(--muted);
+    opacity: 0.55;
+    box-shadow: 0 0 8px currentColor;
+}
 .dash-name-input {
     font-size: 1.05em;
     font-weight: 600;
     width: min(320px, 60vw);
+}
+
+.dash-color-input::-webkit-color-swatch-wrapper {
+    padding: 2px;
+}
+.dash-color-input::-webkit-color-swatch {
+    border: none;
+    border-radius: calc(var(--radius) - 3px);
 }
 .config-cell {
     display: flex;

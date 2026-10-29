@@ -1,10 +1,8 @@
 {
-    "dev.badge.password_none": "无",
     "dev.card.ssh": "SSH",
     "dev.row.password": "密码",
     "dev.row.user": "用户",
     "dev.ssh_new_password": "新密码",
-    "dev.ssh_pending_apply": "将在 SSH 启动时应用",
     "dev.ssh_reset_confirm": "确定要重置 {{user}} 的 SSH 密码吗？将生成并仅显示一次新密码。",
     "dev.ssh_stop_confirm": "停止 SSH 服务器？当前的 SSH 连接将被断开。",
     "mlog.done.ssh_password_reset": "已重置 {{user}} 的 SSH 密码",

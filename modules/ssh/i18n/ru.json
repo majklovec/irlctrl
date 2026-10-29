@@ -1,10 +1,8 @@
 {
-    "dev.badge.password_none": "нет",
     "dev.card.ssh": "SSH",
     "dev.row.password": "Пароль",
     "dev.row.user": "Пользователь",
     "dev.ssh_new_password": "Новый пароль",
-    "dev.ssh_pending_apply": "применится при запуске SSH",
     "dev.ssh_reset_confirm": "Сбросить SSH-пароль пользователя {{user}}? Новый пароль будет сгенерирован и показан один раз.",
     "dev.ssh_stop_confirm": "Остановить SSH-сервер? Активные SSH-соединения будут закрыты.",
     "mlog.done.ssh_password_reset": "SSH-пароль пользователя {{user}} сброшен",

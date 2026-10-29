@@ -1,10 +1,8 @@
 {
-    "dev.badge.password_none": "brak",
     "dev.card.ssh": "SSH",
     "dev.row.password": "Hasło",
     "dev.row.user": "Użytkownik",
     "dev.ssh_new_password": "Nowe hasło",
-    "dev.ssh_pending_apply": "stosowane przy uruchomieniu SSH",
     "dev.ssh_reset_confirm": "Czy zresetować hasło SSH użytkownika {{user}}? Wygenerowane i wyświetlone zostanie tylko raz.",
     "dev.ssh_stop_confirm": "Zatrzymać serwer SSH? Aktywne połączenia SSH zostaną zamknięte.",
     "mlog.done.ssh_password_reset": "Zresetowano hasło SSH użytkownika {{user}}",

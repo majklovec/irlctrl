@@ -12,6 +12,7 @@
  */
 import m from "mithril";
 import SETTINGS_MANIFEST from "../../generated/modules.settings";
+import { type LogWording, registerLogWording } from "../../shared/logMessages";
 import { errorMessage } from "../../shared/util";
 import type { ModulesView, Settings } from "../types";
 import { Card } from "./components/ui";
@@ -62,6 +63,12 @@ export interface ModuleDef {
 	render: (ctx: ModuleContext) => m.Children;
 	/** Re-seed the module's local state from fresh server data. */
 	refresh?: (ctx: ModuleContext) => void;
+	/**
+	 * Log wording for the module's methods (browser-side failure messages,
+	 * section labels) — the settings-only modules have no frontend.tsx to
+	 * register it through, so the framework does.
+	 */
+	log?: LogWording;
 }
 
 interface moduleState {
@@ -85,6 +92,9 @@ export function registerModule(def: ModuleDef): void {
 	}
 	states.set(def.id, { message: "", busy: false });
 	registered.push(def);
+	// Browser-side log wording (settings-only modules have no frontend.tsx
+	// registration to carry it).
+	if (def.log) registerLogWording(def.log);
 }
 
 /**

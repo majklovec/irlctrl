@@ -1,10 +1,8 @@
 {
-    "dev.badge.password_none": "なし",
     "dev.card.ssh": "SSH",
     "dev.row.password": "パスワード",
     "dev.row.user": "ユーザー",
     "dev.ssh_new_password": "新しいパスワード",
-    "dev.ssh_pending_apply": "SSH 起動時に適用",
     "dev.ssh_reset_confirm": "ユーザー {{user}} の SSH パスワードをリセットしますか？新しいパスワードが一度だけ生成・表示されます。",
     "dev.ssh_stop_confirm": "SSHサーバーを停止しますか？接続中のSSHセッションはクローズされます。",
     "mlog.done.ssh_password_reset": "SSH パスワードをリセットしました（{{user}}）",

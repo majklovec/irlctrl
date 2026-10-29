@@ -9,6 +9,7 @@
     "dash.grp_independent": "Indépendant",
     "dash.empty": "Aucun tableau de bord",
     "dash.name": "Nom",
+    "dash.color": "Couleur",
     "dash.new_placeholder": "p. ex. Diffusion",
     "dash.no_widgets": "Aucun widget — en ajouter un ci-dessous",
     "dash.not_found": "Tableau de bord introuvable",

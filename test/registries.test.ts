@@ -117,19 +117,20 @@ describe("module registries", () => {
     });
 
     test("device-card frontends cover every backend device-module id", () => {
-        // The modems card has no frontend of its own: the srtla module composes
-        // it (interfaces table + modem panels), so it is the only backend device
-        // id without a device-card frontend. broadcaster is the reverse
-        // case: a standalone agent (not a backend device module) that ships
-        // its own device-card frontend. Every other backend id must have
-        // exactly one card, and no extra card ids may exist.
+        // Two backend device ids have no device-card frontend: modems is
+        // composed by the srtla module (interfaces table + modem panels),
+        // and ssh lives on the settings page (its card is a settings.tsx
+        // ModuleDef, not a device card). broadcaster is the reverse case: a
+        // standalone agent (not a backend device module) that ships its own
+        // device-card frontend. Every other backend id must have exactly
+        // one card, and no extra card ids may exist.
         const cardIds = scanFrontends()
             .flatMap((fe) => fe.registrations)
             .filter((r) => r.kind === "device-card")
             .map((r) => r.id);
         const front = new Set(cardIds);
         const missing = DEVICE_ORDER.filter(
-            (id) => !front.has(id) && id !== "modems",
+            (id) => !front.has(id) && id !== "modems" && id !== "ssh",
         );
         const extra = [...front].filter(
             (id) => !DEVICE_ORDER.includes(id) && id !== "broadcaster",

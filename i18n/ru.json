@@ -9,6 +9,7 @@
     "dash.grp_independent": "Независимый",
     "dash.empty": "Дашбордов пока нет",
     "dash.name": "Название",
+    "dash.color": "Цвет",
     "dash.new_placeholder": "напр., стриминг",
     "dash.no_widgets": "Виджетов нет — добавьте ниже",
     "dash.not_found": "Дашборд не найден",

@@ -9,6 +9,7 @@
     "dash.grp_independent": "独立",
     "dash.empty": "ダッシュボードはまだありません",
     "dash.name": "名前",
+    "dash.color": "色",
     "dash.new_placeholder": "例：ストリーミング",
     "dash.no_widgets": "ウィジェットはありません — 下のから追加",
     "dash.not_found": "ダッシュボードが見つかりません",

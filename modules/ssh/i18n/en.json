@@ -1,10 +1,8 @@
 {
-    "dev.badge.password_none": "none",
     "dev.card.ssh": "SSH",
     "dev.row.password": "Password",
     "dev.row.user": "User",
     "dev.ssh_new_password": "New password",
-    "dev.ssh_pending_apply": "applied on SSH start",
     "dev.ssh_reset_confirm": "Reset the SSH password for {{user}}?",
     "dev.ssh_stop_confirm": "Stop the SSH server? Active SSH connections will be closed.",
     "mlog.done.ssh_password_reset": "SSH password for {{user}} reset",

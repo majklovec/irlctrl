@@ -292,7 +292,7 @@ Hlavní stránka (`http://<device>:8085/`) zobrazuje kartu pro každou funkci ak
 ### 6.1 Kombinované zařízení (všechny karty)
 
 ![Hlavní stránka kombinovaného zařízení](screenshots/09-device-main-combined-cs.png)
-_Kombinované zařízení: karty Encoder, Relay, Interfaces, Modems, SSH a Log._
+_Kombinované zařízení: karty Encoder, Relay, Interfaces, Modems a Log (SSH je na [stránce nastavení](#74-ssh))._
 
 ### 6.2 Role encoder
 
@@ -302,7 +302,7 @@ _Role encoder: karta Encoder se seznamem pipeline — bez karet Relay a Interfac
 ### 6.3 Role relay
 
 ![Hlavní stránka zařízení relay](screenshots/13-device-main-relay-cs.png)
-_Role relay: karty Relay (spojení a hodnocení kvality), Interfaces, Modems, SSH a Log._
+_Role relay: karty Relay (spojení a hodnocení kvality), Interfaces, Modems a Log._
 
 ### 6.4 Karta Encoder
 
@@ -338,15 +338,11 @@ U každého síťového rozhraní se zobrazuje **zaškrtávací políčko Bond**
 
 Zobrazuje všechny modemy spravované službou ModemManager: IMEI, operátora, stav registrace a sílu signálu. U každého lze použít akce **zapnout / vypnout / připojit / odpojit / resetovat**. Ve výběru zařízení pro agregaci na kartě Interfaces jsou modemy uvedeny jako `modem #N`. Pokud nejsou nalezeny žádné modemy, zobrazí se _„No modems found (ModemManager).“_
 
-### 6.8 Karta SSH
-
-Spravuje SSH server tohoto boxu: **State** (`stopped`/`running`), **User** (přihlašovací účet, výchozí `root`), **Password** (`none` / `configured`) a tlačítka **Start** / **Stop** / **New password** (heslo lze vygenerovat pouze při zastaveném SSH).
-
-### 6.9 Karta Log
+### 6.8 Karta Log
 
 Trvalý protokol událostí zaznamenává všechny akce (změny konfigurace a datového toku, změny agregace spojení, spuštění a zastavení modulů i události modemů) včetně času a úrovně závažnosti. Zapisuje se do souboru `--log-file` a zachová se i po restartu.
 
-### 6.10 Autostart (automatický start)
+### 6.9 Autostart (automatický start)
 
 Zaškrtnutím **Autostart** v hlavičce (nebo zavoláním `autostart.set`) nastavíte automatické obnovení posledního streamu při každém spuštění služby. Pokud potřebné zařízení pro zachytávání, uplinky nebo přijímač ještě nejsou připravené, systém se o spuštění pokusí znovu každých 5 s. Ruční akce Start nebo Stop opakované pokusy zruší.
 
@@ -402,8 +398,10 @@ _Spojení s OBS Studio používané modulem obs-controller. Modul se po uložen�
 
 _Spravuje SSH server zařízení: umožňuje jej spustit či zastavit, vybrat přihlašovací účet a nastavit nebo změnit jeho heslo._
 - **User** — přihlašovací účet (výchozí `root`).
+- **Password** — heslo účtu, vždy viditelné (zařízení ho hlásí v čistém tvaru). Upravuje se pouze při zastaveném SSH; uložené hodnoty se na účet projeví spuštěním SSH.
 - **Start / Stop** — SSH server.
-- **New password** — vygeneruje nové heslo; nová hodnota se zobrazí jen jednou. _Nové heslo lze vygenerovat pouze při zastaveném SSH — nejdřív SSH zastavte._
+- **New password** — vygeneruje nové heslo. _Vygenerovat lze pouze při zastaveném SSH — nejdřív SSH zastavte._
+- **Save** — uloží zadané heslo; na účet se projeví spuštěním SSH.
 
 ---
 
@@ -515,7 +513,7 @@ Kliknutím na zařízení se otevře jeho **stránka zařízení**.
 
 ![Stránka zařízení na ovládacím serveru](screenshots/15-control-device-page-cs.png)
 
-Stránka zařízení zobrazuje **stejné karty** jako místní rozhraní zařízení (Encoder, Relay, Interfaces, Modems, SSH a Log). Je poskytována ovládacím serverem, který příkazy předává zařízení přes jeho odchozí spojení — můžete tak ovládat i zařízení za NAT nebo v mobilní síti. V hlavičce je navíc zaškrtávací políčko **Autostart** a odkaz **Device settings**. Akce Start, Stop, Reload a nastavení fungují stejně jako v [sekci 6](#6-uživatelské-rozhraní-zařízení--běžná-obsluha).
+Stránka zařízení zobrazuje **stejné karty** jako místní rozhraní zařízení (Encoder, Relay, Interfaces, Modems a Log). Je poskytována ovládacím serverem, který příkazy předává zařízení přes jeho odchozí spojení — můžete tak ovládat i zařízení za NAT nebo v mobilní síti. V hlavičce je navíc zaškrtávací políčko **Autostart** a odkaz **Device settings**. Akce Start, Stop, Reload a nastavení fungují stejně jako v [sekci 6](#6-uživatelské-rozhraní-zařízení--běžná-obsluha).
 
 ### 11.3 Profil — heslo, tokeny, pozvánky
 

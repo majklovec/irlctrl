@@ -1,7 +1,7 @@
 /*
  * Local types for the ssh module (never imported by the core or other modules).
  */
-import type { ModuleSliceView, Status } from "../../shared/types";
+import type { ModuleSliceView } from "../../shared/types";
 
 /** The persisted configuration slice of the ssh module (the `modules.ssh` state). */
 export interface SshModuleConfig {
@@ -42,9 +42,3 @@ export interface SshSliceView extends ModuleSliceView {
     user?: string;
     password?: { configured: boolean };
 }
-
-/** The status envelope as the ssh card reads it (the `ssh` fragment is reported in the clear). */
-export type SshStatus = Status & {
-    /** Live state of the local SSH server (null when the module is not enabled). */
-    ssh?: SshHostStatus | null;
-};

@@ -19,6 +19,7 @@ import m from "mithril";
 import { Actions, Button, Field, Input } from "../../frontend/ts/components/ui";
 import { t } from "../../frontend/ts/i18n";
 import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
+import log from "./log";
 import "./styles.css";
 import type { SshSliceView } from "./types";
 
@@ -109,6 +110,7 @@ async function savePassword(ctx: ModuleContext): Promise<void> {
 export const def: ModuleDef = {
 	id: "ssh",
 	titleKey: "set.ssh",
+	log,
 	visible: (ctx) =>
 		ctx.role === "relay" || ctx.role === "encoder" || ctx.role === "combined",
 	refresh: (ctx) => {

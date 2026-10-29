@@ -292,7 +292,7 @@ The main page (`http://<device>:8085/`) shows one card per capability of the act
 ### 6.1 Combined device (all cards)
 
 ![Combined device main page](screenshots/09-device-main-combined.png)
-_Combined device: Encoder, Relay, Interfaces, Modems, SSH and Log cards._
+_Combined device: Encoder, Relay, Interfaces, Modems and Log cards (SSH lives on the [settings page](#74-ssh))._
 
 ### 6.2 Encoder role
 
@@ -302,7 +302,7 @@ _Encoder role: the Encoder card with pipeline list — no relay/routing cards._
 ### 6.3 Relay role
 
 ![Relay device main page](screenshots/13-device-main-relay.png)
-_Relay role: Relay card (connection + quality scoring), Interfaces, Modems, SSH, Log._
+_Relay role: Relay card (connection + quality scoring), Interfaces, Modems, Log._
 
 ### 6.4 Encoder card
 
@@ -340,15 +340,11 @@ Per network interface: **Bond checkbox** ("Include in bond" — the uplinks that
 
 Shows every ModemManager modem: IMEI, operator, registration, signal — with actions to **enable / disable / connect / disconnect / reset** each one. Modems appear as `modem #N` entries in the Interfaces card's bond selection. With no modems: _"No modems found (ModemManager)."_
 
-### 6.8 SSH card
-
-Manages this box's SSH server: **State** (`stopped`/`running`), **User** (login account, default `root`), **Password** (`none` / `configured`), and buttons **Start** / **Stop** / **New password** (a password can only be generated while SSH is stopped).
-
-### 6.9 Log card
+### 6.8 Log card
 
 A persistent event log — every action (configuration changes, bitrate changes, bond toggles, module starts/stops, modem events) with a timestamp and severity. It is written to `--log-file` and survives restarts.
 
-### 6.10 Autostart
+### 6.9 Autostart
 
 Tick **Autostart** in the header (or call `autostart.set`) to resume the last stream whenever the service starts. It **retries every 5 s** until it succeeds (capture card, uplinks, or receiver not ready yet); any manual Start/Stop cancels a pending retry.
 
@@ -404,8 +400,10 @@ _Connection to OBS Studio used by the obs-controller module. The module is resta
 
 _Manage this box's SSH server — start and stop it, choose the login account, and set or reset its password._
 - **User** — the login account (default `root`).
+- **Password** — the account's password, always visible (the device reports it in the clear). Editable only while SSH is stopped; the staged value is applied to the account when SSH starts.
 - **Start / Stop** — the SSH server.
-- **New password** — generates a fresh password; the new value is shown once. _A new password can be generated only while SSH is stopped — stop SSH first._
+- **New password** — generates a fresh password. _Can be generated only while SSH is stopped — stop SSH first._
+- **Save** — stages the typed password; it is applied to the account when SSH starts.
 
 ---
 
@@ -517,7 +515,7 @@ Click a device to open its **device page**.
 
 ![Control server device page](screenshots/15-control-device-page.png)
 
-The device page renders the **same cards** as the device's own UI (Encoder, Relay, Interfaces, Modems, SSH, Log) but is served by the control server, which relays every command to the device over its outbound connection — so you can operate devices behind NAT or on mobile networks from anywhere. It additionally has the **Autostart** checkbox and a **Device settings** link in its header. All start/stop/reload/configure actions work exactly as described in [section 6](#6-the-device-ui--daily-operation).
+The device page renders the **same cards** as the device's own UI (Encoder, Relay, Interfaces, Modems, Log) but is served by the control server, which relays every command to the device over its outbound connection — so you can operate devices behind NAT or on mobile networks from anywhere. It additionally has the **Autostart** checkbox and a **Device settings** link in its header. All start/stop/reload/configure actions work exactly as described in [section 6](#6-the-device-ui--daily-operation).
 
 ### 11.3 Profile — password, tokens, invitations
 

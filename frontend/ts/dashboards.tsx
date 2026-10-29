@@ -94,6 +94,14 @@ function list(): m.Vnode {
 								class="dash-row-link"
 								href={`/dashboards/view/${encodeURIComponent(d.id)}/`}
 							>
+								<span
+									class="dash-dot"
+									style={
+										d.color
+											? `background:${d.color};color:${d.color}`
+											: ""
+									}
+								/>
 								{d.name}
 							</a>
 						</td>

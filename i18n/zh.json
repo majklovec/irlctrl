@@ -9,6 +9,7 @@
     "dash.grp_independent": "独立",
     "dash.empty": "还没有仪表盘",
     "dash.name": "名称",
+    "dash.color": "颜色",
     "dash.new_placeholder": "例如：推流",
     "dash.no_widgets": "暂无小组件 — 请在下方添加",
     "dash.not_found": "未找到仪表盘",

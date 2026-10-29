@@ -1,10 +1,8 @@
 {
-    "dev.badge.password_none": "nenhuma",
     "dev.card.ssh": "SSH",
     "dev.row.password": "Senha",
     "dev.row.user": "Usuário",
     "dev.ssh_new_password": "Nova senha",
-    "dev.ssh_pending_apply": "aplicada ao iniciar o SSH",
     "dev.ssh_reset_confirm": "Redefinir a senha SSH de {{user}}? Uma nova senha será gerada e exibida uma única vez.",
     "dev.ssh_stop_confirm": "Parar o servidor SSH? As ligações SSH ativas serão encerradas.",
     "mlog.done.ssh_password_reset": "Senha SSH de {{user}} redefinida",

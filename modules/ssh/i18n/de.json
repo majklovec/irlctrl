@@ -1,10 +1,8 @@
 {
-    "dev.badge.password_none": "keine",
     "dev.card.ssh": "SSH",
     "dev.row.password": "Passwort",
     "dev.row.user": "Benutzer",
     "dev.ssh_new_password": "Neues Passwort",
-    "dev.ssh_pending_apply": "wird beim SSH-Start angewendet",
     "dev.ssh_reset_confirm": "SSH-Passwort für {{user}} zurücksetzen? Ein neues Passwort wird einmalig erzeugt und angezeigt.",
     "dev.ssh_stop_confirm": "SSH-Server stoppen? Aktive SSH-Verbindungen werden getrennt.",
     "mlog.done.ssh_password_reset": "SSH-Passwort für {{user}} zurückgesetzt",

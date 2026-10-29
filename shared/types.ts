@@ -152,6 +152,8 @@ export interface ServerDashboard {
     /** User profile that owns this dashboard (server-assigned). */
     owner?: string;
     name: string;
+    /** Dashboard accent color, used by the list's dot */
+    color?: string;
     /** Monotonic; bumped on every update. Used for optimistic concurrency. */
     version: number;
     widgets: ServerDashboardWidget[];

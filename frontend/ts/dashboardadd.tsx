@@ -7,6 +7,7 @@
  * free grid slot and the page returns to the (live) dashboard view. A 409
  * conflict reloads the server copy; the widget is not added twice. */
 import m from "mithril";
+import { DEFAULT_COLOR } from "../../shared/validate";
 import type {
 	ServerDashboard,
 	ServerDashboardWidget,
@@ -25,7 +26,7 @@ import {
 } from "./dashboard";
 import { t } from "./i18n";
 import { widgetModule } from "./module-registry";
-import { mountPage, uuid } from "./util";
+import { mountPage, setHeaderColor, uuid } from "./util";
 import { configSelectField } from "./widget-config-select";
 
 const ADD_PATH_RE = /\/dashboards\/add\/([^/]+)\/?$/;
@@ -184,6 +185,7 @@ async function submit(): Promise<void> {
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({
 			name: dash.name,
+			color: dash.color,
 			widgets: [...dash.widgets, widget],
 			version: dash.version,
 		}),
@@ -368,8 +370,10 @@ void (async () => {
 		ok?: boolean;
 		dashboard?: ServerDashboard;
 	} | null;
-	if (body?.ok && body.dashboard) state.dash = body.dashboard;
-	else state.notFound = true;
+	if (body?.ok && body.dashboard) {
+		state.dash = body.dashboard;
+		setHeaderColor(state.dash.color ?? DEFAULT_COLOR);
+	} else state.notFound = true;
 	void mountPage(() => t("dash.title"), App);
 	await refreshDevices();
 	m.redraw();

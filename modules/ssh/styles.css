@@ -2,33 +2,3 @@
 .mod-ssh .actions {
     margin-top: 1rem;
 }
-
-/* SSH card: the one-time fresh-password line. */
-.ssh-password {
-    margin: 0.25rem 0 0.5rem;
-    font-size: 0.9rem;
-}
-
-.ssh-password code {
-    font-family: var(--font-mono, monospace);
-    background: var(--bg-inset, rgba(0, 0, 0, 0.15));
-    padding: 0.1rem 0.4rem;
-    border-radius: var(--radius-sm, 4px);
-    user-select: all;
-}
-
-/* Password value shown in the card's definition list (always visible). */
-.ssh-password-code {
-    font-family: var(--font-mono, monospace);
-    background: var(--bg-inset, rgba(0, 0, 0, 0.15));
-    padding: 0.1rem 0.4rem;
-    border-radius: var(--radius-sm, 4px);
-    user-select: all;
-}
-
-/* Staged-but-not-applied password: value + "applies on start" badge. */
-.ssh-pending {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}

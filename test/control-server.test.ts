@@ -341,15 +341,66 @@ describe("control server HTTP contracts", () => {
                 cookie,
                 "content-type": "application/json",
             },
-            body: JSON.stringify({ name: "Operations", widgets: [] }),
+            body: JSON.stringify({
+                name: "Operations",
+                color: "#ff0000",
+                widgets: [],
+            }),
         });
         expect(createDashboard.status).toBe(201);
         const created = (await createDashboard.json()) as {
-            dashboard: { id: string; version: number; columns: number };
+            dashboard: {
+                id: string;
+                version: number;
+                columns: number;
+                color?: string;
+            };
         };
         expect(created.dashboard).toMatchObject({
             version: 1,
             columns: 12,
+            color: "#ff0000",
+        });
+
+        const invalidColor = await fetch(
+            `${baseUrl}/api/dashboards/${created.dashboard.id}`,
+            {
+                method: "PUT",
+                headers: {
+                    cookie,
+                    "content-type": "application/json",
+                },
+                body: JSON.stringify({
+                    name: "Operations",
+                    color: "not-a-color",
+                    widgets: [],
+                    version: created.dashboard.version,
+                }),
+            },
+        );
+        expect(invalidColor.status).toBe(200);
+        expect(await invalidColor.json()).toMatchObject({ ok: false, code: 400 });
+
+        const recolorDashboard = await fetch(
+            `${baseUrl}/api/dashboards/${created.dashboard.id}`,
+            {
+                method: "PUT",
+                headers: {
+                    cookie,
+                    "content-type": "application/json",
+                },
+                body: JSON.stringify({
+                    name: "Operations",
+                    color: "#00ff00",
+                    widgets: [],
+                    version: created.dashboard.version,
+                }),
+            },
+        );
+        expect(recolorDashboard.status).toBe(200);
+        expect(await recolorDashboard.json()).toMatchObject({
+            ok: true,
+            dashboard: { color: "#00ff00", version: 2 },
         });
 
         await stopServer();
@@ -366,10 +417,42 @@ describe("control server HTTP contracts", () => {
                 {
                     id: created.dashboard.id,
                     name: "Operations",
-                    version: 1,
+                    color: "#00ff00",
+                    version: 2,
                     widgets: [],
                 },
             ],
         });
+
+        // A PUT without a color clears it
+        const clearColor = await fetch(
+            `${baseUrl}/api/dashboards/${created.dashboard.id}`,
+            {
+                method: "PUT",
+                headers: {
+                    cookie: restoredCookie,
+                    "content-type": "application/json",
+                },
+                body: JSON.stringify({
+                    name: "Operations",
+                    widgets: [],
+                    version: 2,
+                }),
+            },
+        );
+        expect(clearColor.status).toBe(200);
+        expect(await clearColor.json()).toMatchObject({
+            ok: true,
+            dashboard: { version: 3 },
+        });
+        expect(
+            ((await (
+                await fetch(
+                    `${baseUrl}/api/dashboards/${created.dashboard.id}`,
+                    { headers: { cookie: restoredCookie } },
+                )
+            ).json()) as { dashboard: { color?: string } })
+                .dashboard.color,
+        ).toBeUndefined();
     }, 60_000);
 });

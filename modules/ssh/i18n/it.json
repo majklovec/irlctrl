@@ -1,10 +1,8 @@
 {
-    "dev.badge.password_none": "nessuna",
     "dev.card.ssh": "SSH",
     "dev.row.password": "Password",
     "dev.row.user": "Utente",
     "dev.ssh_new_password": "Nuova password",
-    "dev.ssh_pending_apply": "applicato all'avvio di SSH",
     "dev.ssh_reset_confirm": "Reimposta la password SSH di {{user}}? Verrà generata e mostrata una sola volta.",
     "dev.ssh_stop_confirm": "Arrestare il server SSH? Le connessioni SSH attive verranno chiuse.",
     "mlog.done.ssh_password_reset": "Password SSH di {{user}} reimpostata",
