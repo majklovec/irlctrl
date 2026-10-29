@@ -20,9 +20,36 @@ export interface SrtlaOutputState {
 	keyConfigured: boolean;
 }
 
+/**
+ * One bonded SRTLA connection's latest keepalive, parsed from `srtla_rec`'s
+ * `Per-connection keepalive:` stdout lines. The receiver reports one of these
+ * per SRTLA link roughly every 1–2 s while the stream is up.
+ */
+export interface SrtlaKeepalive {
+	/** The SRTLA connection id (the `ID=` field). */
+	id: number;
+	/** Measured bandwidth, kbits/s (the `BW:` field). */
+	bwKbits: number;
+	/** Receiver window in SRTLA buffers (the `Window=` field). */
+	window: number;
+	/** Packets currently in flight (the `In-flight=` field). */
+	inFlight: number;
+	/** Round-trip time, ms (the `RTT=` field). */
+	rttMs: number;
+	/** NAKs reported on this connection (the `NAKs=` field). */
+	naks: number;
+	/** Epoch ms of the keepalive that produced these numbers. */
+	at: number;
+}
+
 export interface SrtlaStreamStateFields {
 	/** The stream lifecycle (`idle` / `starting` / `running` / `stopping`). */
 	stream: SrtlaStreamState;
+	/**
+	 * Latest per-connection SRTLA keepalive stats (one entry per bonded link,
+	 * sorted by connection id). Empty while the stream is not flowing.
+	 */
+	keepalives: SrtlaKeepalive[];
 	/** The configured RTMP destinations (empty = setup incomplete). */
 	outputs: SrtlaOutputState[];
 	inputFormat: string;

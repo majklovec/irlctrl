@@ -2,3 +2,19 @@
 .mod-broadcaster .broadcaster-rtmp {
 	word-break: break-all;
 }
+
+/* Per-connection SRTLA keepalive table under the stream state. */
+.mod-broadcaster .broadcaster-links {
+	margin-top: 0.75rem;
+}
+.mod-broadcaster .broadcaster-links h3 {
+	margin: 0 0 0.25rem;
+	font-size: 0.8em;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	opacity: 0.7;
+}
+.mod-broadcaster .broadcaster-links .total td {
+	font-weight: 600;
+	border-top: 1px solid var(--border, rgba(128, 128, 128, 0.4));
+}

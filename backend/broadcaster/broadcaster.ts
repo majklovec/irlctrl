@@ -79,6 +79,7 @@ import {
 	srtlaService,
 	srtlaServiceForUrl,
 } from "../../modules/broadcaster/services";
+import type { SrtlaKeepalive } from "../../modules/broadcaster/types";
 import { arg, argEnv, argFail, enumArgEnv, flag, flagOrEnv } from "../../shared/args";
 import {
 	COLOR_RE,
@@ -242,6 +243,54 @@ let logSeq = 0;
 let lastFlushedId = 0;
 const logBuffer: LogEntry[] = [];
 
+// Latest per-connection SRTLA keepalive stats, parsed from `srtla_rec`'s
+// stdout. Keyed by SRTLA connection id so a rebonded link (new id) starts a
+// fresh entry; cleared when the stream stops.
+const keepalives = new Map<number, SrtlaKeepalive>();
+let lastKeepalivePushAt = 0;
+const KEEPALIVE_PUSH_INTERVAL_MS = 2_000;
+
+/**
+ * One `Per-connection keepalive:` line, e.g.
+ * `[2026-10-29 13:16:16.335] [info] [192.168.32.1:60401] [Group: 0x…]
+ *  Per-connection keepalive: ID=4146118334, BW: 5946.18 kbits/s, Window=60000,
+ *  In-flight=7, RTT=11ms, NAKs=0`
+ *
+ * Anchored on the `Per-connection keepalive:` marker (the leading timestamp,
+ * level and peer are irrelevant) so the parser is robust to srtla_rec's
+ * surrounding log decoration. All six fields are required — a line that only
+ * partially matches is ignored rather than half-parsed.
+ */
+const KEEPALIVE_RE =
+	/Per-connection keepalive:\s*ID=(\d+),\s*BW:\s*([\d.]+)\s*kbits\/s,\s*Window=(\d+),\s*In-flight=(\d+),\s*RTT=(\d+)\s*ms,\s*NAKs=(\d+)/;
+
+/** Parse one srtla_rec stdout line; stores the connection's latest keepalive
+ * and schedules a throttled status push so the web UI stays current.
+ * Returns true when the line was a keepalive (so pumpOutput skips re-logging
+ * it) — the values are already surfaced to the web UI as stats. */
+function parseKeepalive(line: string): boolean {
+	const m = KEEPALIVE_RE.exec(line);
+	if (!m) return false;
+	const id = Number(m[1]);
+	keepalives.set(id, {
+		id,
+		bwKbits: Number(m[2]),
+		window: Number(m[3]),
+		inFlight: Number(m[4]),
+		rttMs: Number(m[5]),
+		naks: Number(m[6]),
+		at: Date.now(),
+	});
+	// Keepalives arrive every 1–2 s per link; push at most once per interval so
+	// the status stream stays chatty, not per-line.
+	const now = Date.now();
+	if (now - lastKeepalivePushAt >= KEEPALIVE_PUSH_INTERVAL_MS) {
+		lastKeepalivePushAt = now;
+		pushStatus();
+	}
+	return true;
+}
+
 // ── Small helpers ────────────────────────────────────────────────────────────
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -348,6 +397,9 @@ function currentStatus(): Record<string, unknown> {
 		state: {
 			autostart: config.autoStart,
 			stream: streamState,
+			// Latest per-connection SRTLA keepalive stats (see parseKeepalive);
+			// empty while the stream is down.
+			keepalives: [...keepalives.values()].sort((a, b) => a.id - b.id),
 			// The key is never part of the advertised URL — each destination is
 			// reported separately with only a key-present flag.
 			outputs: config.outputs.map((out) => ({
@@ -704,10 +756,15 @@ function preflight(): void {
 
 // ── Process management ───────────────────────────────────────────────────────
 
+// onLine returns true when it fully consumes a line (e.g. a parsed keepalive);
+// such lines are surfaced to the web UI as stats, so they are not re-logged.
+type OnLine = (line: string) => boolean | void;
+
 async function pumpOutput(
 	stream: ReadableStream<Uint8Array>,
 	label: string,
 	level: LogLevel = "info",
+	onLine?: OnLine,
 ): Promise<void> {
 	const decoder = new TextDecoder();
 	let buf = "";
@@ -718,7 +775,10 @@ async function pumpOutput(
 			while (nl >= 0) {
 				const line = buf.slice(0, nl).replace(/\r$/, "").trim();
 				buf = buf.slice(nl + 1);
-				if (line !== "") log(level, `[${label}] ${line.slice(0, 400)}`, label);
+				if (line !== "") {
+					if (onLine?.(line) !== true)
+						log(level, `[${label}] ${line.slice(0, 400)}`, label);
+				}
 				nl = buf.indexOf("\n");
 			}
 		}
@@ -756,6 +816,7 @@ function spawnProc(
 	name: string,
 	args: string[],
 	label: string,
+	onStdoutLine?: OnLine,
 ): Bun.Subprocess {
 	// The child's arguments may carry a stream key in each RTMP URL; logs
 	// reach the web UI, so mask every configured key.
@@ -767,7 +828,12 @@ function spawnProc(
 		stdout: "pipe",
 		stderr: "pipe",
 	});
-	void pumpOutput(proc.stdout as ReadableStream<Uint8Array>, label);
+	void pumpOutput(
+		proc.stdout as ReadableStream<Uint8Array>,
+		label,
+		"info",
+		onStdoutLine,
+	);
 	void pumpOutput(proc.stderr as ReadableStream<Uint8Array>, label, "warn");
 	proc.exited
 		.then((code) => onChildExit(label, code))
@@ -789,6 +855,10 @@ function killProcs(): void {
 function resetStreamHandles(): void {
 	srtlaProc = null;
 	ffmpegProc = null;
+	// The stats belong to the run we just tore down; a stale keepalive from the
+	// previous stream would read as "live" on the next start.
+	keepalives.clear();
+	lastKeepalivePushAt = 0;
 }
 
 // 5 s health monitor: srtla_rec's SRTLA UDP port is the liveness signal for
@@ -1036,7 +1106,7 @@ async function startStream(): Promise<Record<string, unknown>> {
 	];
 	if (config.metricsPort > 0)
 		srtlaArgs.push("--metrics_port", String(config.metricsPort));
-	srtlaProc = spawnProc("srtla_rec", srtlaArgs, "srtla_rec");
+	srtlaProc = spawnProc("srtla_rec", srtlaArgs, "srtla_rec", parseKeepalive);
 
 	startedAt = Date.now();
 	streamState = "running";

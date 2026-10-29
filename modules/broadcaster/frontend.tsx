@@ -18,6 +18,13 @@ import { SRTLA_CUSTOM_SERVICE, srtlaService } from "./services";
 import "./styles.css";
 import type { BroadcasterDeviceSummary, BroadcasterStatus } from "./types";
 
+/** kbits/s → "5946 kbits/s" above 1000, "6.05 Mbits/s" beyond. */
+function formatKbits(kbits: number): string {
+	return kbits >= 1000
+		? `${(kbits / 1000).toFixed(1)} Mbits/s`
+		: `${Math.round(kbits)} kbits/s`;
+}
+
 function broadcasterCardBody(
 	host: DeviceCard,
 	status: BroadcasterStatus,
@@ -25,6 +32,57 @@ function broadcasterCardBody(
 	const s = status.state;
 	const running = s.stream === "running";
 	const transitional = s.stream === "starting" || s.stream === "stopping";
+	const ka = s.keepalives;
+	// Per-connection SRTLA keepalive table (BW, Window, In flight, RTT, NAKs),
+	// rendered under the stream state. No keepalives to show: the stream is up
+	// but srtla_rec has not reported a link yet (first ~1–2 s), so show a
+	// "waiting" hint; otherwise the stream is down and the section is omitted.
+	const keepalivesSection =
+		ka.length === 0 ? (
+			running ? (
+				<p class="broadcaster-links muted">{t("dev.kp_waiting")}</p>
+			) : null
+		) : (
+			// One row per bonded link, plus a totals footer (combined
+			// bandwidth and NAK count) — a bond aggregates its links, so
+			// the per-link sum is the figure the operator reads off.
+			<div class="broadcaster-links">
+				<h3>{t("dev.kp_links")}</h3>
+				<table class="dash-table">
+					<thead>
+						<tr>
+							<th>{t("dev.kp_bw")}</th>
+							<th>{t("dev.kp_window")}</th>
+							<th>{t("dev.kp_inflight")}</th>
+							<th>{t("dev.kp_rtt")}</th>
+							<th>{t("dev.kp_naks")}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{ka.map((k, i) => (
+							<tr key={k.id ?? i}>
+								<td class="num">{formatKbits(k.bwKbits)}</td>
+								<td class="num">{k.window}</td>
+								<td class="num">{k.inFlight}</td>
+								<td class="num">{k.rttMs} ms</td>
+								<td class="num">{k.naks}</td>
+							</tr>
+						))}
+						{ka.length > 1 ? (
+							<tr class="total">
+								<td>{t("dev.kp_total")}</td>
+								<td class="num">
+									{formatKbits(ka.reduce((sum, k) => sum + k.bwKbits, 0))}
+								</td>
+								<td class="num">{ka.reduce((s, k) => s + k.inFlight, 0)}</td>
+								<td class="num" />
+								<td class="num">{ka.reduce((s, k) => s + k.naks, 0)}</td>
+							</tr>
+						) : null}
+					</tbody>
+				</table>
+			</div>
+		);
 	return (
 		<Card title={t("dev.card.broadcaster")} class="mod-broadcaster">
 			<DefinitionList
@@ -42,7 +100,6 @@ function broadcasterCardBody(
 					[
 						t("dev.row.outputs"),
 						s.outputs.length > 0 ? (
-							// biome-ignore lint/complexity/noUselessFragments: Element[] is not a Child; the fragment makes it one
 							<ul>
 								{s.outputs.map((o) => {
 									// The catalog service name (Kick, Twitch, ...)
@@ -90,6 +147,7 @@ function broadcasterCardBody(
 						: []),
 				]}
 			/>
+			{keepalivesSection}
 			<Actions>
 				<Button
 					label={t("ui.start")}
