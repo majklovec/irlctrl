@@ -77,6 +77,10 @@ services:
             # GStreamer pipeline definitions (encoder role); kept mounted for
             # parity with the combined role.
             - ./pipeline:/app/pipeline
+        extra_hosts:
+            # srtla2platform lives on the host (SRTLA receiver on 5001/udp);
+            # the relay container cannot resolve it by service name without this.
+            - "broadcaster:host-gateway"
         environment:
             - CONTROL_SERVER_URL=${CONTROL_SERVER_URL}
             - CONTROL_SERVER_TOKEN=${CONTROL_SERVER_TOKEN}
