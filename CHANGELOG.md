@@ -1,3 +1,10 @@
+# [1.17.0](https://github.com/majklovec/irlctrl/compare/v1.16.0...v1.17.0) (2026-10-29)
+
+
+### Features
+
+* **table:** align table text to the center for improved readability ([fa0f372](https://github.com/majklovec/irlctrl/commit/fa0f3726e3f9bad8dd89819b323935faa92a9297))
+
 # [1.16.0](https://github.com/majklovec/irlctrl/compare/v1.15.0...v1.16.0) (2026-10-29)
 
 
