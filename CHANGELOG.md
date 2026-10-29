@@ -1,3 +1,10 @@
+# [1.18.0](https://github.com/majklovec/irlctrl/compare/v1.17.0...v1.18.0) (2026-10-29)
+
+
+### Features
+
+* **chat:** add message timestamps feature with localization support ([0703e5a](https://github.com/majklovec/irlctrl/commit/0703e5a20d4dfc4d8068dd7b268309894037de05))
+
 # [1.17.0](https://github.com/majklovec/irlctrl/compare/v1.16.0...v1.17.0) (2026-10-29)
 
 
