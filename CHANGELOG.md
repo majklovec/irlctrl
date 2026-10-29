@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/majklovec/irlctrl/compare/v1.10.0...v1.11.0) (2026-10-29)
+
+
+### Features
+
+* **srtla2platform:** implement RTMP service catalog and settings UI ([01b7a97](https://github.com/majklovec/irlctrl/commit/01b7a97d393d27b89467cb9aad22da8f4de24c8e))
+
 # [1.10.0](https://github.com/majklovec/irlctrl/compare/v1.9.0...v1.10.0) (2026-10-28)
 
 
