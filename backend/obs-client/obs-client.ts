@@ -65,7 +65,7 @@ import type {
     SwitcherConfig,
     SwitcherMetrics,
 } from "../../modules/obs-controller/types";
-import { arg, argFail, flag, intArg } from "../../shared/args";
+import { argEnv, argFail, flag, intArgEnv } from "../../shared/args";
 import {
     ApiError,
     checkColor,
@@ -253,7 +253,9 @@ const help = (code: number = 0): void => {
             " CLI flags > env vars > config file > defaults.",
     );
     console.log(
-        "The CONTROL_SERVER_TOKEN / CONTROL_SERVER_URL / OBS_URL / OBS_PASSWORD env vars override the config file (e.g. from docker-compose).",
+        "Every flag has an env var counterpart that overrides the config file (e.g. from docker-compose):" +
+            " CONTROL_SERVER_URL / CONTROL_SERVER_TOKEN / OBS_URL / OBS_PASSWORD /" +
+            " DEVICE_HOSTNAME / DEVICE_UUID / CONFIG_FILE / CONTROL_SERVER_INTERVAL.",
     );
     process.exit(code);
 };
@@ -275,8 +277,11 @@ interface ObsClientConfig {
 }
 
 async function main(): Promise<void> {
-    const configFile = arg(
+    // CLI flags > env vars > config file > defaults: the env vars (e.g. from
+    // docker-compose) override values persisted to the config file.
+    const configFile = argEnv(
         "--config",
+        "CONFIG_FILE",
         join(tmpdir(), "obs-client-config.json"),
     );
     const cfg: ObsClientConfig =
@@ -285,30 +290,39 @@ async function main(): Promise<void> {
             .catch(() => null)) as ObsClientConfig | null) ?? {};
     const cfgStr = (key: keyof ObsClientConfig): string | undefined =>
         typeof cfg[key] === "string" ? (cfg[key] as string) : undefined;
-    // CLI flags > env vars > config file > defaults: the env vars (e.g. from
-    // docker-compose) override values persisted to the config file.
-    const obsUrl = arg(
+    const obsUrl = argEnv(
         "--obs",
-        process.env.OBS_URL ?? cfgStr("obsUrl") ?? "ws://127.0.0.1:4455",
+        "OBS_URL",
+        cfgStr("obsUrl") ?? "ws://127.0.0.1:4455",
     );
-    const obsPassword = arg(
+    const obsPassword = argEnv(
         "--obs-password",
-        process.env.OBS_PASSWORD ?? cfgStr("obsPassword") ?? "",
+        "OBS_PASSWORD",
+        cfgStr("obsPassword") ?? "",
     );
     // mutable — `settings.update` can change these while the box runs
-    let remoteUrl = arg(
+    let remoteUrl = argEnv(
         "--remote",
-        process.env.CONTROL_SERVER_URL ?? cfgStr("remoteUrl") ?? "",
+        "CONTROL_SERVER_URL",
+        cfgStr("remoteUrl") ?? "",
     );
-    let remoteToken = arg(
+    let remoteToken = argEnv(
         "--remote-token",
-        process.env.CONTROL_SERVER_TOKEN ?? cfgStr("remoteToken") ?? "",
+        "CONTROL_SERVER_TOKEN",
+        cfgStr("remoteToken") ?? "",
     );
-    const remoteInterval =
-        arg("--remote-interval") !== undefined
-            ? intArg("--remote-interval", 30, 0, 3600)
-            : cfg.remoteInterval ?? 30;
-    let deviceName = arg("--hostname", cfgStr("hostname") ?? hostname());
+    const remoteInterval = intArgEnv(
+        "--remote-interval",
+        "CONTROL_SERVER_INTERVAL",
+        cfg.remoteInterval ?? 30,
+        0,
+        3600,
+    );
+    let deviceName = argEnv(
+        "--hostname",
+        "DEVICE_HOSTNAME",
+        cfgStr("hostname") ?? hostname(),
+    );
     let deviceColor = checkColor(cfgStr("color") ?? DEFAULT_COLOR);
 
     if (flag("--help") || flag("-h")) {
@@ -323,7 +337,7 @@ async function main(): Promise<void> {
     // This box's own config file: the resolved connection info is written
     // back (CLI > env > config file), so the file always reflects the
     // connection actually in use and survives restarts.
-    const cfgUuid = arg("--uuid");
+    const cfgUuid = argEnv("--uuid", "DEVICE_UUID");
     if (cfgUuid) cfg.uuid = cfgUuid;
     Object.assign(cfg, {
         obsUrl,

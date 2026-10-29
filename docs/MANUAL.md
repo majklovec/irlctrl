@@ -572,36 +572,38 @@ A widget for a device whose module is off shows _Module disabled on device_; a w
 
 ### 12.1 Device client (`backend/client/client.ts`)
 
-| Option                    | Env                    | Default                          | What it does                                                                                                                                          |
-| ------------------------- | ---------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--role`                  | `ROLE`                 | `relay`                          | `relay`, `encoder`, or `combined`.                                                                                                                    |
-| `--host`, `--port`        | —                      | `127.0.0.1`, `8085`              | Local web UI and WebSocket API (`/ws`), always on.                                                                                                    |
-| `--allow-origin`          | —                      | —                                | Extra browser origins for `/ws` (comma-separated, `*` = any).                                                                                         |
-| `--config`                | —                      | `$TMPDIR/config.json`            | Device config — settings, encoder, srtla target, autostart, modems. **Use a persistent path in production** (autostart needs it to survive a reboot). |
-| `--uplinks`               | —                      | `$TMPDIR/srtla_ips.txt`          | Uplinks file for `srtla_send`.                                                                                                                        |
-| `--start-srtla`           | —                      | —                                | Relay/combined: start `srtla_send` on boot with `<listenPort> <remoteHost> <remotePort>`.                                                             |
-| `--srtla-reload`          | —                      | `signal`                         | How to reload `srtla_send`: `signal` (SIGHUP) or `restart`.                                                                                           |
-| `--srtla-socket`          | `SRTLA_CONTROL_SOCKET` | `$TMPDIR/srtla_send.sock`        | `srtla_send` control socket (link stats, mode/quality); `""` disables it.                                                                             |
-| `--debounce-ms`           | —                      | `1500`                           | Interface-event debounce in ms.                                                                                                                       |
-| `--pipelines`             | `PIPELINES_DIR`        | `/usr/share/belacoder/pipelines` | Pipeline files, including subdirectories.                                                                                                             |
-| `--encoder`               | `ENCODER_BIN`          | `belacoder`                      | Encoder binary; `ceracoder` is detected by name and switches the encoder module to INI-config mode.                                                   |
-| —                         | `SRTLA_SEND_BIN`       | `srtla_send`                     | Path to the `srtla_send` binary.                                                                                                                      |
-| `--bitrate-file`          | —                      | `$TMPDIR/belacoder_br`           | belacoder bitrate file (re-read on SIGHUP).                                                                                                           |
-| `--ceracoder-conf`        | —                      | `$TMPDIR/ceracoder.conf`         | ceracoder INI config (balancer + tuning), applied live by the encoder module.                                                                         |
-| `--log-file`              | —                      | `$TMPDIR/srtla_log.json`         | Persistent event log shown in the web UI.                                                                                                             |
-| `--remote`                | `CONTROL_SERVER_URL`   | —                                | Control server, e.g. `wss://ctl.example.com/device`. The env var overrides the config file (CLI flag overrides both).                                 |
-| `--remote-token`          | `CONTROL_SERVER_TOKEN` | —                                | Device token. **Prefer the env var** (keeps it out of `ps`); the env var overrides the config file.                                                   |
-| `--remote-interval`       | —                      | `30`                             | Periodic status push in seconds (`0` = only on change).                                                                                               |
-| `--remote-stats-interval` | —                      | `2`                              | `srtla_send` link-stats push interval in seconds.                                                                                                     |
-| `--dry-run`               | —                      | —                                | Print `ip`/process actions instead of running them (safe testing).                                                                                    |
+Every flag has an environment-variable counterpart. Resolution order: **CLI flag > env var > config file > default**.
+
+| Option                    | Env                             | Default                          | What it does                                                                                                                                          |
+| ------------------------- | ------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--role`                  | `ROLE`                          | `relay`                          | `relay`, `encoder`, or `combined`.                                                                                                                    |
+| `--host`, `--port`        | `API_HOST`, `API_PORT`          | `127.0.0.1`, `8085`              | Local web UI and WebSocket API (`/ws`), always on.                                                                                                    |
+| `--allow-origin`          | `ALLOWED_ORIGINS`               | —                                | Extra browser origins for `/ws` (comma-separated, `*` = any).                                                                                         |
+| `--config`                | `CONFIG_FILE`                   | `$TMPDIR/config.json`            | Device config — settings, encoder, srtla target, autostart, modems. **Use a persistent path in production** (autostart needs it to survive a reboot). |
+| `--uplinks`               | `UPLINKS_FILE`                  | `$TMPDIR/srtla_ips.txt`          | Uplinks file for `srtla_send`.                                                                                                                        |
+| `--start-srtla`           | —                               | —                                | Relay/combined: start `srtla_send` on boot with `<listenPort> <remoteHost> <remotePort>`.                                                             |
+| `--srtla-reload`          | `SRTLA_RELOAD_MODE`             | `signal`                         | How to reload `srtla_send`: `signal` (SIGHUP) or `restart`.                                                                                           |
+| `--srtla-socket`          | `SRTLA_CONTROL_SOCKET`          | `$TMPDIR/srtla_send.sock`        | `srtla_send` control socket (link stats, mode/quality); `""` disables it.                                                                             |
+| `--debounce-ms`           | `DEBOUNCE_MS`                   | `1500`                           | Interface-event debounce in ms.                                                                                                                       |
+| `--pipelines`             | `PIPELINES_DIR`                 | `/usr/share/belacoder/pipelines` | Pipeline files, including subdirectories.                                                                                                             |
+| `--encoder`               | `ENCODER_BIN`                   | `belacoder`                      | Encoder binary; `ceracoder` is detected by name and switches the encoder module to INI-config mode.                                                   |
+| —                         | `SRTLA_SEND_BIN`                | `srtla_send`                     | Path to the `srtla_send` binary.                                                                                                                      |
+| `--bitrate-file`          | `BITRATE_FILE`                  | `$TMPDIR/belacoder_br`           | belacoder bitrate file (re-read on SIGHUP).                                                                                                           |
+| `--ceracoder-conf`        | `CERACODER_CONF`                | `$TMPDIR/ceracoder.conf`         | ceracoder INI config (balancer + tuning), applied live by the encoder module.                                                                         |
+| `--log-file`              | `LOG_FILE`                      | `$TMPDIR/srtla_log.json`         | Persistent event log shown in the web UI.                                                                                                             |
+| `--remote`                | `CONTROL_SERVER_URL`            | —                                | Control server, e.g. `wss://ctl.example.com/device`.                                                                                                   |
+| `--remote-token`          | `CONTROL_SERVER_TOKEN`          | —                                | Device token. **Prefer the env var** (keeps it out of `ps`).                                                                                           |
+| `--remote-interval`       | `CONTROL_SERVER_INTERVAL`       | `30`                             | Periodic status push in seconds (`0` = only on change).                                                                                               |
+| `--remote-stats-interval` | `CONTROL_SERVER_STATS_INTERVAL` | `2`                              | `srtla_send` link-stats push interval in seconds.                                                                                                     |
+| `--dry-run`               | `DRY_RUN`                       | —                                | Print `ip`/process actions instead of running them (safe testing).                                                                                    |
 
 ### 12.2 Control server (`backend/server/server.ts`)
 
 | Option             | Env        | Default        | What it does                                                                                                                  |
 | ------------------ | ---------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `--host`, `--port` | —          | `0.0.0.0:8090` | Listen address. Run behind a TLS reverse proxy in production (device tokens and the session cookie need `wss://`/`https://`). |
-| `--db`             | `SRTLA_DB` | `users.db`     | SQLite database: users, device tokens, dashboards.                                                                            |
-| `--no-auth`        | —          | —              | Local testing only — one shared `local` profile, no tokens needed (no database; dashboards are kept in memory only).          |
+| `--host`, `--port` | `SERVER_HOST`, `SERVER_PORT` | `0.0.0.0:8090` | Listen address. Run behind a TLS reverse proxy in production (device tokens and the session cookie need `wss://`/`https://`). |
+| `--db`             | `DB_FILE`                    | `users.db`     | SQLite database: users, device tokens, dashboards.                                                                            |
+| `--no-auth`        | `NO_AUTH`                    | —              | Local testing only — one shared `local` profile, no tokens needed (no database; dashboards are kept in memory only).          |
 
 ### 12.3 OBS client (`backend/obs-client/obs-client.ts`)
 
@@ -609,18 +611,21 @@ A widget for a device whose module is off shows _Module disabled on device_; a w
 Usage: bun backend/obs-client/obs-client.ts --remote ws://host:port/device
     [--obs ws://127.0.0.1:4455] [--obs-password pw]
     [--remote-token pw] [--hostname name]
-    [--config path] [--uuid uuid]
+    [--remote-interval 30] [--config path] [--uuid uuid]
 ```
 
-| Option              | Meaning                                                          |
-| ------------------- | ---------------------------------------------------------------- |
-| `--remote`          | The control server's `/device` endpoint (required).              |
-| `--remote-token`    | The owning user's device token.                                  |
-| `--obs`             | The host's OBS Studio WebSocket (default `ws://127.0.0.1:4455`). |
-| `--obs-password`    | OBS Studio password.                                             |
-| `--hostname`        | Device name shown in the control server.                         |
-| `--config`          | Config file (persists UUID and settings).                        |
-| `--uuid`            | Explicit fixed device identity.                                  |
+Every flag has an environment-variable counterpart. Resolution order: **CLI flag > env var > config file > default**.
+
+| Option              | Env                       | Meaning                                                          |
+| ------------------- | ------------------------- | ---------------------------------------------------------------- |
+| `--remote`          | `CONTROL_SERVER_URL`      | The control server's `/device` endpoint (required).              |
+| `--remote-token`    | `CONTROL_SERVER_TOKEN`    | The owning user's device token. **Prefer the env var** (keeps it out of `ps`). |
+| `--obs`             | `OBS_URL`                 | The host's OBS Studio WebSocket (default `ws://127.0.0.1:4455`). |
+| `--obs-password`    | `OBS_PASSWORD`            | OBS Studio password.                                             |
+| `--hostname`        | `DEVICE_HOSTNAME`         | Device name shown in the control server.                         |
+| `--remote-interval` | `CONTROL_SERVER_INTERVAL` | Periodic status push in seconds (`0` = only on change).          |
+| `--config`          | `CONFIG_FILE`             | Config file (persists UUID and settings).                        |
+| `--uuid`            | `DEVICE_UUID`             | Explicit fixed device identity.                                  |
 | `--remote-interval` | Status push interval in seconds (default 30).                    |
 
 It speaks the full obs-websocket v5 handshake (Hello → Identify → Identified), forwards `Request`/`RequestBatch` verbatim from the server, republishes OBS events as `obs.event` frames so dashboards pick up scene/stream/record changes, and auto-reconnects with exponential backoff (emitting a synthetic _ObsDisconnected_ on drop and replaying a state snapshot on reconnect).

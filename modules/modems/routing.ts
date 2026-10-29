@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
 import type { ModuleCore } from "../../backend/client/module-core";
-import { arg, intArg } from "../../shared/args";
+import { argEnv, intArgEnv } from "../../shared/args";
 import { errorMessage, readLines } from "../../shared/util";
 import type {
     Iface,
@@ -21,8 +21,12 @@ import type {
     ReconfigureResult,
 } from "./types";
 
-export const UPLINKS_FILE = arg("--uplinks", join(tmpdir(), "srtla_ips.txt"));
-const DEBOUNCE_MS = intArg("--debounce-ms", 1500);
+export const UPLINKS_FILE = argEnv(
+    "--uplinks",
+    "UPLINKS_FILE",
+    join(tmpdir(), "srtla_ips.txt"),
+);
+const DEBOUNCE_MS = intArgEnv("--debounce-ms", "DEBOUNCE_MS", 1500);
 
 let core: ModuleCore;
 let modems: ModemSource;

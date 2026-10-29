@@ -50,7 +50,9 @@ async function main(): Promise<void> {
                 "[--role relay|encoder|combined|obs] [--remote ws://host:port/device] [--remote-token secret]",
         );
         console.log(
-            "The token/URL may also come from CONTROL_SERVER_TOKEN / CONTROL_SERVER_URL env vars. See the README for the full option list, including the module options.",
+            "Every flag also has an env var counterpart (token/URL: CONTROL_SERVER_TOKEN /" +
+                " CONTROL_SERVER_URL) — CLI flag > env var > config file > default." +
+                " See the README for the full option list, including the module options.",
         );
         process.exit(0);
     }

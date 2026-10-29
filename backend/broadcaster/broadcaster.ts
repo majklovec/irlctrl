@@ -50,11 +50,13 @@
  *
  * Usage:
  *   CONTROL_SERVER_TOKEN=<t> RTMP_KEY=<key> bun broadcaster.ts \
- *     --server-url ws://host:7788/device \
+ *     --remote ws://host:7788/device \
  *     --rtmp-url rtmp://host/live --input-format ts
  *
- * All options can also be supplied via environment variables or `~/.config/
- * broadcaster/config.json` (see ConfigFile).
+ * Every flag (except --server-url, a legacy alias of --remote) can also be
+ * supplied via its environment variable, e.g. --remote / CONTROL_SERVER_URL,
+ * or via `~/.config/broadcaster/config.json` (see ConfigFile). Resolution
+ * order: CLI flag > env var > config file > default.
  */
 
 import { randomUUID } from "node:crypto";
@@ -77,7 +79,7 @@ import {
 	srtlaService,
 	srtlaServiceForUrl,
 } from "../../modules/broadcaster/services";
-import { arg, argFail, enumArg, flag } from "../../shared/args";
+import { arg, argEnv, argFail, enumArgEnv, flag, flagOrEnv } from "../../shared/args";
 import {
 	COLOR_RE,
 	DEFAULT_COLOR,
@@ -1298,7 +1300,7 @@ function loadConfig(): Config {
 		process.exit(0);
 	}
 
-	const configPath = arg("--config");
+	const configPath = argEnv("--config", "CONFIG_FILE");
 	const file = readConfigFile(configPath);
 
 	// UUID precedence: CLI flag > DEVICE_UUID env var > config file (with a
@@ -1306,13 +1308,15 @@ function loadConfig(): Config {
 	// generated and persisted on first run.
 	const storedUuid = file?.uuid ?? migrateLegacyUuid(configPath, file);
 	const uuid =
-		firstDefined(arg("--uuid"), process.env.DEVICE_UUID, storedUuid) ??
-		randomUUID();
+		firstDefined(argEnv("--uuid", "DEVICE_UUID"), storedUuid) ?? randomUUID();
 	if (!ID_RE.test(uuid))
 		argFail("--uuid", uuid, "a device id matching /^\\w[-\\w.]{0,63}$/");
 	if (uuid !== storedUuid) storeUuid(configPath, uuid);
 
-	const rtmpUrlFile = firstDefined(arg("--rtmp-url-file"), file?.rtmpUrlFile);
+	const rtmpUrlFile = firstDefined(
+		argEnv("--rtmp-url-file", "RTMP_URL_FILE"),
+		file?.rtmpUrlFile,
+	);
 	let rtmpFromUrlFile: string | undefined;
 	if (rtmpUrlFile) {
 		try {
@@ -1387,26 +1391,28 @@ function loadConfig(): Config {
 				`RTMP URL is not an rtmp(s):// URL and will fail at start: ${out.url}`,
 			);
 
-	const inputFormat = enumArg(
+	const inputFormat = enumArgEnv(
 		"--input-format",
 		["ts", "h264"] as const,
-		firstDefined(file?.inputFormat, DEFAULTS.inputFormat) ??
-			DEFAULTS.inputFormat,
+		"INPUT_FORMAT",
+		(file?.inputFormat ?? DEFAULTS.inputFormat) as "ts" | "h264",
 	);
 
 	// ffmpeg output profiles: the user-authored JSON profile files live in
 	// the profiles directory; the selected profile id comes from the config
 	// file (written by the web UI), not a CLI flag.
-	const profilesDir = firstDefined(
-		arg("--profiles"),
-		process.env.PROFILES_DIR,
-		file?.profilesDir,
-		DEFAULTS.profilesDir,
-	) as string;
+	const profilesDir = argEnv(
+		"--profiles",
+		"PROFILES_DIR",
+		file?.profilesDir ?? DEFAULTS.profilesDir,
+	);
 	const profile = firstDefined(file?.profile, DEFAULTS.profile) as string;
 
 	const cfg: Config = {
+		// --remote is the canonical flag (like in the other roles);
+		// --server-url stays as a legacy alias.
 		controlServerUrl: firstDefined(
+			arg("--remote"),
 			arg("--server-url"),
 			process.env.CONTROL_SERVER_URL,
 			file?.controlServerUrl,
@@ -1421,6 +1427,7 @@ function loadConfig(): Config {
 		srtlaPort: toPort(
 			firstDefined<string | number>(
 				arg("--srtla-port"),
+				process.env.SRTLA_PORT,
 				file?.srtlaPort,
 				DEFAULTS.srtlaPort,
 			),
@@ -1430,6 +1437,7 @@ function loadConfig(): Config {
 		srtPort: toPort(
 			firstDefined<string | number>(
 				arg("--srt-port"),
+				process.env.SRT_PORT,
 				file?.srtPort,
 				DEFAULTS.srtPort,
 			),
@@ -1439,6 +1447,7 @@ function loadConfig(): Config {
 		srtLatencyMs: toLatency(
 			firstDefined<string | number>(
 				arg("--srt-latency-ms"),
+				process.env.SRT_LATENCY_MS,
 				file?.srtLatencyMs,
 				DEFAULTS.srtLatencyMs,
 			),
@@ -1463,8 +1472,8 @@ function loadConfig(): Config {
 		inputFormat,
 		profilesDir,
 		profile,
-		autoStart: flag("--autostart") || file?.autoStart === true,
-		dryRun: flag("--dry-run"),
+		autoStart: flagOrEnv("--autostart", "AUTOSTART") || file?.autoStart === true,
+		dryRun: flagOrEnv("--dry-run", "DRY_RUN"),
 	};
 
 	return cfg;

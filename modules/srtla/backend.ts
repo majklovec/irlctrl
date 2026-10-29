@@ -9,7 +9,7 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ModuleCore } from "../../backend/client/module-core";
-import { arg, argv, enumArg } from "../../shared/args";
+import { argEnv, argv, enumArgEnv } from "../../shared/args";
 import { t } from "../../shared/i18n";
 import type { BackendModule, Emit } from "../../shared/module-contract";
 import {
@@ -36,15 +36,17 @@ import {
 
 const RESTART_DELAY_MS = 2_000;
 /** How an uplinks change reaches srtla_send: SIGHUP (re-read) or a respawn. */
-const RELOAD_MODE = enumArg(
+const RELOAD_MODE = enumArgEnv(
     "--srtla-reload",
     ["signal", "restart"] as const,
+    "SRTLA_RELOAD_MODE",
     "signal",
 );
 /** srtla_send JSON-RPC control socket (link stats, mode / quality switching); "" disables it. */
-const SRTLA_SOCKET = arg(
+const SRTLA_SOCKET = argEnv(
     "--srtla-socket",
-    process.env.SRTLA_CONTROL_SOCKET ?? join(tmpdir(), "srtla_send.sock"),
+    "SRTLA_CONTROL_SOCKET",
+    join(tmpdir(), "srtla_send.sock"),
 );
 
 /** Core bag, bound at discovery and re-filled at start (a module never imports the core). */

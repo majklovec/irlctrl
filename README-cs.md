@@ -72,28 +72,30 @@ sudo CONTROL_SERVER_TOKEN=token \
 
 ### Parametry
 
-| Parametr                  | Proměnná prostředí     | Výchozí hodnota                  | Poznámka                                                                                                                              |
-| ------------------------- | ---------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `‑‑role`                  | `ROLE`                 | `relay`                          | `relay`, `encoder`, `combined`                                                                                                        |
-| `‑‑host`, `‑‑port`        |                        | `127.0.0.1`, `8085`              | Lokální webové rozhraní a WebSocket API (`/ws`), vždy aktivní                                                                         |
-| `‑‑allow‑origin`          |                        |                                  | Další povolené originy pro `/ws` (oddělené čárkami, `*` = libovolný)                                                                  |
-| `‑‑config`                |                        | `$TMPDIR/config.json`            | Konfigurace zařízení — nastavení, enkodér, cíl SRTLA, automatické spuštění a modemy. **V produkčním provozu použijte trvalou cestu.** |
-| `‑‑uplinks`               |                        | `$TMPDIR/srtla_ips.txt`          | Soubor s uplinky pro `srtla_send`                                                                                                     |
-| `‑‑start‑srtla`           |                        |                                  | Pro relay/combined: spustí `srtla_send` při startu pomocí parametrů `<listenPort> <remoteHost> <remotePort>`                          |
-| `‑‑srtla‑reload`          |                        | `signal`                         | `signal` (SIGHUP) nebo `restart`                                                                                                      |
-| `‑‑srtla‑socket`          | `SRTLA_CONTROL_SOCKET` | `$TMPDIR/srtla_send.sock`        | Řídicí socket `srtla_send` (statistiky připojení, režim a kvalita); `""` jej deaktivuje                                               |
-| `‑‑debounce‑ms`           |                        | `1500`                           | Prodleva pro sloučení událostí síťových rozhraní                                                                                      |
-| `‑‑pipelines`             | `PIPELINES_DIR`        | `/usr/share/belacoder/pipelines` | Soubory pipeline včetně podadresářů                                                                                                   |
-| `‑‑encoder`               | `ENCODER_BIN`          | `belacoder`                      | Binární soubor enkodéru; pokud název odpovídá `ceracoder`, automaticky se aktivuje režim konfigurace INI                              |
-|                           | `SRTLA_SEND_BIN`       | `srtla_send`                     | Cesta k binárnímu souboru `srtla_send`                                                                                                |
-| `‑‑bitrate‑file`          |                        | `$TMPDIR/belacoder_br`           | Soubor s datovým tokem belacoder; znovu se načítá při SIGHUP                                                                          |
-| `‑‑ceracoder‑conf`        |                        | `$TMPDIR/ceracoder.conf`         | Konfigurace INI pro ceracoder (balancer a ladění parametrů), kterou modul enkodéru aplikuje za běhu                                   |
-| `‑‑log‑file`              |                        | `$TMPDIR/srtla_log.json`         | Trvalý protokol událostí zobrazovaný ve webovém rozhraní                                                                              |
-| `‑‑remote`                | `CONTROL_SERVER_URL`   |                                  | Řídicí server, např. `wss://ctl.example.com/device`. Proměnná prostředí přebije hodnotu ze souboru (CLI flag má před oběma)           |
-| `‑‑remote‑token`          | `CONTROL_SERVER_TOKEN` |                                  | Upřednostněte proměnnou prostředí, aby token nebyl viditelný ve výpisu procesů `ps`; proměnná přebije token ze souboru                |
-| `‑‑remote‑interval`       |                        | `30`                             | Interval odesílání stavových informací v sekundách (`0` = pouze při změně)                                                            |
-| `‑‑remote‑stats‑interval` |                        | `2`                              | Interval odesílání statistik připojení `srtla_send` na řídicí server v sekundách (`0` = vypnuto)                                      |
-| `‑‑dry‑run`               |                        |                                  | Vypisuje akce `ip` a procesů, místo aby je skutečně prováděl                                                                          |
+Každý parametr má protějšek v podobě proměnné prostředí. Řešení: **CLI flag > proměnná prostředí > konfigurační soubor > výchozí hodnota**.
+
+| Parametr                  | Proměnná prostředí                | Výchozí hodnota                  | Poznámka                                                                                                                              |
+| ------------------------- | --------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `‑‑role`                  | `ROLE`                            | `relay`                          | `relay`, `encoder`, `combined`                                                                                                        |
+| `‑‑host`, `‑‑port`        | `API_HOST`, `API_PORT`            | `127.0.0.1`, `8085`              | Lokální webové rozhraní a WebSocket API (`/ws`), vždy aktivní                                                                         |
+| `‑‑allow‑origin`          | `ALLOWED_ORIGINS`                 |                                  | Další povolené originy pro `/ws` (oddělené čárkami, `*` = libovolný)                                                                  |
+| `‑‑config`                | `CONFIG_FILE`                     | `$TMPDIR/config.json`            | Konfigurace zařízení — nastavení, enkodér, cíl SRTLA, automatické spuštění a modemy. **V produkčním provozu použijte trvalou cestu.** |
+| `‑‑uplinks`               | `UPLINKS_FILE`                    | `$TMPDIR/srtla_ips.txt`          | Soubor s uplinky pro `srtla_send`                                                                                                     |
+| `‑‑start‑srtla`           |                                   |                                  | Pro relay/combined: spustí `srtla_send` při startu pomocí parametrů `<listenPort> <remoteHost> <remotePort>`                          |
+| `‑‑srtla‑reload`          | `SRTLA_RELOAD_MODE`               | `signal`                         | `signal` (SIGHUP) nebo `restart`                                                                                                      |
+| `‑‑srtla‑socket`          | `SRTLA_CONTROL_SOCKET`            | `$TMPDIR/srtla_send.sock`        | Řídicí socket `srtla_send` (statistiky připojení, režim a kvalita); `""` jej deaktivuje                                               |
+| `‑‑debounce‑ms`           | `DEBOUNCE_MS`                     | `1500`                           | Prodleva pro sloučení událostí síťových rozhraní                                                                                      |
+| `‑‑pipelines`             | `PIPELINES_DIR`                   | `/usr/share/belacoder/pipelines` | Soubory pipeline včetně podadresářů                                                                                                   |
+| `‑‑encoder`               | `ENCODER_BIN`                     | `belacoder`                      | Binární soubor enkodéru; pokud název odpovídá `ceracoder`, automaticky se aktivuje režim konfigurace INI                              |
+|                           | `SRTLA_SEND_BIN`                  | `srtla_send`                     | Cesta k binárnímu souboru `srtla_send`                                                                                                |
+| `‑‑bitrate‑file`          | `BITRATE_FILE`                    | `$TMPDIR/belacoder_br`           | Soubor s datovým tokem belacoder; znovu se načítá při SIGHUP                                                                          |
+| `‑‑ceracoder‑conf`        | `CERACODER_CONF`                  | `$TMPDIR/ceracoder.conf`         | Konfigurace INI pro ceracoder (balancer a ladění parametrů), kterou modul enkodéru aplikuje za běhu                                   |
+| `‑‑log‑file`              | `LOG_FILE`                        | `$TMPDIR/srtla_log.json`         | Trvalý protokol událostí zobrazovaný ve webovém rozhraní                                                                              |
+| `‑‑remote`                | `CONTROL_SERVER_URL`              |                                  | Řídicí server, např. `wss://ctl.example.com/device`                                                                                   |
+| `‑‑remote‑token`          | `CONTROL_SERVER_TOKEN`            |                                  | Upřednostněte proměnnou prostředí, aby token nebyl viditelný ve výpisu procesů `ps`                                                   |
+| `‑‑remote‑interval`       | `CONTROL_SERVER_INTERVAL`         | `30`                             | Interval odesílání stavových informací v sekundách (`0` = pouze při změně)                                                            |
+| `‑‑remote‑stats‑interval` | `CONTROL_SERVER_STATS_INTERVAL`   | `2`                              | Interval odesílání statistik připojení `srtla_send` na řídicí server v sekundách (`0` = vypnuto)                                      |
+| `‑‑dry‑run`               | `DRY_RUN`                         |                                  | Vypisuje akce `ip` a procesů, místo aby je skutečně prováděl                                                                          |
 
 ### Průvodce prvotním nastavením
 
@@ -156,11 +158,11 @@ CONTROL_SERVER_TOKEN=tok-alice-1 bun backend/client/client.ts --role encoder --r
 open http://ctl.example.com/  # přesměruje na /login; zadejte uživatelské jméno a heslo
 ```
 
-| Parametr           | Proměnná prostředí | Poznámka                                                                                                                                  |
-| ------------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `‑‑host`, `‑‑port` |                    | Výchozí hodnota `0.0.0.0:8090`                                                                                                            |
-| `‑‑db`             | `SRTLA_DB`         | Databáze SQLite: uživatelé, tokeny zařízení, nástěnky (výchozí `users.db`)                                                                |
-| `‑‑no‑auth`        |                    | Pouze pro místní testování — jeden sdílený profil `local`, bez nutnosti tokenů (databáze se nevyužívá; nástěnky zůstávají pouze v paměti) |
+| Parametr           | Proměnná prostředí       | Poznámka                                                                                                                                  |
+| ------------------ | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `‑‑host`, `‑‑port` | `SERVER_HOST`, `SERVER_PORT` | Výchozí hodnota `0.0.0.0:8090`                                                                                                            |
+| `‑‑db`             | `DB_FILE`                | Databáze SQLite: uživatelé, tokeny zařízení, nástěnky (výchozí `users.db`)                                                                |
+| `‑‑no‑auth`        | `NO_AUTH`                | Pouze pro místní testování — jeden sdílený profil `local`, bez nutnosti tokenů (databáze se nevyužívá; nástěnky zůstávají pouze v paměti) |
 
 > [!IMPORTANT]
 > Server provozujte za reverzní TLS proxy — tokeny zařízení a relační cookie vyžadují `wss://` a `https://`.
@@ -309,6 +311,8 @@ Klient implementuje kompletní úvodní komunikaci protokolu obs-websocket v5 (`
 Při výpadku se automaticky znovu připojuje s exponenciálně rostoucí prodlevou. Při odpojení emituje syntetickou událost `ObsDisconnected` a po opětovném připojení přehraje snímek stavu ve formě událostí odpovídajících skutečným zprávám OBS.
 
 Stejná knihovna `ObsClient` (`shared/obs/client.ts`) se používá také přímo v modulu `obs-controller`, takže relé s lokálním OBS nepotřebuje druhé WebSocket spojení.
+
+Každý parametr má protějšek v podobě proměnné prostředí — `CONFIG_FILE`, `OBS_URL`, `OBS_PASSWORD`, `CONTROL_SERVER_URL`, `CONTROL_SERVER_TOKEN`, `DEVICE_HOSTNAME`, `DEVICE_UUID`, `CONTROL_SERVER_INTERVAL` — se stejným pořadím řešení: **CLI flag > proměnná prostředí > konfigurační soubor > výchozí hodnota** (viz `--help`).
 
 ## Vývoj
 
