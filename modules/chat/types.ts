@@ -19,10 +19,17 @@ export interface ChatLive {
     /** The sender's platform color (hex), for username display. */
     color?: string;
     text?: string;
+    /** The message's classification; `banned` marks a message removed by the
+     * platform's moderation (shown struck-through or hidden per widget config). */
     type?: string;
     /** Message time (epoch ms) — where the platform provides it. */
     ts?: number;
 }
+
+/** `ChatLive.type` value marking a message removed by the platform's
+ * moderation. The frontend renders these struck-through or hidden per the
+ * widget's `bannedMessages` config, and stops any in-flight TTS for them. */
+export const CHAT_BANNED_TYPE = "banned" as const;
 
 /** The platform a live fragment / spec key refers to. */
 export type ChatPlatform = "youtube" | "twitch" | "tiktok" | "kick";

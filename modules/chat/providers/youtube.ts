@@ -1,8 +1,10 @@
 /**
  * YouTube chat provider — polls the creator's live chat on a fixed ~1 s
- * cadence (youtube-chat-next `fetchLivePage` + `fetchChat`), ignoring
- * YouTube's suggested `timeoutMs` throttle so messages land within about a
- * second. The config value carries no `@`; the poll adds it back for the
+ * cadence (youtube-chat-next `fetchLivePage` + a raw `get_live_chat` call via
+ * `fetchChatWithActions`), ignoring YouTube's suggested `timeoutMs` throttle
+ * so messages land within about a second. The raw call also returns the
+ * `actions` so moderation deletes (`markChatItemAsDeletedAction`) can be turned
+ * into "banned" flags, since anonymous viewers never get the banned-user event. The config value carries no `@`; the poll adds it back for the
  * handle. Offline streams make the first fetch reject — treated like a
  * disconnect and retried with backoff. The live-page fetch is part of the
  * same failure budget as the polls: a single unparseable page (a consent
@@ -13,9 +15,14 @@
  */
 
 import { RateLimitError, ScrapeError } from "youtube-chat-next";
-import { fetchChat, fetchLivePage } from "youtube-chat-next/dist/requests";
+import { fetchLivePage } from "youtube-chat-next/dist/requests";
+import { parseChatData } from "youtube-chat-next/dist/parser";
 import type { ChatItem } from "youtube-chat-next/dist/types/data";
-import type { FetchOptions } from "youtube-chat-next/dist/types/yt-response";
+import type {
+    Action,
+    FetchOptions,
+    GetLiveChatResponse,
+} from "youtube-chat-next/dist/types/yt-response";
 import type { ChatLive, PublishFn } from "../types";
 import { ChatProvider } from "./base";
 
@@ -80,6 +87,78 @@ function asChatMessage(item: ChatItem): ChatLive | null {
         ts: item.timestamp.getTime(),
         color: username ? userNameColor(username) : undefined,
     };
+}
+
+/** One `get_live_chat` action. The library's `Action` only models
+ * `addChatItemAction`; a moderation delete arrives as a sibling
+ * `markChatItemAsDeletedAction` that `parseChatData` discards, so widen the
+ * type here to read the deleted message's id. */
+type ChatAction = Action & {
+    markChatItemAsDeletedAction?: { targetItemId?: string };
+};
+
+/**
+ * Fetch one chat page and also return the raw `actions`.
+ *
+ * Anonymous viewers never receive the moderator-only `liveChatUserBanned-
+ * MessageRenderer`; a mod's ban (or a single-message removal) reaches them as
+ * one `markChatItemAsDeletedAction` per affected message, which the library's
+ * parser drops. Its HTTP client is not exported, so we issue the same
+ * `get_live_chat` call ourselves — matching its headers, timeout, and rate-
+ * limit handling — and return the actions so the deleted message ids can be
+ * mapped back to history and marked banned.
+ */
+async function fetchChatWithActions(
+    options: FetchOptions,
+): Promise<[ChatItem[], string, ChatAction[]]> {
+    const url = `https://www.youtube.com/youtubei/v1/live_chat/get_live_chat?key=${options.apiKey}`;
+    const res = await fetch(url, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            // Browser-like identity, pinned locale, and EU consent opt-out —
+            // mirrors the library's private client; without these YouTube
+            // serves a different or consent-walled page.
+            "User-Agent":
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+            Cookie: "SOCS=CAI",
+        },
+        body: JSON.stringify({
+            context: {
+                client: { clientVersion: options.clientVersion, clientName: "WEB" },
+            },
+            continuation: options.continuation,
+        }),
+        signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) {
+        if (res.status === 429 || res.status === 403)
+            throw new RateLimitError(
+                res.status,
+                parseRetryAfterMs(res.headers.get("retry-after")),
+            );
+        throw new Error(`youtube get_live_chat HTTP ${res.status}`);
+    }
+    const data = (await res.json()) as GetLiveChatResponse;
+    const [items, continuation] = parseChatData(data);
+    const actions = (
+        data.continuationContents?.liveChatContinuation?.actions ?? []
+    ) as ChatAction[];
+    return [items, continuation, actions];
+}
+
+/** Parse a `Retry-After` header (delta-seconds or an HTTP-date) into ms. */
+function parseRetryAfterMs(header: string | null): number | undefined {
+    if (!header) return undefined;
+    const seconds = Number(header);
+    if (Number.isFinite(seconds)) {
+        const ms = seconds * 1000;
+        return Number.isFinite(ms) && ms >= 0 ? ms : undefined;
+    }
+    const dateMs = Date.parse(header);
+    if (Number.isNaN(dateMs)) return undefined;
+    return Math.max(0, dateMs - Date.now());
 }
 
 export class YoutubeChatProvider extends ChatProvider {
@@ -158,7 +237,8 @@ export class YoutubeChatProvider extends ChatProvider {
                 }
 
                 try {
-                    const [items, continuation] = await fetchChat(options);
+                    const [items, continuation, actions] =
+                        await fetchChatWithActions(options);
                     failures = 0;
                     if (!continuation) {
                         // Empty continuation — the stream ended.
@@ -175,6 +255,21 @@ export class YoutubeChatProvider extends ChatProvider {
                             if (!line) continue;
                             this.deliver(line);
                         }
+                        // Anonymous viewers never get the banned-user event; a
+                        // mod's ban reaches them as one
+                        // `markChatItemAsDeletedAction` per deleted message. A
+                        // ban clears all of a user's recent messages, so these
+                        // deletions are the only "banned" signal. Each
+                        // `targetItemId` equals the delivered line's id, so we
+                        // batch them and mark the matching history lines.
+                        const deleted: string[] = [];
+                        for (const action of actions) {
+                            const id =
+                                action.markChatItemAsDeletedAction
+                                    ?.targetItemId;
+                            if (id) deleted.push(id);
+                        }
+                        if (deleted.length) this.markBanned(deleted);
                     }
                 } catch (err) {
                     if (await fail(err)) {

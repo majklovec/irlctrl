@@ -14,6 +14,7 @@ import type { ServerDashboardWidget } from "../../shared/types";
 import {
 	CHAT_CONFIG_FIELDS,
 	CHAT_PLATFORMS,
+	bannedMessagesFromConfig,
 	chatOrderFromConfig,
 	chatTtsConfig,
 	chatTtsShouldSpeak,
@@ -22,6 +23,7 @@ import {
 } from "./config";
 import { decorateText } from "./text";
 import {
+	banSpeech,
 	enqueueSpeech,
 	ensureVoices,
 	initTts,
@@ -31,7 +33,12 @@ import {
 	stopSpeech,
 	voiceName,
 } from "./tts";
-import type { ChannelLive, ChatLive, ChatPlatform } from "./types";
+import {
+	CHAT_BANNED_TYPE,
+	type ChannelLive,
+	type ChatLive,
+	type ChatPlatform,
+} from "./types";
 import "./styles.css";
 
 /** Live chat buffer size per channel; matches the backend rolling buffer. */
@@ -81,7 +88,13 @@ function ttsVoiceOptions(): string[] {
 }
 
 type ChatSpec = { platform: ChatPlatform; spec: string };
-type MergedLine = { line: ChatLive; key: string; platform: ChatPlatform };
+type MergedLine = {
+	line: ChatLive;
+	key: string;
+	platform: ChatPlatform;
+	/** The line was removed by moderation (struck-through per config). */
+	banned: boolean;
+};
 
 /** One `<platform>:<channel>` spec for each configured platform channel. */
 function chatSpecsOf(w: ServerDashboardWidget): ChatSpec[] {
@@ -112,6 +125,7 @@ const liveFor = (spec: string): ChannelLive => {
 type ChatFrame =
 	| { channel?: string; message: ChatLive }
 	| { channel?: string; reconnect: boolean; messages: ChatLive[] }
+	| { channel?: string; banned: { ids: (string | number)[] } }
 	| { channel?: string; disconnected: boolean };
 
 const CHAT_EVENTS = new Set([
@@ -149,14 +163,29 @@ function onFrame(event: string, data: unknown): void {
 	if ("message" in frame) {
 		target.chat = [frame.message, ...(target.chat ?? [])].slice(0, CAP);
 
-		// Read the new message out loud (the batch snapshot frames don't).
+		// Read the new message out loud (the batch snapshot frames don't). The
+		// speech id is namespaced per platform so a ban can cancel the exact
+		// message even when platform id spaces overlap.
 		if (
 			cachedConfig &&
 			chatTtsShouldSpeak(frame.message, chatTtsConfig(cachedConfig))
 		) {
 			const username = (frame.message.username ?? "").trim();
 			const text = (frame.message.text ?? "").trim();
-			enqueueSpeech(username ? `${username} říká: ${text}` : text);
+			enqueueSpeech(
+				`${platform}:${frame.message.id}`,
+				username ? `${username} říká: ${text}` : text,
+			);
+		}
+	} else if ("banned" in frame) {
+		// A message was removed by moderation: flag it in the live buffer and
+		// stop its in-flight (or queued) TTS immediately.
+		const banned = new Set(frame.banned.ids.map((id) => `${platform}:${id}`));
+		for (const line of target.chat ?? []) {
+			if (banned.has(`${platform}:${line.id}`)) line.type = CHAT_BANNED_TYPE;
+		}
+		for (const id of frame.banned.ids) {
+			banSpeech(`${platform}:${id}`);
 		}
 	} else if ("messages" in frame) {
 		target.chat = frame.messages.slice(0, CAP);
@@ -166,19 +195,25 @@ function onFrame(event: string, data: unknown): void {
 	}
 }
 
-/** Merge configured channels, newest first by timestamp, and cap history. */
+/** Merge configured channels, newest first by timestamp, and cap history.
+ * Banned lines are dropped when the widget is set to `hide`, kept (flagged)
+ * when set to `strike`. */
 function mergedLines(
 	w: ServerDashboardWidget,
 	specs: ChatSpec[],
 ): MergedLine[] {
+	const hideBanned = bannedMessagesFromConfig(w.config) === "hide";
 	const all: MergedLine[] = [];
 
 	for (const { platform, spec } of specs) {
 		for (const line of live.get(spec)?.chat ?? []) {
+			const banned = line.type === CHAT_BANNED_TYPE;
+			if (banned && hideBanned) continue;
 			all.push({
 				line,
 				key: `${platform}:${line.id}`,
 				platform,
+				banned,
 			});
 		}
 	}
@@ -549,8 +584,11 @@ const ChatFeed: m.Component<ChatFeedAttrs> = {
 					chatAutoScroll.set(el, distance <= DISTANCE_THRESHOLD);
 				}}
 			>
-				{lines.map(({ line, key, platform }) => (
-					<div class="chat-line" key={key}>
+				{lines.map(({ line, key, platform, banned }) => (
+					<div
+						class={banned ? "chat-line chat-line-banned" : "chat-line"}
+						key={key}
+					>
 						{mixed && (
 							<span class="chat-icon" title={platform}>
 								{m.trust(PLATFORM_ICONS[platform])}

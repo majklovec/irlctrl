@@ -184,9 +184,34 @@ export class KickChatProvider extends ChatProvider {
                 this.deliver(line);
                 break;
             }
+            case "App\\Events\\UserBannedEvent": {
+                let payload: unknown;
+                try {
+                    payload =
+                        typeof msg.data === "string"
+                            ? JSON.parse(msg.data)
+                            : msg.data;
+                } catch {
+                    return;
+                }
+                this.#onUserBanned(payload);
+                break;
+            }
             default:
                 break;
         }
+    }
+
+    /**
+     * `App\Events\UserBannedEvent` — a user was banned in this chat (removed
+     * by a mod or the broadcaster), so every message of theirs becomes banned.
+     * The payload's top-level `username` is who was banned (Kick shares one
+     * canonical username between chat senders and ban events).
+     */
+    #onUserBanned(payload: unknown): void {
+        if (!payload || typeof payload !== "object") return;
+        const username = (payload as Record<string, unknown>).username;
+        if (typeof username === "string") this.banUser(username);
     }
 
     #onPusherClose(): void {

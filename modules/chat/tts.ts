@@ -168,8 +168,17 @@ export function setRate(next: number): void {
 	rate = next;
 }
 
+/** One queued utterance: its source chat message id (for selective cancel)
+ * and the text to speak. */
+interface QueuedSpeech {
+	id: string;
+	text: string;
+}
+
 /** The queue of pending utterances and the in-flight flag. */
-let queue: string[] = [];
+let queue: QueuedSpeech[] = [];
+/** The chat message id of the utterance being spoken ("" = none). */
+let speakingId = "";
 let speaking = false;
 let safetyTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -179,6 +188,7 @@ function startSafetyTimer(): void {
 		safetyTimer = null;
 		// `onend` never fired — release the queue (Chrome quirk).
 		speaking = false;
+		speakingId = "";
 		drain();
 	}, UTTERANCE_TIMEOUT_MS);
 }
@@ -189,6 +199,7 @@ function endUtterance(): void {
 		safetyTimer = null;
 	}
 	speaking = false;
+	speakingId = "";
 	drain();
 }
 
@@ -196,10 +207,10 @@ function drain(): void {
 	const s = synth();
 	if (!s || speaking || !queue.length) return;
 
-	const text = queue.shift();
-	if (text === undefined) return;
+	const next = queue.shift();
+	if (next === undefined) return;
 
-	const u = new SpeechSynthesisUtterance(text);
+	const u = new SpeechSynthesisUtterance(next.text);
 	if (voice) {
 		u.voice = voice;
 		u.lang = voice.lang;
@@ -209,22 +220,38 @@ function drain(): void {
 	u.onerror = endUtterance;
 
 	speaking = true;
+	speakingId = next.id;
 	startSafetyTimer();
 	s.speak(u);
 }
 
-/** Queue one utterance; the queue drains one-by-one (never overlapping). */
-export function enqueueSpeech(text: string): void {
+/** Queue one utterance; the queue drains one-by-one (never overlapping). `id`
+ * is the source chat message's id, kept so `banSpeech` can cancel it. */
+export function enqueueSpeech(id: string, text: string): void {
 	const s = synth();
 	if (!s || !isReady() || !text) return;
-	queue.push(text);
+	queue.push({ id, text });
 	drain();
+}
+
+/**
+ * Stop the speech for one chat message — its TTS twin of a message being
+ * banned. Cancels the in-flight utterance when it is this message, and drops
+ * any still-queued entries for it; other pending messages keep speaking.
+ */
+export function banSpeech(id: string): void {
+	if (speakingId === id) {
+		stopSpeech();
+		return;
+	}
+	queue = queue.filter((item) => item.id !== id);
 }
 
 /** Empty the queue and cancel the in-flight utterance. */
 export function stopSpeech(): void {
 	queue = [];
 	speaking = false;
+	speakingId = "";
 	if (safetyTimer) {
 		clearTimeout(safetyTimer);
 		safetyTimer = null;

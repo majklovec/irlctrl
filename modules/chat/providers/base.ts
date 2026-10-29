@@ -8,6 +8,7 @@
  * (`reconnect` with the rolling buffer, `disconnected`).
  */
 import {
+    CHAT_BANNED_TYPE,
     type ChatLive,
     type ChatPlatform,
     eventFrame,
@@ -80,6 +81,59 @@ export abstract class ChatProvider {
         this.publish(
             eventFrame(event, { channel: this.channel, message: line }),
         );
+    }
+
+    /**
+     * Mark one of this channel's messages as removed by moderation. Updates
+     * the rolling history in place (so reconnection snapshots and the
+     * `widget.snapshot` feed carry the flag) and broadcasts a `banned` frame
+     * so live viewers strike/refresh the line and stop any in-flight TTS for
+     * it. Ids not yet in history (already evicted) are carried to the frame
+     * as-is — the frontend drops them harmlessly. Returns the ids it touched.
+     */
+    markBanned(ids: (string | number)[]): (string | number)[] {
+        if (!ids.length) return [];
+        const wanted = new Set(ids.map(String));
+        const affected: (string | number)[] = [];
+        for (const line of this.history) {
+            if (wanted.has(String(line.id)) && line.type !== CHAT_BANNED_TYPE) {
+                line.type = CHAT_BANNED_TYPE;
+                affected.push(line.id);
+            }
+        }
+        this.publish(
+            eventFrame(`${this.platformName()}.chat`, {
+                channel: this.channel,
+                banned: { ids },
+            }),
+        );
+        return affected;
+    }
+
+    /** The ids of this user's messages currently in the rolling history
+     * (case-insensitive on the display name) — for a platform "user banned"
+     * signal that arrives without per-message ids. */
+    historyIdsForUser(username: string): (string | number)[] {
+        const want = username.trim().toLowerCase();
+        if (!want) return [];
+        return this.history
+            .filter((line) => (line.username ?? "").toLowerCase() === want)
+            .map((line) => line.id);
+    }
+
+    /**
+     * Mark every message of a banned user as removed by moderation. A
+     * platform "user banned" signal (Twitch `CLEARCHIT`, Kick
+     * `UserBannedEvent`) names only the person, not the messages, so this
+     * resolves their messages in the rolling history and marks them banned.
+     * Returns the ids it touched (empty when the name matches no one in
+     * history — a channel-wide clear's free-text reason marks nothing).
+     */
+    banUser(username: string): (string | number)[] {
+        const name = (username ?? "").trim();
+        if (!name) return [];
+        const ids = this.historyIdsForUser(name);
+        return ids.length ? this.markBanned(ids) : [];
     }
 
     /**

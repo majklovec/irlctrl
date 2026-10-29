@@ -18,6 +18,7 @@ export const CHAT_CONFIG_FIELDS = [
     "kick",
     "history",
     { name: "order", type: "select", options: ["top", "bottom"] },
+    { name: "bannedMessages", type: "select", options: ["strike", "hide"] },
     {
         name: "ttsEnabled",
         type: "select",
@@ -62,6 +63,21 @@ export function chatOrderFromConfig(
 ): ChatOrder {
     const value = (config?.order ?? "").trim().toLowerCase();
     return value === "bottom" ? "bottom" : "top";
+}
+
+/** How banned (moderated) messages present in the feed. */
+export type ChatBannedMode = "strike" | "hide";
+
+/**
+ * A widget's banned-message presentation, validated from its config. Anything
+ * that is not "hide" falls back to "strike" (the default: keep the line in
+ * place but crossed out, so the removal is visible).
+ */
+export function bannedMessagesFromConfig(
+    config: Record<string, string> | undefined,
+): ChatBannedMode {
+    const value = (config?.bannedMessages ?? "").trim().toLowerCase();
+    return value === "hide" ? "hide" : "strike";
 }
 
 /** Normalize one platform channel value (lowercased, trimmed; "" when empty). */

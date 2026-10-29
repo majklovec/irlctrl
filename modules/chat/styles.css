@@ -95,3 +95,15 @@
 .dash-widget-body .chat-line .dm {
     opacity: 0.55;
 }
+
+/* A line removed by moderation (config `bannedMessages: strike`): kept in
+   place but crossed out and dimmed so the removal stays visible in the feed. */
+.dash-widget-body .chat-line-banned > * {
+    opacity: 0.5;
+}
+
+.dash-widget-body .chat-line-banned .chat-user,
+.dash-widget-body .chat-line-banned .chat-text,
+.dash-widget-body .chat-line-banned .chat-text * {
+    text-decoration: line-through;
+}

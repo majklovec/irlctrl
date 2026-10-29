@@ -36,6 +36,18 @@ export class TiktokChatProvider extends ChatProvider {
             if (!line) return;
             this.deliver(line);
         });
+        // TikTok, unlike YouTube, broadcasts moderations (`imDelete`) to every
+        // viewer: a mod deleting one message clears its id, while a ban/kick
+        // clears all of the user's recent message ids in one event. Both arrive
+        // here as `deleteMsgIds` — the same `msgId`s stored as each line's
+        // `id` — so the matching history lines can be marked banned.
+        conn.on(WebcastEvent.IM_DELETE, (raw: unknown) => {
+            if (this.stopped || !this.connected) return;
+            const ids = imDeleteMessageIds(raw);
+            if (!ids.length) return;
+            this.log("moderation", `messages removed (${ids.length})`);
+            this.markBanned(ids);
+        });
         conn.on(ControlEvent.CONNECTED, () => {
             if (this.stopped) return;
             this.#disarmConnectTimer();
@@ -131,4 +143,12 @@ function asChatMessage(raw: unknown): ChatLive | null {
     if (text) out.text = text;
     out.ts = Date.now();
     return out;
+}
+
+/** The deleted message ids from a `WebcastImDeleteMessage` (its `deleteMsgIds`
+ * are the `msgId`s stored as each delivered line's `id`). */
+function imDeleteMessageIds(raw: unknown): string[] {
+    if (!raw || typeof raw !== "object") return [];
+    const ids = (raw as { deleteMsgIds?: string[] }).deleteMsgIds;
+    return Array.isArray(ids) ? ids.filter((id) => id && id.length > 0) : [];
 }

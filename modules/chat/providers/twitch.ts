@@ -63,11 +63,30 @@ export class TwitchChatProvider extends ChatProvider {
                 this.#ws?.send("PONG :tmi.twitch.tv");
                 continue;
             }
+            // A mod banned a user — their history lines become banned.
+            if (line.includes("CLEARCHIT")) {
+                this.#onClearChat(line);
+                continue;
+            }
             if (!line.includes("PRIVMSG")) continue;
             const chatLine = asChatMessage(line);
             if (!chatLine) continue;
             this.deliver(chatLine);
         }
+    }
+
+    /**
+     * `:tmi.twitch.tv CLEARCHIT #channel :<target>` — a user was banned (their
+     * messages cleared) or, with no matching user, a channel-wide clear. The
+     * trailing `:target` is only a real display name when it matches a user in
+     * our history, so `banUser` is a safe discriminator: a clear's free-text
+     * reason matches no one and marks nothing.
+     */
+    #onClearChat(line: string): void {
+        const { rest } = parseTags(line);
+        const match = rest.match(/CLEARCHIT\s+#\S+\s*(:\S+)?/);
+        const target = match?.[1]?.slice(1);
+        if (target) this.banUser(target);
     }
 }
 
