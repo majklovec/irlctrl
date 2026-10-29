@@ -51,21 +51,21 @@ function broadcasterCardBody(
 				<table class="dash-table">
 					<thead>
 						<tr>
-							<th>{t("dev.kp_bw")}</th>
-							<th>{t("dev.kp_window")}</th>
-							<th>{t("dev.kp_inflight")}</th>
-							<th>{t("dev.kp_rtt")}</th>
-							<th>{t("dev.kp_naks")}</th>
+							<th class="right">{t("dev.kp_bw")}</th>
+							<th class="right">{t("dev.kp_window")}</th>
+							<th class="right">{t("dev.kp_inflight")}</th>
+							<th class="right">{t("dev.kp_rtt")}</th>
+							<th class="right">{t("dev.kp_naks")}</th>
 						</tr>
 					</thead>
 					<tbody>
 						{ka.map((k, i) => (
 							<tr key={k.id ?? i}>
-								<td class="num">{formatKbits(k.bwKbits)}</td>
-								<td class="num">{k.window}</td>
-								<td class="num">{k.inFlight}</td>
-								<td class="num">{k.rttMs} ms</td>
-								<td class="num">{k.naks}</td>
+								<td class="num right">{formatKbits(k.bwKbits)}</td>
+								<td class="num right">{k.window}</td>
+								<td class="num right">{k.inFlight}</td>
+								<td class="num right">{k.rttMs} ms</td>
+								<td class="num right">{k.naks}</td>
 							</tr>
 						))}
 						{ka.length > 1 ? (
