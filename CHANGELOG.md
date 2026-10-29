@@ -1,3 +1,17 @@
+# [1.14.0](https://github.com/majklovec/irlctrl/compare/v1.13.0...v1.14.0) (2026-10-29)
+
+
+### Bug Fixes
+
+* **broadcaster:** update RTMP URL for Kick server ([37d22ae](https://github.com/majklovec/irlctrl/commit/37d22ae031af11f8404604c0c17a10a1b7f09f72))
+
+
+### Features
+
+* **broadcaster:** enhance stream lifecycle tracking in device summary ([605f3aa](https://github.com/majklovec/irlctrl/commit/605f3aa606521899640b4638bc143a82ced2318a))
+* **chat:** implement banned messages feature with moderation handling ([f4de822](https://github.com/majklovec/irlctrl/commit/f4de822870b9be6317fcf6338fe40fdd9d1f89cd))
+* **docker:** add extra_hosts for broadcaster resolution in relay container ([b83d2c5](https://github.com/majklovec/irlctrl/commit/b83d2c502666191b327028e7d71c09aa43a4251d))
+
 # [1.13.0](https://github.com/majklovec/irlctrl/compare/v1.12.0...v1.13.0) (2026-10-29)
 
 
