@@ -1,3 +1,13 @@
+# [1.13.0](https://github.com/majklovec/irlctrl/compare/v1.12.0...v1.13.0) (2026-10-29)
+
+
+### Features
+
+* **broadcaster:** add autostart configuration command to manage boot behavior ([b68aa98](https://github.com/majklovec/irlctrl/commit/b68aa98ed987bcef5ed6a12732f5b1c4020cfd66))
+* **dashboards:** add color customization for dashboards ([53bfad3](https://github.com/majklovec/irlctrl/commit/53bfad3475a08852e97b1fa6030e208aa055352c))
+* **database:** consolidate migration logic into db.ts and remove migrate.ts ([13d560b](https://github.com/majklovec/irlctrl/commit/13d560b1f120d0c64e94d636abbe838517c251eb))
+* **database:** implement database migration system and refactor auth initialization ([a4e41c5](https://github.com/majklovec/irlctrl/commit/a4e41c58e936d35a77f1cf3f73d35a63529d79e9))
+
 # [1.12.0](https://github.com/majklovec/irlctrl/compare/v1.11.0...v1.12.0) (2026-10-29)
 
 
