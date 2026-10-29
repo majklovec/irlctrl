@@ -6,6 +6,7 @@
 import m from "mithril";
 import type { Role } from "../../types";
 import { t } from "../i18n";
+import type { MithrilJSXComponent } from "../jsx";
 
 type ShapeTag = "circle" | "path" | "rect";
 type Shape = readonly (readonly [ShapeTag, Record<string, string>])[];
@@ -97,20 +98,28 @@ const shapeElement = {
 	rect: (attrs: Record<string, string>) => <rect {...attrs} />,
 };
 
-/** An icon from the shape registry. The `role-icon` CSS class supplies size, stroke
- * and colour; any additional attributes passed here land on the SVG element. */
-export const icon = (name: IconName, attrs: m.Attributes = {}): m.Vnode => (
-	<svg viewBox="0 0 24 24" aria-hidden="true" {...attrs}>
-		{SHAPES[name].map(([tag, partAttrs]) => shapeElement[tag](partAttrs))}
-	</svg>
-);
+/**
+ * An icon from the shape registry. The `role-icon` CSS class supplies size, stroke
+ * and colour; any additional attributes passed here land on the SVG element.
+ */
+export const Icon = {
+	view: ({ attrs: { name, ...rest } }) => (
+		<svg viewBox="0 0 24 24" aria-hidden="true" {...rest}>
+			{SHAPES[name].map(([tag, partAttrs]) => shapeElement[tag](partAttrs))}
+		</svg>
+	),
+} as MithrilJSXComponent<{ name: IconName } & m.Attributes>;
 
 const roleIcon = (role: Exclude<Role, "combined">): m.Vnode =>
-	icon(role, { class: `role-icon role-icon-${role}` });
+	<Icon name={role} class={`role-icon role-icon-${role}`} />;
 
 /** Role icon(s) with the translated role as tooltip; combined devices get both icons. */
-export const roleTag = (role: Role): m.Vnode => (
-	<span class="role" title={t(`role.${role}`)}>
-		{role === "combined" ? [roleIcon("encoder"), roleIcon("relay")] : roleIcon(role)}
-	</span>
-);
+export const RoleTag = {
+	view: ({ attrs: { role } }) => (
+		<span class="role" title={t(`role.${role}`)}>
+			{role === "combined"
+				? [roleIcon("encoder"), roleIcon("relay")]
+				: roleIcon(role)}
+		</span>
+	),
+} as MithrilJSXComponent<{ role: Role }>;

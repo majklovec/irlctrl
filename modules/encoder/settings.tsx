@@ -14,7 +14,7 @@
  *     pipeline editor page (/pipelines/…).
  */
 import m from "mithril";
-import { icon } from "../../frontend/ts/components/icons";
+import { Icon } from "../../frontend/ts/components/icons";
 import {
 	Actions,
 	Badge,
@@ -232,7 +232,7 @@ export const def: ModuleDef = {
 									}
 									onclick={() => toggleGroup(group)}
 								>
-									{icon("chevron", { class: "role-icon" })}
+									<Icon name="chevron" class="role-icon" />
 									<span class="pipe-group-name">{group}</span>
 									<Badge
 										text={t("set.pipeline_count", {
@@ -251,10 +251,10 @@ export const def: ModuleDef = {
 														title={t("set.pipeline_edit")}
 														aria-label={t("set.pipeline_edit")}
 													>
-														{icon("edit", { class: "role-icon" })}
+														<Icon name="edit" class="role-icon" />
 													</a>
 													<Button
-														label={icon("delete", { class: "role-icon" })}
+														label={<Icon name="delete" class="role-icon" />}
 														class="icon-link dash-delete"
 														title={t("set.pipeline_delete")}
 														aria-label={t("set.pipeline_delete")}
@@ -279,7 +279,7 @@ export const def: ModuleDef = {
 								})}
 							/>
 							<Button
-								label={icon("sync", { class: "role-icon" })}
+								label={<Icon name="sync" class="role-icon" />}
 								class="icon-link"
 								title={t("set.repo_update")}
 								aria-label={t("set.repo_update")}
@@ -287,7 +287,7 @@ export const def: ModuleDef = {
 								onclick={() => void updateRepository(ctx, repository)}
 							/>
 							<Button
-								label={icon("delete", { class: "role-icon" })}
+								label={<Icon name="delete" class="role-icon" />}
 								class="icon-link dash-delete"
 								title={t("ui.remove")}
 								aria-label={t("ui.remove")}

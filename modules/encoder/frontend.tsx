@@ -1,6 +1,6 @@
 /* Encoder card: status rows, the stream form and (on ceracoder devices) bitrate control. */
 import m from "mithril";
-import { icon } from "../../frontend/ts/components/icons";
+import { Icon } from "../../frontend/ts/components/icons";
 import {
 	Actions,
 	Badge,
@@ -405,7 +405,7 @@ const encoderSummaryColumns = [
 		available: (device: DeviceSummary) =>
 			device.role === "encoder" || device.role === "combined",
 		header: () => [
-			icon("encoder", { class: "role-icon role-icon-encoder" }),
+			<Icon name="encoder" class="role-icon role-icon-encoder" />,
 			` ${t("setup.step.encoder")}`,
 		],
 		cell: (device: DeviceSummary) => {

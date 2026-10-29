@@ -4,7 +4,7 @@ import m from "mithril";
 import { errorMessage } from "../../shared/util";
 import { DEFAULT_COLOR, HOSTNAME_RE } from "../../shared/validate";
 import type { Role, SetupInfo } from "../types";
-import { icon } from "./components/icons";
+import { Icon } from "./components/icons";
 import {
 	Actions,
 	Break,
@@ -106,10 +106,10 @@ const roleCard = (value: Role, name: string, tagline: string): m.Vnode => (
 		/>
 		{value === "combined"
 			? [
-					icon("encoder", { class: "role-icon" }),
-					icon("relay", { class: "role-icon" }),
+					<Icon name="encoder" class="role-icon" />,
+					<Icon name="relay" class="role-icon" />,
 			  ]
-			: icon(value, { class: "role-icon" })}
+			: <Icon name={value} class="role-icon" />}
 		<span class="role-name">{name}</span>
 		<span class="role-tagline">{tagline}</span>
 		<img src={`/img/${value}.svg`} alt="" aria-hidden="true" />

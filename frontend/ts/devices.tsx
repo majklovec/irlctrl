@@ -2,7 +2,7 @@
  * list (devices.snapshot / devices.changed over the shared feed websocket). */
 import m from "mithril";
 import type { DeviceSummary } from "../types";
-import { roleTag } from "./components/icons";
+import { RoleTag } from "./components/icons";
 import { Badge, Card, Page, ServerNav } from "./components/ui";
 import { i18nReady, t } from "./i18n";
 import {
@@ -68,7 +68,7 @@ function row(
 					{d.hostname || d.id}
 				</a>
 			</td>
-			<td class="muted">{d.role ? roleTag(d.role) : "—"}</td>
+			<td class="muted">{d.role ? <RoleTag role={d.role} /> : "—"}</td>
 			<td>
 				{d.online ? (
 					<Badge text={t("dev.badge.online")} kind="on" />

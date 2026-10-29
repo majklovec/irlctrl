@@ -9,7 +9,7 @@
  * the dashboard from the server. */
 import m from "mithril";
 import type { ServerDashboard, ServerDashboardWidget } from "../types";
-import { icon } from "./components/icons";
+import { Icon } from "./components/icons";
 import { Page, ServerNav, TitleWithBack } from "./components/ui";
 import {
 	ensureDashboardsWs,
@@ -360,12 +360,14 @@ const App: m.Component = {
 									disabled={!document.fullscreenEnabled}
 									onclick={() => void toggleFullscreen()}
 								>
-									{icon(
-										document.fullscreenElement
-											? "exit-fullscreen"
-											: "fullscreen",
-										{ class: "role-icon" },
-									)}
+									<Icon
+										name={
+											document.fullscreenElement
+												? "exit-fullscreen"
+												: "fullscreen"
+										}
+										class="role-icon"
+									/>
 								</button>,
 							]
 						: null,

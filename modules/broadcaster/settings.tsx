@@ -1,5 +1,5 @@
 import m from "mithril";
-import { icon } from "../../frontend/ts/components/icons";
+import { Icon } from "../../frontend/ts/components/icons";
 import {
 	Actions,
 	Break,
@@ -255,7 +255,7 @@ export const def: ModuleDef = {
 						</div>
 					))}
 					<Button
-						label={icon("plus", { class: "role-icon" })}
+						label={<Icon name="plus" class="role-icon" />}
 						title={t("set.output_add")}
 						aria-label={t("set.output_add")}
 						disabled={ctx.busy}

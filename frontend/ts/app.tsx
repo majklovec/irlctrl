@@ -1,7 +1,7 @@
 /* Device page — a Mithril view over the device store (device/store.ts): header, one card per
  * role-specific function, and the event log. The WebSocket client mutates state and redraws. */
 import m from "mithril";
-import { icon, roleTag } from "./components/icons";
+import { Icon, RoleTag } from "./components/icons";
 import { Badge, Page, TitleWithBack } from "./components/ui";
 import { LogCard } from "./device/log";
 import { act, connectDevice, st } from "./device/store";
@@ -48,7 +48,7 @@ function headerRight(): m.Children[] {
 			/>
 			{` ${t("ui.autostart")}`}
 		</label>,
-		status && <span class="badge">{roleTag(status.role)}</span>,
+		status && <span class="badge"><RoleTag role={status.role} /></span>,
 		connBadge(),
 		<a
 			class="icon-link"
@@ -56,7 +56,7 @@ function headerRight(): m.Children[] {
 			title={t("set.title")}
 			aria-label={t("set.title")}
 		>
-			{icon("gear", { class: "role-icon" })}
+			<Icon name="gear" class="role-icon" />
 		</a>,
 	];
 }
