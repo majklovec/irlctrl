@@ -1,12 +1,18 @@
 {
-    "dev.badge.starting": "spouští",
-    "dev.card.srtla2platform": "SRTLA → RTMP",
-    "dev.row.auto_restarts": "Automatické restarty",
-    "dev.row.rtmp": "Cíl",
-    "dev.row.rtmp_key": "Klíč streamu",
-    "set.rtmp_key": "Klíč streamu",
-    "set.rtmp_url": "RTMP(S) URL",
-    "set.srtla2platform": "RTMP výstup",
-    "set.srtla2platform_desc": "Cíl, kam se stream publikuje, a ffmpeg profil, který se na něj použije. Stream se po uložení restartuje.",
-    "set.srtla2platform_profile": "Výstupní profil"
+	"dev.badge.starting": "spouští",
+	"dev.card.srtla2platform": "SRTLA → RTMP",
+	"dev.row.auto_restarts": "Automatické restarty",
+	"dev.row.outputs": "Cíle",
+	"set.output_add": "Přidat cíl",
+	"set.output_remove": "Odebrat",
+	"set.rtmp_key": "Klíč streamu",
+	"set.rtmp_url": "RTMP(S) URL",
+	"set.server": "Server",
+	"set.service": "Služba",
+	"set.service_custom": "Vlastní",
+	"set.service_group_common": "Časté",
+	"set.service_group_other": "Ostatní",
+	"set.srtla2platform": "RTMP výstupy",
+	"set.srtla2platform_desc": "Služba, URL a klíč pro každý cíl, do kterého se stream publikuje — všechny používají stejný ffmpeg profil. Klíče streamu jsou pouze pro zápis. Po uložení se stream restartuje.",
+	"set.srtla2platform_profile": "Výstupní profil"
 }

@@ -1,12 +1,18 @@
 {
-    "dev.badge.starting": "起動中",
-    "dev.card.srtla2platform": "SRTLA → RTMP",
-    "dev.row.auto_restarts": "自動再起動",
-    "dev.row.rtmp": "送信先",
-    "dev.row.rtmp_key": "ストリームキー",
-    "set.rtmp_key": "ストリームキー",
-    "set.rtmp_url": "RTMP(S) URL",
-    "set.srtla2platform": "RTMP出力",
-    "set.srtla2platform_desc": "ストリームを配信する先と適用されるffmpegプロファイル。保存後にストリームを再起動します。",
-    "set.srtla2platform_profile": "出力プロファイル"
+	"dev.badge.starting": "起動中",
+	"dev.card.srtla2platform": "SRTLA → RTMP",
+	"dev.row.auto_restarts": "自動再起動",
+	"dev.row.outputs": "送信先",
+	"set.output_add": "送信先を追加",
+	"set.output_remove": "削除",
+	"set.rtmp_key": "ストリームキー",
+	"set.rtmp_url": "RTMP(S) URL",
+	"set.server": "サーバー",
+	"set.service": "サービス",
+	"set.service_custom": "カスタム",
+	"set.service_group_common": "よく使う",
+	"set.service_group_other": "その他",
+	"set.srtla2platform": "RTMP 出力",
+	"set.srtla2platform_desc": "配信先ごとのサービス、URL、キーを設定します — すべての配信先は同じ ffmpeg プロファイルを使用します。ストリームキーは書き込み専用です。保存後にストリームは再起動されます。",
+	"set.srtla2platform_profile": "出力プロファイル"
 }

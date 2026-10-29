@@ -198,7 +198,7 @@ docker compose up -d --build
 - **obs-client** — proxies a host's OBS Studio (`ws://host.docker.internal:4455`) into the server.
 - **relay** — `client.ts --role relay`, bonds SRT out via `srtla_send` (`Dockerfile.device`, image `majkl/irlctrl-device`).
 - **encoder** — `client.ts --role encoder`, runs `ceracoder`/GStreamer and sends SRT to the relay; same device image, different role + `ENCODER_BIN`.
-- **srtla2platform** — `srtla2platform.ts`, de-bonds an SRTLA stream via `srtla_rec` and re-publishes it as RTMP (`RTMP_URL` + `RTMP_KEY` stream key) over GStreamer (`Dockerfile.srtla2platform`, image `majkl/irlctrl-srtla2platform`); exposes the SRTLA receiver on `5000/udp`.
+- **srtla2platform** — `srtla2platform.ts`, de-bonds an SRTLA stream via `srtla_rec` and re-publishes it as RTMP to one or more destinations (configured in the web UI via the module settings; a single `RTMP_URL` + `RTMP_KEY` stream key is accepted as a legacy default) (`Dockerfile.srtla2platform`, image `majkl/irlctrl-srtla2platform`); exposes the SRTLA receiver on `5000/udp`.
 
 The **relay** container grants the `NET_ADMIN` capability because at startup it builds per-uplink policy routing (`ip rule add` + route tables) and watches interfaces with `ip monitor`; without it the relay logs `ip rule add … Operation not permitted` and exits. The encoder does not need the capability. On the default bridge network the relay's routing changes act on the container's own namespace; for real bonded uplinks on the host's raw interfaces run the relay with `network_mode: host`.
 

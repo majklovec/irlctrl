@@ -1,12 +1,18 @@
 {
-    "dev.badge.starting": "uruchamianie",
-    "dev.card.srtla2platform": "SRTLA → RTMP",
-    "dev.row.auto_restarts": "Automatyczne restarty",
-    "dev.row.rtmp": "Miejsce docelowe",
-    "dev.row.rtmp_key": "Klucz strumienia",
-    "set.rtmp_key": "Klucz strumienia",
-    "set.rtmp_url": "RTMP(S) URL",
-    "set.srtla2platform": "Wyjście RTMP",
-    "set.srtla2platform_desc": "Miejsce publikacji strumienia i profil ffmpeg. Strumień jest restartowany po zapisaniu.",
-    "set.srtla2platform_profile": "Profil wyjściowy"
+	"dev.badge.starting": "uruchamianie",
+	"dev.card.srtla2platform": "SRTLA → RTMP",
+	"dev.row.auto_restarts": "Automatyczne restarty",
+	"dev.row.outputs": "Miejsca docelowe",
+	"set.output_add": "Dodaj miejsce docelowe",
+	"set.output_remove": "Usuń",
+	"set.rtmp_key": "Klucz strumienia",
+	"set.rtmp_url": "RTMP(S) URL",
+	"set.server": "Serwer",
+	"set.service": "Usługa",
+	"set.service_custom": "Własna",
+	"set.service_group_common": "Popularne",
+	"set.service_group_other": "Inne",
+	"set.srtla2platform": "Wyjścia RTMP",
+	"set.srtla2platform_desc": "Usługa, URL i klucz każdego destynacji, do której publikowany jest stream — wszystkie używają tego samego profilu ffmpeg. Klucze streamu są tylko do zapisu. Po zapisaniu strumień jest restartowany.",
+	"set.srtla2platform_profile": "Profil wyjściowy"
 }

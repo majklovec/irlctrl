@@ -5,7 +5,9 @@
 # (the ffmpeg output profile — copy, re-encode, … — is selected in the UI)
 #
 # Unlike the relay/encoder device image (Dockerfile.device), this:
-#   - bundles only the srtla2platform agent (backend/srtla2platform/ + shared/),
+#   - bundles only the srtla2platform agent (backend/srtla2platform/ +
+#     modules/srtla2platform/ — the service catalog the agent validates
+#     against — + shared/),
 #   - builds `srtla_rec` from irlserver/srtla (rev b8359bc, the same revision the
 #     OBS SRTLA input plugin embeds) in a separate stage so the runtime image
 #     stays free of the C/C++ toolchain. srtla_rec parses SRTLA packets at the
@@ -72,6 +74,7 @@ WORKDIR /app
 # Copy only what the agent runs unbundled (`bun backend/srtla2platform/...`).
 COPY package.json ./
 COPY backend/srtla2platform ./backend/srtla2platform
+COPY modules/srtla2platform ./modules/srtla2platform
 COPY shared ./shared
 
 # Bake the gitignored generated/version.ts (APP_VERSION) from package.json.

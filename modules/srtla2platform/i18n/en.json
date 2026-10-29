@@ -1,12 +1,18 @@
 {
-    "dev.badge.starting": "starting",
-    "dev.card.srtla2platform": "SRTLA → RTMP",
-    "dev.row.auto_restarts": "Auto-restarts",
-    "dev.row.rtmp": "Destination",
-    "dev.row.rtmp_key": "Stream key",
-    "set.rtmp_key": "Stream key",
-    "set.rtmp_url": "RTMP(S) URL",
-    "set.srtla2platform": "RTMP output",
-    "set.srtla2platform_desc": "Destination the stream is published to, and the ffmpeg profile applied to it. The stream restarts after saving.",
-    "set.srtla2platform_profile": "Output profile"
+	"dev.badge.starting": "starting",
+	"dev.card.srtla2platform": "SRTLA → RTMP",
+	"dev.row.auto_restarts": "Auto-restarts",
+	"dev.row.outputs": "Destinations",
+	"set.output_add": "Add destination",
+	"set.output_remove": "Remove",
+	"set.rtmp_key": "Stream key",
+	"set.rtmp_url": "RTMP(S) URL",
+	"set.server": "Server",
+	"set.service": "Service",
+	"set.service_custom": "Custom",
+	"set.service_group_common": "Common",
+	"set.service_group_other": "Other",
+	"set.srtla2platform": "RTMP outputs",
+	"set.srtla2platform_desc": "Stream service, URL and key for each destination the stream is published to — all use the same ffmpeg profile. Stream keys are write-only. The stream restarts after saving.",
+	"set.srtla2platform_profile": "Output profile"
 }

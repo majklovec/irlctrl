@@ -13,10 +13,14 @@ import { card, type DeviceCard } from "../../frontend/ts/device/store";
 import { t } from "../../frontend/ts/i18n";
 import type { FrontendModule } from "../../frontend/ts/module-contracts";
 import log from "./log";
+import { SRTLA_CUSTOM_SERVICE, srtlaService } from "./services";
 import "./styles.css";
 import type { Srtla2PlatformStatus } from "./types";
 
-function srtla2platformCardBody(host: DeviceCard, status: Srtla2PlatformStatus): m.Vnode {
+function srtla2platformCardBody(
+	host: DeviceCard,
+	status: Srtla2PlatformStatus,
+): m.Vnode {
 	const s = status.state;
 	const running = s.stream === "running";
 	const transitional = s.stream === "starting" || s.stream === "stopping";
@@ -35,33 +39,43 @@ function srtla2platformCardBody(host: DeviceCard, status: Srtla2PlatformStatus):
 						),
 					],
 					[
-						t("dev.row.rtmp"),
-						s.rtmp ? (
-							<code class="srtla2platform-rtmp">{s.rtmp}</code>
+						t("dev.row.outputs"),
+						s.outputs.length > 0 ? (
+							// biome-ignore lint/complexity/noUselessFragments: Element[] is not a Child; the fragment makes it one
+							<ul>
+								{s.outputs.map((o) => {
+									// The catalog service name (Kick, Twitch, ...)
+									// leads each destination; custom shows only the
+									// URL.
+									const svc = srtlaService(o.service);
+									const label =
+										svc && svc.id !== SRTLA_CUSTOM_SERVICE
+											? svc.name
+											: undefined;
+									return (
+										<li class="srtla2platform-rtmp" key={o.url}>
+											{label !== undefined ? (
+												<>
+													<strong>{label}</strong> ·{" "}
+												</>
+											) : null}
+											<code>{o.url}</code>
+											<span class="muted">{!o.keyConfigured ? "" : " 🔑"}</span>
+										</li>
+									);
+								})}
+							</ul>
 						) : (
 							<span class="muted">{t("set.srtla2platform_desc")}</span>
 						),
 					],
-					// The stream key is reported separately from the URL, masked.
-					...(s.rtmpKey
-						? [
-								[
-									t("dev.row.rtmp_key"),
-									<code class="srtla2platform-rtmp">
-										{s.rtmpKey}
-									</code>,
-								] as [string, m.Vnode],
-							]
-						: []),
 					// The selected ffmpeg output profile (always present;
 					// "copy" is the default stream-copy profile).
 					...(s.profile
 						? [
 								[
 									t("set.srtla2platform_profile"),
-									<code class="srtla2platform-rtmp">
-										{s.profile}
-									</code>,
+									<code class="srtla2platform-rtmp">{s.profile}</code>,
 								] as [string, m.Vnode],
 							]
 						: []),
@@ -69,9 +83,7 @@ function srtla2platformCardBody(host: DeviceCard, status: Srtla2PlatformStatus):
 						? [
 								[
 									t("dev.row.auto_restarts"),
-									<span class={running ? "muted" : "error"}>
-										{s.restarts}
-									</span>,
+									<span class={running ? "muted" : "error"}>{s.restarts}</span>,
 								] as [string, m.Vnode],
 							]
 						: []),
@@ -80,13 +92,20 @@ function srtla2platformCardBody(host: DeviceCard, status: Srtla2PlatformStatus):
 			<Actions>
 				<Button
 					label={t("ui.start")}
-					disabled={running || transitional || !s.rtmp || host.pending("srtla2platform-start")}
+					disabled={
+						running ||
+						transitional ||
+						s.outputs.length === 0 ||
+						host.pending("srtla2platform-start")
+					}
 					onclick={() => host.press("srtla2platform-start", "start")}
 				/>
 				<Button
 					label={t("ui.stop")}
 					class="danger"
-					disabled={!running || transitional || host.pending("srtla2platform-stop")}
+					disabled={
+						!running || transitional || host.pending("srtla2platform-stop")
+					}
 					onclick={() => host.press("srtla2platform-stop", "stop")}
 				/>
 			</Actions>

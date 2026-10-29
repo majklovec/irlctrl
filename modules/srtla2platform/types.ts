@@ -7,16 +7,31 @@ import type { Status } from "../../shared/types";
 /** The lifecycle of the srtla_rec + gstreamer stream on the relay. */
 export type SrtlaStreamState = "idle" | "starting" | "running" | "stopping";
 
+/** One RTMP destination the pipeline publishes to (key masked for the UI). */
+export interface SrtlaOutputState {
+	/**
+	 * The streaming-service catalog id (e.g. "kick", "custom") — see
+	 * services.ts.
+	 */
+	service: string;
+	/** The destination URL the ffmpeg pipeline publishes to (key not included). */
+	url: string;
+	/** True when a stream key is configured for this destination. */
+	keyConfigured: boolean;
+}
+
 export interface SrtlaStreamStateFields {
 	/** The stream lifecycle (`idle` / `starting` / `running` / `stopping`). */
 	stream: SrtlaStreamState;
-	/** The RTMP destination URL the ffmpeg pipeline publishes to (key not included, null when unset). */
-	rtmp: string | null;
-	/** The stream key appended to the destination, masked (null when unset). */
-	rtmpKey: string | null;
+	/** The configured RTMP destinations (empty = setup incomplete). */
+	outputs: SrtlaOutputState[];
 	inputFormat: string;
 	/** The selected ffmpeg output profile id (e.g. "copy", "reencode-h264"). */
 	profile: string;
+	/** The available output profiles (built-in + user-authored). */
+	profiles: { id: string; name: string }[];
+	/** Directory holding user-authored ffmpeg profile files (JSON). */
+	profilesDir: string;
 	srtlaPort: number;
 	srtPort: number;
 	metricsPort: number;

@@ -197,6 +197,18 @@ export const chevronIcon = (): m.Vnode =>
 		"stroke-linejoin": "round",
 	});
 
+/** Bold plus (heavier stroke than the action icons) for the "add" button. */
+export const plusIcon = (): m.Vnode =>
+	draw([["path", { d: "M12 5v14M5 12h14" }]], {
+		width: "18",
+		height: "18",
+		fill: "none",
+		stroke: "currentColor",
+		"stroke-width": "3",
+		"stroke-linecap": "round",
+		"stroke-linejoin": "round",
+	});
+
 /** Role icon(s) with the translated role as tooltip; combined devices get both icons. */
 export const roleTag = (role: Role): m.Vnode => (
 	<span class="role" title={t(`role.${role}`)}>

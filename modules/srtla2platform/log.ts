@@ -1,9 +1,6 @@
 /** Log wording of the srtla2platform module's methods (start / stop the
  * srtla_rec + gstreamer stream). */
-import {
-	type LogWording,
-	wording,
-} from "../../shared/logMessages";
+import { type LogWording, wording } from "../../shared/logMessages";
 
 const log: LogWording = {
 	methods: {
