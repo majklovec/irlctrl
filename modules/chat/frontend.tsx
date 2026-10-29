@@ -16,6 +16,7 @@ import {
 	CHAT_PLATFORMS,
 	bannedMessagesFromConfig,
 	chatOrderFromConfig,
+	chatTimestampsFromConfig,
 	chatTtsConfig,
 	chatTtsShouldSpeak,
 	historyLengthFromConfig,
@@ -526,10 +527,34 @@ function lineSegments(text: string): m.Children {
  */
 const chatAutoScroll = new WeakMap<HTMLElement, boolean>();
 
+/** A message's arrival time (HH:MM:SS, locale-aware) or "" when the platform
+ * didn't provide one. The formatter is cached per language. */
+let timestampFormatter: (ts: number) => string;
+let timestampFormatterLang: string | undefined;
+
+function formatTimestamp(ts: number): string {
+	if (!Number.isFinite(ts) || ts <= 0) return "";
+	const lang = currentLanguage();
+
+	if (timestampFormatterLang !== lang) {
+		timestampFormatter = new Intl.DateTimeFormat(lang, {
+			hour: "2-digit",
+			minute: "2-digit",
+			second: "2-digit",
+			hour12: false,
+		});
+		timestampFormatterLang = lang;
+	}
+
+	return timestampFormatter.format(ts);
+}
+
 type ChatFeedAttrs = {
 	lines: MergedLine[];
 	bottom: boolean;
 	mixed: boolean;
+	/** Show each line's arrival time next to it. */
+	showTimestamps: boolean;
 	feedKey: string;
 };
 
@@ -568,7 +593,7 @@ const ChatFeed: m.Component<ChatFeedAttrs> = {
 	},
 
 	view(vnode) {
-		const { lines, mixed, feedKey } = vnode.attrs;
+		const { lines, mixed, showTimestamps, feedKey } = vnode.attrs;
 
 		return (
 			<div
@@ -592,6 +617,12 @@ const ChatFeed: m.Component<ChatFeedAttrs> = {
 						{mixed && (
 							<span class="chat-icon" title={platform}>
 								{m.trust(PLATFORM_ICONS[platform])}
+							</span>
+						)}
+
+						{showTimestamps && line.ts != null && (
+							<span class="chat-time" title={new Date(line.ts).toISOString()}>
+								{formatTimestamp(line.ts)}
 							</span>
 						)}
 
@@ -633,6 +664,7 @@ function body(w: ServerDashboardWidget, _ctx: WidgetContext): m.Children {
 
 	const mixed = specs.length > 1;
 	const bottom = chatOrderFromConfig(w.config) === "bottom";
+	const showTimestamps = chatTimestampsFromConfig(w.config);
 	const feedKey = `chat-feed:${specs.map((spec) => spec.spec).join(",")}`;
 
 	return m(ChatFeed, {
@@ -641,6 +673,7 @@ function body(w: ServerDashboardWidget, _ctx: WidgetContext): m.Children {
 		lines,
 		bottom,
 		mixed,
+		showTimestamps,
 	});
 }
 

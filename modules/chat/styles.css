@@ -67,6 +67,14 @@
     margin-right: 6px;
 }
 
+/* A line's arrival time (config `timestamps: on`); dimmed so it recedes
+   next to the username. */
+.dash-widget-body .chat-line .chat-time {
+    opacity: 0.55;
+    margin-right: 6px;
+    font-variant-numeric: tabular-nums;
+}
+
 .dash-widget-body .chat-line .chat-emote {
     height: 1em;
     width: auto;

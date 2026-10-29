@@ -19,6 +19,7 @@ export const CHAT_CONFIG_FIELDS = [
     "history",
     { name: "order", type: "select", options: ["top", "bottom"] },
     { name: "bannedMessages", type: "select", options: ["strike", "hide"] },
+    { name: "timestamps", type: "select", options: ["off", "on"] },
     {
         name: "ttsEnabled",
         type: "select",
@@ -78,6 +79,16 @@ export function bannedMessagesFromConfig(
 ): ChatBannedMode {
     const value = (config?.bannedMessages ?? "").trim().toLowerCase();
     return value === "hide" ? "hide" : "strike";
+}
+
+/**
+ * Whether a widget shows each message's arrival time next to its line.
+ * Anything that is not "on" falls back to "off" (the default: no timestamps).
+ */
+export function chatTimestampsFromConfig(
+    config: Record<string, string> | undefined,
+): boolean {
+    return (config?.timestamps ?? "").trim().toLowerCase() === "on";
 }
 
 /** Normalize one platform channel value (lowercased, trimmed; "" when empty). */
