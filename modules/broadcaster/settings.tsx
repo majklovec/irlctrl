@@ -35,8 +35,8 @@ interface OutputView {
 	keyConfigured: boolean;
 }
 
-/** The device's srtla2platform slice of the modules view; keys are masked. */
-interface Srtla2PlatformModuleView extends ModuleSliceView {
+/** The device's broadcaster slice of the modules view; keys are masked. */
+interface BroadcasterModuleView extends ModuleSliceView {
 	outputs: OutputView[];
 	profile: string;
 	profiles: Profile[];
@@ -68,7 +68,7 @@ let syncSignature: string | null = null;
  *  - A profile that no longer exists on the device is reset to the copy
  *    profile; an in-progress choice the device has not saved yet is kept.
  */
-function adopt(view: Srtla2PlatformModuleView | undefined): void {
+function adopt(view: BroadcasterModuleView | undefined): void {
 	const rows = view?.outputs ?? [];
 	while (draft.outputs.length > rows.length) draft.outputs.pop();
 	rows.forEach((o, i) => {
@@ -87,7 +87,7 @@ function adopt(view: Srtla2PlatformModuleView | undefined): void {
 async function save(ctx: ModuleContext): Promise<void> {
 	const result = await ctx.run(() =>
 		ctx.rpc.call<{ modules: ModuleContext["modules"] }>("modules.configure", {
-			id: "srtla2platform",
+			id: "broadcaster",
 			config: {
 				outputs: draft.outputs,
 				profile: draft.profile,
@@ -97,8 +97,8 @@ async function save(ctx: ModuleContext): Promise<void> {
 	ctx.setModules(result.modules);
 	// Adopt the server's fresh view and mark it synced so the next status
 	// push does not resync it.
-	adopt(result.modules.srtla2platform as Srtla2PlatformModuleView | undefined);
-	syncSignature = JSON.stringify(result.modules.srtla2platform);
+	adopt(result.modules.broadcaster as BroadcasterModuleView | undefined);
+	syncSignature = JSON.stringify(result.modules.broadcaster);
 	// Keys are write-only: clear them from the draft, the device keeps them.
 	draft.outputs = draft.outputs.map((out) => ({ ...out, key: "" }));
 	ctx.note(t("set.saved"));
@@ -110,7 +110,7 @@ const ProfileOptions = {
 		const profiles = view?.profiles ?? [];
 		return <Options pairs={profiles.map((p) => [p.id, p.name])} />;
 	},
-} as MithrilJSXComponent<{ view?: Srtla2PlatformModuleView }>;
+} as MithrilJSXComponent<{ view?: BroadcasterModuleView }>;
 
 /**
  * The per-destination service options in two groups: the common platforms,
@@ -140,7 +140,7 @@ const ServiceOptions = {
 
 /** Per-destination key placeholder: configured keys show "leave blank". */
 function keyPlaceholder(
-	view: Srtla2PlatformModuleView | undefined,
+	view: BroadcasterModuleView | undefined,
 	index: number,
 ): string {
 	return view?.outputs[index]?.keyConfigured
@@ -163,16 +163,14 @@ const ServerOptions = {
 } as MithrilJSXComponent<{ out: { service: string; url: string } }>;
 
 export const def: ModuleDef = {
-	id: "srtla2platform",
-	titleKey: "set.srtla2platform",
-	visible: (ctx) => ctx.role === "srtla2platform",
+	id: "broadcaster",
+	titleKey: "set.broadcaster",
+	visible: (ctx) => ctx.role === "broadcaster",
 	refresh: (ctx) => {
 		// A status push while a save is in flight must not clobber the
 		// operator's edits — the in-flight save already carries them.
 		if (ctx.busy) return;
-		const view = ctx.modules.srtla2platform as
-			| Srtla2PlatformModuleView
-			| undefined;
+		const view = ctx.modules.broadcaster as BroadcasterModuleView | undefined;
 		// The view lags the draft until a save round-trips, so a push that
 		// carries no change since the last sync must not touch the draft —
 		// the operator may be mid-edit. Set only after the sync below: a
@@ -183,16 +181,14 @@ export const def: ModuleDef = {
 		syncSignature = signature;
 	},
 	render: (ctx) => {
-		const view = ctx.modules.srtla2platform as
-			| Srtla2PlatformModuleView
-			| undefined;
+		const view = ctx.modules.broadcaster as BroadcasterModuleView | undefined;
 		return [
 			<p class="muted" key="hint">
-				{t("set.srtla2platform_desc")}
+				{t("set.broadcaster_desc")}
 			</p>,
 			<Form key="form" onSubmit={() => void save(ctx)}>
 				<Field
-					label={t("set.srtla2platform_profile")}
+					label={t("set.broadcaster_profile")}
 					control={
 						<Select target={draft} prop="profile">
 							<ProfileOptions view={view} />
@@ -200,7 +196,7 @@ export const def: ModuleDef = {
 					}
 				/>
 
-				<FieldGroup legend={t("set.srtla2platform")}>
+				<FieldGroup legend={t("set.broadcaster")}>
 					{draft.outputs.map((out, i) => (
 						<div class="output-row" key={i}>
 							<Field

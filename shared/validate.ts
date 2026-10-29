@@ -11,7 +11,7 @@ export const REMOTE_URL_RE = /^wss?:\/\//;
 /** Device types: relay bonds a stream out over its uplinks, encoder produces the
  *  stream, combined does both on one box, obs runs the OBS controls. Which modules
  *  serve a role is declared by the modules themselves (`roles`). */
-export const ROLES = ["relay", "encoder", "combined", "obs", "srtla2platform"] as const;
+export const ROLES = ["relay", "encoder", "combined", "obs", "broadcaster"] as const;
 export type Role = (typeof ROLES)[number];
 
 export const isRole = (v: unknown): v is Role =>

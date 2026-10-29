@@ -1,6 +1,6 @@
 {
 	"dev.badge.starting": "启动中",
-	"dev.card.srtla2platform": "SRTLA → RTMP",
+	"dev.card.broadcaster": "SRTLA → RTMP",
 	"dev.row.auto_restarts": "自动重启",
 	"dev.row.outputs": "目标",
 	"set.output_add": "添加目标",
@@ -12,7 +12,7 @@
 	"set.service_custom": "自定义",
 	"set.service_group_common": "常用",
 	"set.service_group_other": "其他",
-	"set.srtla2platform": "RTMP 输出",
-	"set.srtla2platform_desc": "为每个发布目标设置流服务、URL 和密钥——所有目标使用相同的 ffmpeg 配置。流密钥仅可写入。保存后流会重启。",
-	"set.srtla2platform_profile": "输出配置"
+	"set.broadcaster": "RTMP 输出",
+	"set.broadcaster_desc": "为每个发布目标设置流服务、URL 和密钥——所有目标使用相同的 ffmpeg 配置。流密钥仅可写入。保存后流会重启。",
+	"set.broadcaster_profile": "输出配置"
 }

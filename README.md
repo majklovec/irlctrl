@@ -187,7 +187,7 @@ The image ships with the whole streaming chain — GStreamer (incl. `gstreamer1.
 
 ### Docker
 
-`docker-compose.yaml` runs the whole stack — the control server plus a relay, an encoder, an OBS Studio proxy, and the SRTLA-to-platform agent (see `Dockerfile`, `Dockerfile.device`, and `Dockerfile.srtla2platform`):
+`docker-compose.yaml` runs the whole stack — the control server plus a relay, an encoder, an OBS Studio proxy, and the SRTLA-to-platform agent (see `Dockerfile`, `Dockerfile.device`, and `Dockerfile.broadcaster`):
 
 ```sh
 docker compose up -d --build
@@ -197,7 +197,7 @@ docker compose up -d --build
 -   **obs-client** — `backend/obs-client/obs-client.ts`, proxies a host's OBS Studio (`ws://host.docker.internal:4455`) into the server; reuses the control image with a different entrypoint.
 -   **relay** — `backend/client/client.ts --role relay`, bonds SRT out via `srtla_send` (`Dockerfile.device`, image `majkl/irlctrl-device`).
 -   **encoder** — `backend/client/client.ts --role encoder`, runs `ceracoder`/GStreamer and sends SRT to the relay; same device image, different role + `ENCODER_BIN`.
--   **srtla2platform** — `backend/srtla2platform/srtla2platform.ts`, de-bonds an SRTLA stream via `srtla_rec` and re-publishes it as RTMP to one or more destinations (configured in the web UI via the module settings; a single `RTMP_URL` + `RTMP_KEY` stream key is accepted as a legacy default) with ffmpeg, using a UI-selectable output profile (JSON files in `config/srtla2platform/profiles/`; the defaults for stream-copy, H.264/H.265 re-encode, and audio-only are seeded there from `backend/srtla2platform/defaults/profiles/` on first run and can be edited or extended) (`Dockerfile.srtla2platform`, image `majkl/irlctrl-srtla2platform`); exposes the SRTLA receiver on `5000/udp`.
+-   **broadcaster** — `backend/broadcaster/broadcaster.ts`, de-bonds an SRTLA stream via `srtla_rec` and re-publishes it as RTMP to one or more destinations (configured in the web UI via the module settings; a single `RTMP_URL` + `RTMP_KEY` stream key is accepted as a legacy default) with ffmpeg, using a UI-selectable output profile (JSON files in `config/broadcaster/profiles/`; the defaults for stream-copy, H.264/H.265 re-encode, and audio-only are seeded there from `backend/broadcaster/defaults/profiles/` on first run and can be edited or extended) (`Dockerfile.broadcaster`, image `majkl/irlctrl-broadcaster`); exposes the SRTLA receiver on `5000/udp`.
 
 The relay/encoder device image bundles `backend/client/client.ts` plus the native `srtla_send`, `ceracoder`, `belacoder` binaries, the GStreamer pipeline definitions, and `iproute2`. The **relay** grants the `NET_ADMIN` capability (`cap_add`) because at startup it builds per-uplink policy routing (`ip rule add` + route tables) and watches interfaces with `ip monitor`; without it the relay logs `ip rule add … Operation not permitted` and exits. The encoder does not need the capability. On the default bridge network the relay's routing changes act on the container's own network namespace, not the host; for real bonded uplinks on the host's raw interfaces, run the relay with `network_mode: host`.
 

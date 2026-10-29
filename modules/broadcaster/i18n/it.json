@@ -1,6 +1,6 @@
 {
 	"dev.badge.starting": "avvio",
-	"dev.card.srtla2platform": "SRTLA → RTMP",
+	"dev.card.broadcaster": "SRTLA → RTMP",
 	"dev.row.auto_restarts": "Riavvii automatici",
 	"dev.row.outputs": "Destinazioni",
 	"set.output_add": "Aggiungi destinazione",
@@ -12,7 +12,7 @@
 	"set.service_custom": "Personalizzato",
 	"set.service_group_common": "Comuni",
 	"set.service_group_other": "Altri",
-	"set.srtla2platform": "Uscite RTMP",
-	"set.srtla2platform_desc": "Servizio, URL e chiave per ogni destinazione a cui viene pubblicato lo stream — tutti usano lo stesso profilo ffmpeg. Le chiavi di stream sono solo in scrittura. Lo stream viene riavviato dopo il salvataggio.",
-	"set.srtla2platform_profile": "Profilo di uscita"
+	"set.broadcaster": "Uscite RTMP",
+	"set.broadcaster_desc": "Servizio, URL e chiave per ogni destinazione a cui viene pubblicato lo stream — tutti usano lo stesso profilo ffmpeg. Le chiavi di stream sono solo in scrittura. Lo stream viene riavviato dopo il salvataggio.",
+	"set.broadcaster_profile": "Profilo di uscita"
 }

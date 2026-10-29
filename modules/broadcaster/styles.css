@@ -1,4 +1,4 @@
 /* SRTLA → RTMP card: the masked RTMP destination. */
-.mod-srtla2platform .srtla2platform-rtmp {
+.mod-broadcaster .broadcaster-rtmp {
 	word-break: break-all;
 }

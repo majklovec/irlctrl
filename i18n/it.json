@@ -143,7 +143,7 @@
     "role.encoder": "encoder",
     "role.obs": "obs",
     "role.relay": "relay",
-    "role.srtla2platform": "srtla2platform",
+    "role.broadcaster": "broadcaster",
     "set.back": "Torna al dispositivo",
     "set.color": "Colore accento",
     "set.description": "Le impostazioni vengono riapplicate sul server di controllo dopo il salvataggio.",

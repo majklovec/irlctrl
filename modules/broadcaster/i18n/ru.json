@@ -1,0 +1,18 @@
+{
+	"dev.badge.starting": "запуск",
+	"dev.card.broadcaster": "SRTLA → RTMP",
+	"dev.row.auto_restarts": "Автовозобновление",
+	"dev.row.outputs": "Назначения",
+	"set.output_add": "Добавить назначение",
+	"set.output_remove": "Удалить",
+	"set.rtmp_key": "Ключ потока",
+	"set.rtmp_url": "RTMP(S) URL",
+	"set.server": "Сервер",
+	"set.service": "Сервис",
+	"set.service_custom": "Свой",
+	"set.service_group_common": "Частые",
+	"set.service_group_other": "Другие",
+	"set.broadcaster": "Выводы RTMP",
+	"set.broadcaster_desc": "Сервис, URL и ключ для каждой цели, на которую публикуется поток — все используют один и тот же профиль ffmpeg. Ключи потоков доступны только для записи. После сохранения поток перезапускается.",
+	"set.broadcaster_profile": "Профиль вывода"
+}

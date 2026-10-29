@@ -1,6 +1,6 @@
 {
 	"dev.badge.starting": "démarrage",
-	"dev.card.srtla2platform": "SRTLA → RTMP",
+	"dev.card.broadcaster": "SRTLA → RTMP",
 	"dev.row.auto_restarts": "Redémarrages auto",
 	"dev.row.outputs": "Destinations",
 	"set.output_add": "Ajouter une destination",
@@ -12,7 +12,7 @@
 	"set.service_custom": "Personnalisé",
 	"set.service_group_common": "Courants",
 	"set.service_group_other": "Autres",
-	"set.srtla2platform": "Sorties RTMP",
-	"set.srtla2platform_desc": "Service, URL et clé de chaque destination vers laquelle le flux est publié — tous utilisent le même profil ffmpeg. Les clés de stream sont en écriture seule. Le flux redémarre après enregistrement.",
-	"set.srtla2platform_profile": "Profil de sortie"
+	"set.broadcaster": "Sorties RTMP",
+	"set.broadcaster_desc": "Service, URL et clé de chaque destination vers laquelle le flux est publié — tous utilisent le même profil ffmpeg. Les clés de stream sont en écriture seule. Le flux redémarre après enregistrement.",
+	"set.broadcaster_profile": "Profil de sortie"
 }

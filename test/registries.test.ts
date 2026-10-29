@@ -119,7 +119,7 @@ describe("module registries", () => {
     test("device-card frontends cover every backend device-module id", () => {
         // The modems card has no frontend of its own: the srtla module composes
         // it (interfaces table + modem panels), so it is the only backend device
-        // id without a device-card frontend. srtla2platform is the reverse
+        // id without a device-card frontend. broadcaster is the reverse
         // case: a standalone agent (not a backend device module) that ships
         // its own device-card frontend. Every other backend id must have
         // exactly one card, and no extra card ids may exist.
@@ -132,7 +132,7 @@ describe("module registries", () => {
             (id) => !front.has(id) && id !== "modems",
         );
         const extra = [...front].filter(
-            (id) => !DEVICE_ORDER.includes(id) && id !== "srtla2platform",
+            (id) => !DEVICE_ORDER.includes(id) && id !== "broadcaster",
         );
         expect(missing).toEqual([]);
         expect(extra).toEqual([]);

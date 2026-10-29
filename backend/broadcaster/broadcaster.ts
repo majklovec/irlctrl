@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * srtla2platform — irlctrl device-side agent.
+ * broadcaster — irlctrl device-side agent.
  *
  * Receives a bonded SRTLA stream from an encoder, de-bonds it to standard SRT
  * with `srtla_rec` (built from irlserver/srtla, rev b8359bc — the same
@@ -12,7 +12,7 @@
  * and the irlctrl control plane.
  *
  * It registers with the irlctrl control server over WebSocket as a device of
- * role `srtla2platform` and accepts `start` / `stop` / `status` commands.
+ * role `broadcaster` and accepts `start` / `stop` / `status` commands.
  *
  * The media pipeline is independent of the control link: the stream keeps
  * flowing even while the WebSocket is down, and status/log events are replayed
@@ -26,7 +26,7 @@
  *
  * The relay publishes to one or more RTMP destinations (the `outputs` array:
  * service + url + stream key each). The service is a streaming-platform
- * catalog id (Kick, Twitch, YouTube, ... — see modules/srtla2platform/services.ts)
+ * catalog id (Kick, Twitch, YouTube, ... — see modules/broadcaster/services.ts)
  * whose server URL the web UI prefills; the stored url is authoritative and
  * may differ from the catalog server (custom override). Each key is appended
  * to its URL as the final path segment (rtmp://host/live + key →
@@ -39,22 +39,22 @@
  *
  * The `profile` config field selects an ffmpeg output profile. Profiles are
  * JSON files in the profiles directory (--profiles / PROFILES_DIR, default
- * ~/.config/srtla2platform/profiles; ./config/srtla2platform/profiles in the
+ * ~/.config/broadcaster/profiles; ./config/broadcaster/profiles in the
  * container) holding the extra ffmpeg arguments to append after `-i`.
  * Defaults (copy-only, H.264/H.265 re-encode, audio-only) are shipped in the
- * repo (backend/srtla2platform/defaults/profiles/) and seeded into the
+ * repo (backend/broadcaster/defaults/profiles/) and seeded into the
  * directory on first run (never overwriting user files); it can be edited or
  * extended by adding more <id>.json files.
  * The selected profile is appended to the fixed input→FLV→output command
  * chain.
  *
  * Usage:
- *   CONTROL_SERVER_TOKEN=<t> RTMP_KEY=<key> bun srtla2platform.ts \
+ *   CONTROL_SERVER_TOKEN=<t> RTMP_KEY=<key> bun broadcaster.ts \
  *     --server-url ws://host:7788/device \
  *     --rtmp-url rtmp://host/live --input-format ts
  *
  * All options can also be supplied via environment variables or `~/.config/
- * srtla2platform/config.json` (see ConfigFile).
+ * broadcaster/config.json` (see ConfigFile).
  */
 
 import { randomUUID } from "node:crypto";
@@ -76,7 +76,7 @@ import {
 	SRTLA_CUSTOM_SERVICE,
 	srtlaService,
 	srtlaServiceForUrl,
-} from "../../modules/srtla2platform/services";
+} from "../../modules/broadcaster/services";
 import { arg, argFail, enumArg, flag } from "../../shared/args";
 import {
 	COLOR_RE,
@@ -93,9 +93,9 @@ const BunWebSocket = WebSocket as unknown as new (
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const ROLE = "srtla2platform";
+const ROLE = "broadcaster";
 const ID_RE = /^[\w.-]{1,64}$/;
-const CONFIG_DIR = join(homedir(), ".config", "srtla2platform");
+const CONFIG_DIR = join(homedir(), ".config", "broadcaster");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
 // Pre-change installs kept the UUID in this standalone file; one-time
 // migration source (merge into config.json, then the file is ignored).
@@ -537,13 +537,13 @@ async function handleCommand(
 }
 
 /** Shared settings page save: name / color / remote url + token. The role is
- * locked (this box is always `srtla2platform`). A remote change re-dials the
+ * locked (this box is always `broadcaster`). A remote change re-dials the
  * socket so the fresh hello carries the new name / color / URL / token. */
 function settingsUpdate(params: Record<string, unknown>): unknown {
 	if (params.uuid !== undefined && params.uuid !== config.uuid)
 		throw new Error("The device uuid can't be changed");
 	if (params.role !== undefined && params.role !== ROLE)
-		throw new Error("The role of this device is always srtla2platform");
+		throw new Error("The role of this device is always broadcaster");
 
 	const hostname =
 		typeof params.hostname === "string" && params.hostname !== ""
@@ -814,7 +814,7 @@ function startHealthMonitor(): void {
 //   { "name": "My profile", "desc": "…", "args": ["-c:v","libx264", …] }
 // The id is the file name (without .json); `args` defaults to copy. The
 // default profiles (copy, re-encode, audio-only) are seeded into the
-// directory from backend/srtla2platform/defaults/profiles/ on startup
+// directory from backend/broadcaster/defaults/profiles/ on startup
 // (never overwriting user files) and can be edited or extended.
 
 interface FfmpegProfile {
@@ -874,7 +874,7 @@ function findProfile(id: string): FfmpegProfile | undefined {
 }
 
 /** Seed the profiles directory with the default profile files shipped in the
- * repo (backend/srtla2platform/defaults/profiles/). Non-destructive: an
+ * repo (backend/broadcaster/defaults/profiles/). Non-destructive: an
  * existing file is never overwritten, so user edits survive restarts. */
 function seedDefaultProfiles(): void {
 	const src = join(import.meta.dir, "defaults", "profiles");
@@ -1202,7 +1202,7 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
  * masked as {configured}, matching the core's secret handling. */
 function moduleSliceView(): Record<string, unknown> {
 	return {
-		srtla2platform: {
+		broadcaster: {
 			enabled: true,
 			outputs: config.outputs.map((out) => ({
 				service: out.service,
@@ -1280,7 +1280,7 @@ function maskedRtmpUrl(out: RtmpOutput): string {
 
 function loadConfig(): Config {
 	if (flag("--version")) {
-		console.log(`srtla2platform ${APP_VERSION}`);
+		console.log(`broadcaster ${APP_VERSION}`);
 		process.exit(0);
 	}
 
@@ -1503,7 +1503,7 @@ function main(): void {
 
 	log(
 		"info",
-		`srtla2platform ${APP_VERSION} starting (uuid=${config.uuid}…, role=${ROLE})`,
+		`broadcaster ${APP_VERSION} starting (uuid=${config.uuid}…, role=${ROLE})`,
 	);
 
 	startHealthMonitor();

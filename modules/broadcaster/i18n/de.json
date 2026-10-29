@@ -1,6 +1,6 @@
 {
 	"dev.badge.starting": "startet",
-	"dev.card.srtla2platform": "SRTLA → RTMP",
+	"dev.card.broadcaster": "SRTLA → RTMP",
 	"dev.row.auto_restarts": "Automatische Neustarts",
 	"dev.row.outputs": "Ziele",
 	"set.output_add": "Ziel hinzufügen",
@@ -12,7 +12,7 @@
 	"set.service_custom": "Eigener Dienst",
 	"set.service_group_common": "Häufig",
 	"set.service_group_other": "Weitere",
-	"set.srtla2platform": "RTMP-Ausgaben",
-	"set.srtla2platform_desc": "Streamingdienst, URL und Key für jedes Ziel, an das der Stream gesendet wird — alle nutzen dasselbe ffmpeg-Profil. Stream-Keys sind nur schreibbar. Der Stream wird nach dem Speichern neu gestartet.",
-	"set.srtla2platform_profile": "Ausgabeprofil"
+	"set.broadcaster": "RTMP-Ausgaben",
+	"set.broadcaster_desc": "Streamingdienst, URL und Key für jedes Ziel, an das der Stream gesendet wird — alle nutzen dasselbe ffmpeg-Profil. Stream-Keys sind nur schreibbar. Der Stream wird nach dem Speichern neu gestartet.",
+	"set.broadcaster_profile": "Ausgabeprofil"
 }

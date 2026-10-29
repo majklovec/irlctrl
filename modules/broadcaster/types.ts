@@ -1,5 +1,5 @@
 /*
- * Local types for the srtla2platform module (never imported by the core or
+ * Local types for the broadcaster module (never imported by the core or
  * other modules).
  */
 import type { Status } from "../../shared/types";
@@ -40,8 +40,8 @@ export interface SrtlaStreamStateFields {
 	restarts: number;
 }
 
-/** The status envelope as the srtla2platform card reads it. */
-export type Srtla2PlatformStatus = Status & {
+/** The status envelope as the broadcaster card reads it. */
+export type BroadcasterStatus = Status & {
 	/** The relay's stream slice (the `state` fragment this card renders). */
 	state: SrtlaStreamStateFields;
 };

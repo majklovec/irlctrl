@@ -9,7 +9,8 @@ import { t } from "../i18n";
 type ShapeTag = "circle" | "path" | "rect";
 type Shape = readonly (readonly [ShapeTag, Record<string, string>])[];
 
-// 24×24 outline shapes: a video camera for the encoder, a broadcasting antenna for the relay.
+// 24×24 outline shapes: a video camera for the encoder, a broadcasting antenna for the relay,
+// and a transmission tower for the broadcaster.
 const ROLE_SHAPES = {
 	encoder: [
 		["rect", { x: "2", y: "6", width: "14", height: "12", rx: "2" }],
@@ -26,11 +27,12 @@ const ROLE_SHAPES = {
 		["path", { d: "m9 7 5 3.5L9 14z" }],
 		["path", { d: "M8 21h8M12 17v4" }],
 	],
-	srtla2platform: [
-		["rect", { x: "3", y: "14", width: "8", height: "7", rx: "1.5" }],
-		["path", { d: "M17 20V7" }],
-		["path", { d: "m13.5 10.5 3.5-3.5 3.5 3.5" }],
-		["path", { d: "M13 4h8" }],
+	broadcaster: [
+		["path", { d: "M12 5v16" }],
+		["path", { d: "m7.5 21 4.5-13 4.5 13" }],
+		["path", { d: "M9.3 16h5.4" }],
+		["path", { d: "M8.5 4a5 5 0 0 0 0 7" }],
+		["path", { d: "M15.5 4a5 5 0 0 1 0 7" }],
 	],
 } as const satisfies Record<string, Shape>;
 
@@ -87,11 +89,12 @@ const ROLE_CARD_SHAPES = {
 		["path", { d: "m9 7 5 3.5L9 14z" }],
 		["path", { d: "M8 21h8M12 17v4" }],
 	],
-	srtla2platform: [
-		["rect", { x: "2", y: "13", width: "9", height: "9", rx: "1.5" }],
-		["path", { d: "M17.5 21V6" }],
-		["path", { d: "m13.5 10 4-4 4 4" }],
-		["path", { d: "M12.5 3.5h10" }],
+	broadcaster: [
+		["path", { d: "M12 5v16" }],
+		["path", { d: "m7.5 21 4.5-13 4.5 13" }],
+		["path", { d: "M9.3 16h5.4" }],
+		["path", { d: "M8.5 4a5 5 0 0 0 0 7" }],
+		["path", { d: "M15.5 4a5 5 0 0 1 0 7" }],
 	],
 } as const satisfies Record<Role, Shape>;
 

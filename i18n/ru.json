@@ -143,7 +143,7 @@
     "role.encoder": "энкодер",
     "role.obs": "obs",
     "role.relay": "ретранслятор",
-    "role.srtla2platform": "srtla2platform",
+    "role.broadcaster": "broadcaster",
     "set.back": "Назад к устройству",
     "set.color": "Акцентный цвет",
     "set.description": "После сохранения настройки повторно применяются на сервере управления.",

@@ -1,6 +1,6 @@
 {
 	"dev.badge.starting": "spouští",
-	"dev.card.srtla2platform": "SRTLA → RTMP",
+	"dev.card.broadcaster": "SRTLA → RTMP",
 	"dev.row.auto_restarts": "Automatické restarty",
 	"dev.row.outputs": "Cíle",
 	"set.output_add": "Přidat cíl",
@@ -12,7 +12,7 @@
 	"set.service_custom": "Vlastní",
 	"set.service_group_common": "Časté",
 	"set.service_group_other": "Ostatní",
-	"set.srtla2platform": "RTMP výstupy",
-	"set.srtla2platform_desc": "Služba, URL a klíč pro každý cíl, do kterého se stream publikuje — všechny používají stejný ffmpeg profil. Klíče streamu jsou pouze pro zápis. Po uložení se stream restartuje.",
-	"set.srtla2platform_profile": "Výstupní profil"
+	"set.broadcaster": "RTMP výstupy",
+	"set.broadcaster_desc": "Služba, URL a klíč pro každý cíl, do kterého se stream publikuje — všechny používají stejný ffmpeg profil. Klíče streamu jsou pouze pro zápis. Po uložení se stream restartuje.",
+	"set.broadcaster_profile": "Výstupní profil"
 }

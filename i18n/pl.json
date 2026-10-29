@@ -143,7 +143,7 @@
     "role.encoder": "enkoder",
     "role.obs": "obs",
     "role.relay": "relay",
-    "role.srtla2platform": "srtla2platform",
+    "role.broadcaster": "broadcaster",
     "set.back": "Powrót do urządzenia",
     "set.color": "Kolor akcentu",
     "set.description": "Ustawienia zostaną ponownie zastosowane na serwerze sterowania po zapisaniu.",

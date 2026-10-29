@@ -1,6 +1,6 @@
 {
 	"dev.badge.starting": "starting",
-	"dev.card.srtla2platform": "SRTLA → RTMP",
+	"dev.card.broadcaster": "SRTLA → RTMP",
 	"dev.row.auto_restarts": "Auto-restarts",
 	"dev.row.outputs": "Destinations",
 	"set.output_add": "Add destination",
@@ -12,7 +12,7 @@
 	"set.service_custom": "Custom",
 	"set.service_group_common": "Common",
 	"set.service_group_other": "Other",
-	"set.srtla2platform": "RTMP outputs",
-	"set.srtla2platform_desc": "Stream service, URL and key for each destination the stream is published to — all use the same ffmpeg profile. Stream keys are write-only. The stream restarts after saving.",
-	"set.srtla2platform_profile": "Output profile"
+	"set.broadcaster": "RTMP outputs",
+	"set.broadcaster_desc": "Stream service, URL and key for each destination the stream is published to — all use the same ffmpeg profile. Stream keys are write-only. The stream restarts after saving.",
+	"set.broadcaster_profile": "Output profile"
 }

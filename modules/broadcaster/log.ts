@@ -1,4 +1,4 @@
-/** Log wording of the srtla2platform module's methods (start / stop the
+/** Log wording of the broadcaster module's methods (start / stop the
  * srtla_rec + gstreamer stream). */
 import { type LogWording, wording } from "../../shared/logMessages";
 
@@ -8,7 +8,7 @@ const log: LogWording = {
 		stop: wording("Stream", "Stop", "mlog.done.stopped"),
 	},
 	sections: { stream: "Stream" },
-	labels: { Stream: "set.srtla2platform" },
+	labels: { Stream: "set.broadcaster" },
 };
 
 export default log;

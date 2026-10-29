@@ -7,7 +7,7 @@
  * servers at all (the "Custom" placeholder) is kept as-is: its URL is
  * typed in by the operator and it carries no inpoints.
  *
- * Own of the srtla2platform module — imported by the device agent
+ * Own of the broadcaster module — imported by the device agent
  * (validation, config defaults) and the web settings UI (the per-destination
  * service/server selects), so both sides agree on the same ids. The JSON is
  * inlined at build time; nothing reads it from disk at runtime.

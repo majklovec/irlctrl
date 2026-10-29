@@ -143,7 +143,7 @@
     "role.encoder": "エンコーダー",
     "role.obs": "obs",
     "role.relay": "リレー",
-    "role.srtla2platform": "srtla2platform",
+    "role.broadcaster": "broadcaster",
     "set.back": "デバイスに戻る",
     "set.color": "アクセント色",
     "set.description": "保存後、設定は制御サーバーで再適用されます。",

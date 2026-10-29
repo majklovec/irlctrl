@@ -15,17 +15,17 @@ import type { FrontendModule } from "../../frontend/ts/module-contracts";
 import log from "./log";
 import { SRTLA_CUSTOM_SERVICE, srtlaService } from "./services";
 import "./styles.css";
-import type { Srtla2PlatformStatus } from "./types";
+import type { BroadcasterStatus } from "./types";
 
-function srtla2platformCardBody(
+function broadcasterCardBody(
 	host: DeviceCard,
-	status: Srtla2PlatformStatus,
+	status: BroadcasterStatus,
 ): m.Vnode {
 	const s = status.state;
 	const running = s.stream === "running";
 	const transitional = s.stream === "starting" || s.stream === "stopping";
 	return (
-		<Card title={t("dev.card.srtla2platform")} class="mod-srtla2platform">
+		<Card title={t("dev.card.broadcaster")} class="mod-broadcaster">
 			<DefinitionList
 				rows={[
 					[
@@ -53,7 +53,7 @@ function srtla2platformCardBody(
 											? svc.name
 											: undefined;
 									return (
-										<li class="srtla2platform-rtmp" key={o.url}>
+										<li class="broadcaster-rtmp" key={o.url}>
 											{label !== undefined ? (
 												<>
 													<strong>{label}</strong> ·{" "}
@@ -66,7 +66,7 @@ function srtla2platformCardBody(
 								})}
 							</ul>
 						) : (
-							<span class="muted">{t("set.srtla2platform_desc")}</span>
+							<span class="muted">{t("set.broadcaster_desc")}</span>
 						),
 					],
 					// The selected ffmpeg output profile (always present;
@@ -74,8 +74,8 @@ function srtla2platformCardBody(
 					...(s.profile
 						? [
 								[
-									t("set.srtla2platform_profile"),
-									<code class="srtla2platform-rtmp">{s.profile}</code>,
+									t("set.broadcaster_profile"),
+									<code class="broadcaster-rtmp">{s.profile}</code>,
 								] as [string, m.Vnode],
 							]
 						: []),
@@ -96,34 +96,33 @@ function srtla2platformCardBody(
 						running ||
 						transitional ||
 						s.outputs.length === 0 ||
-						host.pending("srtla2platform-start")
+						host.pending("broadcaster-start")
 					}
-					onclick={() => host.press("srtla2platform-start", "start")}
+					onclick={() => host.press("broadcaster-start", "start")}
 				/>
 				<Button
 					label={t("ui.stop")}
 					class="danger"
 					disabled={
-						!running || transitional || host.pending("srtla2platform-stop")
+						!running || transitional || host.pending("broadcaster-stop")
 					}
-					onclick={() => host.press("srtla2platform-stop", "stop")}
+					onclick={() => host.press("broadcaster-stop", "stop")}
 				/>
 			</Actions>
 		</Card>
 	);
 }
 
-const srtla2platformModule: FrontendModule = {
-	id: "srtla2platform",
+const broadcasterModule: FrontendModule = {
+	id: "broadcaster",
 	kind: "device-card",
 	title: "SRTLA → RTMP",
 	order: 20,
-	available: (status) => status.role === "srtla2platform",
+	available: (status) => status.role === "broadcaster",
 	defaultSize: { w: 4, h: 4 },
 	minSize: { w: 3, h: 3 },
-	component: (status) =>
-		srtla2platformCardBody(card, status as Srtla2PlatformStatus),
+	component: (status) => broadcasterCardBody(card, status as BroadcasterStatus),
 	log,
 };
 
-export default srtla2platformModule;
+export default broadcasterModule;

@@ -1,12 +1,12 @@
-# srtla2platform agent image — runs `backend/srtla2platform/srtla2platform.ts`.
+# broadcaster agent image — runs `backend/broadcaster/broadcaster.ts`.
 #
 # The agent relays an SRTLA device's stream into an RTMP ingest:
 #   srtla_rec (SRTLA de-bonder) -> ffmpeg (SRT listener) -> TS -> FLV/RTMP(S)
 # (the ffmpeg output profile — copy, re-encode, … — is selected in the UI)
 #
 # Unlike the relay/encoder device image (Dockerfile.device), this:
-#   - bundles only the srtla2platform agent (backend/srtla2platform/ +
-#     modules/srtla2platform/ — the service catalog the agent validates
+#   - bundles only the broadcaster agent (backend/broadcaster/ +
+#     modules/broadcaster/ — the service catalog the agent validates
 #     against — + shared/),
 #   - builds `srtla_rec` from irlserver/srtla (rev b8359bc, the same revision the
 #     OBS SRTLA input plugin embeds) in a separate stage so the runtime image
@@ -58,23 +58,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=srtla_rec-builder /srtla/build/srtla_rec /usr/local/bin/srtla_rec
 RUN chmod +x /usr/local/bin/srtla_rec
 
-# The agent keeps its config + device UUID under $HOME/.config/srtla2platform/
-# (see srtla2platform.ts CONFIG_DIR). Point HOME at a fixed path so a compose
+# The agent keeps its config + device UUID under $HOME/.config/broadcaster/
+# (see broadcaster.ts CONFIG_DIR). Point HOME at a fixed path so a compose
 # volume mounted there persists the config file and the device identity across
 # rebuilds/restarts. No --config flag needed: this is the agent's default path.
 # Pre-create the dir owned by the runtime user (1000) so the agent can persist
 # its UUID even without a volume; a compose bind mount overrides it at runtime.
 # /home/srtla itself stays root-owned; only the subdirs are user-writable.
 ENV HOME=/home/srtla
-RUN mkdir -p /home/srtla/.config/srtla2platform \
+RUN mkdir -p /home/srtla/.config/broadcaster \
     && chown -R 1000:1000 /home/srtla/.config
 
 WORKDIR /app
 
-# Copy only what the agent runs unbundled (`bun backend/srtla2platform/...`).
+# Copy only what the agent runs unbundled (`bun backend/broadcaster/...`).
 COPY package.json ./
-COPY backend/srtla2platform ./backend/srtla2platform
-COPY modules/srtla2platform ./modules/srtla2platform
+COPY backend/broadcaster ./backend/broadcaster
+COPY modules/broadcaster ./modules/broadcaster
 COPY shared ./shared
 
 # Bake the gitignored generated/version.ts (APP_VERSION) from package.json.
@@ -86,5 +86,5 @@ EXPOSE 5000/udp 5002/udp
 
 # Default entrypoint — supply control server URL/token and the RTMP target
 # via environment (see docker-compose.yaml).
-ENTRYPOINT ["bun", "backend/srtla2platform/srtla2platform.ts"]
+ENTRYPOINT ["bun", "backend/broadcaster/broadcaster.ts"]
 CMD []

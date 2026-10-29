@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# install.sh — fetch and build `srtla_rec` for the srtla2platform agent.
+# install.sh — fetch and build `srtla_rec` for the broadcaster agent.
 #
 # Clones https://github.com/irlserver/srtla (pinned to rev b8359bc by default,
 # the same revision the OBS SRTLA input plugin embeds), builds `srtla_rec`
-# with CMake, and installs it on $PATH so `srtla2platform.ts` can find it.
+# with CMake, and installs it on $PATH so `broadcaster.ts` can find it.
 #
 # Usage:
 #   bash install.sh                  # build srtla_rec and install it
@@ -15,7 +15,7 @@
 #   SRTLA_REPO         git repo url (default: https://github.com/irlserver/srtla.git)
 #   SRTLA_REF          git ref to build (default: b8359bc)
 #   SRTLA_SRC_DIR      work dir for clone + build
-#                      (default: ~/.cache/srtla2platform/srtla)
+#                      (default: ~/.cache/broadcaster/srtla)
 #   SRTLA_INSTALL_DIR  where to put the binary
 #                      (default: /usr/local/bin as root, ~/.local/bin otherwise)
 
@@ -23,7 +23,7 @@ set -euo pipefail
 
 SRTLA_REPO="${SRTLA_REPO:-https://github.com/irlserver/srtla.git}"
 SRTLA_REF="${SRTLA_REF:-b8359bc}"
-SRTLA_SRC_DIR="${SRTLA_SRC_DIR:-$HOME/.cache/srtla2platform/srtla}"
+SRTLA_SRC_DIR="${SRTLA_SRC_DIR:-$HOME/.cache/broadcaster/srtla}"
 SRTLA_BUILD_DIR="$SRTLA_SRC_DIR/build"
 INSTALL_DEPS=0
 
@@ -134,4 +134,4 @@ case ":$PATH:" in
         c_info "  echo 'export PATH=\"$SRTLA_INSTALL_DIR:\$PATH\"' >> ~/.bashrc"
         ;;
 esac
-c_info "srtla2platform preflight now passes: $(command -v srtla_rec || echo "srtla_rec (not on PATH yet — see note above)")"
+c_info "broadcaster preflight now passes: $(command -v srtla_rec || echo "srtla_rec (not on PATH yet — see note above)")"
