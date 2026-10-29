@@ -4,7 +4,7 @@
  * opens. */
 import m from "mithril";
 import type { ServerDashboard } from "../types";
-import { actionIcon } from "./components/icons";
+import { icon } from "./components/icons";
 import { Button, Card, Input, Page, ServerNav } from "./components/ui";
 import { t } from "./i18n";
 import { serverLive } from "./services/serverws";
@@ -107,7 +107,7 @@ function list(): m.Vnode {
 										title={t("dash.view")}
 										aria-label={t("dash.view")}
 									>
-										{actionIcon("view")}
+										{icon("view", { class: "role-icon" })}
 									</a>,
 									<a
 										class="icon-link"
@@ -115,10 +115,10 @@ function list(): m.Vnode {
 										title={t("dash.edit")}
 										aria-label={t("dash.edit")}
 									>
-										{actionIcon("edit")}
+										{icon("edit", { class: "role-icon" })}
 									</a>,
 									<Button
-										label={actionIcon("delete")}
+										label={icon("delete", { class: "role-icon" })}
 										class="icon-link dash-delete"
 										title={t("dash.delete")}
 										aria-label={t("dash.delete")}

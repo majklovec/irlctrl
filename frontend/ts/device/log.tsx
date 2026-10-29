@@ -8,7 +8,7 @@ import {
 	type LogEvent,
 	label,
 } from "../../../shared/logMessages";
-import { type Level, levelIcon } from "../components/icons";
+import { type Level, icon } from "../components/icons";
 import { Card } from "../components/ui";
 import { t } from "../i18n";
 import type { MithrilJSXComponent } from "../jsx";
@@ -83,7 +83,7 @@ const LogCardComponent: m.Component = {
 			<code id="log">
 				{sorted().map((e) => (
 					<li key={keyOf(e)} class={`log-${e.level}`}>
-						{levelIcon(e.level)}
+						{icon(e.level, { class: "role-icon log-icon" })}
 						{time(e.at)}
 						<span class="log-level">{t(LEVEL_KEY[e.level])}</span>
 						<span class="log-section">{label(e.section)}</span>

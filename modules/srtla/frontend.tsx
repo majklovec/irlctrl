@@ -5,7 +5,7 @@
  * same content. */
 import "./styles.css";
 import m from "mithril";
-import { actionIcon, icon } from "../../frontend/ts/components/icons";
+import { icon } from "../../frontend/ts/components/icons";
 import {
 	Actions,
 	Badge,
@@ -213,7 +213,10 @@ const srtlaSummaryColumns = [
 		id: "relay",
 		order: 40,
 		available: (device: DeviceSummary) => device.role !== "encoder",
-		header: () => [icon("relay"), ` ${t("setup.step.relay")}`],
+		header: () => [
+			icon("relay", { class: "role-icon role-icon-relay" }),
+			` ${t("setup.step.relay")}`,
+		],
 		cell: (device: DeviceSummary) => {
 			const { srtla } = device as SrtlaDeviceSummary;
 			if (!srtla) return "—";
@@ -615,7 +618,7 @@ function interfacesCard(host: DeviceCard, status: SrtlaStatus): m.Vnode {
 					/>
 				),
 				<Button
-					label={actionIcon("sync")}
+					label={icon("sync", { class: "role-icon" })}
 					class="icon-link"
 					title={t("ui.reconfigure")}
 					aria-label={t("ui.reconfigure")}

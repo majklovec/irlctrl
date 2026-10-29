@@ -1162,6 +1162,10 @@ td.num {
     justify-self: start;
     transition: color var(--t);
 }
+/* Combined role: encoder + relay icons overlap in the same grid cell */
+.role-card .role-icon + .role-icon {
+    margin-left: -18px;
+}
 .role-card:has(input:checked) .role-icon {
     color: var(--accent);
 }

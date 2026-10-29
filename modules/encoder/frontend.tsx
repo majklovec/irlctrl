@@ -404,7 +404,10 @@ const encoderSummaryColumns = [
 		order: 30,
 		available: (device: DeviceSummary) =>
 			device.role === "encoder" || device.role === "combined",
-		header: () => [icon("encoder"), ` ${t("setup.step.encoder")}`],
+		header: () => [
+			icon("encoder", { class: "role-icon role-icon-encoder" }),
+			` ${t("setup.step.encoder")}`,
+		],
 		cell: (device: DeviceSummary) => {
 			const { encoder } = device as EncoderDeviceSummary;
 			if (!encoder) return "—";

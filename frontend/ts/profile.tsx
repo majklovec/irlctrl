@@ -1,6 +1,6 @@
 /* Profile page: change the login password and manage the device tokens. */
 import m from "mithril";
-import { actionIcon } from "./components/icons";
+import { icon } from "./components/icons";
 import {
 	Actions,
 	Badge,
@@ -281,7 +281,7 @@ const App: m.Component = {
 							</span>
 							<Button
 								class="icon-link dash-delete"
-								label={actionIcon("delete")}
+								label={icon("delete", { class: "role-icon" })}
 								title={t("profile.tokens.remove")}
 								aria-label={t("profile.tokens.remove")}
 								disabled={state.removing}
