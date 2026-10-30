@@ -1,3 +1,10 @@
+# [1.20.0](https://github.com/majklovec/irlctrl/compare/v1.19.0...v1.20.0) (2026-10-30)
+
+
+### Features
+
+* **chat:** add OBS overlay support with token authentication ([34d2ea0](https://github.com/majklovec/irlctrl/commit/34d2ea0a1508c8a17b40b93a3dbf437aca9cb2db))
+
 # [1.19.0](https://github.com/majklovec/irlctrl/compare/v1.18.0...v1.19.0) (2026-10-30)
 
 
