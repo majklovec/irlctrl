@@ -89,8 +89,8 @@ const state = {
 	newVariableType: "string",
 	triggerName: "",
 	copied: false,
-	/** Inspector "Elements" list is collapsed by default. */
-	layersOpen: false,
+	/** Element currently expanded in the inspector list (accordion). */
+	expandedElementId: null as string | null,
 };
 
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
@@ -312,22 +312,22 @@ function deleteElement(id: string): void {
 		.filter((e) => e.id !== id)
 		.map((e) => (e.parentId === id ? { ...e, parentId: null } : e));
 	if (state.selectedElementId === id) state.selectedElementId = null;
+	if (state.expandedElementId === id) state.expandedElementId = null;
 	void saveSceneElements(s);
 	m.redraw();
 }
 
 /**
- * Reorder the selected element within `scene.elements` (back-to-front array
- * order = z-order). Works on locked elements too — stacking is not a
- * positional edit.
+ * Reorder an element within `scene.elements` (back-to-front array order =
+ * z-order). Works on locked elements too — stacking is not a positional edit.
  */
 function reorderElement(
+	elementId: string,
 	op: "front" | "forward" | "backward" | "back",
 ): void {
 	const s = scene();
-	const e = selElement();
-	if (!s || !e) return;
-	const i = s.elements.findIndex((x) => x.id === e.id);
+	if (!s) return;
+	const i = s.elements.findIndex((x) => x.id === elementId);
 	if (i < 0) return;
 	if (op === "front" && i === s.elements.length - 1) return;
 	if (op === "back" && i === 0) return;
@@ -515,6 +515,7 @@ function applySnap(
 
 function selectElement(elementId: string | null): void {
 	state.selectedElementId = elementId;
+	state.expandedElementId = elementId;
 	m.redraw();
 }
 
@@ -769,23 +770,22 @@ function lbl(label: string): m.Vnode {
 }
 
 /**
- * The four z-order controls, rendered as compact arrow buttons in the
- * Elements section header (to-front / forward / backward / to-back).
+ * The four z-order controls (to-front / forward / backward / to-back) for one
+ * element, rendered as compact arrow buttons in that element's list row.
  */
-function zorderHeader(): m.Vnode {
-	const e = selElement();
+function zorderButtons(elementId: string): m.Vnode {
 	const list = scene()?.elements ?? [];
-	const idx = e ? list.findIndex((x) => x.id === e.id) : -1;
+	const idx = list.findIndex((x) => x.id === elementId);
 	const atFront = idx === list.length - 1;
 	const atBack = idx === 0;
 	const ops: { op: "front" | "forward" | "backward" | "back"; dis: boolean; label: string }[] = [
-		{ op: "front", dis: idx < 0 || atFront, label: t("overlay.bring_front") },
-		{ op: "forward", dis: idx < 0 || atFront, label: t("overlay.bring_forward") },
-		{ op: "backward", dis: idx < 0 || atBack, label: t("overlay.send_backward") },
-		{ op: "back", dis: idx < 0 || atBack, label: t("overlay.send_back") },
+		{ op: "front", dis: atFront, label: t("overlay.bring_front") },
+		{ op: "forward", dis: atFront, label: t("overlay.bring_forward") },
+		{ op: "backward", dis: atBack, label: t("overlay.send_backward") },
+		{ op: "back", dis: atBack, label: t("overlay.send_back") },
 	];
 	return (
-		<span class="ov-zhead">
+		<span class="ov-zhead" onclick={(e: MouseEvent) => e.stopPropagation()}>
 			{ops.map(({ op, dis, label }) => (
 				<button
 					key={op}
@@ -794,7 +794,10 @@ function zorderHeader(): m.Vnode {
 					title={label}
 					aria-label={label}
 					disabled={dis}
-					onclick={() => reorderElement(op)}
+					onclick={(ev: MouseEvent) => {
+						ev.stopPropagation();
+						reorderElement(elementId, op);
+					}}
 				>
 					{zArrow(op)}
 				</button>
@@ -844,8 +847,10 @@ function layerColor(type: string): string {
 }
 
 /**
- * Collapsible list of every element in the scene, topmost (front) first.
- * Collapsed by default; clicking a row selects it on the canvas.
+ * List of every element in the scene, topmost (front) first. Each element is
+ * an individually collapsible row: its header carries the name plus the four
+ * z-order buttons, and expanding reveals the element's property fields.
+ * Clicking a row also selects the element on the canvas.
  */
 function layersPanel(): m.Vnode {
 	const els = scene()?.elements ?? [];
@@ -853,34 +858,17 @@ function layersPanel(): m.Vnode {
 	return (
 		<div class="ov-layers">
 			<div class="ov-layers-head">
-				<button
-					type="button"
-					class="ov-layers-toggle"
-					aria-expanded={state.layersOpen}
-					onclick={() => {
-						state.layersOpen = !state.layersOpen;
-						m.redraw();
-					}}
-				>
-					<Icon
-						name="chevron"
-						class={state.layersOpen ? "ov-chev ov-chev-open" : "ov-chev"}
-						width="14"
-						height="14"
-					/>
-					<span>{t("overlay.elements")}</span>
-					<span class="ov-layers-count">{els.length}</span>
-				</button>
-				{zorderHeader()}
+				<span class="ov-layers-title">{t("overlay.elements")}</span>
+				<span class="ov-layers-count">{els.length}</span>
 			</div>
-			{state.layersOpen ? (
-				<ul class="ov-layers-list">
-					{frontFirst.map((el) => (
+			<ul class="ov-layers-list">
+				{frontFirst.map((el) => {
+					const open = state.expandedElementId === el.id;
+					return (
 						<li key={el.id}>
-							<button
-								type="button"
+							<div
 								class={
-									"ov-layer" +
+									"ov-layer ov-el" +
 									(el.id === state.selectedElementId
 										? " ov-layer-sel"
 										: "")
@@ -893,297 +881,318 @@ function layersPanel(): m.Vnode {
 								/>
 								<span class="ov-layer-name">{el.name}</span>
 								{el.locked ? <span class="ov-layer-lock">🔒</span> : null}
-							</button>
+								{zorderButtons(el.id)}
+								<button
+									type="button"
+									class="ov-el-chevbtn"
+									aria-expanded={open}
+									aria-label={open ? "Collapse" : "Expand"}
+									onclick={(ev: MouseEvent) => {
+										ev.stopPropagation();
+										state.expandedElementId = open ? null : el.id;
+										m.redraw();
+									}}
+								>
+									<Icon
+										name="chevron"
+										class={
+											open ? "ov-chev ov-chev-open" : "ov-chev"
+										}
+										width="14"
+										height="14"
+									/>
+								</button>
+							</div>
+							{open ? (
+								<div class="ov-el-body">{elementProps(el)}</div>
+							) : null}
 						</li>
-					))}
-				</ul>
-			) : null}
+					);
+				})}
+			</ul>
 		</div>
 	);
 }
 
 function inspector(): m.Vnode {
-	const e = selElement();
-	const layers = layersPanel();
-	if (!e)
-		return (
-			<Card class="ov-rail">
-				<div class="ov-inspect">
-					{layers}
-					<p class="muted">{t("overlay.no_selection")}</p>
-				</div>
-			</Card>
-		);
+	return (
+		<Card class="ov-rail">
+			<div class="ov-inspect">
+				{layersPanel()}
+			</div>
+		</Card>
+	);
+}
+
+/** Property fields for one element, rendered inside its expanded list row. */
+function elementProps(e: OverlayElement): m.Vnode {
 	const tm = e.transform;
 	const setT = (fn: (t: Transform) => void) =>
 		mutateElement((el) => fn({ ...el.transform }));
 	const p = e.props;
 
 	return (
-		<Card class="ov-rail">
-			<div class="ov-inspect">
-				{layers}
+		<>
+			<label class="ov-field">
+				{lbl(t("overlay.name"))}
+				<input
+					type="text"
+					value={e.name}
+					oninput={(ev: Event) =>
+						mutateElement((el) => {
+							el.name = (ev.target as HTMLInputElement).value;
+						})
+					}
+				/>
+			</label>
+
+			<div class="ov-grid2">
+				{[
+					[t("overlay.x"), tm.x, (n: number) => setT((x) => (x.x = n))],
+					[t("overlay.y"), tm.y, (n: number) => setT((x) => (x.y = n))],
+					[
+						t("overlay.w"),
+						tm.width,
+						(n: number) => setT((x) => (x.width = Math.max(1, n))),
+					],
+					[
+						t("overlay.h"),
+						tm.height,
+						(n: number) => setT((x) => (x.height = Math.max(1, n))),
+					],
+					[
+						t("overlay.rotation"),
+						tm.rotation,
+						(n: number) => setT((x) => (x.rotation = n)),
+					],
+				].map(([label, value, on]) => (
+					<label class="ov-field" key={String(label)}>
+						{lbl(String(label))}
+						<input
+							type="number"
+							value={Number(value)}
+							oninput={(ev: Event) => {
+								const n = Number((ev.target as HTMLInputElement).value);
+								if (Number.isFinite(n)) (on as (n: number) => void)(n);
+							}}
+						/>
+					</label>
+				))}
 				<label class="ov-field">
-					{lbl(t("overlay.name"))}
+					{lbl(t("overlay.opacity"))}
 					<input
-						type="text"
-						value={e.name}
+						type="range"
+						min="0"
+						max="1"
+						step="0.01"
+						value={tm.opacity}
 						oninput={(ev: Event) =>
-							mutateElement((el) => {
-								el.name = (ev.target as HTMLInputElement).value;
+							setT((x) => {
+								x.opacity = Number((ev.target as HTMLInputElement).value);
 							})
 						}
 					/>
 				</label>
+			</div>
 
-				<div class="ov-grid2">
-					{[
-						[t("overlay.x"), tm.x, (n: number) => setT((x) => (x.x = n))],
-						[t("overlay.y"), tm.y, (n: number) => setT((x) => (x.y = n))],
-						[
-							t("overlay.w"),
-							tm.width,
-							(n: number) => setT((x) => (x.width = Math.max(1, n))),
-						],
-						[
-							t("overlay.h"),
-							tm.height,
-							(n: number) => setT((x) => (x.height = Math.max(1, n))),
-						],
-						[
-							t("overlay.rotation"),
-							tm.rotation,
-							(n: number) => setT((x) => (x.rotation = n)),
-						],
-					].map(([label, value, on]) => (
-						<label class="ov-field" key={String(label)}>
-							{lbl(String(label))}
-							<input
-								type="number"
-								value={Number(value)}
-								oninput={(ev: Event) => {
-									const n = Number((ev.target as HTMLInputElement).value);
-									if (Number.isFinite(n)) (on as (n: number) => void)(n);
-								}}
-							/>
-						</label>
-					))}
+			<label class="ov-check">
+				<input
+					type="checkbox"
+					checked={e.visible}
+					onchange={(ev: Event) =>
+						mutateElement((el) => {
+							el.visible = (ev.target as HTMLInputElement).checked;
+						})
+					}
+				/>
+				{t("overlay.visible")}
+			</label>
+			<label class="ov-check">
+				<input
+					type="checkbox"
+					checked={e.locked}
+					onchange={(ev: Event) =>
+						mutateElement((el) => {
+							el.locked = (ev.target as HTMLInputElement).checked;
+						})
+					}
+				/>
+				{t("overlay.locked")}
+			</label>
+
+			{e.type === "text" ? (
+				<>
 					<label class="ov-field">
-						{lbl(t("overlay.opacity"))}
+						{lbl(t("overlay.text"))}
 						<input
-							type="range"
-							min="0"
-							max="1"
-							step="0.01"
-							value={tm.opacity}
+							type="text"
+							value={String(p.text ?? "")}
 							oninput={(ev: Event) =>
-								setT((x) => {
-									x.opacity = Number((ev.target as HTMLInputElement).value);
+								mutateElement((el) => {
+									el.props.text = (ev.target as HTMLInputElement).value;
 								})
 							}
 						/>
 					</label>
-				</div>
-
-				<label class="ov-check">
-					<input
-						type="checkbox"
-						checked={e.visible}
-						onchange={(ev: Event) =>
-							mutateElement((el) => {
-								el.visible = (ev.target as HTMLInputElement).checked;
-							})
-						}
-					/>
-					{t("overlay.visible")}
-				</label>
-				<label class="ov-check">
-					<input
-						type="checkbox"
-						checked={e.locked}
-						onchange={(ev: Event) =>
-							mutateElement((el) => {
-								el.locked = (ev.target as HTMLInputElement).checked;
-							})
-						}
-					/>
-					{t("overlay.locked")}
-				</label>
-
-				{e.type === "text" ? (
-					<>
+					<div class="ov-grid2">
 						<label class="ov-field">
-							{lbl(t("overlay.text"))}
-							<input
-								type="text"
-								value={String(p.text ?? "")}
-								oninput={(ev: Event) =>
-									mutateElement((el) => {
-										el.props.text = (ev.target as HTMLInputElement).value;
-									})
-								}
-							/>
-						</label>
-						<div class="ov-grid2">
-							<label class="ov-field">
-								{lbl(t("overlay.font_size"))}
-								<input
-									type="number"
-									value={Number(p.fontSize ?? 48)}
-									oninput={(ev: Event) =>
-										mutateElement((el) => {
-											el.props.fontSize = Number(
-												(ev.target as HTMLInputElement).value,
-											);
-										})
-									}
-								/>
-							</label>
-							<label class="ov-field">
-								{lbl(t("overlay.color"))}
-								<input
-									type="color"
-									value={String(p.color ?? "#ffffff")}
-									oninput={(ev: Event) =>
-										mutateElement((el) => {
-											el.props.color = (ev.target as HTMLInputElement).value;
-										})
-									}
-								/>
-							</label>
-						</div>
-						<div class="ov-grid2">
-							<label class="ov-field">
-								{lbl(t("overlay.font_weight"))}
-								<select
-									value={String(p.fontWeight ?? 600)}
-									onchange={(ev: Event) =>
-										mutateElement((el) => {
-											el.props.fontWeight = Number(
-												(ev.target as HTMLSelectElement).value,
-											);
-										})
-									}
-								>
-									<option value="400">400</option>
-									<option value="600">600</option>
-									<option value="700">700</option>
-									<option value="900">900</option>
-								</select>
-							</label>
-							<label class="ov-field">
-								{lbl(t("overlay.align"))}
-								<select
-									value={String(p.textAlign ?? "left")}
-									onchange={(ev: Event) =>
-										mutateElement((el) => {
-											el.props.textAlign = (
-												ev.target as HTMLSelectElement
-											).value;
-										})
-									}
-								>
-									<option value="left">left</option>
-									<option value="center">center</option>
-									<option value="right">right</option>
-								</select>
-							</label>
-						</div>
-						{bindingRow(e, "text")}
-					</>
-				) : null}
-
-				{e.type === "shape" ? (
-					<>
-						<label class="ov-field">
-							{lbl(t("overlay.shape"))}
-							<select
-								value={String(p.shape ?? "rect")}
-								onchange={(ev: Event) =>
-									mutateElement((el) => {
-										el.props.shape = (ev.target as HTMLSelectElement).value;
-									})
-								}
-							>
-								<option value="rect">rect</option>
-								<option value="ellipse">ellipse</option>
-								<option value="line">line</option>
-							</select>
-						</label>
-						<div class="ov-grid2">
-							<label class="ov-field">
-								{lbl(t("overlay.fill"))}
-								<input
-									type="color"
-									value={String(p.fill ?? "#0ea5e9")}
-									oninput={(ev: Event) =>
-										mutateElement((el) => {
-											el.props.fill = (ev.target as HTMLInputElement).value;
-										})
-									}
-								/>
-							</label>
-							<label class="ov-field">
-								{lbl(t("overlay.stroke"))}
-								<input
-									type="color"
-									value={String(p.stroke ?? "#000000")}
-									oninput={(ev: Event) =>
-										mutateElement((el) => {
-											el.props.stroke = (ev.target as HTMLInputElement).value;
-										})
-									}
-								/>
-							</label>
-						</div>
-						<label class="ov-field">
-							{lbl(t("overlay.stroke_width"))}
+							{lbl(t("overlay.font_size"))}
 							<input
 								type="number"
-								value={Number(p.strokeWidth ?? 0)}
+								value={Number(p.fontSize ?? 48)}
 								oninput={(ev: Event) =>
 									mutateElement((el) => {
-										el.props.strokeWidth = Number(
+										el.props.fontSize = Number(
 											(ev.target as HTMLInputElement).value,
 										);
 									})
 								}
 							/>
 						</label>
-						{p.shape !== "line" ? bindingRow(e, "fill") : null}
-					</>
-				) : null}
+						<label class="ov-field">
+							{lbl(t("overlay.color"))}
+							<input
+								type="color"
+								value={String(p.color ?? "#ffffff")}
+								oninput={(ev: Event) =>
+									mutateElement((el) => {
+										el.props.color = (ev.target as HTMLInputElement).value;
+									})
+								}
+							/>
+						</label>
+					</div>
+					<div class="ov-grid2">
+						<label class="ov-field">
+							{lbl(t("overlay.font_weight"))}
+							<select
+								value={String(p.fontWeight ?? 600)}
+								onchange={(ev: Event) =>
+									mutateElement((el) => {
+										el.props.fontWeight = Number(
+											(ev.target as HTMLSelectElement).value,
+										);
+									})
+								}
+							>
+								<option value="400">400</option>
+								<option value="600">600</option>
+								<option value="700">700</option>
+								<option value="900">900</option>
+							</select>
+						</label>
+						<label class="ov-field">
+							{lbl(t("overlay.align"))}
+							<select
+								value={String(p.textAlign ?? "left")}
+								onchange={(ev: Event) =>
+									mutateElement((el) => {
+										el.props.textAlign = (
+											ev.target as HTMLSelectElement
+										).value;
+									})
+								}
+							>
+								<option value="left">left</option>
+								<option value="center">center</option>
+								<option value="right">right</option>
+							</select>
+						</label>
+					</div>
+					{bindingRow(e, "text")}
+				</>
+			) : null}
 
-				{e.type === "image" ? (
+			{e.type === "shape" ? (
+				<>
 					<label class="ov-field">
-						{lbl(t("overlay.asset"))}
+						{lbl(t("overlay.shape"))}
 						<select
-							value={String(e.props.assetId ?? "")}
+							value={String(p.shape ?? "rect")}
 							onchange={(ev: Event) =>
 								mutateElement((el) => {
-									el.props.assetId = (ev.target as HTMLSelectElement).value;
+									el.props.shape = (ev.target as HTMLSelectElement).value;
 								})
 							}
 						>
-							<option value="">—</option>
-							{state.project.assets.map((a: Asset) => (
-								<option key={a.id} value={a.id}>
-									{a.filename}
-								</option>
-							))}
+							<option value="rect">rect</option>
+							<option value="ellipse">ellipse</option>
+							<option value="line">line</option>
 						</select>
 					</label>
-				) : null}
+					<div class="ov-grid2">
+						<label class="ov-field">
+							{lbl(t("overlay.fill"))}
+							<input
+								type="color"
+								value={String(p.fill ?? "#0ea5e9")}
+								oninput={(ev: Event) =>
+									mutateElement((el) => {
+										el.props.fill = (ev.target as HTMLInputElement).value;
+									})
+								}
+							/>
+						</label>
+						<label class="ov-field">
+							{lbl(t("overlay.stroke"))}
+							<input
+								type="color"
+								value={String(p.stroke ?? "#000000")}
+								oninput={(ev: Event) =>
+									mutateElement((el) => {
+										el.props.stroke = (ev.target as HTMLInputElement).value;
+									})
+								}
+							/>
+						</label>
+					</div>
+					<label class="ov-field">
+						{lbl(t("overlay.stroke_width"))}
+						<input
+							type="number"
+							value={Number(p.strokeWidth ?? 0)}
+							oninput={(ev: Event) =>
+								mutateElement((el) => {
+									el.props.strokeWidth = Number(
+										(ev.target as HTMLInputElement).value,
+									);
+								})
+							}
+						/>
+					</label>
+					{p.shape !== "line" ? bindingRow(e, "fill") : null}
+				</>
+			) : null}
 
-				<div class="ov-danger">
-					<Button
-						label={t("overlay.delete")}
-						class="ov-danger-btn"
-						onclick={() => deleteElement(e.id)}
-					/>
-				</div>
+			{e.type === "image" ? (
+				<label class="ov-field">
+					{lbl(t("overlay.asset"))}
+					<select
+						value={String(e.props.assetId ?? "")}
+						onchange={(ev: Event) =>
+							mutateElement((el) => {
+								el.props.assetId = (ev.target as HTMLSelectElement).value;
+							})
+						}
+					>
+						<option value="">—</option>
+						{state.project.assets.map((a: Asset) => (
+							<option key={a.id} value={a.id}>
+								{a.filename}
+							</option>
+						))}
+					</select>
+				</label>
+			) : null}
+
+			<div class="ov-danger">
+				<Button
+					label={t("overlay.delete")}
+					class="ov-danger-btn"
+					onclick={() => deleteElement(e.id)}
+				/>
 			</div>
-		</Card>
+		</>
 	);
 }
 
