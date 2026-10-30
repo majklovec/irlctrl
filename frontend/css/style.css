@@ -1910,10 +1910,11 @@ p.message {
 	flex-direction: column;
 	gap: 10px;
 }
-/* z-order arrows in the inspector card header */
+/* z-order arrows (in the Elements section header) */
 .ov-zhead {
 	display: inline-flex;
 	gap: 3px;
+	flex: none;
 }
 .ov-zhead .ov-zbtn {
 	width: 24px;
@@ -1949,6 +1950,14 @@ p.message {
 	align-items: center;
 	gap: 6px;
 	width: 100%;
+	padding: 0;
+}
+.ov-layers-toggle {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex: 1;
+	min-width: 0;
 	padding: 4px 2px;
 	background: transparent;
 	border: none;
@@ -1958,12 +1967,13 @@ p.message {
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 	cursor: pointer;
+	text-align: left;
 }
-.ov-layers-head .ov-chev {
+.ov-layers-toggle .ov-chev {
 	color: var(--muted);
 	transition: transform 0.15s ease;
 }
-.ov-layers-head .ov-chev-open {
+.ov-layers-toggle .ov-chev-open {
 	transform: rotate(90deg);
 }
 .ov-layers-count {

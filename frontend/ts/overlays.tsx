@@ -770,7 +770,7 @@ function lbl(label: string): m.Vnode {
 
 /**
  * The four z-order controls, rendered as compact arrow buttons in the
- * Inspector card header (front / forward / backward / back).
+ * Elements section header (to-front / forward / backward / to-back).
  */
 function zorderHeader(): m.Vnode {
 	const e = selElement();
@@ -852,24 +852,27 @@ function layersPanel(): m.Vnode {
 	const frontFirst = [...els].reverse();
 	return (
 		<div class="ov-layers">
-			<button
-				type="button"
-				class="ov-layers-head"
-				aria-expanded={state.layersOpen}
-				onclick={() => {
-					state.layersOpen = !state.layersOpen;
-					m.redraw();
-				}}
-			>
-				<Icon
-					name="chevron"
-					class={state.layersOpen ? "ov-chev ov-chev-open" : "ov-chev"}
-					width="14"
-					height="14"
-				/>
-				<span>{t("overlay.elements")}</span>
-				<span class="ov-layers-count">{els.length}</span>
-			</button>
+			<div class="ov-layers-head">
+				<button
+					type="button"
+					class="ov-layers-toggle"
+					aria-expanded={state.layersOpen}
+					onclick={() => {
+						state.layersOpen = !state.layersOpen;
+						m.redraw();
+					}}
+				>
+					<Icon
+						name="chevron"
+						class={state.layersOpen ? "ov-chev ov-chev-open" : "ov-chev"}
+						width="14"
+						height="14"
+					/>
+					<span>{t("overlay.elements")}</span>
+					<span class="ov-layers-count">{els.length}</span>
+				</button>
+				{zorderHeader()}
+			</div>
 			{state.layersOpen ? (
 				<ul class="ov-layers-list">
 					{frontFirst.map((el) => (
@@ -901,11 +904,10 @@ function layersPanel(): m.Vnode {
 
 function inspector(): m.Vnode {
 	const e = selElement();
-	const head = zorderHeader();
 	const layers = layersPanel();
 	if (!e)
 		return (
-			<Card title={t("overlay.inspector")} headActions={head} class="ov-rail">
+			<Card class="ov-rail">
 				<div class="ov-inspect">
 					{layers}
 					<p class="muted">{t("overlay.no_selection")}</p>
@@ -918,7 +920,7 @@ function inspector(): m.Vnode {
 	const p = e.props;
 
 	return (
-		<Card title={t("overlay.inspector")} headActions={head} class="ov-rail">
+		<Card class="ov-rail">
 			<div class="ov-inspect">
 				{layers}
 				<label class="ov-field">
