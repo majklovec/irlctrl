@@ -455,4 +455,61 @@ describe("control server HTTP contracts", () => {
                 .dashboard.color,
         ).toBeUndefined();
     }, 60_000);
+
+    test("persists chat tokens and serves only the overlay without a login session", async () => {
+        const cookie = await login();
+        const created = await fetch(`${baseUrl}/api/dashboards`, {
+            method: "POST",
+            headers: { cookie, "content-type": "application/json" },
+            body: JSON.stringify({
+                name: "OBS chat",
+                widgets: [{
+                    id: "overlay",
+                    type: "chat",
+                    config: { token: "overlay-test-token" },
+                }],
+            }),
+        });
+        expect(created.status).toBe(201);
+        const { dashboard } = await created.json();
+        expect(dashboard.widgets[0].config.token).toBe("overlay-test-token");
+        const overlayPath = `/chat/${dashboard.id}/overlay`;
+        const apiPath = `/api${overlayPath}`;
+        expect((await fetch(`${baseUrl}${overlayPath}`)).status).toBe(401);
+
+        await stopServer();
+        await startServer();
+
+        const overlay = await fetch(`${baseUrl}${overlayPath}?token=overlay-test-token`);
+        expect(overlay.status).toBe(200);
+        expect(overlay.headers.get("content-type")).toContain("text/html");
+        const html = await overlay.text();
+        expect(html).toContain("Chat - IRLCTRL");
+        expect(html).not.toContain("overlay-test-token");
+        const script = html.match(/src="(\/assets\/[^"]+\.js)"/)?.[1];
+        expect(script).toBeDefined();
+        expect((await fetch(`${baseUrl}${script}`)).status).toBe(200);
+
+        const state = await fetch(`${baseUrl}${apiPath}`, {
+            headers: { authorization: "Bearer overlay-test-token" },
+        });
+        expect(state.status).toBe(200);
+        const body = await state.json();
+        expect(body).toMatchObject({ widget: { id: "overlay" }, chat: {} });
+        expect(body.widget.config.token).toBeUndefined();
+        expect((await fetch(`${baseUrl}/api/dashboards?token=overlay-test-token`)).status).toBe(401);
+
+        const restoredCookie = await login();
+        const disabled = await fetch(`${baseUrl}/api/dashboards/${dashboard.id}`, {
+            method: "PUT",
+            headers: { cookie: restoredCookie, "content-type": "application/json" },
+            body: JSON.stringify({
+                name: dashboard.name,
+                version: dashboard.version,
+                widgets: [{ id: "overlay", type: "chat", config: { token: "" } }],
+            }),
+        });
+        expect(await disabled.json()).toMatchObject({ ok: true });
+        expect((await fetch(`${baseUrl}${apiPath}?token=overlay-test-token`)).status).toBe(401);
+    }, 60_000);
 });

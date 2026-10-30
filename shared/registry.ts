@@ -112,6 +112,7 @@ function validate(mod: unknown, file: string): asserts mod is BackendModule {
         "setupInfo",
         "setup",
         "configure",
+        "controlRoutes",
     ])
         fn(name);
     strings("dependencies");

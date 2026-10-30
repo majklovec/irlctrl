@@ -1,4 +1,11 @@
 {
+    "dash.widget_platformIcons": "Ikony platforem",
+    "dash.widget_platformIcons.auto": "Automaticky (více platforem)",
+    "dash.widget_platformIcons.on": "Zobrazit",
+    "dash.widget_platformIcons.off": "Skrýt",
+    "dash.widget_token": "Token OBS vrstvy (prázdný zakáže přístup)",
+    "chat.overlay": "Otevřít samostatný chat pro OBS",
+    "chat.overlay_error": "Chat není dostupný. Zkontrolujte URL vrstvy a token.",
     "chat.empty": "Zatím žádné zprávy",
     "wtype.chat": "Chat",
     "dash.widget_tiktok": "TikTok kanál",

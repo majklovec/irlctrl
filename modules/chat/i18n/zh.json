@@ -1,4 +1,11 @@
 {
+    "dash.widget_platformIcons": "平台图标",
+    "dash.widget_platformIcons.auto": "自动（多个平台）",
+    "dash.widget_platformIcons.on": "显示",
+    "dash.widget_platformIcons.off": "隐藏",
+    "dash.widget_token": "OBS叠加层令牌（留空禁用访问）",
+    "chat.overlay": "打开用于OBS的纯聊天窗口",
+    "chat.overlay_error": "聊天不可用。请检查叠加层URL和令牌。",
     "chat.empty": "还没有消息",
     "wtype.chat": "聊天",
     "dash.widget_tiktok": "TikTok 频道",

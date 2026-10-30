@@ -1,4 +1,11 @@
 {
+    "dash.widget_platformIcons": "Ikony platform",
+    "dash.widget_platformIcons.auto": "Automatycznie (wiele platform)",
+    "dash.widget_platformIcons.on": "Pokaż",
+    "dash.widget_platformIcons.off": "Ukryj",
+    "dash.widget_token": "Token nakładki OBS (pusty wyłącza dostęp)",
+    "chat.overlay": "Otwórz sam czat dla OBS",
+    "chat.overlay_error": "Czat niedostępny. Sprawdź adres URL i token.",
     "chat.empty": "Brak wiadomości",
     "wtype.chat": "Czat",
     "dash.widget_tiktok": "Kanał TikTok",

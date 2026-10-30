@@ -45,6 +45,18 @@ export interface ChannelLive {
     chat?: ChatLive[];
 }
 
+/** Read-only, widget-scoped state for the token-authenticated OBS overlay. */
+export interface ChatOverlayState {
+    widget: { id: string; config: Record<string, string> };
+    chat: ChatSnapshot;
+}
+
+/** Per-channel transport state and rolling messages, newest first. */
+export type ChatSnapshot = Record<
+    string,
+    { connected: boolean; messages: ChatLive[] }
+>;
+
 /** Channels to keep attached (spec keys). */
 export type ChannelSpecs = Set<string>;
 

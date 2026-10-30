@@ -273,6 +273,22 @@ Jsou určeny pouze pro nástěnky a běží na řídicím serveru nezávisle na 
 
 Widgety chatu uchovávají průběžnou historii zpráv, aby se při opětovném připojení neposílaly znovu, a používají množinu `seen` k odstranění duplicit podle ID zpráv i po opětovném připojení.
 
+Nastavení **Ikony platforem** ovládá ikonu před každou zprávou v dashboardu
+i OBS vrstvě: **Automaticky** (výchozí) zobrazuje ikony pouze při konfiguraci
+více platforem, **Zobrazit** je zobrazuje vždy a **Skrýt** je skryje.
+
+Pro zdroj Prohlížeč v OBS nastavte v konfiguraci widgetu chatu dlouhý náhodný
+**Token OBS vrstvy** a uložte dashboard. Klikněte na **OBS** v záhlaví widgetu
+a zkopírujte URL do zdroje Prohlížeč:
+`https://<server>/chat/<dashboard-id>/<widget-id>?token=<token>`.
+Zobrazení pouze pro čtení nevyžaduje přihlášení, má průhledné pozadí, neobsahuje
+ovládání dashboardu a obnovuje se každou sekundu. Používá kanály, historii,
+řazení, časové značky a nastavení moderace widgetu; nepřehrává TTS.
+URL uchovávejte v tajnosti a používejte HTTPS: token zpřístupňuje pouze chat
+daného widgetu, nikoli dashboard nebo zařízení. Vymazání tokenu vrstvu zakáže;
+změna tokenu zneplatní staré URL při dalším obnovení. Prázdný token zachovává
+dosavadní přístup pouze přes přihlášenou relaci.
+
 ### Jak funguje systém modulů
 
 Každý adresář `modules/<id>/` obsahuje přesně čtyři soubory:

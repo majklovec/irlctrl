@@ -1,4 +1,11 @@
 {
+    "dash.widget_platformIcons": "Icônes des plateformes",
+    "dash.widget_platformIcons.auto": "Automatique (plusieurs plateformes)",
+    "dash.widget_platformIcons.on": "Afficher",
+    "dash.widget_platformIcons.off": "Masquer",
+    "dash.widget_token": "Jeton OBS (vide pour désactiver l'accès)",
+    "chat.overlay": "Ouvrir le chat seul pour OBS",
+    "chat.overlay_error": "Chat indisponible. Vérifiez l'URL et le jeton.",
     "chat.empty": "Pas encore de messages",
     "wtype.chat": "Chat",
     "dash.widget_tiktok": "Chaîne TikTok",

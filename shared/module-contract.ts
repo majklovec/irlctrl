@@ -11,7 +11,8 @@
  * below. The core never names a module id, method prefix or status key.
  */
 import type { LogWording } from "./logMessages";
-import type { Status, WidgetConfigField } from "./types";
+import type { AnyElysia } from "elysia";
+import type { ServerDashboard, Status, WidgetConfigField } from "./types";
 import type { Role, RoleDefinition } from "./roles";
 
 export type Params = Record<string, unknown>;
@@ -89,6 +90,13 @@ export interface ModulePage {
     page: string;
 }
 
+/** Services for module-owned control-server routes; modules own their authorization. */
+export interface ControlRouteContext {
+    dashboardById(id: string): ServerDashboard | undefined;
+    htmlResponse(page: string): Response;
+    widgetHubSnapshot(): Record<string, unknown>;
+}
+
 /** What a device widget's server-side `validateConfig` can look at. */
 export interface WidgetConfigContext {
     /** True when the dashboard is being created (POST); a later save (PUT) is
@@ -156,6 +164,8 @@ export interface BackendModule<TCore = unknown> {
     /** Module id = directory name. */
     id: string;
     title: string;
+    /** Optional control-server HTTP routes (not mounted on devices). */
+    controlRoutes?(context: ControlRouteContext): AnyElysia;
     /** Roles contributed by this module; ids remain stable on the wire and in persisted settings. */
     roleDefinitions?: readonly RoleDefinition[];
 

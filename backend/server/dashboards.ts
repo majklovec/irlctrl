@@ -471,5 +471,9 @@ export function createDashboards({
         }
     }
 
-    return { dashApi, dashboardsFor };
+    return {
+        dashApi,
+        dashboardsFor,
+        dashboardById: (id: string) => dashboards.find((d) => d.id === id),
+    };
 }

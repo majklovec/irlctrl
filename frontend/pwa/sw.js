@@ -12,6 +12,7 @@ const PRECACHE = ["/icons/icon-192.png", "/icons/icon-512.png"];
 
 const isLive = (url) =>
     url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/chat/") ||
     url.pathname.startsWith("/i18n/") ||
     url.pathname === "/device" ||
     url.pathname === "/healthz" ||

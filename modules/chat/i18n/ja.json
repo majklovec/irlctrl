@@ -1,4 +1,11 @@
 {
+    "dash.widget_platformIcons": "プラットフォームアイコン",
+    "dash.widget_platformIcons.auto": "自動（複数のプラットフォーム）",
+    "dash.widget_platformIcons.on": "表示",
+    "dash.widget_platformIcons.off": "非表示",
+    "dash.widget_token": "OBSオーバーレイトークン（空欄でアクセス無効）",
+    "chat.overlay": "OBS用のチャットのみの画面を開く",
+    "chat.overlay_error": "チャットを利用できません。URLとトークンを確認してください。",
     "chat.empty": "メッセージはまだありません",
     "wtype.chat": "チャット",
     "dash.widget_tiktok": "TikTokチャンネル",

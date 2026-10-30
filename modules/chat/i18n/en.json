@@ -1,4 +1,11 @@
 {
+    "dash.widget_platformIcons": "Platform icons",
+    "dash.widget_platformIcons.auto": "Automatic (multiple platforms)",
+    "dash.widget_platformIcons.on": "Show",
+    "dash.widget_platformIcons.off": "Hide",
+    "dash.widget_token": "OBS overlay token (empty disables access)",
+    "chat.overlay": "Open plain chat for OBS",
+    "chat.overlay_error": "Chat unavailable. Check the overlay URL and token.",
     "chat.empty": "No messages yet",
     "wtype.chat": "Chat",
     "dash.widget_tiktok": "TikTok channel",

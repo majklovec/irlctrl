@@ -247,6 +247,22 @@ and frontend implementation remain co-located. Cross-layer wire types live in
 
 Chat widgets keep rolling message history so reconnects don't re-send, and a `seen` set that dedupes message ids across reconnects.
 
+The **Platform icons** setting controls the icon before each message in both the
+dashboard and OBS overlay: **Automatic** (default) shows icons only when multiple
+platforms are configured, **Show** always shows them, and **Hide** hides them.
+
+For an OBS Browser Source, set a long, random **OBS overlay token** in the chat
+widget's configuration and save the dashboard. Click **OBS** in the widget header
+and copy its URL into the Browser Source:
+`https://<server>/chat/<dashboard-id>/<widget-id>?token=<token>`.
+This read-only view needs no login, has a transparent background and no dashboard
+controls, and refreshes once per second. It shares the widget's channels, history,
+message order, timestamps and moderation settings; it does not play TTS.
+Keep the URL secret and use HTTPS: the token grants access only to that widget's
+chat, not to the dashboard or devices. Clearing the token disables the overlay;
+changing it revokes old URLs on their next refresh. Leave the token empty to keep
+existing session-only behavior.
+
 **Buttons widget** (`modules/buttons/`) — a **virtual StreamDeck**, offered once per dashboard (under _Independent_): a grid of buttons where each button fires one RPC method of one module on one of your devices (`encoder.stop`, a bitrate preset, `srtla.reload`, an OBS `StartStream`, …) — one widget can mix buttons from any number of devices. Modules declare the actions they offer with `dashboardActions` on their backend registration — a fixed list, or a `status => …` factory for actions that depend on live device state (e.g. one mute button per OBS audio source); the control server resolves them against the device's freshest status and merges the enabled modules' actions into each device's cached status (`status.actions`), and the widget's settings (pencil icon in edit mode) compose the layout from the catalogues of all your devices — with per-button label / icon overrides and a JSON params override (e.g. `pipeline`, `host`, `port` for `encoder.start`). Actions marked `confirm` ask before firing; buttons whose device went away or whose module was disabled are shown as unavailable. See [modules/README.md → Dashboard actions](modules/README.md#dashboard-actions) for declaring actions in a module.
 
 ### How the module system works

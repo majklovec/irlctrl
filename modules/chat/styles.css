@@ -46,7 +46,7 @@
     opacity: 1;
 }
 
-/* Per-line platform icon (only shown when the widget mixes platforms). */
+/* Per-line platform icon (visibility follows the widget configuration). */
 .dash-widget-body .chat-line .chat-icon {
     display: inline-block;
     width: 1em;

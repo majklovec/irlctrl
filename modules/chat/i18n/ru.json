@@ -1,4 +1,11 @@
 {
+    "dash.widget_platformIcons": "Значки платформ",
+    "dash.widget_platformIcons.auto": "Автоматически (несколько платформ)",
+    "dash.widget_platformIcons.on": "Показать",
+    "dash.widget_platformIcons.off": "Скрыть",
+    "dash.widget_token": "Токен слоя OBS (пустое поле отключает доступ)",
+    "chat.overlay": "Открыть только чат для OBS",
+    "chat.overlay_error": "Чат недоступен. Проверьте URL и токен.",
     "chat.empty": "Сообщений пока нет",
     "wtype.chat": "Чат",
     "dash.widget_tiktok": "TikTok-канал",

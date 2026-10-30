@@ -7,6 +7,7 @@ import { createFrontend } from "../../shared/frontend";
 import { notFound } from "../../shared/http";
 import { i18nReady } from "../../shared/i18n";
 import { pwaRoutes } from "../../shared/pwa";
+import { ALL_MODULES, widgetHubSnapshot } from "../../shared/registry";
 import { createAuth } from "./auth";
 import type { Publish } from "./contracts";
 import { createDashboards } from "./dashboards";
@@ -53,6 +54,15 @@ export async function createControlServer(options: ControlServerOptions) {
         deviceExists: (id) => !!devices.getDevice(id),
         deviceStatus: (id) => devices.getDevice(id)?.status,
     });
+
+    for (const mod of ALL_MODULES) {
+        if (mod.controlRoutes)
+            app.use(mod.controlRoutes({
+                dashboardById: dashboards.dashboardById,
+                htmlResponse: frontend.htmlResponse,
+                widgetHubSnapshot,
+            }));
+    }
 
     app.use(publicRoutes(auth, frontend))
         .use(pwaRoutes())

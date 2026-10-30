@@ -16,10 +16,12 @@ export const CHAT_CONFIG_FIELDS = [
     "twitch",
     "tiktok",
     "kick",
+    "token",
     "history",
     { name: "order", type: "select", options: ["top", "bottom"] },
     { name: "bannedMessages", type: "select", options: ["strike", "hide"] },
     { name: "timestamps", type: "select", options: ["off", "on"] },
+    { name: "platformIcons", type: "select", options: ["auto", "on", "off"] },
     {
         name: "ttsEnabled",
         type: "select",
@@ -89,6 +91,16 @@ export function chatTimestampsFromConfig(
     config: Record<string, string> | undefined,
 ): boolean {
     return (config?.timestamps ?? "").trim().toLowerCase() === "on";
+}
+
+export function chatPlatformIconsFromConfig(
+    config: Record<string, string> | undefined,
+    platformCount: number,
+): boolean {
+    const value = (config?.platformIcons ?? "").trim().toLowerCase();
+    if (value === "on") return true;
+    if (value === "off") return false;
+    return platformCount > 1;
 }
 
 /** Normalize one platform channel value (lowercased, trimmed; "" when empty). */

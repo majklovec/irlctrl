@@ -23,17 +23,13 @@ import {
     chatSpecsFromConfig,
 } from "./config";
 import { ChatProvider } from "./providers/base";
+import { chatOverlayRoutes } from "./overlay-server";
 import { KickChatProvider } from "./providers/kick";
 import { TiktokChatProvider } from "./providers/tiktok";
 import { TwitchChatProvider } from "./providers/twitch";
 import { YoutubeChatProvider } from "./providers/youtube";
-import type { ChannelSpecs, ChatLive, PublishFn } from "./types";
-
-/** chat.snapshot: per `<platform>:<channel>` {connected, messages (newest first)}. */
-export type ChatSnapshot = Record<
-    string,
-    { connected: boolean; messages: ChatLive[] }
->;
+import type { ChannelSpecs, ChatSnapshot, PublishFn } from "./types";
+export type { ChatSnapshot } from "./types";
 
 /** Split a spec into its platform and channel halves (null on a bad spec). */
 function parseSpec(spec: string): { platform: string; channel: string } | null {
@@ -130,6 +126,7 @@ export default {
     id: "chat",
     kind: "widget" as const,
     title: "Chat",
+    controlRoutes: chatOverlayRoutes,
     hub: {
         widgetType: "chat",
         snapshotKey: "chat",
