@@ -139,6 +139,8 @@ export type SrtlaStatus = Status & {
     };
     interfaces: Iface[];
     selected: Iface[];
+    defaultRouteInterface?: string | null;
+    defaultRouteSourceIp?: string | null;
     modems: ModemInfo[];
     uplinksFile: string;
     srtlaControl: SrtlaControlState;

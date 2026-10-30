@@ -1,6 +1,7 @@
 {
     "dev.card.srtla": "Relay",
     "dev.control": "Ovládanie",
+    "dev.default_route": "Predvolená trasa",
     "dev.control_connecting": "pripája sa",
     "dev.control_unavailable": "nedostupné",
     "dev.control_unavailable_title": "Nie je pripojený riadiaci websocket",

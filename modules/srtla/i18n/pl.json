@@ -1,6 +1,7 @@
 {
     "dev.card.srtla": "Relay",
     "dev.control": "Sterowanie",
+    "dev.default_route": "Trasa domyślna",
     "dev.control_connecting": "łączenie",
     "dev.control_unavailable": "niedostępne",
     "dev.control_unavailable_title": "Brak połączonego websocketu sterowania",

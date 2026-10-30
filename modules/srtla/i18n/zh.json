@@ -1,6 +1,7 @@
 {
     "dev.card.srtla": "中继",
     "dev.control": "控制",
+    "dev.default_route": "默认路由",
     "dev.control_connecting": "连接中",
     "dev.control_unavailable": "不可用",
     "dev.control_unavailable_title": "未连接控制 websocket",

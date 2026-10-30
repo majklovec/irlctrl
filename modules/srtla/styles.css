@@ -87,6 +87,20 @@
     display: block;
     font-size: 0.8rem;
 }
+.mod-srtla tr.default-route td {
+    background: color-mix(in srgb, var(--ok) 12%, transparent);
+}
+.default-route-label {
+    display: inline-block;
+    margin-left: 0.45rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ok) 20%, transparent);
+    color: var(--ok);
+    font-size: 0.75em;
+    font-weight: 600;
+    white-space: nowrap;
+}
 .no-stats .link-col {
     display: none;
 }

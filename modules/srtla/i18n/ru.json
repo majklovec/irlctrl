@@ -1,6 +1,7 @@
 {
     "dev.card.srtla": "Ретранслятор",
     "dev.control": "Управление",
+    "dev.default_route": "Маршрут по умолчанию",
     "dev.control_connecting": "подключение",
     "dev.control_unavailable": "недоступно",
     "dev.control_unavailable_title": "Нет подключенного управляющего websocket",

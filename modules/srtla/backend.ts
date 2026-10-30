@@ -33,13 +33,16 @@ import {
 } from "./modems";
 import {
     bindRouting,
+    defaultRouteDetails,
     detectInterfaces,
     isMonitorRunning,
     reconfigure,
     resolveSelection,
     selection,
     setSelection,
+    startDefaultRouteFailover,
     startInterfaceMonitor,
+    stopDefaultRouteFailover,
     stopInterfaceMonitor,
     UPLINKS_FILE,
 } from "./routing";
@@ -483,9 +486,11 @@ const registration: BackendModule<ModuleCore> = {
         }
         console.log(`Initial uplinks: ${result.ips.join(", ")}`);
         startInterfaceMonitor(reloadSrtla);
+        startDefaultRouteFailover();
         await maybeStartSrtla();
     },
     async stop() {
+        stopDefaultRouteFailover();
         await stopInterfaceMonitor();
         await stopSrtla();
     },
@@ -579,7 +584,10 @@ const registration: BackendModule<ModuleCore> = {
         throw new Error(`unknown method ${method}`);
     },
     async status() {
-        const modem = await modemStatus();
+        const [modem, defaultRoute] = await Promise.all([
+            modemStatus(),
+            defaultRouteDetails(),
+        ]);
         return {
             state: {
                 srtla: srtlaStatus(),
@@ -588,6 +596,8 @@ const registration: BackendModule<ModuleCore> = {
                 selection: selection(),
             },
             ...modem,
+            defaultRouteInterface: defaultRoute?.iface ?? null,
+            defaultRouteSourceIp: defaultRoute?.ip ?? null,
             uplinksFile: UPLINKS_FILE,
             srtlaControl: control.srtlaControlState(),
             monitor: {

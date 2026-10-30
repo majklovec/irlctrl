@@ -46,6 +46,7 @@ import type {
 	SrtlaStatsEvent,
 	SrtlaStatus,
 } from "./types";
+import { defaultRouteRowIndex } from "./route-view";
 
 type EncoderStart = (
 	host: DeviceCard,
@@ -563,8 +564,14 @@ function interfacesCard(host: DeviceCard, status: SrtlaStatus): m.Vnode {
 	const total =
 		live?.links.reduce((sum, l) => sum + (l.bitrate_bytes_per_sec || 0), 0) ??
 		0;
+	const defaultRouteRow = defaultRouteRowIndex(
+		status.interfaces,
+		status.defaultRouteInterface,
+		status.defaultRouteSourceIp,
+	);
 
-	const rows = status.interfaces.map((i) => {
+	const rows = status.interfaces.map((i, index) => {
+		const isDefaultRoute = index === defaultRouteRow;
 		const sub = [
 			i.cidr,
 			i.modemIndex !== undefined
@@ -576,7 +583,15 @@ function interfacesCard(host: DeviceCard, status: SrtlaStatus): m.Vnode {
 		const network = [i.operatorName, i.accessTech].filter(Boolean).join(" · ");
 		const busyKey = `iface:${i.iface}`;
 		return (
-			<tr key={i.iface} class={selected.has(i.iface) ? "selected" : ""}>
+			<tr
+				key={`${i.iface}:${i.ip}`}
+				class={[
+					selected.has(i.iface) ? "selected" : "",
+					isDefaultRoute ? "default-route" : "",
+				]
+					.filter(Boolean)
+					.join(" ")}
+			>
 				<td>
 					<input
 						type="checkbox"
@@ -592,6 +607,11 @@ function interfacesCard(host: DeviceCard, status: SrtlaStatus): m.Vnode {
 				</td>
 				<td class="is-iface">
 					{i.iface}
+					{isDefaultRoute ? (
+						<span class="default-route-label">
+							{t("dev.default_route")}
+						</span>
+					) : null}
 					{i.speed ? (
 						<small class="muted">{` · ${formatSpeed(i.speed)}`}</small>
 					) : null}

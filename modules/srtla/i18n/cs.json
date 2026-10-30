@@ -1,6 +1,7 @@
 {
     "dev.card.srtla": "Brána",
     "dev.control": "Ovládání",
+    "dev.default_route": "default",
     "dev.control_connecting": "připojuje se",
     "dev.control_unavailable": "nedostupné",
     "dev.control_unavailable_title": "Nejsou připojeny žádné řídicí websockety",

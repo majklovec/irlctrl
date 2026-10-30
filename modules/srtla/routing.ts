@@ -7,6 +7,8 @@
  * ModemManager lookups.
  */
 import { readFile } from "node:fs/promises";
+import { resolve4 } from "node:dns/promises";
+import { createConnection } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
@@ -27,6 +29,10 @@ export const UPLINKS_FILE = argEnv(
     join(tmpdir(), "srtla_ips.txt"),
 );
 const DEBOUNCE_MS = intArgEnv("--debounce-ms", "DEBOUNCE_MS", 1500);
+const FAILOVER_INTERVAL_MS = 2000;
+const CONNECTIVITY_HOST = "www.gstatic.com";
+const CONNECTIVITY_PATH = "/generate_204";
+const CONNECTIVITY_TIMEOUT_MS = 2000;
 
 let core: ModuleCore;
 let modems: ModemSource;
@@ -53,6 +59,21 @@ const VIRTUAL_PREFIXES = [
 ];
 
 const TABLE_BASE = 100;
+let routingQueue: Promise<void> = Promise.resolve();
+
+async function withRoutingLock<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = routingQueue;
+    let release!: () => void;
+    routingQueue = new Promise<void>((resolve) => {
+        release = resolve;
+    });
+    await previous;
+    try {
+        return await operation();
+    } finally {
+        release();
+    }
+}
 
 const isVirtual = (iface: string): boolean =>
     VIRTUAL_PREFIXES.some((p) => iface.startsWith(p));
@@ -138,6 +159,19 @@ export async function detectInterfaces(
 async function getGateway(iface: string): Promise<string | null> {
     const out = await ip(["route", "show", "default", "dev", iface], true);
     return out.match(/via\s+(\S+)/)?.[1] ?? null;
+}
+
+export async function defaultRouteDetails(): Promise<{
+    iface: string;
+    ip: string | null;
+} | null> {
+    const route = await ip(["-4", "route", "get", "1.1.1.1"], true);
+    const iface = route.match(/\bdev\s+(\S+)/)?.[1];
+    if (!iface) return null;
+    return {
+        iface,
+        ip: route.match(/\bsrc\s+(\S+)/)?.[1] ?? null,
+    };
 }
 
 function getNetwork(ipAddr: string, prefix: number): string {
@@ -228,6 +262,7 @@ async function setupSourceRouting({
 // get their stale tables cleaned and monitor events for them are recognised.
 let managedTableCount = 0;
 let lastAppliedPlan: string | null = null;
+let lastAppliedPlanEntries: RoutePlanEntry[] = [];
 
 const isManagedTable = (table: number): boolean =>
     table >= TABLE_BASE && table < TABLE_BASE + Math.max(managedTableCount, 1);
@@ -252,14 +287,207 @@ async function routingIntact(plan: RoutePlanEntry[]): Promise<boolean> {
 
 async function applyRouting(plan: RoutePlanEntry[]): Promise<boolean> {
     const signature = JSON.stringify(plan);
-    if (signature === lastAppliedPlan && (await routingIntact(plan)))
+    if (signature === lastAppliedPlan && (await routingIntact(plan))) {
+        lastAppliedPlanEntries = plan;
         return false;
+    }
 
+    lastAppliedPlan = null;
+    lastAppliedPlanEntries = [];
     await cleanupTables(Math.max(managedTableCount, plan.length));
     managedTableCount = Math.max(managedTableCount, plan.length);
     for (const p of plan) await setupSourceRouting(p);
     lastAppliedPlan = signature;
+    lastAppliedPlanEntries = plan;
     return true;
+}
+
+// ----------------------------------------------------------------------
+// Main-table default-route failover
+// ----------------------------------------------------------------------
+let failoverTimer: ReturnType<typeof setInterval> | null = null;
+let failoverBusy = false;
+
+function probeAddress(address: string, localAddress?: string): Promise<boolean> {
+    return new Promise((resolve) => {
+        const socket = createConnection({
+            host: address,
+            port: 80,
+            ...(localAddress ? { localAddress } : {}),
+        });
+        let settled = false;
+        let response = "";
+        const finish = (reachable: boolean): void => {
+            if (settled) return;
+            settled = true;
+            socket.destroy();
+            resolve(reachable);
+        };
+
+        socket.setTimeout(CONNECTIVITY_TIMEOUT_MS, () => finish(false));
+        socket.once("connect", () => {
+            socket.write(
+                `GET ${CONNECTIVITY_PATH} HTTP/1.1\r\nHost: ${CONNECTIVITY_HOST}\r\nConnection: close\r\n\r\n`,
+            );
+        });
+        socket.on("data", (chunk: Buffer) => {
+            response += chunk.toString("ascii");
+            const lineEnd = response.indexOf("\r\n");
+            if (lineEnd !== -1) {
+                finish(/^HTTP\/\d(?:\.\d)? 204(?:\s|$)/.test(response.slice(0, lineEnd)));
+            }
+        });
+        socket.once("error", () => finish(false));
+        socket.once("close", () => finish(false));
+    });
+}
+
+async function checkConnectivity(
+    addresses: string[],
+    localAddress?: string,
+): Promise<boolean> {
+    if (core.config.DRY_RUN) return true;
+    const results = await Promise.all(
+        addresses.map((address) => probeAddress(address, localAddress)),
+    );
+    return results.some(Boolean);
+}
+
+async function tableDefaultRoute(table: number): Promise<string | null> {
+    const out = await ip(
+        ["route", "show", "table", String(table), "default"],
+        true,
+    );
+    return out.trim().split("\n")[0]?.trim() || null;
+}
+
+async function accessPointInterfaces(): Promise<Set<string>> {
+    const output = await core.run("iw", ["dev"], true);
+    return new Set(
+        output
+            .split(/(?=^\s*Interface\s)/m)
+            .flatMap((section) => {
+                const iface = section.match(/^\s*Interface\s+(\S+)/m)?.[1];
+                return iface && /^\s*type AP\s*$/m.test(section) ? [iface] : [];
+            }),
+    );
+}
+
+async function clearMainDefaultRoutes(): Promise<void> {
+    const routes = await ip(["route", "show", "default"], true);
+    const count = routes.trim() ? routes.trim().split("\n").length : 0;
+    for (let i = 0; i < count; i++) {
+        await ip(["route", "del", "default"]);
+    }
+}
+
+async function enforceDefaultRoute(): Promise<void> {
+    if (failoverBusy || core.config.DRY_RUN) return;
+    failoverBusy = true;
+    try {
+        await withRoutingLock(async () => {
+            let addresses: string[];
+            try {
+                addresses = await resolve4(CONNECTIVITY_HOST);
+            } catch (err: unknown) {
+                console.warn(
+                    `[failover] DNS lookup failed for ${CONNECTIVITY_HOST}: ${errorMessage(err)}`,
+                );
+                return;
+            }
+            if (addresses.length === 0) return;
+
+            if (await checkConnectivity(addresses)) return;
+
+            const selected = resolveSelection(await detectInterfaces());
+            const plan = lastAppliedPlanEntries;
+            if (
+                plan.length !== selected.length ||
+                plan.some(
+                    (entry, idx) =>
+                        entry.iface !== selected[idx]?.iface ||
+                        entry.ip !== selected[idx]?.ip,
+                )
+            ) {
+                return;
+            }
+
+            const seenIps = new Set<string>();
+            const accessPoints = await accessPointInterfaces();
+            const candidates = selected.flatMap((entry, idx) => {
+                if (seenIps.has(entry.ip)) return [];
+                seenIps.add(entry.ip);
+                if (accessPoints.has(entry.iface)) return [];
+                const appliedEntry = plan[idx];
+                return appliedEntry ? [{ entry, appliedEntry }] : [];
+            });
+            const reachability = await Promise.all(
+                candidates.map(({ entry }) =>
+                    checkConnectivity(addresses, entry.ip),
+                ),
+            );
+            const winnerIndex = reachability.findIndex(Boolean);
+            if (winnerIndex === -1) return;
+            const winner = candidates[winnerIndex];
+            if (!winner) return;
+
+            const currentInterfaces = await detectInterfaces();
+            if (
+                !currentInterfaces.some(
+                    (iface) =>
+                        iface.iface === winner.entry.iface &&
+                        iface.ip === winner.entry.ip,
+                )
+            ) {
+                return;
+            }
+
+            const route = await tableDefaultRoute(winner.appliedEntry.table);
+            if (!route) {
+                console.warn(
+                    `[failover] table ${winner.appliedEntry.table} has no default route`,
+                );
+                return;
+            }
+
+            const routeArgs = route.split(/\s+/);
+            const deviceIndex = routeArgs.indexOf("dev");
+            if (
+                routeArgs[0] !== "default" ||
+                deviceIndex === -1 ||
+                routeArgs[deviceIndex + 1] !== winner.entry.iface
+            ) {
+                console.warn(
+                    `[failover] unexpected default route in table ${winner.appliedEntry.table}: ${route}`,
+                );
+                return;
+            }
+
+            await clearMainDefaultRoutes();
+            await ip(["route", "add", ...routeArgs]);
+            console.log(
+                `[failover] main default route -> ${winner.entry.iface} (table ${winner.appliedEntry.table})`,
+            );
+            core.notifyStateChange();
+        });
+    } finally {
+        failoverBusy = false;
+    }
+}
+
+export function startDefaultRouteFailover(): void {
+    if (failoverTimer) return;
+    failoverTimer = setInterval(() => {
+        void enforceDefaultRoute().catch((err: unknown) =>
+            console.warn("[failover] error:", errorMessage(err)),
+        );
+    }, FAILOVER_INTERVAL_MS);
+}
+
+export function stopDefaultRouteFailover(): void {
+    if (!failoverTimer) return;
+    clearInterval(failoverTimer);
+    failoverTimer = null;
 }
 
 // ----------------------------------------------------------------------
@@ -277,45 +505,47 @@ const failure = (error: string): ReconfigureResult => ({
 });
 
 export async function reconfigure(): Promise<ReconfigureResult> {
-    try {
-        const selected = resolveSelection(await detectInterfaces());
-        if (selected.length === 0)
-            return failure("No interfaces selected for bonding.");
+    return withRoutingLock(async () => {
+        try {
+            const selected = resolveSelection(await detectInterfaces());
+            if (selected.length === 0)
+                return failure("No interfaces selected for bonding.");
 
-        const plan = await Promise.all(
-            selected.map(async ({ iface, ip: addr, prefix }, idx) => ({
-                iface,
-                ip: addr,
-                prefix,
-                gateway: await getGateway(iface),
-                table: TABLE_BASE + idx,
-            })),
-        );
-        // Only touch routing when needed: rewriting tables emits netlink
-        // events that would otherwise re-trigger the monitor forever.
-        await applyRouting(plan);
+            const plan = await Promise.all(
+                selected.map(async ({ iface, ip: addr, prefix }, idx) => ({
+                    iface,
+                    ip: addr,
+                    prefix,
+                    gateway: await getGateway(iface),
+                    table: TABLE_BASE + idx,
+                })),
+            );
+            // Only touch routing when needed: rewriting tables emits netlink
+            // events that would otherwise re-trigger the monitor forever.
+            await applyRouting(plan);
 
-        const ips = selected.map((i) => i.ip);
-        console.log(`Detected IPs: ${ips.join(", ")}`);
-        const content = `${ips.join("\n")}\n`;
-        const previous =
-            lastUplinksContent ??
-            (await Bun.file(UPLINKS_FILE)
-                .text()
-                .catch(() => null));
-        const changed = previous !== content;
-        if (changed && !core.config.DRY_RUN) {
-            await core.writeFileAtomic(UPLINKS_FILE, content);
-            lastUplinksContent = content;
-            console.log(`Uplinks file updated: ${ips.join(", ")}`);
+            const ips = selected.map((i) => i.ip);
+            console.log(`Detected IPs: ${ips.join(", ")}`);
+            const content = `${ips.join("\n")}\n`;
+            const previous =
+                lastUplinksContent ??
+                (await Bun.file(UPLINKS_FILE)
+                    .text()
+                    .catch(() => null));
+            const changed = previous !== content;
+            if (changed && !core.config.DRY_RUN) {
+                await core.writeFileAtomic(UPLINKS_FILE, content);
+                lastUplinksContent = content;
+                console.log(`Uplinks file updated: ${ips.join(", ")}`);
+            }
+
+            // Interfaces / modem details may have changed even if the uplinks did not
+            core.notifyStateChange();
+            return { ok: true, selected, uplinksFile: UPLINKS_FILE, ips, changed };
+        } catch (err: unknown) {
+            return failure(errorMessage(err));
         }
-
-        // Interfaces / modem details may have changed even if the uplinks did not
-        core.notifyStateChange();
-        return { ok: true, selected, uplinksFile: UPLINKS_FILE, ips, changed };
-    } catch (err: unknown) {
-        return failure(errorMessage(err));
-    }
+    });
 }
 
 // ----------------------------------------------------------------------

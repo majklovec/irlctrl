@@ -1,6 +1,7 @@
 {
     "dev.card.srtla": "リレー",
     "dev.control": "制御",
+    "dev.default_route": "デフォルトルート",
     "dev.control_connecting": "接続中",
     "dev.control_unavailable": "利用不可",
     "dev.control_unavailable_title": "制御 websocket が接続されていません",
