@@ -1952,11 +1952,29 @@ p.message {
 	right: 0;
 }
 
+/* editor-only hover affordance (scoped so it never reaches the OBS runtime) */
+.ov-canvas-wrap .overlay-element {
+	cursor: move;
+}
+.ov-canvas-wrap .overlay-element:hover {
+	outline: 1px dashed var(--accent);
+	outline-offset: 1px;
+}
+
 /* inspector */
 .ov-inspect {
 	display: flex;
 	flex-direction: column;
 	gap: 10px;
+}
+.ov-zorder {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 6px;
+}
+.ov-zbtn {
+	width: 100%;
+	font-size: 12px;
 }
 .ov-field {
 	display: flex;

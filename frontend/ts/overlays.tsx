@@ -187,11 +187,20 @@ async function createScene(): Promise<void> {
 		body: JSON.stringify({ name }),
 	});
 	if (body?.scene) {
-		state.project.scenes.push(body.scene);
+		// upsert — the server's `overlays.scene` WS push may already have added
+		// this scene (it fires before the HTTP response), so a raw push would
+		// create a duplicate
+		upsertScene(body.scene);
 		selectScene(body.scene.id);
 		state.newSceneName = "";
 		m.redraw();
 	}
+}
+/** Idempotently insert or replace a scene by id (mirrors the WS handler). */
+function upsertScene(sc: Scene): void {
+	const i = state.project.scenes.findIndex((x) => x.id === sc.id);
+	if (i >= 0) state.project.scenes[i] = sc;
+	else state.project.scenes.push(sc);
 }
 function selectScene(id: string): void {
 	state.selectedSceneId = id;
@@ -291,6 +300,40 @@ function deleteElement(id: string): void {
 	m.redraw();
 }
 
+/**
+ * Reorder the selected element within `scene.elements` (back-to-front array
+ * order = z-order). Works on locked elements too — stacking is not a
+ * positional edit.
+ */
+function reorderElement(
+	op: "front" | "forward" | "backward" | "back",
+): void {
+	const s = scene();
+	const e = selElement();
+	if (!s || !e) return;
+	const i = s.elements.findIndex((x) => x.id === e.id);
+	if (i < 0) return;
+	if (op === "front" && i === s.elements.length - 1) return;
+	if (op === "back" && i === 0) return;
+	if (op === "forward" && i === s.elements.length - 1) return;
+	if (op === "backward" && i === 0) return;
+	snapshot();
+	const list = [...s.elements];
+	const [el] = list.splice(i, 1);
+	const to =
+		op === "front"
+			? list.length
+			: op === "back"
+				? 0
+				: op === "forward"
+					? i + 1
+					: i - 1;
+	list.splice(to, 0, el);
+	s.elements = list;
+	void saveSceneElements(s);
+	m.redraw();
+}
+
 // ── variable ops ─────────────────────────────────────────────────────────
 async function createVariable(): Promise<void> {
 	const name = state.newVariableName.trim();
@@ -300,10 +343,19 @@ async function createVariable(): Promise<void> {
 		body: JSON.stringify({ name, type: state.newVariableType }),
 	});
 	if (body?.variable) {
-		state.project.variables.push(body.variable);
+		// upsert — same double-add race as createScene: the `overlays.variables`
+		// WS push lands before the HTTP response and already contains the new
+		// variable, so a raw push would duplicate it
+		upsertVariable(body.variable);
 		state.newVariableName = "";
 		m.redraw();
 	}
+}
+/** Idempotently insert or replace a variable by id (mirrors the WS handler). */
+function upsertVariable(v: Variable): void {
+	const i = state.project.variables.findIndex((x) => x.id === v.id);
+	if (i >= 0) state.project.variables[i] = v;
+	else state.project.variables.push(v);
 }
 async function setVariable(id: string, value: VariableValue): Promise<void> {
 	const v = state.project.variables.find((x) => x.id === id);
@@ -545,15 +597,22 @@ function applySnap(
 	return { gx, gy };
 }
 
+function selectElement(elementId: string | null): void {
+	state.selectedElementId = elementId;
+	m.redraw();
+}
+
 function startDrag(
 	ev: MouseEvent,
 	elementId: string,
 	mode: "move" | "resize",
 	handle = "",
 ): void {
+	// stop bubbling to the canvas handler first, so clicking a selection box /
+	// handle never deselects (even for locked elements)
+	(ev as Event).stopPropagation();
 	const e = scene()?.elements.find((x) => x.id === elementId);
 	if (!e || e.locked) return;
-	(ev as Event).stopPropagation();
 	state.selectedElementId = elementId;
 	const p = toScenePoint(ev);
 	state.drag = {
@@ -822,9 +881,20 @@ function canvasArea(): m.Vnode {
 						transform: "scale(" + state.zoom + ")",
 						transformOrigin: "0 0",
 					}}
-					onmousedown={() => {
-						state.selectedElementId = null;
-						m.redraw();
+					onmousedown={(ev: MouseEvent) => {
+						// clicking an element selects + begins a drag; clicking
+						// empty canvas clears the selection
+						const hit = (ev.target as HTMLElement).closest<HTMLElement>(
+							"[data-element]",
+						);
+						if (hit?.dataset.element) {
+							const id = hit.dataset.element;
+							const el = scene()?.elements.find((x) => x.id === id);
+							if (el && !el.locked) startDrag(ev, id, "move");
+							else selectElement(id);
+							return;
+						}
+						selectElement(null);
 					}}
 				>
 					<div
@@ -902,6 +972,25 @@ function inspector(): m.Vnode {
 						}
 					/>
 				</label>
+
+				<div class="ov-zorder">
+					{([
+						["front", t("overlay.bring_front")],
+						["forward", t("overlay.bring_forward")],
+						["backward", t("overlay.send_backward")],
+						["back", t("overlay.send_back")],
+					] as const).map(([op, label]) => (
+						<button
+							key={op}
+							type="button"
+							class="ov-zbtn"
+							title={label}
+							onclick={() => reorderElement(op)}
+						>
+							{label}
+						</button>
+					))}
+				</div>
 				<div class="ov-grid2">
 					{[
 						[t("overlay.x"), tm.x, (n: number) => setT((x) => (x.x = n))],
