@@ -446,6 +446,7 @@ function parseSegments(text: string): ChatSegment[] {
 				kind: "emote",
 				id: `kick:${match[1]}`,
 				name: match[2].trim(),
+				url: `https://files.kick.com/emotes/${match[1]}/fullsize`,
 			};
 		} else if (match[3] !== undefined) {
 			// ── YouTube shortcode: :name: ──
