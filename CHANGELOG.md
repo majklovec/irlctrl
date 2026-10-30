@@ -1,3 +1,15 @@
+# [1.21.0](https://github.com/majklovec/irlctrl/compare/v1.20.0...v1.21.0) (2026-10-30)
+
+
+### Bug Fixes
+
+* **chat:** add support for Kick emotes with valid image URLs in chat ([0e3b81a](https://github.com/majklovec/irlctrl/commit/0e3b81a81f069a251f44d3000529921ed21feb09))
+
+
+### Features
+
+* **routing:** implement default route failover and enhance interface display ([f250756](https://github.com/majklovec/irlctrl/commit/f250756a928552ab772c5137d15f24ddfafc6c21))
+
 # [1.20.0](https://github.com/majklovec/irlctrl/compare/v1.19.0...v1.20.0) (2026-10-30)
 
 
