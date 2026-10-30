@@ -91,6 +91,8 @@ const state = {
 	copied: false,
 	/** Element currently expanded in the inspector list (accordion). */
 	expandedElementId: null as string | null,
+	/** Text element being inline-edited on the canvas. */
+	editingElementId: null as string | null,
 };
 
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
@@ -516,6 +518,32 @@ function applySnap(
 function selectElement(elementId: string | null): void {
 	state.selectedElementId = elementId;
 	state.expandedElementId = elementId;
+	state.editingElementId = null;
+	m.redraw();
+}
+
+/** Row-head click: select the element and toggle that row's expanded state. */
+function toggleElementRow(elementId: string): void {
+	state.selectedElementId = elementId;
+	state.editingElementId = null;
+	state.expandedElementId =
+		state.expandedElementId === elementId ? null : elementId;
+	m.redraw();
+}
+
+/** Enter inline text editing on the canvas (double-click a text element). */
+function startInlineEdit(elementId: string): void {
+	const e = scene()?.elements.find((x) => x.id === elementId);
+	if (!e || e.type !== "text" || e.locked) return;
+	snapshot();
+	state.editingElementId = elementId;
+	state.selectedElementId = elementId;
+	m.redraw();
+}
+
+function stopInlineEdit(): void {
+	if (state.editingElementId === null) return;
+	state.editingElementId = null;
 	m.redraw();
 }
 
@@ -721,6 +749,17 @@ function canvasArea(): m.Vnode {
 						}
 						selectElement(null);
 					}}
+					ondblclick={(ev: MouseEvent) => {
+						const target = ev.target as HTMLElement;
+						const hit = target.closest<HTMLElement>("[data-element]");
+						if (hit?.dataset.element) startInlineEdit(hit.dataset.element);
+						// the selection box sits on top of the selected element
+						else if (
+							target.closest(".ov-selection") &&
+							state.selectedElementId
+						)
+							startInlineEdit(state.selectedElementId);
+					}}
 				>
 					<div
 						class="overlay-canvas"
@@ -758,9 +797,88 @@ function canvasArea(): m.Vnode {
 								))}
 							</div>
 						) : null}
+						{state.editingElementId
+							? inlineTextEdit(state.editingElementId, s)
+							: null}
 					</div>
 				</div>
 			</div>
+		</div>
+	);
+}
+
+/**
+ * Inline text editor: a transparent textarea laid exactly over the text
+ * element (same box, same font) so the edit is what-you-see. Enter commits
+ * (Shift+Enter for a newline), Esc cancels, blur commits.
+ */
+function inlineTextEdit(
+	elementId: string,
+	s: Scene | undefined,
+): m.Children {
+	const e = s?.elements.find((x) => x.id === elementId);
+	if (!e || e.type !== "text") return null;
+	const p = (e.props ?? {}) as Record<string, unknown>;
+	const ts = (v: unknown, d: number) =>
+		typeof v === "number" && Number.isFinite(v) ? v : d;
+	const align = p.textAlign;
+	const ta =
+		align === "center" ? "center" : align === "right" ? "right" : "left";
+	const font: Record<string, string> = {
+		fontFamily:
+			typeof p.fontFamily === "string"
+				? p.fontFamily
+				: "Inter, system-ui, sans-serif",
+		fontSize: `${ts(p.fontSize, 48)}px`,
+		fontWeight: `${ts(p.fontWeight, 600)}`,
+		lineHeight: `${ts(p.lineHeight, 1.2)}`,
+		color: typeof p.color === "string" ? p.color : "#ffffff",
+		textAlign: ta,
+		padding: "0",
+		margin: "0",
+		border: "none",
+		outline: "2px solid var(--accent)",
+		background: "rgba(255,255,255,0.06)",
+		resize: "none",
+		overflow: "hidden",
+		width: "100%",
+		height: "100%",
+		display: "block",
+		boxSizing: "border-box",
+	};
+	const commit = () => stopInlineEdit();
+	return (
+		<div
+			class="ov-inline-edit"
+			style={elementStyle(e)}
+			onmousedown={(ev: MouseEvent) => ev.stopPropagation()}
+		>
+			<textarea
+				class="ov-inline-edit-input"
+				style={font}
+				value={typeof p.text === "string" ? p.text : ""}
+				ref={(dom: HTMLTextAreaElement | null) => dom?.focus()}
+				oninput={(ev: Event) => {
+					const sc = scene();
+					const el = sc?.elements.find((x) => x.id === elementId);
+					if (!sc || !el) return;
+					(el.props as Record<string, unknown>).text = (
+						ev.target as HTMLTextAreaElement
+					).value;
+					void saveSceneElements(sc);
+				}}
+				onkeydown={(ev: KeyboardEvent) => {
+					if (ev.key === "Enter" && !ev.shiftKey) {
+						ev.preventDefault();
+						commit();
+					} else if (ev.key === "Escape") {
+						ev.preventDefault();
+						undo(); // revert to the snapshot taken on edit start
+						stopInlineEdit();
+					}
+				}}
+				onblur={commit}
+			/>
 		</div>
 	);
 }
@@ -873,7 +991,7 @@ function layersPanel(): m.Vnode {
 										? " ov-layer-sel"
 										: "")
 								}
-								onclick={() => selectElement(el.id)}
+								onclick={() => toggleElementRow(el.id)}
 							>
 								<span
 									class="ov-layer-dot"

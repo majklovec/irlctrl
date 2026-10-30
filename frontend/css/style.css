@@ -1904,6 +1904,15 @@ p.message {
 	outline-offset: 1px;
 }
 
+/* inline text editing (double-click a text element) */
+.ov-inline-edit {
+	z-index: 5;
+	cursor: text;
+}
+.ov-inline-edit-input::selection {
+	background: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
 /* inspector */
 .ov-inspect {
 	display: flex;
