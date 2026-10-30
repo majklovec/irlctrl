@@ -1,3 +1,10 @@
+# [1.19.0](https://github.com/majklovec/irlctrl/compare/v1.18.0...v1.19.0) (2026-10-30)
+
+
+### Features
+
+* **broadcaster:** add new streaming profiles for audio-only, copy, and re-encoding formats ([8ed4d75](https://github.com/majklovec/irlctrl/commit/8ed4d75480a482b76c7c2ba034d1a14f5b98a91d))
+
 # [1.18.0](https://github.com/majklovec/irlctrl/compare/v1.17.0...v1.18.0) (2026-10-29)
 
 

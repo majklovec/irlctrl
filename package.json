@@ -1,6 +1,6 @@
 {
     "name": "irlctrl",
-    "version": "1.18.0",
+    "version": "1.19.0",
     "description": "IRL control application",
     "author": "Michal Vondráček",
     "scripts": {
@@ -9,7 +9,6 @@
         "pretest": "bun scripts/gen-control-server-assets.ts",
         "dev": "bun backend/server/server.ts",
         "test": "bun test",
-
         "prebuild:client": "bun scripts/gen-control-server-assets.ts",
         "build:client": "bun build --compile --minify --sourcemap --format=esm --bytecode ./backend/client/client.ts --outfile dist/client",
         "prebuild:server": "bun scripts/gen-control-server-assets.ts",
