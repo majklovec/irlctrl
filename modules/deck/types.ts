@@ -21,11 +21,11 @@ export interface ButtonConfig {
     iconOverride?: string;
     /** Merged over the action's default params (`paramsOverride` wins). */
     paramsOverride?: Record<string, unknown>;
-    x?: number;
-    y?: number;
+    x: number;
+    y: number;
     /** The key's extent in grid cells (always present together with `x`/`y`). */
-    w?: number;
-    h?: number;
+    w: number;
+    h: number;
 }
 
 // The internal grid a layout is arranged on: 12 columns (a 4-cells-wide widget
@@ -40,12 +40,6 @@ export const DECK_CELL_MAX = { w: 6, h: 6 } as const;
 const isCount = (v: unknown, min: number): v is number =>
     typeof v === "number" && Number.isInteger(v) && v >= min;
 
-const hasPosition = (b: ButtonConfig): boolean =>
-    b.x !== undefined &&
-    b.y !== undefined &&
-    b.w !== undefined &&
-    b.h !== undefined;
-
 /** Which cells a key occupies. */
 function cells(b: ButtonConfig): {
     x: number;
@@ -53,7 +47,7 @@ function cells(b: ButtonConfig): {
     w: number;
     h: number;
 } {
-    return { x: b.x ?? 0, y: b.y ?? 0, w: b.w ?? 0, h: b.h ?? 0 };
+    return { x: b.x, y: b.y, w: b.w, h: b.h };
 }
 
 const cellKey = (x: number, y: number): string => `${x}\0${y}`;
@@ -81,43 +75,13 @@ export function nextButtonSlot(
     h: number = DECK_CELL_DEFAULT.h,
 ): { x: number; y: number; w: number; h: number } {
     const occupied = new Set<string>();
-    for (const b of deck)
-        if (hasPosition(b)) {
-            const c = cells(b);
-            for (let dy = 0; dy < c.h; dy++)
-                for (let dx = 0; dx < c.w; dx++)
-                    occupied.add(cellKey(c.x + dx, c.y + dy));
-        }
+    for (const b of deck) {
+        const c = cells(b);
+        for (let dy = 0; dy < c.h; dy++)
+            for (let dx = 0; dx < c.w; dx++)
+                occupied.add(cellKey(c.x + dx, c.y + dy));
+    }
     return firstFreeSlot(occupied, w, h);
-}
-
-/**
- * Every key guaranteed a slot: stored positions are kept, the rest are filled
- * in layout order into the first free slots. Pure — returns new objects.
- */
-export function layoutButtons(
-    deck: readonly ButtonConfig[],
-): ButtonConfig[] {
-    const occupied = new Set<string>();
-    const claim = (x: number, y: number, w: number, h: number): void => {
-        for (let dy = 0; dy < h; dy++)
-            for (let dx = 0; dx < w; dx++)
-                occupied.add(cellKey(x + dx, y + dy));
-    };
-    return deck.map((b) => {
-        if (hasPosition(b)) {
-            const c = cells(b);
-            claim(c.x, c.y, c.w, c.h);
-            return { ...b };
-        }
-        const c = firstFreeSlot(
-            occupied,
-            DECK_CELL_DEFAULT.w,
-            DECK_CELL_DEFAULT.h,
-        );
-        claim(c.x, c.y, c.w, c.h);
-        return { ...b, x: c.x, y: c.y, w: c.w, h: c.h };
-    });
 }
 
 /** The name of the widget's single (hidden) config field. */
@@ -171,9 +135,29 @@ export function parseButtons(raw: string | undefined): ButtonConfig[] {
             throw new Error(`deck[${i}]: deviceId is required`);
         if (typeof item.actionId !== "string" || !item.actionId)
             throw new Error(`deck[${i}]: actionId is required`);
+        if (item.x === undefined || item.y === undefined)
+            throw new Error(`deck[${i}]: position is required`);
+        if (!isCount(item.x, 0) || !isCount(item.y, 0))
+            throw new Error(
+                `deck[${i}]: position must be a non-negative integer`,
+            );
+        if (item.w === undefined || item.h === undefined)
+            throw new Error(`deck[${i}]: size is required`);
+        if (
+            !isCount(item.w, 1) ||
+            !isCount(item.h, 1) ||
+            item.x + item.w > DECK_GRID_COLUMNS
+        )
+            throw new Error(
+                `deck[${i}]: size must fit the ${DECK_GRID_COLUMNS}-column grid`,
+            );
         const out: ButtonConfig = {
             deviceId: item.deviceId,
             actionId: item.actionId,
+            x: item.x,
+            y: item.y,
+            w: item.w,
+            h: item.h,
         };
         for (const key of ["labelOverride", "iconOverride"] as const) {
             const v = item[key];
@@ -189,32 +173,6 @@ export function parseButtons(raw: string | undefined): ButtonConfig[] {
                 );
             if (Object.keys(item.paramsOverride).length > 0)
                 out.paramsOverride = item.paramsOverride;
-        }
-        // Position in the internal grid: optional (legacy layouts have none —
-        // the frontend fills the first free slots), but when present it must be
-        // four sane grid coordinates. Absent fields are omitted from the output.
-        if (
-            item.x !== undefined ||
-            item.y !== undefined ||
-            item.w !== undefined ||
-            item.h !== undefined
-        ) {
-            if (!isCount(item.x, 0) || !isCount(item.y, 0))
-                throw new Error(
-                    `deck[${i}]: position must be a non-negative integer`,
-                );
-            if (
-                !isCount(item.w, 1) ||
-                !isCount(item.h, 1) ||
-                item.x + item.w > DECK_GRID_COLUMNS
-            )
-                throw new Error(
-                    `deck[${i}]: size must fit the ${DECK_GRID_COLUMNS}-column grid`,
-                );
-            out.x = item.x;
-            out.y = item.y;
-            out.w = item.w;
-            out.h = item.h;
         }
         for (const key of Object.keys(item))
             if (!BUTTON_FIELDS.has(key))

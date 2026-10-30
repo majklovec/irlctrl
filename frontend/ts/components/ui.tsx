@@ -188,7 +188,7 @@ export interface CardProps {
 	title?: Child;
 	/** Actions on the right of the title row (.card-head). */
 	headActions?: m.Children;
-	/** Extra class(es) on the <section.card> root (module scoping, e.g. `mod-modems`). */
+	/** Extra class(es) on the <section.card> root (module-scoped styling). */
 	class?: string;
 }
 

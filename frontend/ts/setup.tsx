@@ -4,7 +4,7 @@ import m from "mithril";
 import { errorMessage } from "../../shared/util";
 import { DEFAULT_COLOR, HOSTNAME_RE } from "../../shared/validate";
 import type { Role, SetupInfo } from "../types";
-import { Icon } from "./components/icons";
+import { Icon, isIconName } from "./components/icons";
 import {
 	Actions,
 	Break,
@@ -94,7 +94,11 @@ const stepFrame = (
 	</fieldset>
 );
 
-const roleCard = (value: Role, name: string, tagline: string): m.Vnode => (
+const roleCard = (
+	value: Role,
+	name: string,
+	tagline?: string,
+): m.Vnode => (
 	<label class="role-card">
 		<input
 			type="radio"
@@ -104,15 +108,9 @@ const roleCard = (value: Role, name: string, tagline: string): m.Vnode => (
 			checked={f.role === value}
 			onchange={() => (f.role = value)}
 		/>
-		{value === "combined"
-			? [
-					<Icon name="encoder" class="role-icon" />,
-					<Icon name="relay" class="role-icon" />,
-			  ]
-			: <Icon name={value} class="role-icon" />}
+		{isIconName(value) ? <Icon name={value} class="role-icon" /> : null}
 		<span class="role-name">{name}</span>
-		<span class="role-tagline">{tagline}</span>
-		<img src={`/img/${value}.svg`} alt="" aria-hidden="true" />
+		{tagline ? <span class="role-tagline">{tagline}</span> : null}
 	</label>
 );
 
@@ -173,16 +171,14 @@ function coreStep(step: CoreStep): WizardStep {
 						step.id,
 						t("set.role"),
 						t("setup.step.role_sub"),
-						roleCard(
-							"encoder",
-							t("setup.role.encoder"),
-							t("setup.role.encoder_tag"),
-						),
-						roleCard("relay", t("setup.step.relay"), t("setup.role.relay_tag")),
-						roleCard(
-							"combined",
-							t("setup.role.combined"),
-							t("setup.role.combined_tag"),
+						...(state.info?.roleDefinitions ?? []).map((definition) =>
+							roleCard(
+								definition.id,
+								t(definition.titleKey),
+								definition.taglineKey
+									? t(definition.taglineKey)
+									: undefined,
+							),
 						),
 					);
 				case "identity":

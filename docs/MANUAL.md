@@ -1,6 +1,6 @@
 # IRLCTRL — User Operations Manual
 
-This manual explains how to **turn on**, **operate**, and **configure** IRLCTRL — a Bun-based controller for [BELABOX](https://belabox.net/)-style bonded streaming. One program covers three device types, and an optional control server manages a whole fleet of them from a browser.
+This manual explains how to **turn on**, **operate**, and **configure** IRLCTRL — a Bun-based controller for [BELABOX](https://belabox.net/)-style bonded streaming. One module-driven device client runs the selected role, and an optional control server manages the fleet from a browser.
 
 All screenshots in this manual were captured from a real running instance and are in [`docs/screenshots/`](screenshots/).
 
@@ -69,9 +69,8 @@ combined ─────────SRTLA (bonded)─────────▶
 
 | Part               | Entry point                        | What it is                                                                                                                                                                                                  |
 | ------------------ | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Device client**  | `backend/client/client.ts`         | Runs on each encoder/relay/combined box. Serves the local web UI + API on port **8085**, watches interfaces, runs the encoder and/or `srtla_send`, talks modems, and (optionally) dials the control server. |
+| **Device client**  | `backend/client/client.ts`         | Runs every device role. Serves the local web UI + API on port **8085**, starts role modules, and (optionally) dials the control server. |
 | **Control server** | `backend/server/server.ts`         | Central management server on port **8090**: user accounts, device list, per-user dashboards. Reaches devices over their _outbound_ WebSocket, so devices behind NAT / mobile networks are fully manageable. |
-| **OBS client**     | `backend/obs-client/obs-client.ts` | Standalone "obs" role device for machines that run OBS Studio separately. Proxies the host's OBS Studio into the control server so dashboards can show and control OBS.                                     |
 
 ---
 
@@ -79,14 +78,15 @@ combined ─────────SRTLA (bonded)─────────▶
 
 ### Device roles
 
-One binary, four roles — the role is chosen with the `--role` flag (or in the first-run wizard / settings page). **The UI only shows what applies to the active role.**
+One device client, with roles contributed by modules — choose one with `--role` or the first-run wizard / settings page. **The UI only shows what applies to the active role.**
 
 | Role       | Default? | What it does                                                                                                                                                                                             | Needs root?             |
 | ---------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
 | `relay`    | **yes**  | Receives SRT from an encoder and bonds it out over all uplinks with `srtla_send`. Manages source routing, the uplinks file, and modems (ModemManager).                                                   | yes (bonding / routing) |
 | `encoder`  | no       | Runs [belacoder](https://github.com/BELABOX/belacoder) or [ceracoder](https://github.com/CERALIVE/ceracoder) with a GStreamer pipeline and sends SRT to a relay. No routing, no modems, no `srtla_send`. | no                      |
 | `combined` | no       | Encoder **and** relay in one box: encoder → local `srtla_send` → bonded uplinks. One Start/Stop drives both.                                                                                             | yes                     |
-| `obs`      | no       | Standalone OBS client (`obs-client`): registers on the control server and proxies a local OBS Studio instance for the dashboards.                                                                        | no                      |
+| `obs`      | no       | The `obs-controller` module connects to OBS Studio, forwards events, and runs the low-bitrate scene switcher.                                                                                             | no                      |
+| `broadcaster` | no    | The `broadcaster` module receives SRTLA with `srtla_rec` and publishes RTMP outputs through ffmpeg.                                                                                                      | no                      |
 
 ### User roles (control server)
 
@@ -107,6 +107,7 @@ Devices are _owned_ by the user whose **device token** was present when the devi
 | `srtla_send` binary                   | `relay`, `combined`                                                                         |
 | `belacoder` / `ceracoder` + GStreamer | `encoder`, `combined`                                                                       |
 | `iproute2` + ModemManager (`mmcli`)   | bonding & modem management (`relay`, `combined`)                                            |
+| `srtla_rec` + ffmpeg                  | SRTLA-to-RTMP streaming (`broadcaster`)                                                     |
 | OBS Studio with obs-websocket v5      | `obs` role, obs-controller module, stats/chat dashboards                                    |
 | TLS reverse proxy                     | production control server (`wss://` / `https://` are required for tokens + session cookies) |
 
@@ -188,19 +189,19 @@ The control server uses the same pattern with `server` (no `root` needed). Put r
 
 #### Docker
 
-`docker-compose.yaml` runs the whole stack — the control server plus a relay, an encoder, an OBS Studio proxy, and the SRTLA-to-platform agent:
+`docker-compose.yaml` runs the whole stack — the control server plus relay, encoder, OBS, and broadcaster device roles:
 
 ```sh
 docker compose up -d --build
 ```
 
 - **server** — the control server (`Dockerfile`, image `majkl/irlctrl-control`), UI on `:8090`.
-- **obs-client** — proxies a host's OBS Studio (`ws://host.docker.internal:4455`) into the server.
+- **obs-client** — `client.ts --role obs`, using the `obs-controller` module to connect to host OBS (`ws://host.docker.internal:4455`).
 - **relay** — `client.ts --role relay`, bonds SRT out via `srtla_send` (`Dockerfile.device`, image `majkl/irlctrl-device`).
 - **encoder** — `client.ts --role encoder`, runs `ceracoder`/GStreamer and sends SRT to the relay; same device image, different role + `ENCODER_BIN`.
-- **broadcaster** — `broadcaster.ts`, de-bonds an SRTLA stream via `srtla_rec` and re-publishes it as RTMP to one or more destinations (configured in the web UI via the module settings; a single `RTMP_URL` + `RTMP_KEY` stream key is accepted as a legacy default) (`Dockerfile.broadcaster`, image `majkl/irlctrl-broadcaster`); exposes the SRTLA receiver on `5000/udp`.
+- **broadcaster** — `client.ts --role broadcaster`, runs the `modules/broadcaster` receiver/publisher; configure RTMP destinations in device settings and expose its SRTLA receiver on UDP `5001`.
 
-The **relay** container grants the `NET_ADMIN` capability because at startup it builds per-uplink policy routing (`ip rule add` + route tables) and watches interfaces with `ip monitor`; without it the relay logs `ip rule add … Operation not permitted` and exits. The encoder does not need the capability. On the default bridge network the relay's routing changes act on the container's own namespace; for real bonded uplinks on the host's raw interfaces run the relay with `network_mode: host`.
+All device roles use `Dockerfile.device`, which includes the module runtime and required streaming tools. The **relay** container grants the `NET_ADMIN` capability because at startup it builds per-uplink policy routing (`ip rule add` + route tables) and watches interfaces with `ip monitor`; without it the relay logs `ip rule add … Operation not permitted` and exits. The encoder and OBS role do not need the capability. On the default bridge network the relay's routing changes act on the container's own namespace; for real bonded uplinks on the host's raw interfaces run the relay with `network_mode: host`.
 
 #### Armbian image (Orange Pi 5 Plus)
 
@@ -222,10 +223,12 @@ Pick the interface language (12 languages are available). It can be changed at a
 
 ### Step 2 — Device role
 
-Choose how this IRLCTRL joins the network. The three choices show exactly what each does:
+Choose one of the roles contributed by the installed modules:
 - **Relay** — "Receives streams and forwards them with SRTLA"
 - **Encoder** — "Captures a GStreamer pipeline and sends it over SRT"
 - **Combined** — "Encodes and relays in a single service"
+- **OBS** — connects to OBS Studio and enables the OBS controller.
+- **Broadcaster** — receives SRTLA and publishes RTMP outputs.
 
 Selecting _Combined_ inserts the Encoder and Relay steps into the wizard (7 steps total, as in the screenshot).
 
@@ -362,7 +365,7 @@ Open the gear icon in the device header → **Device settings**. The notice at t
 | Option                 | Meaning                                                                                                                                                                                              |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Hostname**           | The device's display name (lowercase letters, numbers, dots and hyphens, max 64 chars). The UUID — the fixed identity on the control server — stays unchanged and survives hostname changes.         |
-| **Device role**        | `relay` / `encoder` / `encoder + relay (combined)` / `obs`. Changing the role requires a service restart.                                                                                            |
+| **Device role**        | `relay` / `encoder` / `encoder + relay (combined)` / `obs` / `broadcaster`. Changing the role requires a service restart.                                                                            |
 | **Accent color**       | Header color of the device UI.                                                                                                                                                                       |
 | **Control server URL** | `ws://…`/`wss://…` endpoint of the control server (`…/device`). Saving re-dials the control server, so the device re-registers with its new URL, token, hostname and role without a service restart. |
 | **Remote token**       | Device token of the owning user. Placeholders: `configured (leave blank to keep)` / `not configured`.                                                                                                |
@@ -501,7 +504,7 @@ The table shows every device owned by the signed-in user:
 | Column              | Meaning                                                                                                                          |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | **Device**          | Hostname + UUID.                                                                                                                 |
-| **Role**            | `relay` / `encoder` / `encoder + relay` / `obs` (badges).                                                                        |
+| **Role**            | `relay` / `encoder` / `encoder + relay` / `obs` / `broadcaster` (badges).                                                       |
 | **Status**          | `online` / `offline` (with _last seen_ time), `stale` if it stopped reporting.                                                   |
 | **Connected**       | Live WebSocket connection of the device.                                                                                         |
 | **Stream**          | `streaming` / `stopped` / `no links` badge.                                                                                      |
@@ -539,7 +542,7 @@ Per-user, persisted to SQLite, live-updating (a shared feed streams widget data 
 ![Add widget page](screenshots/18-dashboard-add.png)
 
 Widgets are of two kinds:
-- **Device widgets** — a live status card per device: `relay`, `encoder`, `combined`, or `obs`, depending on the device's role and enabled modules. The type list shows one entry per connected device (e.g. _Combined_).
+- **Device widgets** — a live status card per device: `relay`, `encoder`, `combined`, `obs`, or `broadcaster`, depending on the device's role and enabled modules. The type list shows one entry per connected device (e.g. _Combined_).
 - **Channel widgets** — device-independent: **Stats** (YouTube/Twitch/Kick viewer counts) and **Chat** (merged chat feeds).
 
 **Dashboard view page:**
@@ -574,10 +577,10 @@ Every flag has an environment-variable counterpart. Resolution order: **CLI flag
 
 | Option                    | Env                             | Default                          | What it does                                                                                                                                          |
 | ------------------------- | ------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--role`                  | `ROLE`                          | `relay`                          | `relay`, `encoder`, or `combined`.                                                                                                                    |
+| `--role`                  | `ROLE`                          | `relay`                          | A role contributed by a registered device module (`relay`, `encoder`, `combined`, `obs`, `broadcaster`).                                                |
 | `--host`, `--port`        | `API_HOST`, `API_PORT`          | `127.0.0.1`, `8085`              | Local web UI and WebSocket API (`/ws`), always on.                                                                                                    |
 | `--allow-origin`          | `ALLOWED_ORIGINS`               | —                                | Extra browser origins for `/ws` (comma-separated, `*` = any).                                                                                         |
-| `--config`                | `CONFIG_FILE`                   | `$TMPDIR/config.json`            | Device config — settings, encoder, srtla target, autostart, modems. **Use a persistent path in production** (autostart needs it to survive a reboot). |
+| `--config`                | `CONFIG_FILE`                   | `$TMPDIR/config.json`            | Device config — core settings and module-owned slices. **Use a persistent path in production** (autostart needs it to survive a reboot).               |
 | `--uplinks`               | `UPLINKS_FILE`                  | `$TMPDIR/srtla_ips.txt`          | Uplinks file for `srtla_send`.                                                                                                                        |
 | `--start-srtla`           | —                               | —                                | Relay/combined: start `srtla_send` on boot with `<listenPort> <remoteHost> <remotePort>`.                                                             |
 | `--srtla-reload`          | `SRTLA_RELOAD_MODE`             | `signal`                         | How to reload `srtla_send`: `signal` (SIGHUP) or `restart`.                                                                                           |
@@ -603,30 +606,9 @@ Every flag has an environment-variable counterpart. Resolution order: **CLI flag
 | `--db`             | `DB_FILE`                    | `users.db`     | SQLite database: users, device tokens, dashboards.                                                                            |
 | `--no-auth`        | `NO_AUTH`                    | —              | Local testing only — one shared `local` profile, no tokens needed (no database; dashboards are kept in memory only).          |
 
-### 12.3 OBS client (`backend/obs-client/obs-client.ts`)
+### 12.3 Module-specific settings
 
-```
-Usage: bun backend/obs-client/obs-client.ts --remote ws://host:port/device
-    [--obs ws://127.0.0.1:4455] [--obs-password pw]
-    [--remote-token pw] [--hostname name]
-    [--remote-interval 30] [--config path] [--uuid uuid]
-```
-
-Every flag has an environment-variable counterpart. Resolution order: **CLI flag > env var > config file > default**.
-
-| Option              | Env                       | Meaning                                                          |
-| ------------------- | ------------------------- | ---------------------------------------------------------------- |
-| `--remote`          | `CONTROL_SERVER_URL`      | The control server's `/device` endpoint (required).              |
-| `--remote-token`    | `CONTROL_SERVER_TOKEN`    | The owning user's device token. **Prefer the env var** (keeps it out of `ps`). |
-| `--obs`             | `OBS_URL`                 | The host's OBS Studio WebSocket (default `ws://127.0.0.1:4455`). |
-| `--obs-password`    | `OBS_PASSWORD`            | OBS Studio password.                                             |
-| `--hostname`        | `DEVICE_HOSTNAME`         | Device name shown in the control server.                         |
-| `--remote-interval` | `CONTROL_SERVER_INTERVAL` | Periodic status push in seconds (`0` = only on change).          |
-| `--config`          | `CONFIG_FILE`             | Config file (persists UUID and settings).                        |
-| `--uuid`            | `DEVICE_UUID`             | Explicit fixed device identity.                                  |
-| `--remote-interval` | Status push interval in seconds (default 30).                    |
-
-It speaks the full obs-websocket v5 handshake (Hello → Identify → Identified), forwards `Request`/`RequestBatch` verbatim from the server, republishes OBS events as `obs.event` frames so dashboards pick up scene/stream/record changes, and auto-reconnects with exponential backoff (emitting a synthetic _ObsDisconnected_ on drop and replaying a state snapshot on reconnect).
+OBS connection fields are owned by `obs-controller` and can be supplied through `OBS_URL` / `OBS_PASSWORD` or the device setup and settings pages. Broadcaster outputs, ffmpeg profiles, and SRTLA receiver settings are owned by `modules/broadcaster`; there is no separate client entrypoint or transport.
 
 ---
 

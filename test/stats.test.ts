@@ -50,10 +50,7 @@ describe("stats channel configuration", () => {
             "twitch",
             "kick",
         ]);
-        expect(STATS_EDITOR_FIELDS[3]).toEqual({
-            name: "channel",
-            type: "hidden",
-        });
+        expect(STATS_EDITOR_FIELDS[3]).toBe("seriesCap");
     });
 
     test("creates one spec for each configured platform", () => {
@@ -66,11 +63,11 @@ describe("stats channel configuration", () => {
         ).toEqual(["youtube:@Creator", "twitch:streamer", "kick:channel"]);
     });
 
-    test("maps the legacy channel parameter to Kick", () => {
+    test("ignores the removed singular channel parameter", () => {
         expect(statsSpecsFromConfig({ channel: "OldChannel" })).toEqual([
             null,
             null,
-            "kick:oldchannel",
+            null,
         ]);
     });
 

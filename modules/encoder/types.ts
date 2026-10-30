@@ -1,10 +1,39 @@
-/* Local types for the encoder module (never imported by the core or other modules). */
+/* Encoder-specific types and the SRTLA capability shape consumed by encoder. */
 import type {
     DeviceSummary,
     Settings,
     SetupInfo,
     Status,
 } from "../../shared/types";
+export interface SrtlaTarget {
+    listenPort: string;
+    remoteHost: string;
+    remotePort: string;
+}
+
+export interface SrtlaState {
+    running: boolean;
+    pid?: number;
+    listenPort?: string;
+    remoteHost?: string;
+    remotePort?: string;
+    startedAt?: number;
+    lastReloadAt?: number;
+    reloadCount?: number;
+}
+
+/** Runtime service the encoder consumes through the generic capability bus. */
+export interface SrtlaCapability {
+    srtlaStatus(): SrtlaState;
+    startSrtla(
+        listenPort: string,
+        remoteHost: string,
+        remotePort: string,
+    ): Promise<SrtlaState>;
+    stopSrtla(): Promise<void>;
+    reloadSrtla(): Promise<void>;
+    target(): SrtlaTarget | undefined;
+}
 
 /** One GStreamer pipeline file found under the pipelines dir. */
 export interface Pipeline {
@@ -75,39 +104,6 @@ export interface CeraConfig {
 
 /** Bitrate bounds (kbps) shared by wire validation and the UI, single source. */
 export const BITRATE_KBPS = { min: 300, max: 30_000 } as const;
-
-/** srtla_send target (the srtla module's persisted `srtlaTarget`); combined devices stream into it. */
-export interface SrtlaTarget {
-    listenPort: string;
-    remoteHost: string;
-    remotePort: string;
-}
-
-/** Live srtla_send state as the `stream.srtla` capability reports it. */
-export interface SrtlaState {
-    running: boolean;
-    pid?: number;
-    listenPort?: string;
-    remoteHost?: string;
-    remotePort?: string;
-    startedAt?: number;
-    lastReloadAt?: number;
-    reloadCount?: number;
-}
-
-/** The `stream.srtla` capability (provided by the srtla module) combined streaming drives. */
-export interface SrtlaCapability {
-    srtlaStatus(): SrtlaState;
-    startSrtla(
-        listenPort: string,
-        remoteHost: string,
-        remotePort: string,
-    ): Promise<SrtlaState>;
-    stopSrtla(): Promise<void>;
-    reloadSrtla(): Promise<void>;
-    /** The persisted target (undefined before the first start / setup). */
-    target(): SrtlaTarget | undefined;
-}
 
 /** The status envelope as the encoder card reads it (encoder fragment + the srtla state it mirrors). */
 export type EncoderStatus = Status & {

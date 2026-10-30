@@ -44,7 +44,8 @@ import {
     requireString,
 } from "../../shared/params";
 import { errorMessage, textOf } from "../../shared/util";
-import { DEFAULT_COLOR, ROLES } from "../../shared/validate";
+import { DEFAULT_COLOR } from "../../shared/validate";
+import { registeredRoleIds, roleDefinitions } from "../../shared/registry";
 import { setAutostart } from "./autostart";
 import { logEntries, logEvent } from "./eventlog";
 import {
@@ -97,6 +98,7 @@ const settingsView = () => {
         color: s.color ?? DEFAULT_COLOR,
         language: uiLanguage(),
         ...moduleSettings(),
+        roleDefinitions: roleDefinitions().filter((role) => role.setupSelectable !== false),
     };
 };
 
@@ -119,7 +121,7 @@ async function setupComplete(p: Params): Promise<object> {
         p.language === undefined
             ? "en"
             : oneOf(p.language, "language", LANGUAGES);
-    const role = oneOf(requireString(p, "role"), "role", ROLES);
+    const role = oneOf(requireString(p, "role"), "role", registeredRoleIds());
     const hostname = checkHostname(requireString(p, "hostname").trim());
     const color = checkColor(requireString(p, "color"));
     const remoteUrl = checkRemoteUrl(
@@ -158,7 +160,9 @@ async function updateSettings(p: Params): Promise<object> {
     );
     const roleValue = optionalSettingString(p, "role", current.role);
     const role =
-        roleValue === undefined ? undefined : oneOf(roleValue, "role", ROLES);
+        roleValue === undefined
+            ? undefined
+            : oneOf(roleValue, "role", registeredRoleIds());
     const remoteUrl = checkRemoteUrl(
         optionalSettingString(p, "remoteUrl", current.remoteUrl),
     );
@@ -220,6 +224,7 @@ const CORE_METHODS: Record<string, Method> = {
         color: state.settings.color ?? DEFAULT_COLOR,
         language: uiLanguage(),
         ...(await moduleSetupInfo()),
+        roleDefinitions: roleDefinitions().filter((role) => role.setupSelectable !== false),
     }),
     "setup.complete": setupComplete,
     "settings.get": () => ({ settings: settingsView(), restartRequired: true }),

@@ -61,5 +61,17 @@
     "wtype.relay": "Relay",
     "act.srtla.stop": "Zastavit SRTLA",
     "act.srtla.reload": "Znovu načíst uplinky",
-    "act.srtla.start": "Spustit SRTLA"
+    "act.srtla.start": "Spustit SRTLA",
+    "log.reconfigure_failed": "Počáteční nastavení rozhraní selhalo: {{error}}",
+    "mlog.action.bond_selection": "Volba bundlu",
+    "mlog.action.bond_toggle": "Přepnutí bundlu",
+    "mlog.done.bond_toggled": "{{iface}} přepnuto v bundlu",
+    "mlog.done.bond_updated": "Volba bundlu aktualizována",
+    "mlog.done.modem_connected": "Modem #{{index}} připojen",
+    "mlog.done.modem_disabled": "Modem #{{index}} zakázán",
+    "mlog.done.modem_disconnected": "Modem #{{index}} odpojen",
+    "mlog.done.modem_enabled": "Modem #{{index}} povolen",
+    "mlog.done.modem_reset": "Modem #{{index}} resetován",
+    "mlog.done.reconfigured": "Překonfigurováno",
+    "act.srtla.reconfigure": "Překonfigurovat modemy"
 }

@@ -8,7 +8,6 @@
  * behind a name are agreed between the providing and consuming modules; the
  * core stores and forwards them without knowing them.
  */
-
 const provided = new Map<string, unknown>();
 
 /** Register a capability implementation. Re-registering replaces the old one. */

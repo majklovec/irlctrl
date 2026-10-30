@@ -61,5 +61,17 @@
     "wtype.relay": "Relay",
     "act.srtla.stop": "停止 SRTLA",
     "act.srtla.reload": "重新加载上行链路",
-    "act.srtla.start": "启动 SRTLA"
+    "act.srtla.start": "启动 SRTLA",
+    "log.reconfigure_failed": "初始重新配置失败：{{error}}",
+    "mlog.action.bond_selection": "聚合选择",
+    "mlog.action.bond_toggle": "聚合切换",
+    "mlog.done.bond_toggled": "{{iface}} 已在聚合中切换",
+    "mlog.done.bond_updated": "聚合选择已更新",
+    "mlog.done.modem_connected": "调制解调器 #{{index}} 已连接",
+    "mlog.done.modem_disabled": "调制解调器 #{{index}} 已禁用",
+    "mlog.done.modem_disconnected": "调制解调器 #{{index}} 已断开",
+    "mlog.done.modem_enabled": "调制解调器 #{{index}} 已启用",
+    "mlog.done.modem_reset": "调制解调器 #{{index}} 已重置",
+    "mlog.done.reconfigured": "已重新配置",
+    "act.srtla.reconfigure": "重新配置调制解调器"
 }

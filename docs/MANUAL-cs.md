@@ -1,6 +1,6 @@
 # IRLCTRL — Uživatelská provozní příručka
 
-Tato příručka vysvětluje, jak IRLCTRL **spustit**, **obsluhovat** a **nastavit**. IRLCTRL je nástroj postavený na Bun pro streamování ve stylu [BELABOX](https://belabox.net/) s agregací více síťových připojení. Jeden program podporuje tři typy zařízení a volitelný ovládací server umožňuje spravovat celou jejich skupinu v prohlížeči.
+Tato příručka vysvětluje, jak IRLCTRL **spustit**, **obsluhovat** a **nastavit**. IRLCTRL je nástroj postavený na Bun pro streamování ve stylu [BELABOX](https://belabox.net/) s agregací více síťových připojení. Jeden modulární klient zařízení spouští zvolenou roli a volitelný ovládací server umožňuje spravovat celou skupinu zařízení v prohlížeči.
 
 Všechny snímky obrazovky v této příručce byly pořízeny ze skutečně běžící instance a nacházejí se ve [`docs/screenshots/`](screenshots/).
 
@@ -69,9 +69,8 @@ combined ─────────SRTLA (bonded)─────────▶
 
 | Část                | Vstupní bod                        | Co to je                                                                                                                                                                                                                                                        |
 | ------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Klient zařízení** | `backend/client/client.ts`         | Běží na každém zařízení s rolí encoder, relay nebo combined. Zpřístupňuje místní webové rozhraní a API na portu **8085**, sleduje síťová rozhraní, spouští enkodér nebo `srtla_send`, komunikuje s modemy a případně se připojuje k ovládacímu serveru.         |
+| **Klient zařízení** | `backend/client/client.ts`         | Běží ve všech rolích zařízení. Zpřístupňuje místní webové rozhraní a API na portu **8085**, spouští příslušné moduly a případně se připojuje k ovládacímu serveru. |
 | **Ovládací server** | `backend/server/server.ts`         | Centrální server pro správu na portu **8090**: spravuje uživatelské účty, seznam zařízení a dashboardy jednotlivých uživatelů. Se zařízeními komunikuje přes jejich _odchozí_ spojení WebSocket, takže lze spravovat i zařízení za NAT nebo v mobilních sítích. |
-| **Klient OBS**      | `backend/obs-client/obs-client.ts` | Samostatný klient s rolí `obs` pro počítače, na kterých běží OBS Studio. Zprostředkovává komunikaci mezi místním OBS Studio a ovládacím serverem, aby dashboardy mohly OBS zobrazovat a ovládat.                                                                |
 
 ---
 
@@ -79,14 +78,15 @@ combined ─────────SRTLA (bonded)─────────▶
 
 ### Role zařízení
 
-Jeden binární soubor, čtyři role — role se vybírá přepínačem `--role` (nebo v průvodci prvním spuštěním / na stránce nastavení). **UI zobrazuje pouze to, co se týká aktivní role.**
+Jeden klient zařízení, role dodávají moduly — vyberte ji přepínačem `--role` nebo v průvodci prvním spuštěním / na stránce nastavení. **UI zobrazuje pouze to, co se týká aktivní role.**
 
 | Role       | Výchozí? | Co dělá                                                                                                                                                                                                      | Vyžaduje root?                     |
 | ---------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- |
 | `relay`    | **ano**  | Přijímá SRT od enkodéru a pomocí `srtla_send` jej odesílá přes všechna dostupná síťová připojení. Spravuje směrování podle zdrojových adres, soubor uplinků a modemy (ModemManager).                         | ano (agregace spojení / směrování) |
 | `encoder`  | ne       | Spouští [belacoder](https://github.com/BELABOX/belacoder) nebo [ceracoder](https://github.com/CERALIVE/ceracoder) s pipeline GStreamer a odesílá SRT do relay. Nepoužívá směrování, modemy ani `srtla_send`. | ne                                 |
 | `combined` | ne       | Kodér **i** relay na jednom zařízení: enkodér → místní `srtla_send` → agregovaná síťová připojení. Jediné tlačítko Start/Stop ovládá obě části.                                                              | ano                                |
-| `obs`      | ne       | Nezávislý OBS klient (`obs-client`): registruje se na ovládacím serveru a proxuje lokální instanci OBS Studio pro dashboardy.                                                                                | ne                                 |
+| `obs`      | ne       | Modul `obs-controller` se připojí k OBS Studio, předává jeho události a spouští přepínač scén podle datového toku.                                                                                             | ne                                 |
+| `broadcaster` | ne     | Modul `broadcaster` přijímá SRTLA přes `srtla_rec` a publikuje RTMP výstupy pomocí ffmpeg.                                                                                                                    | ne                                 |
 
 ### Uživatelské role (ovládací server)
 
@@ -107,6 +107,7 @@ Zařízení _patří_ uživateli, jehož **device token** byl použit, když se 
 | binárka `srtla_send`                  | `relay`, `combined`                                                                 |
 | `belacoder` / `ceracoder` + GStreamer | `encoder`, `combined`                                                               |
 | `iproute2` + ModemManager (`mmcli`)   | bonding a správa modemů (`relay`, `combined`)                                       |
+| `srtla_rec` + ffmpeg                 | převod SRTLA na RTMP (`broadcaster`)                                                 |
 | OBS Studio s obs-websocket v5         | role `obs`, modul obs-controller, dashboardy se statistikou/chatem                  |
 | Reverzní proxy s TLS                  | produkční ovládací server (tokeny a relační cookies vyžadují `wss://` / `https://`) |
 
@@ -188,19 +189,19 @@ Ovládací server používá tentýž vzorec s `server` (root není potřeba). R
 
 #### Docker
 
-`docker-compose.yaml` spustí celou sestavu: ovládací server, relay, encoder, proxy pro OBS Studio a agent SRTLA-to-platform:
+`docker-compose.yaml` spustí celou sestavu: ovládací server a zařízení s rolemi relay, encoder, OBS a broadcaster:
 
 ```sh
 docker compose up -d --build
 ```
 
 - **server** — ovládací server (`Dockerfile`, image `majkl/irlctrl-control`), UI na `:8090`.
-- **obs-client** — proxuje hostitelské OBS Studio (`ws://host.docker.internal:4455`) do serveru.
+- **obs-client** — `client.ts --role obs`, modul `obs-controller` se připojuje k OBS na hostiteli (`ws://host.docker.internal:4455`).
 - **relay** — `client.ts --role relay`, bonduje SRT ven přes `srtla_send` (`Dockerfile.device`, image `majkl/irlctrl-device`).
 - **encoder** — `client.ts --role encoder`, běží `ceracoder`/GStreamer a posílá SRT do relay; stejný device image, jiná role + `ENCODER_BIN`.
-- **broadcaster** — `broadcaster.ts`, de-bonduje SRTLA stream přes `srtla_rec` a přes GStreamer jej zpět vysílá jako RTMP do jednoho nebo více cílů (konfiguruje se ve webu přes nastavení modulu; jako výchozí hodnota zůstává podporován jediný `RTMP_URL` + stream klíč `RTMP_KEY`) (`Dockerfile.broadcaster`, image `majkl/irlctrl-broadcaster`); vystavuje SRTLA přijímač na `5000/udp`.
+- **broadcaster** — `client.ts --role broadcaster` spouští přijímač a publikační modul `modules/broadcaster`; cíle RTMP se konfigurují v nastavení zařízení a SRTLA přijímač naslouchá na UDP portu `5001`.
 
-Kontejner **relay** potřebuje oprávnění `NET_ADMIN`, protože při startu nastavuje směrování podle jednotlivých uplinků (`ip rule add` a tabulky tras) a sleduje rozhraní pomocí `ip monitor`. Bez tohoto oprávnění vypíše `ip rule add … Operation not permitted` a skončí. Encoder je nepotřebuje. Ve výchozí síti bridge se změny směrování relayu projeví pouze v síťovém prostoru kontejneru. Má-li relay používat skutečná síťová rozhraní hostitele pro agregaci připojení, spusťte jej s `network_mode: host`.
+Všechny role zařízení používají `Dockerfile.device`, který obsahuje běhové prostředí modulů a potřebné streamovací nástroje. Kontejner **relay** potřebuje oprávnění `NET_ADMIN`, protože při startu nastavuje směrování podle jednotlivých uplinků (`ip rule add` a tabulky tras) a sleduje rozhraní pomocí `ip monitor`. Bez tohoto oprávnění vypíše `ip rule add … Operation not permitted` a skončí. Encoder ani OBS je nepotřebují. Ve výchozí síti bridge se změny směrování relayu projeví pouze v síťovém prostoru kontejneru. Má-li relay používat skutečná síťová rozhraní hostitele pro agregaci připojení, spusťte jej s `network_mode: host`.
 
 #### Obraz Armbian (Orange Pi 5 Plus)
 
@@ -222,10 +223,12 @@ Vyberte jazyk rozhraní (k dispozici je 12 jazyků). Lze ho kdykoli změnit v ja
 
 ### Krok 2 — Role zařízení
 
-Zvolte, jak se toto IRLCTRL zapojí do sítě. Tři možnosti přesně ukazují, co každá dělá:
-- **Relay** — „Receives streams and forwards them with SRTLA“
-- **Encoder** — „Captures a GStreamer pipeline and sends it over SRT“
-- **Combined** — „Encodes and relays in a single service“
+Zvolte jednu z rolí dodávaných nainstalovanými moduly:
+- **Relay** — přijímá streamy a odesílá je pomocí SRTLA.
+- **Encoder** — zachytává obraz přes GStreamer pipeline a odesílá jej přes SRT.
+- **Combined** — spouští enkodér a relay v jedné službě.
+- **OBS** — připojuje se k OBS Studio a aktivuje jeho řídicí modul.
+- **Broadcaster** — přijímá SRTLA a publikuje RTMP výstupy.
 
 Výběrem možnosti _Combined_ se do průvodce přidají kroky Kodér a Relay (celkem tedy sedm kroků, jak je vidět na snímku).
 
@@ -360,7 +363,7 @@ Otevřete ozubené kolo v hlavičce zařízení a vyberte **Device settings**. U
 | Možnost                | Význam                                                                                                                                                                                                                 |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Hostname**           | Zobrazené jméno zařízení (malá písmena, číslice, tečky a pomlčky, max 64 znaků). UUID — pevná identita na ovládacím serveru — zůstává nezměněna a přežívá změny hostname.                                              |
-| **Device role**        | `relay` / `encoder` / `encoder + relay (combined)` / `obs`. Změna role se projeví po restartu služby.                                                                                                                  |
+| **Device role**        | `relay` / `encoder` / `encoder + relay (combined)` / `obs` / `broadcaster`. Změna role se projeví po restartu služby.                                                                                                  |
 | **Accent color**       | Barva hlavičky UI zařízení.                                                                                                                                                                                            |
 | **Control server URL** | Adresa ovládacího serveru ve tvaru `ws://…` nebo `wss://…` (`…/device`). Po uložení se zařízení znovu připojí a zaregistruje s novou adresou, tokenem, názvem hostitele a rolí, aniž by bylo nutné restartovat službu. |
 | **Remote token**       | Token zařízení jeho vlastníka. Zástupné texty: `configured (leave blank to keep)` / `not configured`.                                                                                                                  |
@@ -499,7 +502,7 @@ Tabulka zobrazuje všechna zařízení patřící přihlášenému uživateli:
 | Sloupec             | Význam                                                                                                                                                             |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Device**          | Hostname + UUID.                                                                                                                                                   |
-| **Role**            | `relay` / `encoder` / `encoder + relay` / `obs` (odznaky).                                                                                                         |
+| **Role**            | `relay` / `encoder` / `encoder + relay` / `obs` / `broadcaster` (odznaky).                                                                                        |
 | **Status**          | `online` / `offline` (včetně času _last seen_); `stale` označuje zařízení, od kterého server přestal dostávat stavové zprávy.                                      |
 | **Connected**       | Informace o aktivním spojení WebSocket se zařízením.                                                                                                               |
 | **Stream**          | Odznak `streaming` / `stopped` / `no links`.                                                                                                                       |
@@ -537,7 +540,7 @@ Dashboardy jsou pro každého uživatele uloženy v databázi SQLite a průběž
 ![Stránka přidat widget](screenshots/18-dashboard-add-cs.png)
 
 Widgety jsou dvou druhů:
-- **Widgety zařízení** — živá stavová karta pro zařízení s rolí `relay`, `encoder`, `combined` nebo `obs`, podle jeho role a aktivních modulů. Seznam typů obsahuje jednu položku pro každé připojené zařízení (např. _Combined_).
+- **Widgety zařízení** — živá stavová karta pro zařízení s rolí `relay`, `encoder`, `combined`, `obs` nebo `broadcaster`, podle jeho role a aktivních modulů. Seznam typů obsahuje jednu položku pro každé připojené zařízení (např. _Combined_).
 - **Kanálové widgety** — nejsou vázané na konkrétní zařízení: **Stats** (počet diváků na YouTube, Twitchi nebo Kicku) a **Chat** (sloučené chatové kanály).
 
 **Pohledová stránka dashboardu:**
@@ -572,10 +575,10 @@ Každá volba má ekvivalent v podobě proměnné prostředí. Řešení: **CLI 
 
 | Volba                     | Proměnná                            | Výchozí                          | Co dělá                                                                                                                                                                                     |
 | ------------------------- | ----------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--role`                  | `ROLE`                              | `relay`                          | `relay`, `encoder` nebo `combined`.                                                                                                                                                         |
+| `--role`                  | `ROLE`                              | `relay`                          | Role dodaná registrovaným modulem zařízení (`relay`, `encoder`, `combined`, `obs`, `broadcaster`).                                                                                           |
 | `--host`, `--port`        | `API_HOST`, `API_PORT`              | `127.0.0.1`, `8085`              | Lokální web UI a WebSocket API (`/ws`), vždy zapnuto.                                                                                                                                       |
 | `--allow-origin`          | `ALLOWED_ORIGINS`                   | —                                | Další povolené zdroje požadavků prohlížeče pro `/ws` (oddělené čárkami, `*` = libovolný zdroj).                                                                                             |
-| `--config`                | `CONFIG_FILE`                       | `$TMPDIR/config.json`            | Konfigurační soubor zařízení: nastavení, enkodér, cíl SRTLA, automatické spuštění a modemy. **V produkci použijte trvalou cestu**, protože ji automatické spuštění potřebuje i po restartu. |
+| `--config`                | `CONFIG_FILE`                       | `$TMPDIR/config.json`            | Konfigurační soubor zařízení: základní nastavení a konfigurace vlastněné moduly. **V produkci použijte trvalou cestu**, protože ji automatické spuštění potřebuje i po restartu. |
 | `--uplinks`               | `UPLINKS_FILE`                      | `$TMPDIR/srtla_ips.txt`          | Soubor se seznamem uplinků pro `srtla_send`.                                                                                                                                                |
 | `--start-srtla`           | —                                   | —                                | Pro role relay a combined spustí při startu `srtla_send` s parametry `<listenPort> <remoteHost> <remotePort>`.                                                                              |
 | `--srtla-reload`          | `SRTLA_RELOAD_MODE`                 | `signal`                         | Určuje, jak znovu načíst `srtla_send`: pomocí signálu `SIGHUP` (`signal`) nebo restartováním procesu (`restart`).                                                                           |
@@ -601,29 +604,9 @@ Každá volba má ekvivalent v podobě proměnné prostředí. Řešení: **CLI 
 | `--db`             | `DB_FILE`                    | `users.db`     | Databáze SQLite obsahující uživatele, tokeny zařízení a dashboardy.                                                                                     |
 | `--no-auth`        | `NO_AUTH`                    | —              | Pouze pro místní testování: používá se společný profil `local` bez tokenů a databáze; dashboardy se uchovávají pouze v paměti.                          |
 
-### 12.3 OBS klient (`backend/obs-client/obs-client.ts`)
+### 12.3 Nastavení specifická pro moduly
 
-```
-Usage: bun backend/obs-client/obs-client.ts --remote ws://host:port/device
-    [--obs ws://127.0.0.1:4455] [--obs-password pw]
-    [--remote-token pw] [--hostname name]
-    [--config path] [--uuid uuid]
-```
-
-Každá volba má ekvivalent v podobě proměnné prostředí. Řešení: **CLI flag > proměnná prostředí > konfigurační soubor > výchozí hodnota**.
-
-| Volba               | Proměnná                    | Význam                                                      |
-| ------------------- | --------------------------- | ----------------------------------------------------------- |
-| `--remote`          | `CONTROL_SERVER_URL`        | Koncový bod `/device` ovládacího serveru (povinné).         |
-| `--remote-token`    | `CONTROL_SERVER_TOKEN`      | Token zařízení jeho vlastníka. **Přednostně proměnná prostředí** (token nezbyde v `ps`). |
-| `--obs`             | `OBS_URL`                   | OBS Studio WebSocket hosta (výchozí `ws://127.0.0.1:4455`). |
-| `--obs-password`    | `OBS_PASSWORD`              | Heslo OBS Studio.                                           |
-| `--hostname`        | `DEVICE_HOSTNAME`           | Jméno zařízení zobrazované na ovládacím serveru.            |
-| `--remote-interval` | `CONTROL_SERVER_INTERVAL`   | Interval push stavu v sekundách (výchozí 30).               |
-| `--config`          | `CONFIG_FILE`               | Konfigurační soubor (uchovává UUID a nastavení).            |
-| `--uuid`            | `DEVICE_UUID`               | Explicitní pevná identita zařízení.                         |
-
-Klient implementuje úplný handshake obs-websocket v5 (`Hello` → `Identify` → `Identified`), beze změn předává požadavky `Request` a `RequestBatch` ze serveru a publikuje události OBS jako zprávy `obs.event`. Dashboardy tak mohou reagovat na změny scény, streamu nebo nahrávání. Při výpadku se klient automaticky znovu připojuje s exponenciálně se prodlužující prodlevou; při odpojení vyšle syntetickou událost _ObsDisconnected_ a po opětovném připojení odešle aktuální stav.
+Připojení k OBS spravuje modul `obs-controller`; hodnoty lze zadat přes `OBS_URL` / `OBS_PASSWORD` nebo na stránce nastavení zařízení. RTMP výstupy, profily ffmpeg a nastavení SRTLA přijímače vlastní `modules/broadcaster`. Pro tyto role neexistuje samostatný vstupní bod klienta.
 
 ---
 

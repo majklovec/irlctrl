@@ -8,10 +8,8 @@ export const MAX_SERIES_CAP = 10_000;
 
 /** The stats widget's configurable channel references, in editor order. */
 export const STATS_CONFIG_FIELDS = STATS_PLATFORMS;
-/** Keep the old singular Kick config during the transition, without showing it. */
 export const STATS_EDITOR_FIELDS = [
     ...STATS_CONFIG_FIELDS,
-    { name: "channel", type: "hidden" },
     "seriesCap",
 ] as const;
 
@@ -43,19 +41,12 @@ export function statsChannel(
     return normalizeChannel(platform, config?.[platform]);
 }
 
-/**
- * Hub specs are `<platform>:<channel>`; the legacy `channel` field maps to
- * Kick so existing dashboards keep working until they are next edited.
- */
+/** Hub specs are `<platform>:<channel>`. */
 export function statsSpecsFromConfig(
     config: Record<string, string> | undefined,
 ): (string | null)[] {
     return STATS_PLATFORMS.map((platform) => {
-        const configured =
-            statsChannel(platform, config) ||
-            (platform === "kick" && !config?.kick
-                ? normalizeChannel("kick", config?.channel)
-                : "");
+        const configured = statsChannel(platform, config);
         return configured ? `${platform}:${configured}` : null;
     });
 }

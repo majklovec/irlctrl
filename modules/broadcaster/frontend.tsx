@@ -157,7 +157,9 @@ function broadcasterCardBody(
 						s.outputs.length === 0 ||
 						host.pending("broadcaster-start")
 					}
-					onclick={() => host.press("broadcaster-start", "start")}
+					onclick={() =>
+						host.press("broadcaster-start", "broadcaster.start")
+					}
 				/>
 				<Button
 					label={t("ui.stop")}
@@ -165,7 +167,9 @@ function broadcasterCardBody(
 					disabled={
 						!running || transitional || host.pending("broadcaster-stop")
 					}
-					onclick={() => host.press("broadcaster-stop", "stop")}
+					onclick={() =>
+						host.press("broadcaster-stop", "broadcaster.stop")
+					}
 				/>
 			</Actions>
 		</Card>

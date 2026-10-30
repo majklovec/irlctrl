@@ -4,8 +4,8 @@ Every capability is a self-contained `modules/<id>/` directory, and the core
 (`backend/` + `frontend/` + `shared/`) contains no module-specific code: it
 discovers, routes and renders through the registration contracts, the
 registries and the capability bus. A high-level tour lives in the
-[main README](../README.md#modules); this file is the reference: layout, the
-two contracts, discovery, persistence and the edge cases.
+[main README](../README.md#modules); this file is the reference: layout,
+registrations, discovery, persistence and the edge cases.
 
 ## Layout
 
@@ -20,8 +20,8 @@ two contracts, discovery, persistence and the edge cases.
     ├── README.md
     ├── encoder/              # device modules
     ├── srtla/
-    ├── modems/
     ├── obs-controller/
+    ├── broadcaster/
     ├── ssh/
     ├── stats/                # channel widget modules
     ├── chat/
@@ -43,16 +43,20 @@ A module ships:
     or an array of them. Runs in the browser; **no** backend imports.
 -   `types.ts` — the module's own types, including its wire shapes (status
     fragment, method results, events). It may import core-owned _types_
-    (`ModuleCore` from `backend/client/module-core`, the contracts, the core
+    (`ModuleCore` from `backend/client/module-core`, the core
     wire vocabulary in `shared/types`: `Status`, `DeviceSummary`, `SetupInfo`,
-    `Settings`); it must not import another module. A module that renders
-    another module's data (the srtla card shows the modems' interfaces)
-    declares the shapes it reads locally — structural duplicates, never imports.
+    `Settings`); it must not import another module. Cross-module services use
+    named runtime capabilities; consumers type only the capability surface
+    they need, without importing provider types.
 -   `styles.css` — scoped under `.mod-<id>` (device card) or `.dash-card`
     (dashboard widget); side-effect-imported by `frontend.tsx` /
     `settings.tsx`.
 -   optional `settings.tsx` — a settings-page card (`ModuleDef`, see
-    `frontend/ts/modules.tsx`).
+    `frontend/ts/module-contracts.ts`).
+-   optional role contributions — `roleDefinitions` on the backend
+    registration. The registry validates role IDs, picks the declared
+    default, and sends setup-selectable metadata to the frontend so the role
+    selector has one source of truth.
 -   optional `log.ts` — the module's log wording, imported by both sides.
 -   optional `i18n/<lang>.json` — the module's translations (one file per
     supported language, same keys in each). They are merged over the core
@@ -74,9 +78,11 @@ beyond the contracts, components, store, i18n and util helpers a card needs.
 | field                              | purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `kind`, `id`, `title`              | identity (`id` = directory name; `kind` is `device` or `widget`)                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `roleDefinitions?`                 | roles provided by this module (stable id, translation keys, ordering, and default/setup metadata)                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `roles?`                           | roles the module serves: its methods are rejected (409) on other roles, its status/settings/setup hooks only run on them, and its slice starts `enabled` on them. Omit for "every role".                                                                                                                                                                                                                                                                                                                  |
 | `methodRoles?`                     | per-method role override (`{ "stream.start": ["combined"] }`)                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `enabledByDefault?`                | `false` keeps the slice disabled on a fresh device even on its roles (opt-in modules)                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `enabledByDefaultRoles?`           | roles that receive an enabled default when the module serves multiple roles                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `requireEnabled?`                  | reject the methods (409) while the slice is disabled                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `configKey?`                       | key of the slice under `settings.modules` (default `id`; `srtla` keeps its historical `relay` key)                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `configDefaults?`                  | defaults of the slice, deep-merged under the stored values at every load (new fields backfill, stored values win)                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -101,7 +107,7 @@ beyond the contracts, components, store, i18n and util helpers a card needs.
 
 ### The process bag (`ModuleCore`)
 
-`core.config` (`argv`, `CONFIG_FILE`, `DRY_RUN`, `LOG_FILE`, `ROLE`),
+`core.config` (`argv`, `DRY_RUN`, `LOG_FILE`, `ROLE`),
 `core.role()` (effective role), `core.state` (`settings`, `autostart`, `data`),
 `saveState`, `notifyStateChange` (status broadcast without a save),
 `onStateChange`, `moduleEnabled(id)`, `cancelAutostart()`, `logEvent`, `run`,
@@ -113,7 +119,7 @@ beyond the contracts, components, store, i18n and util helpers a card needs.
 `config.json` = the core keys (`uuid`, `hostname`, `role`, `remoteUrl`,
 `remoteToken`, `color`, `language`, `autostart`, `modules`) plus every other
 top-level key verbatim as a module section in `core.state.data`. A module reads
-and mutates its own sections (`data.srtla`, `data.encoder`, `data.modems`, …)
+and mutates its own sections (`data.srtla`, `data.encoder`, …)
 and calls `core.saveState()`; runtime state (pids, counters) stays in module
 variables. The per-module settings slices (`settings.modules[<configKey>]`)
 are seeded from `roles` + `configDefaults` when setup completes and backfilled
@@ -250,20 +256,18 @@ frontend pages must stay free of module feature branches.
 
 ## Capabilities
 
-| name           | provider | consumers       | shape                                                                                                        |
-| -------------- | -------- | --------------- | ------------------------------------------------------------------------------------------------------------ |
-| `net.uplinks`  | modems   | srtla           | `{ file, reconfigure() }` — the uplinks file `srtla_send` reads and the routing re-sync                      |
-| `stream.srtla` | srtla    | encoder, modems | `{ srtlaStatus(), startSrtla(), stopSrtla(), reloadSrtla(), target() }` — combined streaming, uplink reloads |
+| name           | provider | consumers | shape                                                                      |
+| -------------- | -------- | --------- | -------------------------------------------------------------------------- |
+| `stream.srtla` | srtla    | encoder   | `{ srtlaStatus(), startSrtla(), stopSrtla(), reloadSrtla(), target() }`    |
 
-A consumer declares the shape it expects locally (in its `types.ts`) and looks
-it up by name; removing a provider breaks only the capabilities that depended
-on it.
+Capabilities are looked up by name; providers and consumers remain isolated
+and depend only on the runtime methods they use.
 
 ## Ordering
 
 `resolveOrder` (in `shared/registry.ts`) topologically sorts modules by their
-`dependencies` (cycle-safe; ids visited alphabetically). Today: `modems` →
-`srtla` → `encoder` → `obs-controller` → `ssh`. `startModules` / `stopModules`
+`dependencies` (cycle-safe; ids visited alphabetically). Today: `srtla` →
+`encoder` → `obs-controller` → `ssh`. `startModules` / `stopModules`
 (reverse) / `moduleStatuses` / autostart all iterate that order.
 
 ## Adding a module
@@ -274,7 +278,7 @@ on it.
    has a device card, a dashboard widget or a setup step) and/or
    `settings.tsx` (a settings-page `ModuleDef`), plus `types.ts`,
    `styles.css`.
-2. Declare `roles`, `methods`, `events`, the hooks you need, `log` wording,
+2. Declare `roleDefinitions`, applicable `roles`, `methods`, `events`, the hooks you need, `log` wording,
    `pages` / `dashboardWidgets` / `dashboardActions`, and `dependencies` if
    it must start after another module.
 3. Put the module's translations in `modules/<id>/i18n/<lang>.json` (all

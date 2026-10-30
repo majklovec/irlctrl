@@ -7,14 +7,27 @@ import {
     safeModules,
 } from "../backend/client/modules";
 import { state } from "../backend/client/state";
-import { ALL_MODULES, allModules } from "../shared/registry";
+import {
+    ALL_MODULES,
+    allModules,
+    defaultRole,
+    isRegisteredRole,
+    registeredRoleIds,
+    roleDefinitions,
+} from "../shared/registry";
 
 /**
  * Registry order of the device modules: the registry's topological sort over
- * declared `dependencies` (srtla after modems, encoder after srtla), ids
- * visited alphabetically. A new start dependency shifts the positions.
+ * declared `dependencies` (encoder after srtla), ids visited alphabetically.
+ * Independent modules precede that chain.
  */
-const DEVICE_ORDER = ["modems", "srtla", "encoder", "obs-controller", "ssh"];
+const DEVICE_ORDER = [
+    "broadcaster",
+    "srtla",
+    "encoder",
+    "obs-controller",
+    "ssh",
+];
 /** The channel widget modules (device-independent dashboard widgets). */
 const WIDGET_IDS = ["stats", "chat"];
 
@@ -88,8 +101,8 @@ function scanFrontends(): {
 const ids = (): string[] => allModules().map((mod) => mod.id);
 
 describe("module registries", () => {
-    // The device modules are discovered from modules/*/backend.ts, the 4 of
-    // them in the canonical dependency order (the registry's start order).
+    // The device modules are discovered from modules/*/backend.ts in the
+    // canonical dependency order (the registry's start order).
     test("backend registry enumerates the device modules in order", () => {
         const deviceIds = ids().filter((id) => DEVICE_ORDER.includes(id));
         expect(deviceIds).toEqual(DEVICE_ORDER);
@@ -106,6 +119,19 @@ describe("module registries", () => {
         expect(new Set(all).size).toBe(all.length);
     });
 
+    test("roles are contributed uniquely by modules with one default", () => {
+        const definitions = roleDefinitions();
+        const roleIds = definitions.map((definition) => definition.id);
+        expect(new Set(roleIds).size).toBe(roleIds.length);
+        expect(registeredRoleIds()).toEqual(roleIds);
+        expect(definitions.filter((definition) => definition.default)).toEqual([
+            expect.objectContaining({ id: defaultRole() }),
+        ]);
+        for (const module of ALL_MODULES)
+            for (const role of module.roles ?? [])
+                expect(isRegisteredRole(role)).toBe(true);
+    });
+
     test("frontend discovery: directory name matches a registration id", () => {
         for (const fe of scanFrontends()) {
             // The module's own id (its directory) must be one of the ids it registers.
@@ -117,32 +143,26 @@ describe("module registries", () => {
     });
 
     test("device-card frontends cover every backend device-module id", () => {
-        // Two backend device ids have no device-card frontend: modems is
-        // composed by the srtla module (interfaces table + modem panels),
-        // and ssh lives on the settings page (its card is a settings.tsx
-        // ModuleDef, not a device card). broadcaster is the reverse case: a
-        // standalone agent (not a backend device module) that ships its own
-        // device-card frontend. Every other backend id must have exactly
-        // one card, and no extra card ids may exist.
+        // The ssh module lives on the settings page (its card is a settings.tsx
+        // ModuleDef, not a device card). Every other backend id must have
+        // exactly one card, and no extra card ids may exist.
         const cardIds = scanFrontends()
             .flatMap((fe) => fe.registrations)
             .filter((r) => r.kind === "device-card")
             .map((r) => r.id);
         const front = new Set(cardIds);
-        const missing = DEVICE_ORDER.filter(
-            (id) => !front.has(id) && id !== "modems" && id !== "ssh",
-        );
+        const missing = DEVICE_ORDER.filter((id) => !front.has(id) && id !== "ssh");
         const extra = [...front].filter(
-            (id) => !DEVICE_ORDER.includes(id) && id !== "broadcaster",
+            (id) => !DEVICE_ORDER.includes(id),
         );
         expect(missing).toEqual([]);
         expect(extra).toEqual([]);
-        // The modems card renders through the srtla composite.
+        // The SRTLA card composes the routing table and modem panels.
         const srtlaSrc = readFileSync(
             join(modulesDir, "srtla", "frontend.tsx"),
             "utf8",
         );
-        expect(srtlaSrc).toContain("mod-modems");
+        expect(srtlaSrc).toContain("mod-srtla-modems");
         expect(srtlaSrc).toContain("interfacesCard");
     });
 
@@ -386,9 +406,9 @@ describe("module registries", () => {
     });
 });
 
-// Role presets come from the registrations (`roles`, `enabledByDefault`): the
-// bonding modules serve relay and combined, the encoder serves encoder and
-// combined, the obs controller is opt-in everywhere.
+// Role presets come from module registrations: the bonding modules serve
+// relay and combined, the encoder serves encoder and combined, the OBS
+// controller defaults on for the dedicated OBS role and remains opt-in elsewhere.
 describe("role presets from the registrations", () => {
     test("default modules follow the roles each module serves", () => {
         const on = (role: Parameters<typeof defaultModules>[0]) =>
@@ -396,10 +416,10 @@ describe("role presets from the registrations", () => {
                 .filter(([, slice]) => slice.enabled)
                 .map(([key]) => key)
                 .sort();
-        expect(on("relay")).toEqual(["modems", "relay", "ssh"]);
-        expect(on("combined")).toEqual(["encoder", "modems", "relay", "ssh"]);
+        expect(on("relay")).toEqual(["relay", "ssh"]);
+        expect(on("combined")).toEqual(["encoder", "relay", "ssh"]);
         expect(on("encoder")).toEqual(["encoder", "ssh"]);
-        expect(on("obs")).toEqual([]);
+        expect(on("obs")).toEqual(["obs-controller"]);
     });
 
     test("a module's stored slice key follows its configKey", () => {
@@ -409,12 +429,12 @@ describe("role presets from the registrations", () => {
         expect(defaultModules("relay")).not.toHaveProperty("srtla");
     });
 
-    test("status view exposes the modems module flag", () => {
+    test("status view exposes the combined SRTLA module flag", () => {
         const saved = state.settings.modules;
         try {
             state.settings.modules = defaultModules("relay");
-            const view = safeModules() as { modems?: { enabled: boolean } };
-            expect(view.modems).toEqual({ enabled: true });
+            const view = safeModules() as { relay?: { enabled: boolean } };
+            expect(view.relay).toEqual({ enabled: true });
         } finally {
             state.settings.modules = saved;
         }

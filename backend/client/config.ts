@@ -17,9 +17,10 @@ import {
     flagOrEnv,
     intArgEnv,
 } from "../../shared/args";
-import { isRole, REMOTE_URL_RE, ROLES, type Role } from "../../shared/validate";
+import { defaultRole, registeredRoleIds } from "../../shared/registry";
+import { REMOTE_URL_RE, type Role } from "../../shared/validate";
 
-export { argv, ROLES, type Role };
+export { argv, type Role };
 
 const TMP = tmpdir();
 
@@ -77,8 +78,7 @@ if (REMOTE_URL && !REMOTE_URL_RE.test(REMOTE_URL))
 
 export const ROLE: Role = enumArgEnv(
     "--role",
-    ROLES,
+    registeredRoleIds(),
     "ROLE",
-    (persisted("role") ?? "relay") as Role,
+    persisted("role") ?? defaultRole(),
 );
-if (!isRole(ROLE)) argFail("ROLE", ROLE, ROLES.join(" | "));

@@ -14,6 +14,7 @@ import type { ModuleCore } from "../../backend/client/module-core";
 import type {
     BackendModule,
     DashboardAction,
+    ModuleSlice,
     Params,
 } from "../../shared/module-contract";
 import {
@@ -39,6 +40,24 @@ import type { Emit, ObsSlice, SwitcherConfig, SwitcherMetrics } from "./types";
 
 const SECTION = "LowBitrateSwitcher";
 const MODULE_ID = "obs-controller";
+
+function validObsUrl(value: unknown): string {
+    if (typeof value !== "string" || !value.trim())
+        throw new ApiError("obsUrl is required");
+    const url = value.trim();
+    let parsed: URL;
+    try {
+        parsed = new URL(url);
+    } catch {
+        throw new ApiError("obsUrl must be a ws:// or wss:// URL");
+    }
+    if (
+        (parsed.protocol !== "ws:" && parsed.protocol !== "wss:") ||
+        !parsed.hostname
+    )
+        throw new ApiError("obsUrl must be a ws:// or wss:// URL");
+    return url;
+}
 
 /** Core bag, bound at discovery and re-filled at start (a module never imports the core). */
 let core: ModuleCore;
@@ -576,12 +595,14 @@ const registration: BackendModule<ModuleCore> = {
     kind: "device",
     id: MODULE_ID,
     title: "OBS",
-    // Enabled by the operator (any role); the methods need a running client.
-    enabledByDefault: false,
+    roleDefinitions: [
+        { id: "obs", titleKey: "role.obs", order: 40, setupSelectable: true },
+    ],
+    enabledByDefaultRoles: ["obs"],
     requireEnabled: true,
     configDefaults: {
-        obsUrl: "",
-        obsPassword: "",
+        obsUrl: process.env.OBS_URL?.trim() ?? "",
+        obsPassword: process.env.OBS_PASSWORD ?? "",
         sceneEvents: true,
         ...SWITCHER_DEFAULTS,
     },
@@ -612,11 +633,47 @@ const registration: BackendModule<ModuleCore> = {
     bind(c) {
         core = c;
     },
+    async setupInfo() {
+        return {
+            obsUrl:
+                slice()?.obsUrl ||
+                process.env.OBS_URL?.trim() ||
+                "ws://127.0.0.1:4455",
+        };
+    },
+    /** Setup wizard: collect the connection owned by this OBS device. */
+    async setup(params, role) {
+        if (role !== "obs") return undefined;
+        const obsUrl = validObsUrl(params.obsUrl);
+        if (
+            params.obsPassword !== undefined &&
+            typeof params.obsPassword !== "string"
+        )
+            throw new ApiError("obsPassword must be a string");
+        return () => {
+            const modules =
+                core.state.settings.modules ??
+                (core.state.settings.modules = {});
+            const existing = modules[MODULE_ID] ?? {};
+            const obsPassword =
+                typeof params.obsPassword === "string"
+                    ? params.obsPassword
+                    : typeof existing.obsPassword === "string"
+                      ? existing.obsPassword
+                      : (process.env.OBS_PASSWORD ?? "");
+            modules[MODULE_ID] = {
+                ...existing,
+                enabled: true,
+                obsUrl,
+                obsPassword,
+            };
+        };
+    },
     async start(ctx) {
         core = ctx.core;
         emit = ctx.emit;
         await teardown();
-        const cfg = ctx.config;
+        const cfg = core.state.settings.modules?.[MODULE_ID] ?? ctx.config;
         if (cfg.enabled !== true) return;
         if (typeof cfg.obsUrl !== "string" || !cfg.obsUrl) {
             ctx.log(MODULE_ID, "enabled but no obsUrl set; module idle");
@@ -657,7 +714,10 @@ const registration: BackendModule<ModuleCore> = {
     /** `modules.configure`: only the connection fields present in `config` are touched. */
     configure(config, s) {
         if (typeof config.enabled === "boolean") s.enabled = config.enabled;
-        if (typeof config.obsUrl === "string") s.obsUrl = config.obsUrl;
+        if (typeof config.obsUrl === "string") {
+            const obsUrl = config.obsUrl.trim();
+            s.obsUrl = obsUrl ? validObsUrl(obsUrl) : "";
+        }
         if (typeof config.obsPassword === "string")
             s.obsPassword = config.obsPassword;
         if (typeof config.sceneEvents === "boolean")

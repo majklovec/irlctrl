@@ -3,20 +3,22 @@
  * or restart), the scheduler options applied over the control socket
  * (control.ts) and the per-link stats push.
  *
- * Self-contained: the core bag is bound at discovery; the uplinks file comes
- * from the `net.uplinks` capability (modems module).
+ * Also owns the relay's interface routing and ModemManager integration;
+ * those implementations are internal parts of this module.
  */
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ModuleCore } from "../../backend/client/module-core";
 import { argEnv, argv, enumArgEnv } from "../../shared/args";
 import { t } from "../../shared/i18n";
-import type { BackendModule, Emit } from "../../shared/module-contract";
+import type { BackendModule, Emit, Params } from "../../shared/module-contract";
 import {
     ApiError,
     oneOf,
+    optionalStringList,
     requireBoolean,
     requireHost,
+    requireIndex,
     requirePort,
     requireString,
 } from "../../shared/params";
@@ -24,8 +26,29 @@ import { errorMessage } from "../../shared/util";
 import * as control from "./control";
 import log from "./log";
 import {
+    bindModemManager,
+    detectModems,
+    modemSource,
+    performModemAction,
+} from "./modems";
+import {
+    bindRouting,
+    detectInterfaces,
+    isMonitorRunning,
+    reconfigure,
+    resolveSelection,
+    selection,
+    setSelection,
+    startInterfaceMonitor,
+    stopInterfaceMonitor,
+    UPLINKS_FILE,
+} from "./routing";
+import {
     SRTLA_MODES,
-    type SrtlaCapability,
+    type Iface,
+    type ModemConfig,
+    type ModemInfo,
+    type ReconfigureResult,
     type SrtlaConfig,
     type SrtlaOptions,
     type SrtlaOptionsResult,
@@ -54,8 +77,59 @@ let core: ModuleCore;
 /** Push channel, available from start on. */
 let emit: Emit | undefined;
 
-const uplinksFile = (): string =>
-    core.requireCapability<{ file: string }>("net.uplinks").file;
+const uplinksFile = (): string => UPLINKS_FILE;
+
+/** Reconfigure routing / uplinks and reload srtla_send if the file changed. */
+async function reconfigureAndReload(): Promise<ReconfigureResult> {
+    const result = await reconfigure();
+    if (!result.ok)
+        throw new ApiError(result.error ?? "reconfigure failed", 500);
+    if (result.changed) await reloadSrtla();
+    return result;
+}
+
+async function applySelection(next: ModemConfig) {
+    await setSelection(next);
+    const { selected, ips, uplinksFile, changed } =
+        await reconfigureAndReload();
+    return { selection: selection(), selected, ips, uplinksFile, changed };
+}
+
+async function selectModems(p: Params) {
+    const names = optionalStringList(p, "modems");
+    const ips = optionalStringList(p, "ips");
+    const all = await detectInterfaces();
+    const badIfaces =
+        names?.filter((name) => !all.some((iface) => iface.iface === name)) ??
+        [];
+    if (badIfaces.length)
+        throw new ApiError(`Unknown interfaces: ${badIfaces.join(", ")}`);
+    const badIps = ips?.filter((ip) => !all.some((iface) => iface.ip === ip)) ?? [];
+    if (badIps.length) throw new ApiError(`Unknown IPs: ${badIps.join(", ")}`);
+    return applySelection(
+        names?.length ? { modems: names } : ips?.length ? { ips } : {},
+    );
+}
+
+async function toggleModem(p: Params) {
+    const name = requireString(p, "iface");
+    const all = await detectInterfaces();
+    if (!all.some((iface) => iface.iface === name))
+        throw new ApiError(`Unknown interface: ${name}`, 404);
+    const names = new Set(resolveSelection(all).map((iface) => iface.iface));
+    if (!names.delete(name)) names.add(name);
+    return applySelection({ modems: [...names] });
+}
+
+async function modemStatus(): Promise<{
+    interfaces: Iface[];
+    selected: Iface[];
+    modems: ModemInfo[];
+}> {
+    const modems = await detectModems();
+    const interfaces = await detectInterfaces(modems);
+    return { interfaces, selected: resolveSelection(interfaces), modems };
+}
 
 // ----------------------------------------------------------------------
 // Persisted section (`state.data.srtla`): receiver target + scheduler options
@@ -89,6 +163,7 @@ async function save(patch: Partial<SrtlaConfig>): Promise<void> {
         quality: s.quality ?? false,
         remoteHost: s.remoteHost ?? "",
         remotePort: s.remotePort ?? "",
+        selection: s.selection,
     } satisfies SrtlaConfig;
     await core.saveState();
 }
@@ -315,7 +390,7 @@ control.onSrtlaControlChange(() => core.notifyStateChange());
 // ----------------------------------------------------------------------
 // Registration
 // ----------------------------------------------------------------------
-const capability: SrtlaCapability = {
+const capability = {
     srtlaStatus,
     startSrtla,
     stopSrtla,
@@ -328,9 +403,28 @@ const registration: BackendModule<ModuleCore> = {
     id: "srtla",
     title: "SRTLA",
     configKey: "relay",
+    roleDefinitions: [
+        {
+            id: "relay",
+            titleKey: "role.relay",
+            taglineKey: "setup.role.relay_tag",
+            order: 10,
+            default: true,
+            setupSelectable: true,
+        },
+    ],
     roles: ["relay", "combined"],
-    dependencies: ["modems"],
     methods: [
+        "interfaces.list",
+        "reconfigure",
+        "modems.list",
+        "modems.select",
+        "modems.toggle",
+        "modems.enable",
+        "modems.disable",
+        "modems.reset",
+        "modems.connect",
+        "modems.disconnect",
         "srtla.status",
         "srtla.start",
         "srtla.stop",
@@ -339,16 +433,60 @@ const registration: BackendModule<ModuleCore> = {
         "srtla.options",
     ],
     events: ["srtla.stats"],
+    dashboardActions: [
+        {
+            id: "reconfigure",
+            label: "act.srtla.reconfigure",
+            icon: "↻",
+            method: "reconfigure",
+        },
+        {
+            id: "start",
+            label: "act.srtla.start",
+            icon: "▶",
+            method: "srtla.start",
+        },
+        {
+            id: "stop",
+            label: "act.srtla.stop",
+            icon: "⏹",
+            method: "srtla.stop",
+            confirm: true,
+        },
+        {
+            id: "reload",
+            label: "act.srtla.reload",
+            icon: "↻",
+            method: "srtla.reload",
+        },
+    ],
     log,
     bind(c) {
         core = c;
+        bindModemManager(c);
+        bindRouting(c, modemSource);
     },
     async start(ctx) {
         core = ctx.core;
         emit = ctx.emit;
+        bindModemManager(core);
+        bindRouting(core, modemSource);
+        const result = await reconfigure();
+        if (!result.ok) {
+            console.error("Initial reconfigure failed:", result.error);
+            core.logEvent(
+                "error",
+                "Interfaces",
+                t("log.reconfigure_failed", { error: result.error }),
+            );
+            throw new Error(`Initial reconfigure failed: ${result.error}`);
+        }
+        console.log(`Initial uplinks: ${result.ips.join(", ")}`);
+        startInterfaceMonitor(reloadSrtla);
         await maybeStartSrtla();
     },
     async stop() {
+        await stopInterfaceMonitor();
         await stopSrtla();
     },
     /** Relay autostart: bring srtla_send back with the saved target (combined devices resume via the encoder module). */
@@ -362,6 +500,18 @@ const registration: BackendModule<ModuleCore> = {
     },
     async dispatch(method, p) {
         switch (method) {
+            case "interfaces.list":
+                return { interfaces: await detectInterfaces() };
+            case "reconfigure":
+                return reconfigureAndReload();
+            case "modems.list": {
+                const status = await modemStatus();
+                return { selection: selection(), ...status };
+            }
+            case "modems.select":
+                return selectModems(p);
+            case "modems.toggle":
+                return toggleModem(p);
             case "srtla.status":
                 return { srtla: srtlaStatus() };
             case "srtla.start": {
@@ -409,17 +559,41 @@ const registration: BackendModule<ModuleCore> = {
                 return result;
             }
         }
+        if (method.startsWith("modems.")) {
+            const action = method.slice("modems.".length);
+            if (
+                action !== "enable" &&
+                action !== "disable" &&
+                action !== "reset" &&
+                action !== "connect" &&
+                action !== "disconnect"
+            )
+                throw new Error(`unknown method ${method}`);
+            const modemIndex = requireIndex(p);
+            return {
+                modemIndex,
+                action,
+                ok: await performModemAction(action, modemIndex),
+            };
+        }
         throw new Error(`unknown method ${method}`);
     },
     async status() {
+        const modem = await modemStatus();
         return {
             state: {
                 srtla: srtlaStatus(),
                 srtlaTarget: target(),
                 srtlaOptions: options() ?? {},
+                selection: selection(),
             },
+            ...modem,
+            uplinksFile: UPLINKS_FILE,
             srtlaControl: control.srtlaControlState(),
-            monitor: { reloadMode: RELOAD_MODE },
+            monitor: {
+                running: isMonitorRunning(),
+                reloadMode: RELOAD_MODE,
+            },
             summary: { srtla: srtlaStatus() },
         };
     },
@@ -441,32 +615,11 @@ const registration: BackendModule<ModuleCore> = {
                 quality,
                 remoteHost,
                 remotePort,
+                selection: stored().selection,
             } satisfies SrtlaConfig;
         };
     },
     dashboardWidgets: [{ type: "relay", defaultSize: { w: 4, h: 4 } }],
-    dashboardActions: [
-        // Needs `listenPort`, `remoteHost` and `remotePort` — set them in the button's params override.
-        {
-            id: "start",
-            label: "act.srtla.start",
-            icon: "▶",
-            method: "srtla.start",
-        },
-        {
-            id: "stop",
-            label: "act.srtla.stop",
-            icon: "⏹",
-            method: "srtla.stop",
-            confirm: true,
-        },
-        {
-            id: "reload",
-            label: "act.srtla.reload",
-            icon: "↻",
-            method: "srtla.reload",
-        },
-    ],
     services: { capabilities: { "stream.srtla": capability } },
 };
 

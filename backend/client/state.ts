@@ -22,7 +22,13 @@ import {
 import type { ModuleSlice } from "../../shared/module-contract";
 import { stableStringify } from "../../shared/util";
 import { DEFAULT_COLOR, type Role } from "../../shared/validate";
-import { CONFIG_EXISTS, CONFIG_FILE, DRY_RUN, INITIAL_CONFIG } from "./config";
+import {
+    CONFIG_EXISTS,
+    CONFIG_FILE,
+    DRY_RUN,
+    INITIAL_CONFIG,
+    ROLE,
+} from "./config";
 import { writeFileAtomic } from "./files";
 
 /** Per-module persisted settings, keyed by the module's `configKey` (default: id). */
@@ -93,7 +99,7 @@ function projectConfig(s: PersistentState): DeviceConfig {
         hostname: settings.hostname ?? "",
         language: asLanguage(settings.language),
         remoteUrl: settings.remoteUrl ?? "",
-        role: settings.role ?? "relay",
+        role: settings.role ?? ROLE,
         uuid: settings.uuid ?? "",
     };
     if (settings.remoteToken) cfg.remoteToken = settings.remoteToken;

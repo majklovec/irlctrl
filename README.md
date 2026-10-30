@@ -4,7 +4,7 @@
 
 # IRLCTRL
 
-Bun-based controller for [BELABOX](https://belabox.net/)-style bonded streaming. One program covers three device types, and an optional control server manages a fleet of them from a browser.
+Bun-based controller for [BELABOX](https://belabox.net/)-style bonded streaming. One module-driven device client runs the selected role, and an optional control server manages a fleet from a browser.
 
 [![Build & Release](https://img.shields.io/github/actions/workflow/status/majklovec/irlctrl/release.yml?style=flat-square&label=release)](https://github.com/majklovec/irlctrl/actions)
 [![Version](https://img.shields.io/github/v/tag/majklovec/irlctrl?style=flat-square&label=version)](https://github.com/majklovec/irlctrl/releases)
@@ -19,13 +19,15 @@ Bun-based controller for [BELABOX](https://belabox.net/)-style bonded streaming.
 
 ## Roles
 
-One binary, three device types. Pick the role with `--role`:
+One device client, module-contributed roles selected with `--role`:
 
 | Role              | What it does                                                                                                                                                                                                               |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `relay` (default) | Receives SRT from an encoder and bonds it out over all uplinks with [srtla_send](https://github.com/irlserver/srtla_send). Manages source routing, the uplinks file, and modems (ModemManager).                            |
-| `encoder`         | Runs [belacoder](https://github.com/BELABOX/belacoder) or [ceracoder](https://github.com/CERALIVE/ceracoder) with a GStreamer pipeline and sends SRT to a relay. No routing, modems, or `srtla_send` — does not need root. |
+| `relay` (default) | Receives SRT from an encoder and bonds it out over all uplinks with [srtla_send](https://github.com/irlserver/srtla_send). Manages source routing, the uplinks file, and ModemManager devices.                                 |
+| `encoder`         | Runs [belacoder](https://github.com/BELABOX/belacoder) or [ceracoder](https://github.com/CERALIVE/ceracoder) with a GStreamer pipeline and sends SRT to a relay. No routing, ModemManager, or `srtla_send` — does not need root. |
 | `combined`        | Encoder and relay in one box: encoder → local `srtla_send` → bonded uplinks. One Start/Stop drives both.                                                                                                                   |
+| `obs`             | Connects to a paired OBS Studio instance, forwards its events, and runs the low-bitrate scene switcher.                                                                                                                         |
+| `broadcaster`     | Receives SRTLA with `srtla_rec` and publishes one or more RTMP outputs through ffmpeg.                                                                                                                                           |
 
 ```
 encoder ──SRT──▶ relay ──SRTLA (bonded)──▶ SRTLA receiver
@@ -40,6 +42,8 @@ combined ─────────SRTLA (bonded)─────────▶
 -   `srtla_send` (relay, combined)
 -   `belacoder`/`ceracoder` and GStreamer (encoder, combined)
 -   `iproute2` and ModemManager (`mmcli`) for bonding and modem management
+-   `srtla_rec` and ffmpeg (broadcaster)
+-   OBS Studio with obs-websocket v5 (obs)
 
 ## Getting started
 
@@ -76,10 +80,10 @@ Every flag has an environment-variable counterpart. Resolution order: **CLI flag
 
 | Option                    | Env                             | Default                          | Notes                                                                                                                |
 | ------------------------- | ------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `‑‑role`                  | `ROLE`                          | `relay`                          | `relay`, `encoder`, `combined`                                                                                       |
+| `‑‑role`                  | `ROLE`                          | `relay`                          | A role contributed by a registered module (`relay`, `encoder`, `combined`, `obs`, `broadcaster`)                      |
 | `‑‑host`, `‑‑port`        | `API_HOST`, `API_PORT`          | `127.0.0.1`, `8085`              | Local web UI and WebSocket API (`/ws`), always on                                                                    |
 | `‑‑allow‑origin`          | `ALLOWED_ORIGINS`               |                                  | Extra browser origins for `/ws` (comma-separated, `*` = any)                                                         |
-| `‑‑config`                | `CONFIG_FILE`                   | `$TMPDIR/config.json`            | Device config — settings, encoder, srtla target, autostart, modems. **Use a persistent path in production**          |
+| `‑‑config`                | `CONFIG_FILE`                   | `$TMPDIR/config.json`            | Device config — core settings, module settings and state. **Use a persistent path in production**                 |
 | `‑‑uplinks`               | `UPLINKS_FILE`                  | `$TMPDIR/srtla_ips.txt`          | Uplinks file for `srtla_send`                                                                                        |
 | `‑‑start‑srtla`           |                                 |                                  | Relay/combined: start `srtla_send` on boot with `<listenPort> <remoteHost> <remotePort>`                             |
 | `‑‑srtla‑reload`          | `SRTLA_RELOAD_MODE`             | `signal`                         | `signal` (SIGHUP) or `restart`                                                                                       |
@@ -117,7 +121,7 @@ Tick **Autostart** in the UI (or call `autostart.set`) to resume the last stream
 
 ## Control server
 
-`backend/server/server.ts` lists all devices and serves the same web UI for each one at `/d/<id>/`, relaying commands to the device over its outbound connection — so devices behind NAT or on mobile networks can be managed. It also hosts per-user **dashboards**: gridstack grids composed of widgets from any device owned by that user, with dedicated add / edit / view pages. Widgets come in three kinds — **device widgets** (bound to one device: the live status cards `relay`, `encoder`, `combined`, `obs` depending on the device's role and enabled modules), **channel widgets** (device-independent modules, one hub per kind serves all widgets of that kind) and **fleet widgets** (offered once, driving any of your devices: the `buttons` virtual StreamDeck). Dashboards are persisted to the SQLite database (`dashboards` table of `--db`), and a shared live feed (`/dashboards/ws`) streams widget data to every open view.
+`backend/server/server.ts` lists all devices and serves the same web UI for each one at `/d/<id>/`, relaying commands to the device over its outbound connection — so devices behind NAT or on mobile networks can be managed. It also hosts per-user **dashboards**: gridstack grids composed of widgets from any device owned by that user, with dedicated add / edit / view pages. Widgets come in three kinds — **device widgets** (bound to one device: live status cards for `relay`, `encoder`, `combined`, `obs`, or `broadcaster`, depending on the device's role and enabled modules), **channel widgets** (device-independent modules, one hub per kind serves all widgets of that kind) and **fleet widgets** (offered once, driving any of your devices: the `buttons` virtual StreamDeck). Dashboards are persisted to the SQLite database (`dashboards` table of `--db`), and a shared live feed (`/dashboards/ws`) streams widget data to every open view.
 
 ### Authentication
 
@@ -189,19 +193,19 @@ The image ships with the whole streaming chain — GStreamer (incl. `gstreamer1.
 
 ### Docker
 
-`docker-compose.yaml` runs the whole stack — the control server plus a relay, an encoder, an OBS Studio proxy, and the SRTLA-to-platform agent (see `Dockerfile`, `Dockerfile.device`, and `Dockerfile.broadcaster`):
+`docker-compose.yaml` runs the whole stack — the control server plus a relay, an encoder, an OBS role device, and a broadcaster role device (see `Dockerfile` and `Dockerfile.device`):
 
 ```sh
 docker compose up -d --build
 ```
 
 -   **server** — `backend/server/server.ts`, the control server (`Dockerfile`, image `majkl/irlctrl-control`), UI on `:8090`.
--   **obs-client** — `backend/obs-client/obs-client.ts`, proxies a host's OBS Studio (`ws://host.docker.internal:4455`) into the server; reuses the control image with a different entrypoint.
+-   **obs-client** — the standard `backend/client/client.ts --role obs` process with the `obs-controller` module enabled; connects to host OBS at `ws://host.docker.internal:4455`.
 -   **relay** — `backend/client/client.ts --role relay`, bonds SRT out via `srtla_send` (`Dockerfile.device`, image `majkl/irlctrl-device`).
 -   **encoder** — `backend/client/client.ts --role encoder`, runs `ceracoder`/GStreamer and sends SRT to the relay; same device image, different role + `ENCODER_BIN`.
--   **broadcaster** — `backend/broadcaster/broadcaster.ts`, de-bonds an SRTLA stream via `srtla_rec` and re-publishes it as RTMP to one or more destinations (configured in the web UI via the module settings; a single `RTMP_URL` + `RTMP_KEY` stream key is accepted as a legacy default) with ffmpeg, using a UI-selectable output profile (JSON files in `config/broadcaster/profiles/`; the defaults for stream-copy, H.264/H.265 re-encode, and audio-only are seeded there from `backend/broadcaster/defaults/profiles/` on first run and can be edited or extended) (`Dockerfile.broadcaster`, image `majkl/irlctrl-broadcaster`); exposes the SRTLA receiver on `5000/udp`.
+-   **broadcaster** — `backend/client/client.ts --role broadcaster` runs the `modules/broadcaster` receiver and publisher with ffmpeg; configure destinations in the device settings and expose SRTLA UDP port `5001`.
 
-The relay/encoder device image bundles `backend/client/client.ts` plus the native `srtla_send`, `ceracoder`, `belacoder` binaries, the GStreamer pipeline definitions, and `iproute2`. The **relay** grants the `NET_ADMIN` capability (`cap_add`) because at startup it builds per-uplink policy routing (`ip rule add` + route tables) and watches interfaces with `ip monitor`; without it the relay logs `ip rule add … Operation not permitted` and exits. The encoder does not need the capability. On the default bridge network the relay's routing changes act on the container's own network namespace, not the host; for real bonded uplinks on the host's raw interfaces, run the relay with `network_mode: host`.
+The shared device image bundles `backend/client/client.ts`, the native streaming binaries, ffmpeg, GStreamer, and the role modules. The **relay** grants the `NET_ADMIN` capability (`cap_add`) because at startup it builds per-uplink policy routing (`ip rule add` + route tables) and watches interfaces with `ip monitor`; without it the relay logs `ip rule add … Operation not permitted` and exits. The encoder and OBS role do not need the capability. On the default bridge network the relay's routing changes act on the container's own network namespace, not the host; for real bonded uplinks on the host's raw interfaces, run the relay with `network_mode: host`.
 
 ## API
 
@@ -219,7 +223,7 @@ The cog in the device header opens a settings page. It uses `settings.get` / `se
 Every capability is a **self-contained module** under [`modules/`](modules/README.md) — a backend registration, a frontend card, local types, and styles. The core (`backend/` + `frontend/` + `shared/`) contains no module-specific code: it discovers, routes, and renders everything through the registration contract, the registries and the capability bus. The boundary is enforced by [`test/registries.test.ts`](test/registries.test.ts).
 
 The browser application lives in `frontend/`; service entrypoints are
-separated under `backend/client/`, `backend/obs-client/`, and `backend/server/`.
+separated under `backend/client/` and `backend/server/`.
 Module directories stay together under `modules/<id>/` so each module's backend
 and frontend implementation remain co-located. Cross-layer wire types live in
 `shared/`.
@@ -229,10 +233,10 @@ and frontend implementation remain co-located. Cross-layer wire types live in
 | Module           | What it does                                                                                                                                                                                                                                                                                                                                                                                            |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `encoder`        | Runs and supervises the encoder process for encoder/combined devices: pipeline discovery (ids are paths under `--pipelines`, e.g. `rk3588/h265_hdmi_1440p25`), start/stop with automatic restart, and live bitrate changes. Supports **belacoder** (bitrate via a min/max file, re-read on SIGHUP) and **ceracoder** (INI config with balancer tuning).                                                 |
-| `srtla`          | Manages the `srtla_send` process for relay/combined devices: start/stop/reload (SIGHUP or restart), and applies scheduler options (mode, quality) over the control socket live.                                                                                                                                                                                                                         |
-| `modems`         | Bonding uplinks for relay/combined devices: interface detection, the bonding selection, source routing tables, the uplinks file `srtla_send` reads and the netlink monitor that keeps it current — plus ModemManager (`mmcli`) integration: enumeration, per-modem state, signal quality, operator, and enable/disable/reset/connect/disconnect actions.                                                |
+| `srtla`          | Owns relay/combined SRTLA: `srtla_send` lifecycle, scheduler options, source routing, uplink selection and ModemManager (`mmcli`) integration, including modem state and enable/disable/reset/connect/disconnect actions.                                                                                                                                                                                     |
 | `ssh`            | Manages the box's sshd (start/stop) and the SSH login account password.                                                                                                                                                                                                                                                                                                                                 |
 | `obs-controller` | Owns the [obs-websocket](https://github.com/obsproject/obs-websocket) (v5) connection to a paired OBS Studio instance and forwards its events into the device event stream. Also runs the **low-bitrate switcher**: a pure state machine ([`switcher-engine.ts`](modules/obs-controller/switcher-engine.ts)) that watches SRT/OBS metrics and switches OBS between `normal` / `low` / `offline` scenes. |
+| `broadcaster`    | Owns the `srtla_rec` + ffmpeg stream lifecycle, output destinations, keepalive telemetry, and non-destructive profile seeding for the `broadcaster` role.                                                                                                                                                                                                                                      |
 
 **Channel widgets** — dashboard-only, run on the control server (device-independent); one hub per module serves all widgets of its kind:
 
@@ -254,27 +258,13 @@ Each `modules/<id>/` is a plugin the core discovers by directory; it ships:
 
 **Discovery** — the backend is a runtime `readdirSync` scan of `modules/*/` in [`shared/registry.ts`](shared/registry.ts) (compiled binaries use the generated manifest): add a directory and it appears. The browser bundle cannot glob at runtime, so `scripts/gen-modules.ts` writes the gitignored `generated/modules.*.ts` manifests from the same scan (wired into `predev`).
 
-**Core ↔ module** — the core knows only the contract. The device lifecycle ([`backend/client/modules.ts`](backend/client/modules.ts)) starts the modules that serve the current role (`roles`), routes every non-core RPC method to its owner's `dispatch` (rejecting it with 409 outside the module's roles, or while a `requireEnabled` module is disabled), deep-merges the modules' `status()` fragments into the `status` payload, seeds and backfills their settings slices from `configDefaults`, runs their `setup()` validators in the first-run wizard and their `resume()` on autostart. Modules receive one process-services bag ([`backend/client/module-core.ts`](backend/client/module-core.ts): state, saveState, logEvent, run, Supervisor, …) and talk to each other only over the **capability bus** by name (`stream.srtla`, `net.uplinks`) — never by import. Module pushes go through `ctx.emit(event, data, { throttle, retain, summary })`; the control server stores retained frames and merges `summary` fields into its device list without knowing the event.
+**Core ↔ module** — the core knows only the contract. The device lifecycle ([`backend/client/modules.ts`](backend/client/modules.ts)) starts the modules that serve the current role (`roles`), routes every non-core RPC method to its owner's `dispatch` (rejecting it with 409 outside the module's roles, or while a `requireEnabled` module is disabled), deep-merges the modules' `status()` fragments into the `status` payload, seeds and backfills their settings slices from `configDefaults`, runs their `setup()` validators in the first-run wizard and their `resume()` on autostart. Modules receive one process-services bag ([`backend/client/module-core.ts`](backend/client/module-core.ts): state, saveState, logEvent, run, Supervisor, …) and talk to each other only over the **capability bus** by name (`stream.srtla`) — never by import. Module pushes go through `ctx.emit(event, data, { throttle, retain, summary })`; the control server stores retained frames and merges `summary` fields into its device list without knowing the event.
 
-**Persistence** — `config.json` holds the core settings plus every module's own sections verbatim (`state.data.<section>`, e.g. `encoder`, `srtla`, `modems`); existing config files keep working unchanged.
+**Persistence** — `config.json` holds the core settings plus each module's own sections (`state.data.<section>`, e.g. `encoder` and `srtla`) in the current format.
 
 **Ordering** — `resolveOrder` topologically sorts modules by their `dependencies` (cycle-safe, id-sorted when no edges); start/stop/status/resume all iterate that order, never a hand-maintained list.
 
 **Adding a module** — `mkdir modules/<id>` with `backend.ts` + `frontend.tsx` (+ `types.ts`, `styles.css`), declare `roles`, `methods`, hooks and capabilities as needed. No core edits — the scan and `predev` pick it up. Method and event names are frozen: renaming one is a breaking API change.
-
-### OBS client
-
-[`backend/obs-client/obs-client.ts`](backend/obs-client/obs-client.ts) is a **standalone device** for machines that run OBS Studio separately from the relay. It registers on the control server exactly like `backend/client/client.ts` (stable UUID, `role: "obs"` in the hello) and proxies between the browser dashboards and OBS:
-
-```sh
-bun backend/obs-client/obs-client.ts --obs ws://127.0.0.1:4455 \
-    --obs-password secret \
-    --remote ws://10.0.0.5:8090/device --remote-token secret
-```
-
-It speaks the full obs-websocket v5 handshake (Hello → Identify → Identified), forwards `Request`/`RequestBatch` verbatim from the server, resolves responses by request id, and republishes OBS events as `obs.event` frames so dashboards pick up scene/stream/record changes. It auto-reconnects with exponential backoff, emits a synthetic `ObsDisconnected` on drop, and replays a state snapshot as real-shaped events on reconnect. The same `ObsClient` library (`shared/obs/client.ts`) powers the `obs-controller` module in-process, so a relay with a local OBS needs no second websocket.
-
-Every flag has an env var counterpart — `CONFIG_FILE`, `OBS_URL`, `OBS_PASSWORD`, `CONTROL_SERVER_URL`, `CONTROL_SERVER_TOKEN`, `DEVICE_HOSTNAME`, `DEVICE_UUID`, `CONTROL_SERVER_INTERVAL` — with the same resolution order: **CLI flag > env var > config file > default** (see `--help`).
 
 ## Development
 
@@ -290,7 +280,6 @@ bun test
 # compiled single-file binaries
 bun run build:client     # → dist/client
 bun run build:server     # → dist/server
-bun run build:obs-client # → dist/obs-client
 ```
 
 Modules are discovered by a runtime scan of `modules/`; generated manifests in `generated/` are produced by `scripts/gen-modules.ts` (wired into `predev`/`pretest`/`prebuild:*`). The UI is localized via JSON catalogs (12 languages): the core strings in `i18n/` and each module's own in `modules/<id>/i18n/`, merged and served to the browser on demand as `/i18n/<lang>.json` (compiled binaries inline them through the generated `generated/i18n.ts`). The language is chosen in the first-run wizard and can be switched at any time from the header select; the device persists the choice in its config file.

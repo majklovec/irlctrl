@@ -43,6 +43,12 @@ export const SHAPES = {
 			<path d="M18.5 3a9.5 9.5 0 0 1 0 14" />
 		</>
 	),
+	combined: (
+		<>
+			<circle cx="12" cy="12" r="9" />
+			<path d="M12 3v18M3 12h18" />
+		</>
+	),
 	info: (
 		<>
 			<circle cx="12" cy="12" r="10" />
@@ -97,6 +103,9 @@ export const SHAPES = {
 
 export type IconName = keyof typeof SHAPES;
 
+export const isIconName = (name: string): name is IconName =>
+	Object.hasOwn(SHAPES, name);
+
 /** Log severity; the names match the icon entries (and the shared `LogLevel`). */
 export type Level = "info" | "warn" | "error";
 
@@ -112,18 +121,13 @@ export const Icon = {
 	),
 } as MithrilJSXComponent<{ name: IconName } & m.Attributes>;
 
-/** Role icon(s) with the translated role as tooltip; combined devices get both icons. */
+/** Generic role marker with the translated role as tooltip. */
 export const RoleTag = {
 	view: ({ attrs: { role } }) => (
 		<span class="role" title={t(`role.${role}`)}>
-			{role === "combined" ? (
-				[
-					<Icon name="encoder" class="role-icon role-icon-encoder" />,
-					<Icon name="relay" class="role-icon role-icon-relay" />,
-				]
-			) : (
+			{isIconName(role) ? (
 				<Icon name={role} class={`role-icon role-icon-${role}`} />
-			)}
+			) : null}
 		</span>
 	),
 } as MithrilJSXComponent<{ role: Role }>;

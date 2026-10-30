@@ -56,8 +56,12 @@ describe("config file projection", () => {
             hostname: "box",
             role: "relay",
             autostart: true,
-            srtla: { listenPort: "9000", remoteHost: "h", remotePort: "1" },
-            modems: { modems: ["wwan0"] },
+            srtla: {
+                listenPort: "9000",
+                remoteHost: "h",
+                remotePort: "1",
+                selection: { modems: ["wwan0"] },
+            },
         });
         expect(st.settings).toMatchObject({
             uuid: "u",
@@ -66,8 +70,12 @@ describe("config file projection", () => {
         });
         expect(st.autostart).toBe(true);
         expect(st.data).toEqual({
-            srtla: { listenPort: "9000", remoteHost: "h", remotePort: "1" },
-            modems: { modems: ["wwan0"] },
+            srtla: {
+                listenPort: "9000",
+                remoteHost: "h",
+                remotePort: "1",
+                selection: { modems: ["wwan0"] },
+            },
         });
     });
 });

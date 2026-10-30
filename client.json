@@ -36,12 +36,8 @@
     "port": "6000",
     "streamid": "test"
   },
-  "modems": {},
   "modules": {
     "encoder": {
-      "enabled": true
-    },
-    "modems": {
       "enabled": true
     },
     "obs-controller": {

@@ -3,7 +3,7 @@
  * control server: the status / settings / setup / device-list envelopes and
  * the dashboard shapes.
  *
- * Module-specific wire shapes (encoder, srtla, modems, obs-controller, ssh,
+ * Module-specific wire shapes (encoder, srtla, obs-controller, ssh,
  * chat, stats) live in the owning module's `modules/<id>/types.ts`; a module
  * narrows these envelopes with its own view types (e.g. `Status & {...}`) and
  * the core never names a module field. The modules/ tree may not contribute
@@ -11,7 +11,7 @@
  */
 import type { Language } from "./languages";
 import type { DashboardActionEntry } from "./module-contract";
-import type { Role } from "./validate";
+import type { Role, RoleDefinition } from "./roles";
 
 export type { DashboardAction, DashboardActionEntry } from "./module-contract";
 export type { Role };
@@ -51,6 +51,7 @@ export interface Settings {
     hasRemoteToken: boolean;
     color: string;
     language?: string;
+    roleDefinitions?: readonly RoleDefinition[];
     [key: string]: unknown;
 }
 
@@ -60,6 +61,7 @@ export interface SetupInfo {
     hostname: string;
     color: string;
     language: string;
+    roleDefinitions: readonly RoleDefinition[];
     [key: string]: unknown;
 }
 

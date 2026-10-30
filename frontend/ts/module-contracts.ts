@@ -10,8 +10,10 @@ import type {
     DeviceSummary,
     Role,
     ServerDashboardWidget,
+    Settings,
     SetupInfo,
     Status,
+    ModulesView,
     WidgetConfigField,
 } from "../types";
 import type { DeviceCard } from "./device/store";
@@ -179,3 +181,30 @@ export type FrontendRegistration =
     | FrontendModule
     | ChannelWidgetModule
     | DashboardWidgetModule;
+
+/** State and actions supplied to a module's settings-page contribution. */
+export interface ModuleContext {
+    rpc: RpcClient;
+    /** The role currently being edited ("" = keep current). */
+    role: string;
+    settings: Settings;
+    modules: ModulesView;
+    /** Status line rendered below the module's body. */
+    message: string;
+    /** True while one of the module's RPC calls is in flight. */
+    busy: boolean;
+    note(message: string): void;
+    setModules(modules: ModulesView): void;
+    run<T>(call: () => Promise<T>): Promise<T>;
+}
+
+/** A module's settings-page contribution. */
+export interface ModuleDef {
+    id: string;
+    titleKey: string;
+    selfCards?: boolean;
+    visible: (ctx: ModuleContext) => boolean;
+    render: (ctx: ModuleContext) => m.Children;
+    refresh?: (ctx: ModuleContext) => void;
+    log?: LogWording;
+}

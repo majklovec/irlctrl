@@ -81,6 +81,8 @@ describe("device RPC surface", () => {
         expect(new Set(names).size).toBe(names.length);
         expect([...names].sort()).toEqual(
             [
+                "broadcaster.start",
+                "broadcaster.stop",
                 "interfaces.list",
                 "reconfigure",
                 "modems.list",
@@ -238,9 +240,9 @@ describe("device RPC surface", () => {
     test("routes a module method to its owner's dispatch with the raw params", async () => {
         combinedDevice();
         const log = silenceLog();
-        const modems = moduleById("modems");
-        if (!modems) throw new Error("modems module missing");
-        const dispatch = spyOn(modems, "dispatch").mockResolvedValue({
+        const srtla = moduleById("srtla");
+        if (!srtla) throw new Error("srtla module missing");
+        const dispatch = spyOn(srtla, "dispatch").mockResolvedValue({
             modemIndex: 2,
             action: "enable",
             ok: false,

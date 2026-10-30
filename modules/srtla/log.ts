@@ -5,8 +5,32 @@ import {
     wording,
 } from "../../shared/logMessages";
 
+const modemAction = (action: string, key: string) =>
+    wording("Modems", action, (p) => logTranslate(key, { index: p.index }));
+
 const log: LogWording = {
     methods: {
+        "modems.select": wording(
+            "Interfaces",
+            "Bond selection",
+            "mlog.done.bond_updated",
+        ),
+        "modems.toggle": wording("Interfaces", "Bond toggle", (p) =>
+            logTranslate("mlog.done.bond_toggled", { iface: p.iface }),
+        ),
+        reconfigure: wording(
+            "Interfaces",
+            "Reconfigure",
+            "mlog.done.reconfigured",
+        ),
+        "modems.enable": modemAction("Enable", "mlog.done.modem_enabled"),
+        "modems.disable": modemAction("Disable", "mlog.done.modem_disabled"),
+        "modems.connect": modemAction("Connect", "mlog.done.modem_connected"),
+        "modems.disconnect": modemAction(
+            "Disconnect",
+            "mlog.done.modem_disconnected",
+        ),
+        "modems.reset": modemAction("Reset", "mlog.done.modem_reset"),
         "srtla.start": wording("SRTLA", "Start", "mlog.done.started"),
         "srtla.stop": wording("SRTLA", "Stop", "mlog.done.stopped"),
         "srtla.reload": wording("SRTLA", "Reload", "mlog.done.reloaded"),
@@ -25,8 +49,6 @@ const log: LogWording = {
                 .join(", "),
         ),
     },
-    // The srtla card also issues the bonding methods (modems module): give their
-    // browser-side failures a proper section too.
     sections: { srtla: "SRTLA", modems: "Modems", interfaces: "Interfaces" },
     labels: {
         SRTLA: "dev.card.srtla",

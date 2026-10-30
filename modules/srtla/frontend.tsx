@@ -1,8 +1,7 @@
 /* SRTLA card: srtla_send state, the receiver form and the scheduler options.
  * The SRTLA module is the relay device's single card: it composes the interfaces
- * table (with the live SRTLA link stats) and the modem panels (merged in from
- * the modems module), so the device page and the dashboard widgets show the
- * same content. */
+ * table (with the live SRTLA link stats) and the modem panels, so the device
+ * page and dashboard widgets show the same content. */
 import "./styles.css";
 import m from "mithril";
 import { Icon } from "../../frontend/ts/components/icons";
@@ -704,7 +703,7 @@ function modemPanel(host: DeviceCard, modem: ModemInfo): m.Vnode {
 
 function modemsCard(host: DeviceCard, status: SrtlaStatus): m.Vnode {
 	return (
-		<Card title={t("dev.card.modems")} class="mod-modems">
+		<Card title={t("dev.card.modems")} class="mod-srtla-modems">
 			{status.modems.length ? (
 				<div class="grid">
 					{status.modems.map((modem) => modemPanel(host, modem))}

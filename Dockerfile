@@ -31,7 +31,6 @@ COPY --from=builder /app/package.json /app/bun.lock ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/backend/client ./backend/client
 COPY --from=builder /app/backend/server ./backend/server
-COPY --from=builder /app/backend/obs-client ./backend/obs-client
 COPY --from=builder /app/modules ./modules
 COPY --from=builder /app/frontend ./frontend
 COPY --from=builder /app/shared ./shared

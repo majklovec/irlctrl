@@ -2,10 +2,9 @@
  * fieldGroup…) so its look comes from frontend/css/style.css; the .mod-srtla
  * class on the card root exists for future scoping.
  *
- * The .mod-modems styles (merged in from the modems module, whose frontend
- * now lives inside this one) scope the modem panels of the composite card.
+ * The modem panel styles are scoped within this module's composite card.
  */
-.mod-modems .modem {
+.mod-srtla-modems .modem {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 0.9rem 1rem;
@@ -14,21 +13,21 @@
         border-color var(--t),
         background var(--t);
 }
-.mod-modems .modem:hover {
+.mod-srtla-modems .modem:hover {
     border-color: var(--border-strong);
 }
-.mod-modems .modem h3 {
+.mod-srtla-modems .modem h3 {
     font-size: 0.95rem;
     margin: 0 0 0.5rem;
     display: flex;
     justify-content: space-between;
     gap: 0.5rem;
 }
-.mod-modems .modem dl {
+.mod-srtla-modems .modem dl {
     font-size: 0.85rem;
     margin-bottom: 0.75rem;
 }
-.mod-modems .modem .actions button {
+.mod-srtla-modems .modem .actions button {
     padding: 0.35rem 0.6rem;
     font-size: 0.8rem;
 }

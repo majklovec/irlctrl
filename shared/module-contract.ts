@@ -12,7 +12,7 @@
  */
 import type { LogWording } from "./logMessages";
 import type { Status, WidgetConfigField } from "./types";
-import type { Role } from "./validate";
+import type { Role, RoleDefinition } from "./roles";
 
 export type Params = Record<string, unknown>;
 
@@ -156,6 +156,8 @@ export interface BackendModule<TCore = unknown> {
     /** Module id = directory name. */
     id: string;
     title: string;
+    /** Roles contributed by this module; ids remain stable on the wire and in persisted settings. */
+    roleDefinitions?: readonly RoleDefinition[];
 
     // --- settings slice -----------------------------------------------------
     /** Key under `settings.modules` (defaults to `id`; lets a renamed module keep its stored slice). */
@@ -169,6 +171,8 @@ export interface BackendModule<TCore = unknown> {
     roles?: readonly Role[];
     /** Fresh devices start the module disabled even on its roles (default: enabled on its roles). */
     enabledByDefault?: boolean;
+    /** Roles that receive an enabled default when the module serves multiple roles. */
+    enabledByDefaultRoles?: readonly Role[];
     /** Reject the module's methods (409) while its slice is disabled. */
     requireEnabled?: boolean;
 

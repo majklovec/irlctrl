@@ -11,7 +11,12 @@
 import type { Role } from "../../shared/validate";
 import { cancelAutostart } from "./autostart";
 import { hasCapability, requireCapability } from "./capabilities";
-import { argv, CONFIG_FILE, DRY_RUN, LOG_FILE, ROLE } from "./config";
+import {
+    argv,
+    DRY_RUN,
+    LOG_FILE,
+    ROLE,
+} from "./config";
 import { logEvent } from "./eventlog";
 import { run } from "./exec";
 import { writeFileAtomic } from "./files";
@@ -28,7 +33,6 @@ import { Supervisor } from "./supervisor";
 export interface ModuleCore {
     config: {
         argv: readonly string[];
-        CONFIG_FILE: string;
         DRY_RUN: boolean;
         LOG_FILE: string;
         /** The process role from the CLI / config file. */
@@ -62,7 +66,7 @@ export function buildModuleCore(
     moduleEnabled: (id: string) => boolean,
 ): ModuleCore {
     return {
-        config: { argv, CONFIG_FILE, DRY_RUN, LOG_FILE, ROLE },
+        config: { argv, DRY_RUN, LOG_FILE, ROLE },
         role: () => state.settings.role ?? ROLE,
         state,
         saveState,

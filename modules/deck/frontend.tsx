@@ -26,7 +26,6 @@ import {
 	DECK_MAX_SIZE,
 	DECK_MIN_SIZE,
 	DECK_WIDGET_TYPE,
-	layoutButtons,
 	mergedParams,
 	nextButtonSlot,
 	parseButtons,
@@ -142,12 +141,11 @@ const stateTitle = (r: Resolved): string => {
 	return t("deck.unavailable");
 };
 
-/** The configured layout, every key guaranteed a slot (legacy layouts — no
- * stored positions — are packed into the first free cells). */
+/** The configured layout. */
 function laidOutButtons(
 	config: Record<string, string> | undefined,
 ): ButtonConfig[] {
-	return layoutButtons(configuredButtons(config));
+	return configuredButtons(config);
 }
 
 /** The inner content of one key (icon, label, device) — shared by the live
@@ -289,10 +287,8 @@ function editorFor(values: Record<string, string>): EditorState {
 		} catch {
 			// unparsable stored layout — start over
 		}
-		// Guarantee every key a slot before the canvas renders it (legacy
-		// layouts carry no positions).
 		state = {
-			deck: layoutButtons(deck).map((b) => ({
+			deck: deck.map((b) => ({
 				...b,
 				paramsText: b.paramsOverride
 					? JSON.stringify(b.paramsOverride, null, 1)
@@ -325,16 +321,18 @@ function parseParamsText(text: string): {
 function commit(values: Record<string, string>, state: EditorState): void {
 	values[DECK_FIELD] = serializeButtons(
 		state.deck.map(({ paramsText, ...b }) => {
-			const out: ButtonConfig = { deviceId: b.deviceId, actionId: b.actionId };
+			const out: ButtonConfig = {
+				deviceId: b.deviceId,
+				actionId: b.actionId,
+				x: b.x,
+				y: b.y,
+				w: b.w,
+				h: b.h,
+			};
 			if (b.labelOverride) out.labelOverride = b.labelOverride;
 			if (b.iconOverride) out.iconOverride = b.iconOverride;
 			const { params } = parseParamsText(paramsText);
 			if (params) out.paramsOverride = params;
-			// The key's slot in the internal grid.
-			if (b.x !== undefined) out.x = b.x;
-			if (b.y !== undefined) out.y = b.y;
-			if (b.w !== undefined) out.w = b.w;
-			if (b.h !== undefined) out.h = b.h;
 			return out;
 		}),
 	);

@@ -20,6 +20,7 @@ import {
 	Field,
 	FieldGroup,
 	Form,
+	Input,
 	NumberField,
 	Options,
 	Select,
@@ -31,8 +32,10 @@ import type {
 	DeviceDashboardContext,
 	DeviceDashboardWidget,
 	FrontendModule,
+	ModuleSetupStep,
 } from "../../frontend/ts/module-contracts";
 import { since, uuid } from "../../frontend/ts/util";
+import type { Role, SetupInfo } from "../../shared/types";
 import type { ObsModuleView, ObsStatus, SwitcherStatus } from "./types";
 import { VUMeter, type VuLevels } from "./vu-meter";
 
@@ -1102,6 +1105,73 @@ function dashboardPanel(context: DeviceDashboardContext): DashboardPanel {
 	return entry;
 }
 
+const setupFields = {
+	obsUrl: "ws://127.0.0.1:4455",
+	obsPassword: "",
+};
+let setupFieldsInitialized = false;
+
+function isObsUrl(value: string): boolean {
+	try {
+		const url = new URL(value.trim());
+		return (
+			(url.protocol === "ws:" || url.protocol === "wss:") &&
+			url.hostname !== ""
+		);
+	} catch {
+		return false;
+	}
+}
+
+const obsSetupStep: ModuleSetupStep = {
+	id: "obs",
+	title: "set.obs",
+	subtitle: "set.obs_desc",
+	roles: ["obs"],
+	isValid: () => isObsUrl(setupFields.obsUrl),
+	render(_role: Role, info: SetupInfo) {
+		if (!setupFieldsInitialized) {
+			if (typeof info.obsUrl === "string")
+				setupFields.obsUrl = info.obsUrl;
+			setupFieldsInitialized = true;
+		}
+		return (
+			<>
+				<Field
+					label={t("set.obs_url")}
+					control={
+						<Input
+							target={setupFields}
+							prop="obsUrl"
+							placeholder="ws://127.0.0.1:4455"
+							required={true}
+						/>
+					}
+				/>
+				<Field
+					label={t("set.obs_password")}
+					control={
+						<Input
+							target={setupFields}
+							prop="obsPassword"
+							type="password"
+							autocomplete="off"
+						/>
+					}
+				/>
+			</>
+		);
+	},
+	config() {
+		return {
+			obsUrl: setupFields.obsUrl.trim(),
+			...(setupFields.obsPassword
+				? { obsPassword: setupFields.obsPassword }
+				: {}),
+		};
+	},
+};
+
 const obsDashboardWidgets: DeviceDashboardWidget[] = [
 	{
 		type: "obs",
@@ -1146,7 +1216,9 @@ const obsControllerModule: FrontendModule = (() => {
 		kind: "device-card",
 		title: "OBS",
 		order: 30,
-		available: (status) => status.modules["obs-controller"]?.enabled === true,
+		setupSteps: [obsSetupStep],
+		available: (status) =>
+			status.modules["obs-controller"]?.enabled === true,
 		dashboardWidgets: obsDashboardWidgets,
 		defaultSize: { w: 6, h: 13 },
 		minSize: { w: 4, h: 4 },

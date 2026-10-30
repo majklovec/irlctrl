@@ -11,12 +11,19 @@ import type {
     ModuleSlice,
     Params,
 } from "../../shared/module-contract";
-import { ALL_MODULES, moduleById } from "../../shared/registry";
+import { argFail } from "../../shared/args";
+import {
+    ALL_MODULES,
+    isRegisteredRole,
+    moduleById,
+    roleDefinitions,
+} from "../../shared/registry";
 import { deepMerge } from "../../shared/util";
 import type { Role } from "../../shared/validate";
 import { runAutostart as runAutostartWith } from "./autostart";
 import { provideCapability } from "./capabilities";
 import { logEvent } from "./eventlog";
+import { ROLE } from "./config";
 import { buildModuleCore, type ModuleCore } from "./module-core";
 import { pushModuleEvent } from "./push";
 import {
@@ -33,6 +40,15 @@ type Module = BackendModule<ModuleCore>;
 const DEVICE_MODULES = ALL_MODULES.filter(
     (m) => m.kind === "device",
 ) as Module[];
+
+if (!isRegisteredRole(ROLE))
+    argFail("--role", ROLE, roleDefinitions().map((role) => role.id).join(" | "));
+if (state.settings.role && !isRegisteredRole(state.settings.role))
+    argFail(
+        "config role",
+        state.settings.role,
+        roleDefinitions().map((role) => role.id).join(" | "),
+    );
 
 // ---------------------------------------------------------------------------
 // Settings slices
@@ -55,7 +71,13 @@ const servesRole = (mod: BackendModule, role: Role): boolean =>
 /** The slice a fresh device gets for `mod` on `role`. */
 const defaultSlice = (mod: BackendModule, role: Role): ModuleSlice =>
     deepMerge(
-        { enabled: servesRole(mod, role) && mod.enabledByDefault !== false },
+        {
+            enabled:
+                servesRole(mod, role) &&
+                (mod.enabledByDefaultRoles
+                    ? mod.enabledByDefaultRoles.includes(role)
+                    : mod.enabledByDefault !== false),
+        },
         mod.configDefaults,
     );
 

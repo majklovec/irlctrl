@@ -3,7 +3,6 @@ import {
     buttonDevices,
     DECK_FIELD,
     DECK_GRID_COLUMNS,
-    layoutButtons,
     mergedParams,
     nextButtonSlot,
     orphanedButtons,
@@ -56,12 +55,12 @@ describe("dashboard action catalogue (status.actions)", () => {
 
     test("merges the actions of the enabled modules that serve the role", () => {
         const keys = dashboardActionsFor(
-            status("combined", { encoder: true, relay: true, modems: false }),
+            status("combined", { encoder: true, relay: false }),
         ).map((a) => a.key);
         expect(keys).toContain(dashboardActionKey("encoder", "stop"));
-        expect(keys).toContain(dashboardActionKey("srtla", "reload"));
-        // disabled module → no actions
-        expect(keys).not.toContain(dashboardActionKey("modems", "reconfigure"));
+        // Disabled SRTLA module → neither relay nor modem actions.
+        expect(keys).not.toContain(dashboardActionKey("srtla", "reconfigure"));
+        expect(keys).not.toContain(dashboardActionKey("srtla", "reload"));
         // not enabled at all (no slice) → no actions
         expect(keys.some((k) => k.startsWith("obs-controller."))).toBe(false);
     });
@@ -193,30 +192,45 @@ describe("deck widget config", () => {
         expect(parseButtons(undefined)).toEqual([]);
         const deck = parseButtons(
             JSON.stringify([
-                { deviceId: "d1", actionId: "encoder.stop" },
+                {
+                    deviceId: "d1",
+                    actionId: "encoder.stop",
+                    x: 0,
+                    y: 0,
+                    w: 2,
+                    h: 2,
+                },
                 {
                     deviceId: "d2",
                     actionId: "encoder.start",
                     labelOverride: "GO",
                     iconOverride: "",
                     paramsOverride: { pipeline: "p" },
+                    x: 2,
+                    y: 0,
+                    w: 2,
+                    h: 2,
                 },
             ]),
         );
         expect(deck).toEqual([
-            { deviceId: "d1", actionId: "encoder.stop" },
+            { deviceId: "d1", actionId: "encoder.stop", x: 0, y: 0, w: 2, h: 2 },
             {
                 deviceId: "d2",
                 actionId: "encoder.start",
                 labelOverride: "GO",
                 paramsOverride: { pipeline: "p" },
+                x: 2,
+                y: 0,
+                w: 2,
+                h: 2,
             },
         ]);
         expect(parseButtons(serializeButtons(deck))).toEqual(deck);
         expect(buttonDevices([...deck, deck[0]])).toEqual(["d1", "d2"]);
     });
 
-    test("round-trips the internal-grid position (x/y/w/h) when present", () => {
+    test("round-trips the required internal-grid position (x/y/w/h)", () => {
         const deck = parseButtons(
             JSON.stringify([
                 {
@@ -284,25 +298,15 @@ describe("deck widget config", () => {
         expect(nextButtonSlot(wide)).toEqual({ x: 0, y: 1, w: 2, h: 2 });
     });
 
-    test("layoutButtons keeps stored positions and fills the rest in order", () => {
-        const input = [
-            { deviceId: "d", actionId: "a", x: 4, y: 0, w: 2, h: 2 },
-            { deviceId: "d", actionId: "b" }, // no position → first free (0,0)
-            { deviceId: "d", actionId: "c" }, // no position → next free (2,0)
-        ];
-        const out = layoutButtons(input);
-        expect(out).toEqual([
-            { deviceId: "d", actionId: "a", x: 4, y: 0, w: 2, h: 2 },
-            { deviceId: "d", actionId: "b", x: 0, y: 0, w: 2, h: 2 },
-            { deviceId: "d", actionId: "c", x: 2, y: 0, w: 2, h: 2 },
-        ]);
-        // pure: the input is not mutated
-        expect(input[1].x).toBeUndefined();
+    test("rejects layouts without an internal-grid position", () => {
+        expect(() =>
+            parseButtons('[{"deviceId":"d","actionId":"a"}]'),
+        ).toThrow("position is required");
     });
 
     test("rejects malformed layouts", () => {
         const b = (extra: string) =>
-            `[{"deviceId":"d","actionId":"a"${extra}}]`;
+            `[{"deviceId":"d","actionId":"a","x":0,"y":0,"w":2,"h":2${extra}}]`;
         expect(() => parseButtons("nope")).toThrow("JSON array");
         expect(() => parseButtons('{"actionId":"x"}')).toThrow("JSON array");
         expect(() => parseButtons("[{}]")).toThrow("deviceId");
@@ -326,7 +330,14 @@ describe("deck widget config", () => {
             method: "m.x",
             params: { a: 1, b: 2 },
         };
-        const button = { deviceId: "d", actionId: "m.x" };
+        const button = {
+            deviceId: "d",
+            actionId: "m.x",
+            x: 0,
+            y: 0,
+            w: 2,
+            h: 2,
+        };
         expect(mergedParams(action, button)).toEqual({ a: 1, b: 2 });
         expect(
             mergedParams(action, { ...button, paramsOverride: { b: 3, c: 4 } }),
@@ -344,10 +355,16 @@ describe("deck widget config", () => {
             // "theirs" is another user's live device; "gone" was pruned
             deviceExists: (id: string) => id !== "gone",
         });
-        const layout = (
-            ...deck: { deviceId: string; actionId: string }[]
-        ) => ({
-            [DECK_FIELD]: JSON.stringify(deck),
+        const layout = (...deck: { deviceId: string; actionId: string }[]) => ({
+            [DECK_FIELD]: JSON.stringify(
+                deck.map((button, index) => ({
+                    ...button,
+                    x: (index % 6) * 2,
+                    y: Math.floor(index / 6) * 2,
+                    w: 2,
+                    h: 2,
+                })),
+            ),
         });
         const ok = layout({ deviceId: "mine", actionId: "encoder.stop" });
         const orphan = layout(

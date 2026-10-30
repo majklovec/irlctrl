@@ -6,10 +6,13 @@ import {
     type LogEvent,
     type LogLevel,
 } from "../../shared/logMessages";
-import { dashboardActionsFor } from "../../shared/registry";
+import {
+    dashboardActionsFor,
+    isRegisteredRole,
+} from "../../shared/registry";
 import type { DeviceInfo, DeviceSummary, Status } from "../../shared/types";
 import { parseJsonObject, textOf } from "../../shared/util";
-import { COLOR_RE, isRole, type Role } from "../../shared/validate";
+import { COLOR_RE, type Role } from "../../shared/validate";
 import {
     devicesTopic,
     event,
@@ -271,7 +274,7 @@ export function createDevices({
                 const role = d.status?.role;
                 // A role change is structural — refresh the list at once for it
                 if (
-                    updateDevice(d, { role: isRole(role) ? role : undefined })
+                    updateDevice(d, { role: isRegisteredRole(role) ? role : undefined })
                 ) {
                     publishToDevice(d, deviceEvent(d));
                     publishDeviceList(true);
@@ -310,7 +313,7 @@ export function createDevices({
             // The per-uuid parameters the device reports about itself; a color change
             // re-themes the list dot, a hostname change the display name
             const changed = updateDevice(d, {
-                role: isRole(msg.role) ? msg.role : undefined,
+                role: isRegisteredRole(msg.role) ? msg.role : undefined,
                 hostname:
                     typeof msg.hostname === "string" && msg.hostname !== ""
                         ? msg.hostname
@@ -528,7 +531,7 @@ export function createDevices({
             id,
             address,
             owner: user,
-            role: isRole(role) ? role : undefined,
+            role: isRegisteredRole(role) ? role : undefined,
         };
     }
 

@@ -296,6 +296,22 @@ const encoderModule: BackendModule<ModuleCore> = {
     kind: "device",
     id: "encoder",
     title: "Encoder",
+    roleDefinitions: [
+        {
+            id: "encoder",
+            titleKey: "role.encoder",
+            taglineKey: "setup.role.encoder_tag",
+            order: 20,
+            setupSelectable: true,
+        },
+        {
+            id: "combined",
+            titleKey: "role.combined",
+            taglineKey: "setup.role.combined_tag",
+            order: 30,
+            setupSelectable: true,
+        },
+    ],
     secretFields: [],
     roles: ["encoder", "combined"],
     methodRoles: { "stream.start": ["combined"], "stream.stop": ["combined"] },

@@ -67,6 +67,7 @@ export const def: ModuleDef = {
 							target={draft}
 							prop="obsUrl"
 							placeholder="ws://127.0.0.1:4455"
+							required={true}
 						/>
 					}
 				/>

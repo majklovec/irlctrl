@@ -6,7 +6,7 @@
  */
 import m from "mithril";
 import { errorMessage } from "../../shared/util";
-import { DEFAULT_COLOR, ROLES } from "../../shared/validate";
+import { DEFAULT_COLOR } from "../../shared/validate";
 import type { ModulesView, Settings } from "../types";
 import {
 	Actions,
@@ -164,7 +164,11 @@ function settingsCard(): m.Vnode {
 							prop="role"
 							onChange={() => setDraftRole(draft.role)}
 						>
-							<Options pairs={ROLES.map((r) => [r, t(`role.${r}`)] as const)} />
+							<Options
+								pairs={(state.settings?.roleDefinitions ?? []).map(
+									({ id, titleKey }) => [id, t(titleKey)] as const,
+								)}
+							/>
 						</Select>
 					}
 				/>

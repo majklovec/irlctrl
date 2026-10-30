@@ -2,9 +2,9 @@
  * Interface detection, bonding selection, source-based routing tables,
  * uplinks file management and the live netlink interface monitor.
  *
- * Bound by the module at discovery (`bindRouting`): the core bag supplies the
- * dry-run aware `ip` runner, atomic writes and the persisted selection; the
- * module supplies the ModemManager lookups.
+ * Bound by the SRTLA module at discovery (`bindRouting`): the core bag supplies
+ * the dry-run aware `ip` runner and atomic writes; the module supplies the
+ * ModemManager lookups.
  */
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -151,10 +151,11 @@ function getNetwork(ipAddr: string, prefix: number): string {
 }
 
 // ----------------------------------------------------------------------
-// Selection (persisted as the `modems` config section)
+// Selection (persisted in the SRTLA config section)
 // ----------------------------------------------------------------------
 export const selection = (): ModemConfig =>
-    (core.state.data.modems ?? {}) as ModemConfig;
+    ((core.state.data.srtla as Record<string, unknown> | undefined)?.selection ??
+        {}) as ModemConfig;
 
 /** The interfaces chosen for bonding: by name, else by IP, else all of them. */
 export function resolveSelection(all: Iface[]): Iface[] {
@@ -165,7 +166,8 @@ export function resolveSelection(all: Iface[]): Iface[] {
 }
 
 export async function setSelection(next: ModemConfig): Promise<void> {
-    core.state.data.modems = next;
+    const stored = (core.state.data.srtla ?? {}) as Record<string, unknown>;
+    core.state.data.srtla = { ...stored, selection: next };
     await core.saveState();
 }
 

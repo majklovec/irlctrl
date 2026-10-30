@@ -4,7 +4,7 @@
  */
 import type { DeviceSummary, Status } from "../../shared/types";
 
-/** The lifecycle of the srtla_rec + gstreamer stream on the relay. */
+/** The lifecycle of the srtla_rec + ffmpeg stream on the relay. */
 export type SrtlaStreamState = "idle" | "starting" | "running" | "stopping";
 
 /** One RTMP destination the pipeline publishes to (key masked for the UI). */

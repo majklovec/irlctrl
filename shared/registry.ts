@@ -28,6 +28,7 @@ import type {
     ModuleWidget,
     WidgetConfigContext,
 } from "./module-contract";
+import type { Role, RoleDefinition } from "./roles";
 import type { ServerDashboard, Status, WidgetConfigField } from "./types";
 import { isCompiledBinary } from "./util";
 
@@ -115,7 +116,30 @@ function validate(mod: unknown, file: string): asserts mod is BackendModule {
         fn(name);
     strings("dependencies");
     strings("roles");
+    strings("enabledByDefaultRoles");
     strings("secretFields");
+    if (m.roleDefinitions !== undefined) {
+        if (
+            !Array.isArray(m.roleDefinitions) ||
+            m.roleDefinitions.some(
+                (r) =>
+                    !(r instanceof Object) ||
+                    typeof (r as RoleDefinition).id !== "string" ||
+                    (r as RoleDefinition).id === "" ||
+                    typeof (r as RoleDefinition).titleKey !== "string" ||
+                    !Number.isFinite((r as RoleDefinition).order) ||
+                    ((r as RoleDefinition).taglineKey !== undefined &&
+                        typeof (r as RoleDefinition).taglineKey !== "string") ||
+                    ((r as RoleDefinition).default !== undefined &&
+                        typeof (r as RoleDefinition).default !== "boolean") ||
+                    ((r as RoleDefinition).setupSelectable !== undefined &&
+                        typeof (r as RoleDefinition).setupSelectable !== "boolean"),
+            )
+        )
+            throw new Error(
+                `module ${id}: roleDefinitions must be valid role metadata`,
+            );
+    }
     if (m.pages !== undefined) {
         if (
             !Array.isArray(m.pages) ||
@@ -230,6 +254,34 @@ export const ALL_MODULES: readonly BackendModule[] = resolveOrder([
 ]);
 
 for (const mod of ALL_MODULES) if (mod.log) registerLogWording(mod.log);
+
+const ROLE_DEFINITIONS: readonly RoleDefinition[] = ALL_MODULES.flatMap(
+    (mod) => mod.roleDefinitions ?? [],
+).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+const roleIds = new Set<string>();
+for (const definition of ROLE_DEFINITIONS) {
+    if (roleIds.has(definition.id))
+        throw new Error(`duplicate role definition ${definition.id}`);
+    roleIds.add(definition.id);
+}
+if (ROLE_DEFINITIONS.filter((definition) => definition.default).length !== 1)
+    throw new Error("module role definitions must declare exactly one default role");
+
+/** Module-contributed roles, sorted for stable setup/settings presentation. */
+export const roleDefinitions = (): readonly RoleDefinition[] =>
+    ROLE_DEFINITIONS;
+
+/** The valid role ids contributed by registered modules. */
+export const registeredRoleIds = (): readonly Role[] =>
+    ROLE_DEFINITIONS.map((definition) => definition.id);
+
+/** Default role selected by the module that contributes it. */
+export const defaultRole = (): Role =>
+    ROLE_DEFINITIONS.find((definition) => definition.default)!.id;
+
+/** Whether a value names a role contributed by a registered module. */
+export const isRegisteredRole = (value: unknown): value is Role =>
+    typeof value === "string" && roleIds.has(value);
 
 const byId = new Map(ALL_MODULES.map((m) => [m.id, m]));
 const byConfigKey = new Map(ALL_MODULES.map((m) => [m.configKey ?? m.id, m]));

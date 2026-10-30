@@ -1,5 +1,73 @@
-/* Local types of the srtla module (never imported by the core or other modules). */
+/* Types owned by the combined SRTLA, interface-routing and modem domain. */
 import type { DeviceSummary, Status } from "../../shared/types";
+
+export interface Iface {
+    iface: string;
+    ip: string;
+    prefix: number;
+    cidr: string;
+    speed?: number;
+    modemIndex?: number;
+    modemPath?: string;
+    signalQuality?: number;
+    operatorName?: string;
+    accessTech?: string;
+    registered?: boolean;
+    connectionState?: string;
+}
+
+export interface ModemConfig {
+    modems?: string[];
+    ips?: string[];
+}
+
+export interface ModemInfo {
+    index: number;
+    path: string;
+    state: string;
+    powerState: string;
+    signalQuality?: number;
+    accessTech?: string;
+    operatorName?: string;
+    registrationState?: string;
+    model?: string;
+    manufacturer?: string;
+    imei?: string;
+    primaryPort?: string;
+    deviceId?: string;
+    simPath?: string;
+}
+
+export interface ReconfigureResult {
+    ok: boolean;
+    selected: Iface[];
+    uplinksFile: string;
+    ips: string[];
+    changed: boolean;
+    error?: string;
+}
+
+export interface ModemSource {
+    detect(): Promise<ModemInfo[]>;
+    modemIface(modem: ModemInfo): Promise<string | null>;
+}
+
+export interface SrtlaTarget {
+    listenPort: string;
+    remoteHost: string;
+    remotePort: string;
+}
+
+export interface SrtlaState {
+    running: boolean;
+    pid?: number;
+    listenPort?: string;
+    remoteHost?: string;
+    remotePort?: string;
+    startedAt?: number;
+    lastReloadAt?: number;
+    reloadCount?: number;
+}
 
 export type SrtlaMode = "classic" | "enhanced";
 export const SRTLA_MODES: readonly SrtlaMode[] = ["classic", "enhanced"];
@@ -13,13 +81,6 @@ export interface SrtlaOptions {
 export interface SrtlaOptionsResult {
     options: SrtlaOptions;
     applied: boolean;
-}
-
-/** The persisted receiver target (`state.srtlaTarget`). */
-export interface SrtlaTarget {
-    listenPort: string;
-    remoteHost: string;
-    remotePort: string;
 }
 
 /** The control socket (`srtlaControl` status fragment). */
@@ -67,58 +128,7 @@ export interface SrtlaStatsEvent {
     stats: SrtlaStats | null;
 }
 
-/** Runtime state of srtla_send, published under `state.srtla`. */
-export interface SrtlaState {
-    running: boolean;
-    pid?: number;
-    listenPort?: string;
-    remoteHost?: string;
-    remotePort?: string;
-    startedAt?: number;
-    lastReloadAt?: number;
-    reloadCount?: number;
-}
-
-// The uplink shapes below mirror the modems module's wire types (modules/modems/types.ts):
-// the srtla card renders that module's status fragment and may not import it.
-export interface Iface {
-    iface: string;
-    ip: string;
-    prefix: number;
-    cidr: string;
-    speed?: number;
-    modemIndex?: number;
-    modemPath?: string;
-    signalQuality?: number;
-    operatorName?: string;
-    accessTech?: string;
-    registered?: boolean;
-    connectionState?: string;
-}
-
-export interface ModemConfig {
-    modems?: string[];
-    ips?: string[];
-}
-
-export interface ModemInfo {
-    index: number;
-    path: string;
-    state: string;
-    powerState: string;
-    signalQuality?: number;
-    accessTech?: string;
-    operatorName?: string;
-    registrationState?: string;
-    model?: string;
-    manufacturer?: string;
-    imei?: string;
-    primaryPort?: string;
-    deviceId?: string;
-    simPath?: string;
-}
-
-/** The status envelope as the srtla card reads it (srtla + modems fragments merged in). */
+/** The status envelope exposed by the SRTLA module. */
 export type SrtlaStatus = Status & {
     state: {
         srtla: SrtlaState;
@@ -151,17 +161,5 @@ export interface SrtlaConfig {
     quality: boolean;
     remoteHost: string;
     remotePort: string;
-}
-
-/** The `stream.srtla` capability (consumed by the encoder module for combined devices). */
-export interface SrtlaCapability {
-    srtlaStatus(): SrtlaState;
-    startSrtla(
-        listenPort: string,
-        remoteHost: string,
-        remotePort: string,
-    ): Promise<SrtlaState>;
-    stopSrtla(): Promise<void>;
-    reloadSrtla(): Promise<void>;
-    target(): SrtlaTarget | undefined;
+    selection?: ModemConfig;
 }

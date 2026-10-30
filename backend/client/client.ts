@@ -47,7 +47,7 @@ async function main(): Promise<void> {
     if (flag("--help") || flag("-h")) {
         console.log(
             "Usage: bun backend/client/client.ts [--config /path/to/config.json] [--dry-run] [--port 8085] " +
-                "[--role relay|encoder|combined|obs] [--remote ws://host:port/device] [--remote-token secret]",
+                "[--role <registered-role>] [--remote ws://host:port/device] [--remote-token secret]",
         );
         console.log(
             "Every flag also has an env var counterpart (token/URL: CONTROL_SERVER_TOKEN /" +

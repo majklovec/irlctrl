@@ -1,14 +1,14 @@
-# Device image — runs `backend/client/client.ts` in the `relay` or `encoder` role.
+# Device image — runs `backend/client/client.ts` in any registered role.
 #
 # Unlike the control image (Dockerfile), this bundles the device runtime:
-#   - backend/client/ + shared/ + modules/ (the relay/encoder client),
-#   - the native streaming binaries (srtla_send, ceracoder, belacoder),
+#   - backend/client/ + shared/ + modules/ (the module-driven device client),
+#   - the native streaming binaries (srtla_send, srtla_rec, ceracoder, belacoder),
 #   - the GStreamer pipeline definitions (pipeline/),
-#   - GStreamer itself, since ceracoder/belacoder drive the encode pipeline.
+#   - GStreamer itself, since ceracoder/belacoder drive the encode pipeline,
+#     plus ffmpeg for the broadcaster module.
 #
 # Pick the role per container with `--role` (see docker-compose.yaml):
-#   relay   -> bonds SRT out via srtla_send (needs no root in-container)
-#   encoder -> runs ceracoder/belacoder and sends SRT to a relay
+#   relay / encoder / combined / obs / broadcaster
 #
 # SRT is built from the CERALIVE fork (Haivision 1.5.7 + BELABOX patches), the
 # same source the Armbian device image uses (armbian/userpatches/
@@ -28,6 +28,20 @@ RUN git clone --depth=1 https://github.com/CERALIVE/srt.git . \
     -DENABLE_ENCRYPTION=ON -DCRYPTO=openssl \
     && make -j"$(nproc)" \
     && make install
+
+# ---- SRTLA receiver build stage (broadcaster role) ----
+FROM oven/bun:1 AS srtla-rec-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /srtla
+RUN git clone --quiet https://github.com/irlserver/srtla.git . \
+    && git checkout --quiet --force b8359bc \
+    && git submodule update --init --recursive --quiet \
+    && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build build --target srtla_rec --parallel "$(nproc)"
 
 # ---- Bun build stage ----
 FROM oven/bun:1 AS builder
@@ -60,6 +74,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
     gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
     gstreamer1.0-libav gstreamer1.0-x \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 # ssh in this container runs without a PAM stack (none is installed):
 #  - `UsePAM no` so sshd starts and `chpasswd` (password reset) can set the
@@ -73,8 +88,12 @@ RUN sed -i 's/^#\?UsePAM.*/UsePAM no/' /etc/ssh/sshd_config \
 # libsrt.so.1 soname. Copy the built tree and bridge the soname so the loader
 # resolves libsrt.so.1 to the fork.
 COPY --from=srt-builder /usr/local/lib /usr/local/lib
+COPY --from=srtla-rec-builder /srtla/build/srtla_rec /usr/local/bin/srtla_rec
 RUN ln -s /usr/local/lib/libsrt.so.1.5.7 /usr/lib/x86_64-linux-gnu/libsrt.so.1 \
-    && ldconfig
+    && ldconfig \
+    && chmod +x /usr/local/bin/srtla_rec \
+    && mkdir -p /home/srtla/.config/broadcaster/profiles \
+    && chown -R 1000:1000 /home/srtla
 
 WORKDIR /app
 

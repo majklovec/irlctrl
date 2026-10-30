@@ -12,64 +12,15 @@
  */
 import m from "mithril";
 import SETTINGS_MANIFEST from "../../generated/modules.settings";
-import { type LogWording, registerLogWording } from "../../shared/logMessages";
+import { registerLogWording } from "../../shared/logMessages";
 import { errorMessage } from "../../shared/util";
 import type { ModulesView, Settings } from "../types";
 import { Card } from "./components/ui";
 import { t } from "./i18n";
 import type { RpcClient } from "./services/rpc";
+import type { ModuleContext, ModuleDef } from "./module-contracts";
 
-/** Everything a module needs to render and act. */
-export interface ModuleContext {
-	rpc: RpcClient;
-	/** The role currently being edited ("" = keep current). */
-	role: string;
-	settings: Settings;
-	modules: ModulesView;
-	/** Status line rendered below the module's body. */
-	message: string;
-	/** True while one of the module's RPC calls is in flight. */
-	busy: boolean;
-	/** Set the module's status line. */
-	note(message: string): void;
-	/** Adopt the server's module list (e.g. after modules.configure). */
-	setModules(modules: ModulesView): void;
-	/**
-	 * Run an RPC call: clears the status, tracks busy state, routes
-	 * errors into the status line and rethrows.
-	 */
-	run<T>(call: () => Promise<T>): Promise<T>;
-}
-
-export interface ModuleDef {
-	/** Module id, matches the server's modules list (e.g. "encoder"). */
-	id: string;
-	/** i18n key for the card title (ignored when `selfCards` is true). */
-	titleKey: string;
-	/**
-	 * When true, `render` returns the module's own <Card> element(s) and is
-	 * not wrapped in the framework's single titled card. Use for modules
-	 * that want several cards of their own (e.g. encoder: repositories +
-	 * pipelines).
-	 */
-	selfCards?: boolean;
-	/** Whether the card is shown for the current role/module state. */
-	visible: (ctx: ModuleContext) => boolean;
-	/**
-	 * Card body: the module's own form fields and action buttons. When
-	 * `selfCards` is set, the returned vnodes must be (a list of) Card
-	 * elements with keys.
-	 */
-	render: (ctx: ModuleContext) => m.Children;
-	/** Re-seed the module's local state from fresh server data. */
-	refresh?: (ctx: ModuleContext) => void;
-	/**
-	 * Log wording for the module's methods (browser-side failure messages,
-	 * section labels) — the settings-only modules have no frontend.tsx to
-	 * register it through, so the framework does.
-	 */
-	log?: LogWording;
-}
+export type { ModuleContext, ModuleDef } from "./module-contracts";
 
 interface moduleState {
 	message: string;

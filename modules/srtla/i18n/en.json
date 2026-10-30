@@ -61,5 +61,17 @@
     "wtype.relay": "Relay",
     "act.srtla.stop": "Stop SRTLA",
     "act.srtla.reload": "Reload uplinks",
-    "act.srtla.start": "Start SRTLA"
+    "act.srtla.start": "Start SRTLA",
+    "log.reconfigure_failed": "Initial reconfigure failed: {{error}}",
+    "mlog.action.bond_selection": "Bond selection",
+    "mlog.action.bond_toggle": "Bond toggle",
+    "mlog.done.bond_toggled": "{{iface}} toggled in bond",
+    "mlog.done.bond_updated": "Bond selection updated",
+    "mlog.done.modem_connected": "Modem #{{index}} connected",
+    "mlog.done.modem_disabled": "Modem #{{index}} disabled",
+    "mlog.done.modem_disconnected": "Modem #{{index}} disconnected",
+    "mlog.done.modem_enabled": "Modem #{{index}} enabled",
+    "mlog.done.modem_reset": "Modem #{{index}} reset",
+    "mlog.done.reconfigured": "Reconfigured",
+    "act.srtla.reconfigure": "Reconfigure modems"
 }
