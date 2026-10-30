@@ -12,6 +12,7 @@ import { createAuth } from "./auth";
 import type { Publish } from "./contracts";
 import { createDashboards } from "./dashboards";
 import { createDevices } from "./devices";
+import { createOverlays } from "./overlays";
 import { accountRoutes } from "./plugins/account";
 import { authenticatedHandler } from "./plugins/authenticated";
 import { dashboardRoutes } from "./plugins/dashboards";
@@ -19,6 +20,7 @@ import { deviceConnectionRoutes } from "./plugins/device-connection";
 import { deviceListRoutes } from "./plugins/device-list";
 import { devicePageRoutes } from "./plugins/device-pages";
 import { deviceViewerRoutes } from "./plugins/device-viewers";
+import { overlayRoutes } from "./plugins/overlays";
 import { publicRoutes } from "./plugins/public";
 import { staticRoutes } from "./plugins/static";
 
@@ -54,6 +56,11 @@ export async function createControlServer(options: ControlServerOptions) {
         deviceExists: (id) => !!devices.getDevice(id),
         deviceStatus: (id) => devices.getDevice(id)?.status,
     });
+    const overlays = createOverlays({
+        db: auth.db,
+        databaseFile: options.databaseFile,
+        publish,
+    });
 
     for (const mod of ALL_MODULES) {
         if (mod.controlRoutes)
@@ -68,6 +75,7 @@ export async function createControlServer(options: ControlServerOptions) {
         .use(pwaRoutes())
         .use(accountRoutes(auth, frontend))
         .use(dashboardRoutes(auth, dashboards, devices, frontend))
+        .use(overlayRoutes(auth, overlays, frontend))
         .use(deviceListRoutes(auth, devices))
         .use(deviceConnectionRoutes(devices))
         .use(deviceViewerRoutes(auth, devices))

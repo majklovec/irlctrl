@@ -1756,3 +1756,387 @@ p.message {
 .right {
     text-align: right;
 }
+
+/* ── OBS overlay editor (/overlays/) ─────────────────────────────────── */
+.ov-layout {
+	display: grid;
+	grid-template-columns: 230px 1fr 290px;
+	grid-template-rows: 1fr auto;
+	gap: 12px;
+	height: calc(100vh - 140px);
+	min-height: 480px;
+}
+.ov-left,
+.ov-right {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	min-height: 0;
+}
+.ov-center {
+	min-height: 0;
+	min-width: 0;
+	display: flex;
+}
+.ov-rail,
+.ov-rail .card {
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+}
+
+/* scene rail */
+.ov-scene-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.ov-scene {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px;
+	padding: 6px 8px;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	cursor: pointer;
+}
+.ov-scene:hover {
+	border-color: var(--border-strong);
+}
+.ov-scene.active {
+	border-color: var(--accent);
+	background: var(--bg-glow-2);
+}
+.ov-scene-name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.ov-scene-actions {
+	display: none;
+	gap: 2px;
+}
+.ov-scene:hover .ov-scene-actions {
+	display: flex;
+}
+.ov-scene-actions button {
+	background: none;
+	border: none;
+	color: var(--muted);
+	cursor: pointer;
+	font-size: 12px;
+	padding: 2px 4px;
+}
+.ov-scene-actions button:hover {
+	color: var(--text);
+}
+.ov-rename {
+	width: 100%;
+	min-width: 0;
+}
+.ov-new-scene {
+	display: flex;
+	gap: 6px;
+	margin-top: 8px;
+}
+.ov-new-scene input {
+	flex: 1;
+	min-width: 0;
+}
+
+/* canvas */
+.ov-canvas-wrap {
+	flex: 1;
+	min-width: 0;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	overflow: hidden;
+	background:
+		linear-gradient(45deg, #1a1e27 25%, transparent 25%) 0 0 / 24px 24px,
+		linear-gradient(-45deg, #1a1e27 25%, transparent 25%) 0 12px / 24px 24px,
+		linear-gradient(45deg, transparent 75%, #1a1e27 75%) 12px -12px / 24px 24px,
+		linear-gradient(-45deg, transparent 75%, #1a1e27 75%) 12px 0 / 24px 24px
+		#10131a;
+}
+.ov-canvas-scroll {
+	flex: 1;
+	overflow: auto;
+	padding: 24px;
+}
+.overlay-canvas-scaled {
+	position: relative;
+	box-shadow:
+		0 0 0 1px var(--border-strong),
+		0 12px 40px rgb(0 0 0 / 50%);
+}
+.ov-selection {
+	position: absolute;
+	outline: 1.5px solid var(--accent);
+	outline-offset: 0;
+	cursor: move;
+	pointer-events: auto;
+	transform-origin: center center;
+}
+.ov-selection:hover {
+	outline-color: var(--accent-hover);
+}
+.ov-handle {
+	position: absolute;
+	width: 10px;
+	height: 10px;
+	background: var(--base);
+	border: 1.5px solid var(--accent);
+	border-radius: 3px;
+	z-index: 2;
+}
+.ov-handle.ov-nw {
+	top: -6px;
+	left: -6px;
+	cursor: nwse-resize;
+}
+.ov-handle.ov-n {
+	top: -6px;
+	left: calc(50% - 5px);
+	cursor: ns-resize;
+}
+.ov-handle.ov-ne {
+	top: -6px;
+	right: -6px;
+	cursor: nesw-resize;
+}
+.ov-handle.ov-e {
+	top: calc(50% - 5px);
+	right: -6px;
+	cursor: ew-resize;
+}
+.ov-handle.ov-se {
+	bottom: -6px;
+	right: -6px;
+	cursor: nwse-resize;
+}
+.ov-handle.ov-s {
+	bottom: -6px;
+	left: calc(50% - 5px);
+	cursor: ns-resize;
+}
+.ov-handle.ov-sw {
+	bottom: -6px;
+	left: -6px;
+	cursor: nesw-resize;
+}
+.ov-handle.ov-w {
+	top: calc(50% - 5px);
+	left: -6px;
+	cursor: ew-resize;
+}
+.ov-snap-line {
+	position: absolute;
+	background: var(--warn);
+	z-index: 3;
+	pointer-events: none;
+}
+.ov-snap-line.ov-snap-v {
+	width: 1px;
+	top: 0;
+	bottom: 0;
+}
+.ov-snap-line.ov-snap-h {
+	height: 1px;
+	left: 0;
+	right: 0;
+}
+
+/* inspector */
+.ov-inspect {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+.ov-field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	font-size: 13px;
+	color: var(--muted);
+}
+.ov-field input,
+.ov-field select {
+	width: 100%;
+}
+.ov-field input[type="color"] {
+	padding: 2px;
+	height: 32px;
+}
+.ov-field input[type="range"] {
+	accent-color: var(--accent);
+}
+.ov-grid2 {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 10px;
+}
+.ov-lbl {
+	font-size: 12px;
+}
+.ov-check {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+}
+.ov-danger {
+	margin-top: 6px;
+}
+.ov-danger-btn {
+	border-color: var(--bad) !important;
+	color: var(--bad) !important;
+}
+.ov-danger-btn:hover {
+	background: color-mix(in srgb, var(--bad) 14%, transparent) !important;
+}
+
+/* footer panels */
+.ov-footers {
+	grid-column: 1 / -1;
+	display: grid;
+	grid-template-columns: 2fr 1fr 2fr 1fr;
+	gap: 12px;
+}
+.ov-bottom {
+	min-width: 0;
+	max-height: 210px;
+	overflow-y: auto;
+}
+.ov-newvar {
+	display: flex;
+	gap: 6px;
+	width: 100%;
+}
+.ov-newvar input {
+	flex: 1;
+	min-width: 0;
+}
+.ov-var-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-top: 10px;
+}
+.ov-var {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.ov-var-name {
+	flex: 0 0 140px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.ov-var input {
+	flex: 1;
+	min-width: 0;
+}
+.ov-var-del {
+	background: none;
+	border: none;
+	color: var(--muted);
+	cursor: pointer;
+}
+.ov-var-del:hover {
+	color: var(--bad);
+}
+.ov-hint {
+	margin: 8px 0 0;
+	font-size: 12px;
+}
+.ov-runtime {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	align-items: center;
+}
+.ov-url {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding: 4px 8px;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	font-size: 12px;
+}
+.ov-upload {
+	display: inline-block;
+	position: relative;
+	overflow: hidden;
+	cursor: pointer;
+}
+.ov-upload input {
+	position: absolute;
+	inset: 0;
+	opacity: 0;
+	cursor: pointer;
+}
+.ov-asset-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 10px;
+}
+.ov-asset {
+	position: relative;
+	display: inline-block;
+}
+.ov-asset img {
+	width: 44px;
+	height: 44px;
+	object-fit: contain;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	display: block;
+}
+.ov-asset button {
+	position: absolute;
+	top: -6px;
+	right: -6px;
+	background: var(--base);
+	border: 1px solid var(--border);
+	border-radius: 50%;
+	width: 16px;
+	height: 16px;
+	font-size: 9px;
+	line-height: 1;
+	color: var(--muted);
+	cursor: pointer;
+	padding: 0;
+}
+.ov-asset button:hover {
+	color: var(--bad);
+}
+
+/* header toolbar */
+.ov-toolbar {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+.ov-adds,
+.ov-zoom {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+.ov-zoom-val {
+	min-width: 44px;
+	text-align: center;
+	font-size: 12px;
+	color: var(--muted);
+}
