@@ -1760,13 +1760,12 @@ p.message {
 /* ── OBS overlay editor (/overlays/) ─────────────────────────────────── */
 .ov-layout {
 	display: grid;
-	grid-template-columns: 230px 1fr 290px;
+	grid-template-columns: 1fr 290px;
 	grid-template-rows: 1fr auto;
 	gap: 12px;
 	height: calc(100vh - 140px);
 	min-height: 480px;
 }
-.ov-left,
 .ov-right {
 	display: flex;
 	flex-direction: column;
@@ -1785,65 +1784,9 @@ p.message {
 	flex-direction: column;
 }
 
-/* scene rail */
-.ov-scene-list {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-}
-.ov-scene {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 6px;
-	padding: 6px 8px;
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	cursor: pointer;
-}
-.ov-scene:hover {
-	border-color: var(--border-strong);
-}
-.ov-scene.active {
-	border-color: var(--accent);
-	background: var(--bg-glow-2);
-}
-.ov-scene-name {
-	flex: 1;
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-.ov-scene-actions {
-	display: none;
-	gap: 2px;
-}
-.ov-scene:hover .ov-scene-actions {
-	display: flex;
-}
-.ov-scene-actions button {
-	background: none;
-	border: none;
-	color: var(--muted);
-	cursor: pointer;
-	font-size: 12px;
-	padding: 2px 4px;
-}
-.ov-scene-actions button:hover {
-	color: var(--text);
-}
+/* inline scene-name rename input (overlay list) */
 .ov-rename {
 	width: 100%;
-	min-width: 0;
-}
-.ov-new-scene {
-	display: flex;
-	gap: 6px;
-	margin-top: 8px;
-}
-.ov-new-scene input {
-	flex: 1;
 	min-width: 0;
 }
 

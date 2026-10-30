@@ -789,99 +789,6 @@ serverLive.rpc.on("overlays.token", (data) => {
 });
 
 // ── views ────────────────────────────────────────────────────────────────
-function sceneRail(): m.Vnode {
-	return (
-		<Card title={t("overlay.scenes")} class="ov-rail">
-			<div class="ov-scene-list">
-				{state.project.scenes.map((s) => (
-					<div
-						key={s.id}
-						class={
-							s.id === state.selectedSceneId ? "ov-scene active" : "ov-scene"
-						}
-						onclick={() => selectScene(s.id)}
-					>
-						{state.renamingSceneId === s.id ? (
-							<input
-								class="ov-rename"
-								value={state.renameValue}
-								oninput={(ev: Event) =>
-									(state.renameValue = (ev.target as HTMLInputElement).value)
-								}
-								onblur={() => {
-									renameScene(s.id, state.renameValue);
-									state.renamingSceneId = null;
-									m.redraw();
-								}}
-								onkeydown={(ev: KeyboardEvent) => {
-									if (ev.key === "Enter")
-										(ev.target as HTMLInputElement).blur();
-								}}
-								oncreate={(v) => {
-									const el = v.dom as HTMLInputElement;
-									el.focus();
-									el.select();
-								}}
-							/>
-						) : (
-							<span
-								class="ov-scene-name"
-								ondblclick={(ev: Event) => {
-									ev.stopPropagation();
-									state.renamingSceneId = s.id;
-									state.renameValue = s.name;
-									m.redraw();
-								}}
-							>
-								{s.name}
-							</span>
-						)}
-						<span class="ov-scene-actions">
-							<button
-								type="button"
-								title={t("overlay.rename_scene")}
-								onclick={(ev: Event) => {
-									ev.stopPropagation();
-									state.renamingSceneId = s.id;
-									state.renameValue = s.name;
-									m.redraw();
-								}}
-							>
-								✎
-							</button>
-							<button
-								type="button"
-								title={t("overlay.delete_scene")}
-								onclick={(ev: Event) => {
-									ev.stopPropagation();
-									if (confirm(t("overlay.confirm_delete_scene")))
-										void deleteScene(s.id);
-								}}
-							>
-								✕
-							</button>
-						</span>
-					</div>
-				))}
-			</div>
-			<div class="ov-new-scene">
-				<input
-					type="text"
-					placeholder={t("overlay.scene_name")}
-					value={state.newSceneName}
-					oninput={(ev: Event) =>
-						(state.newSceneName = (ev.target as HTMLInputElement).value)
-					}
-				/>
-				<Button
-					label={t("overlay.new_scene")}
-					onclick={() => void createScene()}
-				/>
-			</div>
-		</Card>
-	);
-}
-
 function canvasArea(): m.Vnode {
 	const s = scene();
 	const C = state.project.canvas;
@@ -1540,7 +1447,32 @@ function overlayList(): m.Vnode {
 							{scenes.map((s) => (
 								<tr key={s.id} onclick={() => openEditor(s.id)}>
 									<td class="dash-name">
+										{state.renamingSceneId === s.id ? (
+											<input
+												class="ov-rename"
+												value={state.renameValue}
+												oninput={(ev: Event) => (state.renameValue = (ev.target as HTMLInputElement).value)}
+												onkeydown={(ev: KeyboardEvent) => {
+													if (ev.key === "Enter") (ev.target as HTMLInputElement).blur();
+													if (ev.key === "Escape") {
+														state.renamingSceneId = null;
+														m.redraw();
+													}
+												}}
+												onblur={() => {
+													void renameScene(s.id, state.renameValue);
+													state.renamingSceneId = null;
+													m.redraw();
+												}}
+												oncreate={(v) => {
+													const el = v.dom as HTMLInputElement;
+													el.focus();
+													el.select();
+												}}
+											/>
+										) : (
 										<span class="dash-row-link">{s.name}</span>
+										)}
 									</td>
 									<td class="muted">/overlay/{s.slug}</td>
 									<td class="muted">{s.elements.length}</td>
@@ -1560,6 +1492,18 @@ function overlayList(): m.Vnode {
 												>
 													<Icon name="view" class="role-icon" />
 												</a>,
+												<Button
+													label={<Icon name="edit" class="role-icon" />}
+													class="icon-link"
+													title={t("overlay.rename_scene")}
+													aria-label={t("overlay.rename_scene")}
+													onclick={(ev: Event) => {
+														ev.stopPropagation();
+														state.renamingSceneId = s.id;
+														state.renameValue = s.name;
+														m.redraw();
+													}}
+												/>,
 												<Button
 													label={
 														<Icon name="delete" class="role-icon" />
@@ -1662,7 +1606,6 @@ const overlaysPage: m.Component = {
 				headerRight={headerRight()}
 			>
 				<div class="ov-layout">
-					<div class="ov-left">{sceneRail()}</div>
 					<div class="ov-center">{canvasArea()}</div>
 					<div class="ov-right">{inspector()}</div>
 					<div class="ov-footers">
