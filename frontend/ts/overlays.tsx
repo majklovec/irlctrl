@@ -2,11 +2,13 @@
 /*
  * OBS Overlay editor page (/overlays/).
  *
- * Single Mithril component:
- *   left rail:  scene list (create / rename / delete / select)
- *   center:     zoomable canvas — select / drag / resize / nudge / snap
- *   right rail: inspector for the selected element (transform, props, binding)
- *   footers:    variables (live), triggers (fire), runtime URL (copy/rotate), assets
+ * Two views in one SPA (like the Dashboards list → editor flow):
+ *   list:    dashboard-style list of overlays (create / delete / open)
+ *   editor:
+ *     left rail:  scene list (create / rename / delete / select)
+ *     center:     zoomable canvas — select / drag / resize / nudge / snap
+ *     right rail: inspector for the selected element (transform, props, binding)
+ *     footers:    variables (live), triggers (fire), runtime URL (copy/rotate), assets
  *
  * The scene renders through the SHARED overlay-render views so the preview is
  * pixel-identical to the OBS runtime; the editor only layers a selection box +
@@ -28,6 +30,7 @@ import type {
 	VariableValue,
 } from "../../shared/overlay";
 import { DEFAULT_SHAPE_PROPS, DEFAULT_TEXT_PROPS } from "../../shared/overlay";
+import { Icon } from "./components/icons";
 import { Button, Card, Page, ServerNav } from "./components/ui";
 import { t } from "./i18n";
 import {
@@ -67,6 +70,8 @@ function initialProject(): OverlayProject {
 
 const state = {
 	loaded: false,
+	/** "list" shows the overlay list page; "editor" opens the scene editor. */
+	view: "list" as "list" | "editor",
 	project: initialProject(),
 	token: "",
 	selectedSceneId: null as string | null,
@@ -191,10 +196,20 @@ async function createScene(): Promise<void> {
 		// this scene (it fires before the HTTP response), so a raw push would
 		// create a duplicate
 		upsertScene(body.scene);
-		selectScene(body.scene.id);
+		openEditor(body.scene.id);
 		state.newSceneName = "";
-		m.redraw();
 	}
+}
+/** Switch to the scene editor for a given scene. */
+function openEditor(id: string): void {
+	selectScene(id);
+	state.view = "editor";
+	m.redraw();
+}
+/** Return to the overlay list without discarding the active scene. */
+function backToList(): void {
+	state.view = "list";
+	m.redraw();
 }
 /** Idempotently insert or replace a scene by id (mirrors the WS handler). */
 function upsertScene(sc: Scene): void {
@@ -698,6 +713,7 @@ function endDrag(): void {
 
 // ── keyboard ─────────────────────────────────────────────────────────────
 function onKey(ev: KeyboardEvent): void {
+	if (state.view !== "editor") return;
 	const tag = (ev.target as HTMLElement | null)?.tagName;
 	if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
 	const e = selElement();
@@ -1482,6 +1498,142 @@ function headerRight(): m.Vnode {
 	);
 }
 
+function listToolbar(): m.Vnode {
+	return (
+		<div class="dash-toolbar">
+			<span class="dash-empty-text">{t("overlay.new_scene")}</span>
+			<input
+				type="text"
+				placeholder={t("overlay.scene_name")}
+				value={state.newSceneName}
+				oninput={(ev: Event) => {
+					state.newSceneName = (ev.target as HTMLInputElement).value;
+					m.redraw();
+				}}
+			/>
+			<Button
+				label={t("overlay.new_scene")}
+				disabled={!state.newSceneName.trim()}
+				onclick={() => void createScene()}
+			/>
+		</div>
+	);
+}
+
+/** Dashboards-style list of overlays; click a row to open its editor. */
+function overlayList(): m.Vnode {
+	const scenes = state.project.scenes;
+	return (
+		<Card>
+			{scenes.length ? (
+				[
+					<table class="dash-table">
+						<thead>
+							<tr>
+								<th>{t("overlay.name")}</th>
+								<th>{t("overlay.url")}</th>
+								<th>{t("overlay.elements")}</th>
+								<th />
+							</tr>
+						</thead>
+						<tbody>
+							{scenes.map((s) => (
+								<tr key={s.id} onclick={() => openEditor(s.id)}>
+									<td class="dash-name">
+										<span class="dash-row-link">{s.name}</span>
+									</td>
+									<td class="muted">/overlay/{s.slug}</td>
+									<td class="muted">{s.elements.length}</td>
+									<td class="actions-cell">
+										<div class="dash-row-actions">
+											{[
+												<a
+													class="icon-link"
+													href="#"
+													title={t("overlay.open")}
+													aria-label={t("overlay.open")}
+													onclick={(ev: Event) => {
+														ev.preventDefault();
+														ev.stopPropagation();
+														openEditor(s.id);
+													}}
+												>
+													<Icon name="view" class="role-icon" />
+												</a>,
+												<Button
+													label={
+														<Icon name="delete" class="role-icon" />
+													}
+													class="icon-link dash-delete"
+													title={t("overlay.delete_scene")}
+													aria-label={t("overlay.delete_scene")}
+													onclick={(ev: Event) => {
+														ev.stopPropagation();
+														if (
+															confirm(
+																t(
+																	"overlay.confirm_delete_scene",
+																),
+															)
+														)
+															void deleteScene(s.id);
+													}}
+												/>,
+											]}
+										</div>
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</table>,
+					listToolbar(),
+				]
+			) : (
+				<div class="dash-empty">
+					<p class="muted">{t("overlay.empty_list")}</p>
+					{listToolbar()}
+				</div>
+			)}
+		</Card>
+	);
+}
+
+/** Editor header: back-to-list link + "Overlays / <scene>". */
+function editorTitle(): m.Vnode {
+	const s = scene();
+	return (
+		<>
+			<a
+				class="icon-link page-back"
+				href="#"
+				title={t("overlay.back_list")}
+				aria-label={t("overlay.back_list")}
+				onclick={(ev: Event) => {
+					ev.preventDefault();
+					backToList();
+				}}
+			>
+				<span class="sr-only">{t("overlay.back_list")}</span>
+				<svg
+					width={16}
+					height={16}
+					viewBox="0 0 16 16"
+					fill="none"
+					stroke="currentColor"
+					strokeWidth={1.75}
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					aria-hidden="true"
+				>
+					<path d="M10 12L6 8l4-4" />
+				</svg>
+			</a>{" "}
+			{t("overlay.title")}
+			{s ? <> / {s.name}</> : null}
+		</>
+	);
+}
+
 const overlaysPage: m.Component = {
 	oncreate() {
 		void load();
@@ -1490,15 +1642,25 @@ const overlaysPage: m.Component = {
 	onremove() {
 		window.removeEventListener("keydown", onKey, true);
 	},
-	view: () => (
-		<Page
-			title={t("overlay.title")}
-			nav={<ServerNav active="overlays" />}
-			headerRight={headerRight()}
-		>
-			{!state.loaded ? (
-				<p class="muted">{t("overlay.loading")}</p>
-			) : (
+	view: () => {
+		if (!state.loaded)
+			return (
+				<Page nav={<ServerNav active="overlays" />}>
+					<p class="muted">{t("overlay.loading")}</p>
+				</Page>
+			);
+		if (state.view === "list")
+			return (
+				<Page title={t("overlay.title")} nav={<ServerNav active="overlays" />}>
+					{overlayList()}
+				</Page>
+			);
+		return (
+			<Page
+				title={editorTitle()}
+				nav={<ServerNav active="overlays" />}
+				headerRight={headerRight()}
+			>
 				<div class="ov-layout">
 					<div class="ov-left">{sceneRail()}</div>
 					<div class="ov-center">{canvasArea()}</div>
@@ -1510,9 +1672,9 @@ const overlaysPage: m.Component = {
 						{assetsPanel()}
 					</div>
 				</div>
-			)}
-		</Page>
-	),
+			</Page>
+		);
+	},
 };
 
 void mountPage(() => t("overlay.title"), overlaysPage);
