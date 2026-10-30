@@ -89,6 +89,8 @@ const state = {
 	newVariableType: "string",
 	triggerName: "",
 	copied: false,
+	/** Inspector "Elements" list is collapsed by default. */
+	layersOpen: false,
 };
 
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
@@ -766,12 +768,148 @@ function lbl(label: string): m.Vnode {
 	return <span class="ov-lbl">{label}</span>;
 }
 
+/**
+ * The four z-order controls, rendered as compact arrow buttons in the
+ * Inspector card header (front / forward / backward / back).
+ */
+function zorderHeader(): m.Vnode {
+	const e = selElement();
+	const list = scene()?.elements ?? [];
+	const idx = e ? list.findIndex((x) => x.id === e.id) : -1;
+	const atFront = idx === list.length - 1;
+	const atBack = idx === 0;
+	const ops: { op: "front" | "forward" | "backward" | "back"; dis: boolean; label: string }[] = [
+		{ op: "front", dis: idx < 0 || atFront, label: t("overlay.bring_front") },
+		{ op: "forward", dis: idx < 0 || atFront, label: t("overlay.bring_forward") },
+		{ op: "backward", dis: idx < 0 || atBack, label: t("overlay.send_backward") },
+		{ op: "back", dis: idx < 0 || atBack, label: t("overlay.send_back") },
+	];
+	return (
+		<span class="ov-zhead">
+			{ops.map(({ op, dis, label }) => (
+				<button
+					key={op}
+					type="button"
+					class="ov-zbtn"
+					title={label}
+					aria-label={label}
+					disabled={dis}
+					onclick={() => reorderElement(op)}
+				>
+					{zArrow(op)}
+				</button>
+			))}
+		</span>
+	);
+}
+
+/** Small up/down chevron glyph for a z-order button (single or double). */
+function zArrow(op: "front" | "forward" | "backward" | "back"): m.Vnode {
+	const up = op === "front" || op === "forward";
+	const dbl = op === "front" || op === "back";
+	const chev = (dy: number) =>
+		up ? `m6 ${15 + dy} 6 -6 6 6` : `m6 ${9 + dy} 6 6 6 -6`;
+	const paths = dbl ? [chev(-3.5), chev(3.5)] : [chev(0)];
+	return (
+		<svg
+			viewBox="0 0 24 24"
+			width="15"
+			height="15"
+			aria-hidden="true"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		>
+			{paths.map((d) => (
+				<path key={d} d={d} />
+			))}
+		</svg>
+	);
+}
+
+/** A small colored swatch per element type, for the layers list. */
+function layerColor(type: string): string {
+	switch (type) {
+		case "text":
+			return "var(--accent)";
+		case "image":
+			return "#a855f7";
+		case "shape":
+			return "#22c55e";
+		default:
+			return "var(--muted)";
+	}
+}
+
+/**
+ * Collapsible list of every element in the scene, topmost (front) first.
+ * Collapsed by default; clicking a row selects it on the canvas.
+ */
+function layersPanel(): m.Vnode {
+	const els = scene()?.elements ?? [];
+	const frontFirst = [...els].reverse();
+	return (
+		<div class="ov-layers">
+			<button
+				type="button"
+				class="ov-layers-head"
+				aria-expanded={state.layersOpen}
+				onclick={() => {
+					state.layersOpen = !state.layersOpen;
+					m.redraw();
+				}}
+			>
+				<Icon
+					name="chevron"
+					class={state.layersOpen ? "ov-chev ov-chev-open" : "ov-chev"}
+					width="14"
+					height="14"
+				/>
+				<span>{t("overlay.elements")}</span>
+				<span class="ov-layers-count">{els.length}</span>
+			</button>
+			{state.layersOpen ? (
+				<ul class="ov-layers-list">
+					{frontFirst.map((el) => (
+						<li key={el.id}>
+							<button
+								type="button"
+								class={
+									"ov-layer" +
+									(el.id === state.selectedElementId
+										? " ov-layer-sel"
+										: "")
+								}
+								onclick={() => selectElement(el.id)}
+							>
+								<span
+									class="ov-layer-dot"
+									style={{ background: layerColor(el.type) }}
+								/>
+								<span class="ov-layer-name">{el.name}</span>
+								{el.locked ? <span class="ov-layer-lock">🔒</span> : null}
+							</button>
+						</li>
+					))}
+				</ul>
+			) : null}
+		</div>
+	);
+}
+
 function inspector(): m.Vnode {
 	const e = selElement();
+	const head = zorderHeader();
+	const layers = layersPanel();
 	if (!e)
 		return (
-			<Card title={t("overlay.inspector")} class="ov-rail">
-				<p class="muted">{t("overlay.no_selection")}</p>
+			<Card title={t("overlay.inspector")} headActions={head} class="ov-rail">
+				<div class="ov-inspect">
+					{layers}
+					<p class="muted">{t("overlay.no_selection")}</p>
+				</div>
 			</Card>
 		);
 	const tm = e.transform;
@@ -780,8 +918,9 @@ function inspector(): m.Vnode {
 	const p = e.props;
 
 	return (
-		<Card title={t("overlay.inspector")} class="ov-rail">
+		<Card title={t("overlay.inspector")} headActions={head} class="ov-rail">
 			<div class="ov-inspect">
+				{layers}
 				<label class="ov-field">
 					{lbl(t("overlay.name"))}
 					<input
@@ -795,24 +934,6 @@ function inspector(): m.Vnode {
 					/>
 				</label>
 
-				<div class="ov-zorder">
-					{([
-						["front", t("overlay.bring_front")],
-						["forward", t("overlay.bring_forward")],
-						["backward", t("overlay.send_backward")],
-						["back", t("overlay.send_back")],
-					] as const).map(([op, label]) => (
-						<button
-							key={op}
-							type="button"
-							class="ov-zbtn"
-							title={label}
-							onclick={() => reorderElement(op)}
-						>
-							{label}
-						</button>
-					))}
-				</div>
 				<div class="ov-grid2">
 					{[
 						[t("overlay.x"), tm.x, (n: number) => setT((x) => (x.x = n))],

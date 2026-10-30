@@ -1910,14 +1910,118 @@ p.message {
 	flex-direction: column;
 	gap: 10px;
 }
-.ov-zorder {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 6px;
+/* z-order arrows in the inspector card header */
+.ov-zhead {
+	display: inline-flex;
+	gap: 3px;
 }
-.ov-zbtn {
-	width: 100%;
+.ov-zhead .ov-zbtn {
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	font-size: 12px;
+	border: 1px solid var(--border);
+	border-radius: 5px;
+	background: transparent;
+	color: var(--text);
+	cursor: pointer;
+}
+.ov-zhead .ov-zbtn:hover:not(:disabled) {
+	border-color: var(--accent);
+	color: var(--accent);
+}
+.ov-zhead .ov-zbtn:disabled {
+	opacity: 0.35;
+	cursor: default;
+}
+
+/* layers panel (collapsible element list at the top of the inspector) */
+.ov-layers {
+	display: flex;
+	flex-direction: column;
+	font-size: 13px;
+}
+.ov-layers-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	padding: 4px 2px;
+	background: transparent;
+	border: none;
+	color: var(--text);
+	font-weight: 600;
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	cursor: pointer;
+}
+.ov-layers-head .ov-chev {
+	color: var(--muted);
+	transition: transform 0.15s ease;
+}
+.ov-layers-head .ov-chev-open {
+	transform: rotate(90deg);
+}
+.ov-layers-count {
+	margin-left: auto;
+	padding: 0 7px;
+	min-width: 18px;
+	text-align: center;
+	font-size: 11px;
+	border-radius: 9px;
+	background: var(--card-subtle, rgba(127, 127, 127, 0.18));
+	color: var(--muted);
+}
+.ov-layers-list {
+	list-style: none;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin: 4px 0 0;
+	padding: 0;
+}
+.ov-layer {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 5px 8px;
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 6px;
+	color: var(--text);
+	font-size: 13px;
+	cursor: pointer;
+	text-align: left;
+}
+.ov-layer:hover {
+	background: var(--card-subtle, rgba(127, 127, 127, 0.12));
+}
+.ov-layer-sel {
+	border-color: var(--accent);
+	background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.ov-layer-sel:hover {
+	background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.ov-layer-dot {
+	flex: none;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+}
+.ov-layer-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.ov-layer-lock {
+	margin-left: auto;
+	font-size: 11px;
 }
 .ov-field {
 	display: flex;
