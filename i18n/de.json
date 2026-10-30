@@ -242,7 +242,6 @@
     "overlay.copy": "Copy URL",
     "overlay.delete": "Delete",
     "overlay.delete_scene": "Delete scene",
-    "overlay.export": "Export PNG",
     "overlay.event_name": "Event name",
     "overlay.fill": "Fill",
     "overlay.fire": "Fire",

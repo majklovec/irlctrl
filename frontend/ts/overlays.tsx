@@ -89,7 +89,6 @@ const state = {
 	newVariableType: "string",
 	triggerName: "",
 	copied: false,
-	exportBusy: false,
 };
 
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
@@ -453,106 +452,6 @@ async function copyRuntimeUrl(s: Scene): Promise<void> {
 	} catch {
 		/* clipboard unavailable — the URL text is visible on the page */
 	}
-}
-
-// ── PNG export (client-side, transparent) ────────────────────────────────
-async function exportPng(s: Scene): Promise<void> {
-	state.exportBusy = true;
-	m.redraw();
-	try {
-		const c = state.project.canvas;
-		const svg =
-			`<svg xmlns="http://www.w3.org/2000/svg" width="${c.width}" height="${c.height}">` +
-			`<foreignObject x="0" y="0" width="100%" height="100%">${sceneToHtml(
-				s,
-				ctx(),
-			)}</foreignObject></svg>`;
-		const dataUrl =
-			"data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
-		const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-			const i = new Image();
-			i.onload = () => resolve(i);
-			i.onerror = reject;
-			i.src = dataUrl;
-		});
-		const canvas = document.createElement("canvas");
-		canvas.width = c.width;
-		canvas.height = c.height;
-		const g = canvas.getContext("2d");
-		if (!g) return;
-		g.clearRect(0, 0, c.width, c.height);
-		g.drawImage(img, 0, 0);
-		canvas.toBlob((blob) => {
-			if (!blob) return;
-			const a = document.createElement("a");
-			a.href = URL.createObjectURL(blob);
-			a.download = `${s.slug}.png`;
-			a.click();
-			setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-		}, "image/png");
-	} catch (err) {
-		console.error("overlay export:", err);
-	} finally {
-		state.exportBusy = false;
-		m.redraw();
-	}
-}
-
-const esc = (v: string): string =>
-	v
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;");
-
-/** Standalone HTML for the foreignObject PNG export (mirrors overlay-render). */
-function sceneToHtml(s: Scene, c: ElementContext): string {
-	const parts: string[] = [];
-	for (const e of s.elements) {
-		if (e.type === "group") continue;
-		const t = e.transform;
-		const base =
-			`position:absolute;left:${t.x}px;top:${t.y}px;width:${t.width}px;` +
-			`height:${t.height}px;transform:rotate(${t.rotation}deg);opacity:${t.opacity};` +
-			(e.visible ? "" : "visibility:hidden;");
-		if (e.type === "text") {
-			const p = e.props;
-			parts.push(
-				`<div style="${base}display:flex;overflow:visible;white-space:pre;` +
-					`font-family:${esc(String(p.fontFamily ?? "Inter, sans-serif"))};` +
-					`font-size:${Number(p.fontSize ?? 48)}px;color:${esc(String(p.color ?? "#fff"))};` +
-					`font-weight:${Number(p.fontWeight ?? 600)};line-height:1.2;` +
-					`justify-content:${
-						p.textAlign === "center"
-							? "center"
-							: p.textAlign === "right"
-								? "flex-end"
-								: "flex-start"
-					}">${esc(String(p.text ?? ""))}</div>`,
-			);
-		} else if (e.type === "shape") {
-			const p = e.props;
-			const shape =
-				p.shape === "ellipse" || p.shape === "line" ? p.shape : "rect";
-			const sw = Number(p.strokeWidth ?? 0);
-			parts.push(
-				`<div style="${base}background:${esc(String(p.fill ?? "#0ea5e9"))};` +
-					`border-radius:${shape === "ellipse" ? "50%" : "0"}${
-						sw > 0
-							? `;border:${sw}px solid ${esc(String(p.stroke ?? "transparent"))}`
-							: ""
-					}"></div>`,
-			);
-		} else if (e.type === "image") {
-			const aid = e.props.assetId;
-			const url = typeof aid === "string" ? c.assetUrls.get(aid) : undefined;
-			if (url)
-				parts.push(
-					`<img src="${url}" style="${base}width:100%;height:100%;object-fit:fill" />`,
-				);
-		}
-	}
-	return parts.join("");
 }
 
 // ── canvas drag / resize / snap ──────────────────────────────────────────
@@ -1326,12 +1225,6 @@ function runtimePanel(): m.Vnode {
 						label={state.copied ? t("overlay.copied") : t("overlay.copy")}
 						class="ov-copy"
 						onclick={() => void copyRuntimeUrl(s)}
-					/>
-					<Button
-						label={t("overlay.export")}
-						class="ov-copy"
-						disabled={state.exportBusy}
-						onclick={() => void exportPng(s)}
 					/>
 				</div>
 			) : (
