@@ -300,6 +300,7 @@ function addElement(type: "text" | "shape" | "image" | "group"): void {
 	};
 	s.elements.push(el);
 	state.selectedElementId = el.id;
+	state.expandedElementId = el.id;
 	void saveSceneElements(s);
 	m.redraw();
 }
@@ -399,7 +400,8 @@ async function deleteVariable(id: string): Promise<void> {
 }
 
 // ── asset ops ────────────────────────────────────────────────────────────
-async function uploadAsset(file: File): Promise<void> {
+/** Upload a file and return the (deduplicated by hash) asset. */
+async function uploadAsset(file: File): Promise<Asset | null> {
 	const dataBase64 = await new Promise<string>((resolve, reject) => {
 		const r = new FileReader();
 		r.onload = () => {
@@ -409,7 +411,7 @@ async function uploadAsset(file: File): Promise<void> {
 		r.onerror = reject;
 		r.readAsDataURL(file);
 	});
-	await api("/api/overlays/assets", {
+	const res = await api<{ asset?: Asset }>("/api/overlays/assets", {
 		method: "POST",
 		body: JSON.stringify({
 			filename: file.name,
@@ -417,11 +419,7 @@ async function uploadAsset(file: File): Promise<void> {
 			dataBase64,
 		}),
 	});
-}
-async function deleteAsset(id: string): Promise<void> {
-	await api(`/api/overlays/assets/${encodeURIComponent(id)}`, {
-		method: "DELETE",
-	});
+	return res?.asset ?? null;
 }
 
 // ── trigger / token ──────────────────────────────────────────────────────
@@ -1283,24 +1281,49 @@ function elementProps(e: OverlayElement): m.Vnode {
 			) : null}
 
 			{e.type === "image" ? (
-				<label class="ov-field">
-					{lbl(t("overlay.asset"))}
-					<select
-						value={String(e.props.assetId ?? "")}
-						onchange={(ev: Event) =>
-							mutateElement((el) => {
-								el.props.assetId = (ev.target as HTMLSelectElement).value;
-							})
-						}
-					>
-						<option value="">—</option>
-						{state.project.assets.map((a: Asset) => (
-							<option key={a.id} value={a.id}>
-								{a.filename}
-							</option>
-						))}
-					</select>
-				</label>
+				<>
+					<label class="ov-field">
+						{lbl(t("overlay.asset"))}
+						<select
+							value={String(e.props.assetId ?? "")}
+							onchange={(ev: Event) =>
+								mutateElement((el) => {
+									el.props.assetId = (
+										ev.target as HTMLSelectElement
+									).value;
+								})
+							}
+						>
+							<option value="">—</option>
+							{state.project.assets.map((a: Asset) => (
+								<option key={a.id} value={a.id}>
+									{a.filename}
+								</option>
+							))}
+						</select>
+					</label>
+					<span class="ov-field">
+						<span class="ov-upload ov-upload-btn">
+							<input
+								type="file"
+								accept="image/*"
+								onchange={(ev: Event) => {
+									const input = ev.target as HTMLInputElement;
+									const f = input.files?.[0];
+									input.value = "";
+									if (!f) return;
+									void uploadAsset(f).then((asset) => {
+										if (asset)
+											mutateElement((el) => {
+												el.props.assetId = asset.id;
+											});
+									});
+								}}
+							/>
+							{t("overlay.upload")}
+						</span>
+					</span>
+				</>
 			) : null}
 
 			<div class="ov-danger">
@@ -1463,7 +1486,10 @@ function runtimePanel(): m.Vnode {
 			class="ov-bottom"
 			headActions={
 				<Button
-					label={t("overlay.rotate")}
+					label={<Icon name="sync" class="role-icon" />}
+					class="icon-link"
+					title={t("overlay.rotate")}
+					aria-label={t("overlay.rotate")}
 					onclick={() => void rotateToken()}
 				/>
 			}
@@ -1472,42 +1498,16 @@ function runtimePanel(): m.Vnode {
 				<div class="ov-runtime">
 					<code class="ov-url">{runtimeUrl(s)}</code>
 					<Button
-						label={state.copied ? t("overlay.copied") : t("overlay.copy")}
-						class="ov-copy"
+						label={<Icon name="copy" class="role-icon" />}
+						class={state.copied ? "icon-link ov-copied" : "icon-link"}
+						title={state.copied ? t("overlay.copied") : t("overlay.copy")}
+						aria-label={t("overlay.copy")}
 						onclick={() => void copyRuntimeUrl(s)}
 					/>
 				</div>
 			) : (
 				<p class="muted">{t("overlay.no_selection")}</p>
 			)}
-		</Card>
-	);
-}
-
-function assetsPanel(): m.Vnode {
-	return (
-		<Card title={t("overlay.assets")} class="ov-bottom">
-			<label class="ov-upload">
-				<input
-					type="file"
-					accept="image/*"
-					onchange={(ev: Event) => {
-						const f = (ev.target as HTMLInputElement).files?.[0];
-						if (f) void uploadAsset(f);
-					}}
-				/>
-				{t("overlay.upload")}
-			</label>
-			<div class="ov-asset-list">
-				{state.project.assets.map((a: Asset) => (
-					<span key={a.id} class="ov-asset" title={a.filename}>
-						<img src={assetUrl(a)} alt={a.filename} />
-						<button type="button" onclick={() => void deleteAsset(a.id)}>
-							✕
-						</button>
-					</span>
-				))}
-			</div>
 		</Card>
 	);
 }
@@ -1755,7 +1755,6 @@ const overlaysPage: m.Component = {
 						{variablesPanel()}
 						{triggersPanel()}
 						{runtimePanel()}
-						{assetsPanel()}
 					</div>
 				</div>
 			</Page>

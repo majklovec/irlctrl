@@ -2185,41 +2185,20 @@ p.message {
 	opacity: 0;
 	cursor: pointer;
 }
-.ov-asset-list {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
-	margin-top: 10px;
-}
-.ov-asset {
-	position: relative;
+.ov-upload-btn {
 	display: inline-block;
-}
-.ov-asset img {
-	width: 44px;
-	height: 44px;
-	object-fit: contain;
-	border: 1px solid var(--border);
+	padding: 4px 10px;
+	border: 1px solid var(--accent);
 	border-radius: 6px;
-	display: block;
+	color: var(--accent);
+	font-size: 12px;
+	text-align: center;
 }
-.ov-asset button {
-	position: absolute;
-	top: -6px;
-	right: -6px;
-	background: var(--base);
-	border: 1px solid var(--border);
-	border-radius: 50%;
-	width: 16px;
-	height: 16px;
-	font-size: 9px;
-	line-height: 1;
-	color: var(--muted);
-	cursor: pointer;
-	padding: 0;
+.ov-upload-btn:hover {
+	background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
-.ov-asset button:hover {
-	color: var(--bad);
+.ov-copied {
+	color: var(--ok, #3fb950);
 }
 
 /* header toolbar */
