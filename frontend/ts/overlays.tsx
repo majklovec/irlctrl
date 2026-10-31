@@ -91,6 +91,8 @@ const state = {
 	newVariableType: "string",
 	triggerName: "",
 	copied: false,
+	/** Variable whose modify URL was just copied (icon turns green). */
+	copiedVariableId: null as string | null,
 	/** Element currently expanded in the inspector list (accordion). */
 	expandedElementId: null as string | null,
 	/** Text element being inline-edited on the canvas. */
@@ -122,6 +124,16 @@ function runtimeUrl(s: Scene): string {
 		location.origin +
 		"/overlay/" +
 		encodeURIComponent(s.slug) +
+		"?token=" +
+		state.token
+	);
+}
+/** Token-authenticated URL that revalues one variable: append `&value=…`. */
+function variableUrl(id: string): string {
+	return (
+		location.origin +
+		"/overlay/variables/" +
+		encodeURIComponent(id) +
 		"?token=" +
 		state.token
 	);
@@ -501,6 +513,18 @@ async function copyRuntimeUrl(s: Scene): Promise<void> {
 		/* clipboard unavailable — the URL text is visible on the page */
 	}
 }
+async function copyVariableUrl(id: string): Promise<void> {
+	try {
+		await navigator.clipboard.writeText(variableUrl(id));
+		state.copiedVariableId = id;
+		setTimeout(() => {
+			state.copiedVariableId = null;
+			m.redraw();
+		}, 1500);
+	} catch {
+		/* clipboard unavailable — the URL stays usable via curl/copy-paste */
+	}
+}
 
 // ── canvas drag / resize / snap ──────────────────────────────────────────
 function toScenePoint(ev: MouseEvent): { x: number; y: number } {
@@ -691,6 +715,7 @@ function onDrag(ev: MouseEvent): void {
 			width: Math.round(nw),
 			height: Math.round(nh),
 		};
+		m.redraw();
 		return;
 	}
 	// Line: drag one endpoint, the other stays fixed. All math happens in the
@@ -1340,7 +1365,26 @@ function variablesPanel(): m.Vnode {
 				) : (
 					state.project.variables.map((v) => (
 						<div key={v.id} class="ov-var">
-							<span class="ov-var-name">{v.name}</span>
+							<span class="ov-var-name" title={v.name}>
+								{v.name}
+							</span>
+							<button
+								type="button"
+								class={
+									state.copiedVariableId === v.id
+										? "ov-var-copy ov-copied"
+										: "ov-var-copy"
+								}
+								title={
+									state.copiedVariableId === v.id
+										? t("overlay.copied")
+										: t("overlay.copy_variable_url")
+								}
+								aria-label={t("overlay.copy_variable_url")}
+								onclick={() => void copyVariableUrl(v.id)}
+							>
+								<Icon name="copy" class="role-icon" />
+							</button>
 							{v.type === "boolean" ? (
 								<input
 									type="checkbox"

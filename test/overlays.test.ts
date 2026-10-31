@@ -365,6 +365,62 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
             );
             expect(badVarRes.status).toBe(400);
 
+            // ── token-gated variable modification (copy icon in the editor) ──
+            const tokenVarRes = await fetch(
+                `${baseUrl}/overlay/variables/${varBody.variable.id}?token=${token}&value=7`,
+            );
+            expect(tokenVarRes.status).toBe(200);
+            expect(await tokenVarRes.json()).toMatchObject({
+                ok: true,
+                variable: { name: "score", value: 7 },
+            });
+
+            // the editor feed sees the same update
+            const tokenVarEvent = await nextFrame(
+                editorSocket,
+                (f) =>
+                    f.event === "overlays.variables" &&
+                    (
+                        (f.data as { variables?: { value: number }[] }).variables ?? []
+                    ).some((v) => v.value === 7),
+            );
+            expect(
+                (
+                    tokenVarEvent.data as { variables: { value: number }[] }
+                ).variables.map((v) => v.value),
+            ).toEqual([7]);
+
+            // bad token → 404 (no existence leak), missing value → 400,
+            // bad value → 400, unknown id → 404
+            expect(
+                (
+                    await fetch(
+                        `${baseUrl}/overlay/variables/${varBody.variable.id}?token=deadbeef&value=7`,
+                    )
+                ).status,
+            ).toBe(404);
+            expect(
+                (
+                    await fetch(
+                        `${baseUrl}/overlay/variables/${varBody.variable.id}?token=${token}`,
+                    )
+                ).status,
+            ).toBe(400);
+            expect(
+                (
+                    await fetch(
+                        `${baseUrl}/overlay/variables/${varBody.variable.id}?token=${token}&value=not-a-number`,
+                    )
+                ).status,
+            ).toBe(400);
+            expect(
+                (
+                    await fetch(
+                        `${baseUrl}/overlay/variables/nope?token=${token}&value=7`,
+                    )
+                ).status,
+            ).toBe(404);
+
             // a slug cannot collide with another scene in the same project
             const secondSceneRes = await fetch(`${baseUrl}/api/overlays/scenes`, {
                 method: "POST",

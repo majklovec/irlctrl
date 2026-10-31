@@ -2,6 +2,7 @@
  * OBS overlay editor routes:
  *   GET  /overlays/                the editor page (cookie auth)
  *   GET  /overlay/:slug?token=…    the runtime page (token auth, transparent)
+ *   GET  /overlay/variables/:id    revalue one variable (token auth, ?value=…)
  *   WS   /overlay/:slug/ws?token=… the runtime live feed (token auth)
  *   …    /api/overlays…            the editor REST API (cookie auth)
  *
@@ -13,7 +14,7 @@ import type { createFrontend } from "../../../shared/frontend";
 import { upgradeRequired } from "../../../shared/http";
 import type { createAuth } from "../auth";
 import { event } from "../contracts";
-import { type Overlays, overlayRuntimeTopic } from "../overlays";
+import { ApiError, type Overlays, overlayRuntimeTopic } from "../overlays";
 import { authenticatedHandler } from "./authenticated";
 
 type Auth = Awaited<ReturnType<typeof createAuth>>;
@@ -52,6 +53,40 @@ export function overlayRoutes(
             authenticatedHandler(auth, () => frontend.htmlResponse("overlays")),
         )
         .get("/overlay/:slug", () => runtimePage(frontend))
+        .get(
+            "/overlay/variables/:id",
+            ({ params, request }) => {
+                const value = new URL(request.url).searchParams.get("value");
+                let result:
+                    | { status: number; body: Record<string, unknown> }
+                    | null;
+                try {
+                    result = overlays.setVariableByToken(
+                        runtimeToken(request),
+                        params.id,
+                        value,
+                    );
+                } catch (err: unknown) {
+                    const code = err instanceof ApiError ? err.code : 500;
+                    return Response.json(
+                        {
+                            ok: false,
+                            error:
+                                err instanceof Error ? err.message : "Internal error",
+                            code,
+                        },
+                        { status: code },
+                    );
+                }
+                // token probe — hide project existence, exactly like /overlay/:slug
+                if (!result)
+                    return Response.json(
+                        { ok: false, error: "Not found", code: 404 },
+                        { status: 404 },
+                    );
+                return Response.json(result.body, { status: result.status });
+            },
+        )
         .all(
             "/api/overlays",
             authenticatedHandler(auth, (request, user) =>

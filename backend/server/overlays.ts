@@ -77,6 +77,18 @@ export interface Overlays {
      * is unknown or does not own a scene with that slug.
      */
     runtimeScene(token: string, slug: string): RuntimeScene | null;
+    /**
+     * Token-authenticated revalue for the per-variable URL that the editor's
+     * Variables panel copies (`/overlay/variables/:id?token=…&value=…`).
+     * `null` when the token is unknown (the route 404s — token probes must not
+     * leak project existence, same as the runtime page); a missing/bad value
+     * throws ApiError(400), an unknown id ApiError(404).
+     */
+    setVariableByToken(
+        token: string,
+        variableId: string,
+        value: unknown,
+    ): { status: number; body: Record<string, unknown> } | null;
 }
 
 export function createOverlays({
@@ -618,6 +630,36 @@ export function createOverlays({
                 canvas: store.project.canvas,
                 assets: store.project.assets,
             };
+        },
+        setVariableByToken: (token, variableId, value) => {
+            const hit = runtimeStore(token);
+            if (!hit) return null;
+            const [user, store] = hit;
+            const variable = store.project.variables.find(
+                (v) => v.id === variableId,
+            );
+            if (!variable) throw new ApiError("Unknown variable", 404);
+            if (value === undefined || value === null)
+                throw new ApiError("value query parameter is required", 400);
+            // URL values are strings; map "true"/"false" onto boolean
+            // variables (the parser's !!truthy would turn "false" into true)
+            let raw: unknown = value;
+            if (variable.type === "boolean" && typeof value === "string") {
+                const s = value.trim().toLowerCase();
+                if (s === "true" || s === "1") raw = true;
+                else if (s === "false" || s === "0") raw = false;
+                else throw new ApiError(`${variable.name} must be true or false`);
+            }
+            variable.value = parseVariableValueInput(raw, variable);
+            revalidate(store.project);
+            commit(user, store);
+            feed(user, "overlays.variables", {
+                variables: store.project.variables,
+            });
+            runtime(user, "overlays.variables", {
+                variables: store.project.variables,
+            });
+            return { status: 200, body: { ok: true, variable } };
         },
     };
 }

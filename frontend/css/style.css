@@ -2190,6 +2190,21 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+.ov-var-copy {
+    display: inline-flex;
+    align-items: center;
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--muted);
+    cursor: pointer;
+}
+.ov-var-copy:hover {
+    color: var(--accent);
+}
+.ov-var-copy.ov-copied {
+    color: var(--ok, #3fb950);
+}
 .ov-var input {
     flex: 1;
     min-width: 0;

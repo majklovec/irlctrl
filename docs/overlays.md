@@ -77,6 +77,16 @@ Project-scoped named values, edited in the editor's *Variables* footer.
 - **Values** live in the project blob and are mutable at any time via
   `PUT /api/overlays/variables/:id` — including while a scene is on air;
   bound elements re-render live in the runtime page.
+- **Modify URL** — each row of the *Variables* footer shows a copy icon next
+  to the name; it copies the variable's token URL
+  (`<origin>/overlay/variables/<id>?token=…`). Appending `&value=…` and
+  fetching the URL (browser, curl, script) sets the value — typed per
+  variable: `number` accepts finite numbers, `boolean` accepts `true`/`false`,
+  `color` accepts `#rrggbb`, `string` accepts anything. The fetch returns
+  `{"ok":true,"variable":{…}}` and fans out exactly like an in-editor edit
+  (editor feed + runtime feed, so a live scene re-renders). A missing token
+  or variable 404s; a bad value 400s. The token is a write credential for
+  that variable — treat the URL like a password.
 
 ### Binding
 
@@ -137,6 +147,7 @@ Notes:
 | ------------------------------------------ | -------------------------- | ------------------------------------------ |
 | `/overlays/`                               | cookie session             | the editor page                             |
 | `/overlay/<scene-slug>`                    | project token in `?token=` | the transparent runtime page (OBS Browser Source); a bad token renders a blank page |
+| `/overlay/variables/<id>?token=`           | project token              | one variable; without `&value=` it 400s (read via the editor), with `&value=…` it revalues it and returns the new variable |
 | `/overlay/<scene-slug>/ws?token=`          | project token              | the runtime live feed (WebSocket)           |
 | `/chat/<dashboardId>/<widgetId>?token=`    | per-widget token           | a chat widget's live page                   |
 
