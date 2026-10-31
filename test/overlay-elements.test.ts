@@ -11,6 +11,9 @@ import { describe, expect, test } from "bun:test";
 const { elementRegistry, elementDef } = await import(
     "../frontend/ts/overlay-elements/registry"
 );
+const { lineFlipFromDelta } = await import(
+    "../frontend/ts/overlay-elements/line"
+);
 import {
     type OverlayElement,
     type OverlayElementType,
@@ -108,6 +111,36 @@ describe("element registry contract", () => {
             "text",
         )!.draw(el, { assetUrls: new Map(), variables });
         expect(JSON.stringify(vnode)).toContain("bound text");
+    });
+
+    test("lineFlipFromDelta: only opposite-sign components mirror the diagonal", () => {
+        // same-sign (incl. both backward) = forward diagonal
+        expect(lineFlipFromDelta(10, 5)).toBe(false);
+        expect(lineFlipFromDelta(-10, -5)).toBe(false);
+        // opposite signs = mirrored diagonal
+        expect(lineFlipFromDelta(-10, 5)).toBe(true);
+        expect(lineFlipFromDelta(10, -5)).toBe(true);
+        // a pure-axis drag is a box edge: no ambiguity
+        expect(lineFlipFromDelta(10, 0)).toBe(false);
+        expect(lineFlipFromDelta(-10, 0)).toBe(false);
+    });
+
+    test("line draw runs along the box diagonal set by props.flip", () => {
+        const el = baseElement("line", { flip: false });
+        el.transform = { x: 0, y: 0, width: 100, height: 50, rotation: 0, opacity: 1 };
+        const angleOf = (e: OverlayElement): number => {
+            const vnode = elementDef("line")!.draw(e, ctx()) as {
+                attrs?: { style?: Record<string, string> };
+            };
+            const tr = vnode.attrs?.style?.transform ?? "";
+            const match = /rotate\((-?[\d.]+)deg\)/.exec(tr);
+            return Number(match?.[1]);
+        };
+        // forward diagonal: top-left → bottom-right (positive slope on screen)
+        expect(angleOf(el)).toBeCloseTo(Math.atan2(50, 100) * (180 / Math.PI), 3);
+        el.props.flip = true;
+        // mirrored diagonal: top-right → bottom-left (negative slope)
+        expect(angleOf(el)).toBeCloseTo(-Math.atan2(50, 100) * (180 / Math.PI), 3);
     });
 
     test("unknown / legacy types resolve to undefined", () => {

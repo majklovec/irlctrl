@@ -344,6 +344,7 @@ export interface EllipseProps {
 export const DEFAULT_LINE_PROPS: Required<LineProps> = {
     stroke: "#3b82f6",
     strokeWidth: 4,
+    flip: false,
 };
 
 export interface LineProps {
@@ -351,6 +352,13 @@ export interface LineProps {
     stroke: string;
     /** the line's thickness in px */
     strokeWidth: number;
+    /**
+     * Which box diagonal the line runs along. The box is stored in
+     * min/abs form (negative deltas are impossible in CSS), so this flag
+     * disambiguates: false = top-left → bottom-right, true = top-right →
+     * bottom-left.
+     */
+    flip: boolean;
 }
 
 const COLOR_HEX = /^#[0-9a-f]{6}$/i;
@@ -420,6 +428,7 @@ const normalizeProps = (
             for (const k of Object.keys(props)) out[k] = props[k];
             out.stroke = hex("stroke", d.stroke);
             out.strokeWidth = num("strokeWidth", d.strokeWidth, 1, 500);
+            out.flip = props.flip === true;
             return out;
         }
         case "image":

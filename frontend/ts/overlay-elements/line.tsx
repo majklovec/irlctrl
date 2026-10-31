@@ -12,6 +12,16 @@ import type {
 import { resolveElementProps, strProp, numProp } from "./core";
 import { bindingRow, lbl } from "./fields";
 
+/**
+ * Which box diagonal a drag delta runs along. The box is stored in min/abs
+ * form, so only the sign *combination* of the delta matters: same-sign
+ * components (both forward, both backward) land on the same diagonal
+ * (180° symmetry → flip = false); opposite signs land on the other one
+ * (flip = true). A zero component is a box edge — no diagonal ambiguity.
+ */
+export const lineFlipFromDelta = (dx: number, dy: number): boolean =>
+	dx * dy < 0;
+
 function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	const p = resolveElementProps(element, ctx.variables);
 	const t2 = element.transform;
@@ -19,7 +29,11 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	const stroke = strProp(p, "stroke", DEFAULT_LINE_PROPS.stroke);
 	const strokeWidth = numProp(p, "strokeWidth", DEFAULT_LINE_PROPS.strokeWidth);
 	const length = Math.hypot(t2.width, t2.height);
-	const angle = (Math.atan2(t2.height, t2.width) * 180) / Math.PI;
+	// The box is stored in min/abs form, so the slope's vertical sign comes
+	// from props.flip: false = top-left → bottom-right, true = top-right →
+	// bottom-left.
+	const dy = p.flip === true ? -t2.height : t2.height;
+	const angle = (Math.atan2(dy, t2.width) * 180) / Math.PI;
 	const thickness = Math.max(1, strokeWidth || 4);
 	return m(".overlay-shape", {
 		style: {
@@ -29,7 +43,10 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 			transform: `rotate(${angle}deg)`,
 			left: "50%",
 			top: "50%",
-			margin: `${(-(thickness / 2).toFixed(1))}px ${(-(Math.max(1, length) / 2).toFixed(1))}px 0 0`,
+			// margin shorthand is top/right/bottom/left — the -length/2 must be on
+			// the LEFT side so the bar's center (and rotation axis) lands on the
+			// box center; the line then spans corner-to-corner of w/h
+			margin: `${(-(thickness / 2).toFixed(1))}px 0 0 ${(-(Math.max(1, length) / 2).toFixed(1))}px`,
 			position: "absolute",
 		},
 	});

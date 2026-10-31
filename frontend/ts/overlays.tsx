@@ -30,6 +30,7 @@ import type {
 	VariableValue,
 } from "../../shared/overlay";
 import { elementDef } from "./overlay-elements/registry";
+import { lineFlipFromDelta } from "./overlay-elements/line";
 import { Icon } from "./components/icons";
 import { Button, Card, Page, ServerNav } from "./components/ui";
 import { t } from "./i18n";
@@ -642,8 +643,8 @@ function onDrag(ev: MouseEvent): void {
 	// Line: drag one endpoint, the other stays fixed. All math happens in the
 	// box's unrotated frame (the rotation is constant during the drag). The
 	// server rejects negative width/height, so the box is kept in min/abs
-	// form — the line is drawn centered in the box and is 180°-symmetric, so
-	// that is visually identical to free endpoints.
+	// form — the line runs along one of the box diagonals; which one is
+	// recorded in props.flip (the drag delta's X sign decides).
 	const th = (st.rotation * Math.PI) / 180;
 	const cos = Math.cos(th),
 		sin = Math.sin(th);
@@ -659,9 +660,12 @@ function onDrag(ev: MouseEvent): void {
 		vy = ev2.y - fwy;
 	const ux = vx * cos + vy * sin,
 		uy = -vx * sin + vy * cos;
-	// new box: fixed corner + pointer corner, normalized to min/abs
+	// new box: fixed corner + pointer corner, normalized to min/abs.
+	// The delta's sign combination decides which diagonal the line runs
+	// along (true = top-right → bottom-left, the "backward" diagonal).
 	const width = Math.abs(ux);
 	const height = Math.abs(uy);
+	if (e.type === "line") e.props.flip = lineFlipFromDelta(ux, uy);
 	// new world center: fixed endpoint + rotated half-diagonal
 	const cx = fwx + (ux * cos - uy * sin) / 2;
 	const cy = fwy + (ux * sin + uy * cos) / 2;

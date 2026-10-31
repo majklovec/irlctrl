@@ -229,6 +229,22 @@ describe("overlay schema", () => {
         expect(el.type).toBe("line");
         expect(el.props.stroke).toBe(DEFAULT_LINE_PROPS.stroke);
         expect(el.props.strokeWidth).toBe(3);
+        expect(el.props.flip).toBe(false);
+    });
+
+    test("line flip is a strict boolean (which box diagonal the line runs along)", () => {
+        const el = parseElementInput({
+            ...textElement(),
+            type: "line",
+            props: { flip: true },
+        });
+        expect(el.props.flip).toBe(true);
+        const bad = parseElementInput({
+            ...textElement(),
+            type: "line",
+            props: { flip: "yes" },
+        });
+        expect(bad.props.flip).toBe(false);
     });
 
     test("bindings must be variable references and target existing variables", () => {
