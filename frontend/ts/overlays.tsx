@@ -261,12 +261,37 @@ async function saveSceneElements(s: Scene): Promise<void> {
 	});
 }
 function mutateElement(fn: (e: OverlayElement) => void): void {
-	const e = selElement();
+	mutateElementOf(state.selectedElementId, fn);
+}
+/**
+ * Apply `fn` to one element by id (not to the canvas selection) and persist
+ * the scene. The inspector rows use this so expanded-row edits always hit
+ * the row's element, even when it is not the canvas-selected one.
+ */
+function mutateElementOf(
+	elementId: string | null,
+	fn: (e: OverlayElement) => void,
+): void {
+	const s = scene();
+	if (!s) return;
+	const e = s.elements.find((x) => x.id === elementId);
 	if (!e || e.locked) return;
 	snapshot();
 	fn(e);
+	void saveSceneElements(s);
+	m.redraw();
+}
+/** Set the lock state of an element. Deliberately NOT routed through
+ * `mutateElementOf` — its `e.locked` guard is what protects locked elements
+ * from edits, and it would also block the very action that unlocks them. */
+function setElementLocked(elementId: string, locked: boolean): void {
 	const s = scene();
-	if (s) void saveSceneElements(s);
+	if (!s) return;
+	const e = s.elements.find((x) => x.id === elementId);
+	if (!e || e.locked === locked) return;
+	snapshot();
+	e.locked = locked;
+	void saveSceneElements(s);
 	m.redraw();
 }
 function addElement(type: "text" | "shape" | "image" | "group"): void {
@@ -542,6 +567,9 @@ function startDrag(
 	// stop bubbling to the canvas handler first, so clicking a selection box /
 	// handle never deselects (even for locked elements)
 	(ev as Event).stopPropagation();
+	// prevent the browser from starting its own drags (element content
+	// selection, image ghosting) which would swallow mousemove mid-drag
+	(ev as Event).preventDefault();
 	const e = scene()?.elements.find((x) => x.id === elementId);
 	if (!e || e.locked) return;
 	state.selectedElementId = elementId;
@@ -669,12 +697,21 @@ function onKey(ev: KeyboardEvent): void {
 }
 
 // ── live feed (server / other editor tabs) ───────────────────────────────
+/** A pushed scene is stale when it carries a lower server rev than the copy
+ * we already have locally — an out-of-order broadcast must not clobber a
+ * newer applied state. Scenes without revs (pre-rev data) are never stale. */
+function sceneIsStale(local: Scene | undefined, pushed: Scene): boolean {
+	if (!local || typeof local.rev !== "number") return false;
+	return typeof pushed.rev === "number" && pushed.rev < local.rev;
+}
 serverLive.rpc.on("overlays.scene", (data) => {
 	const sc = (data as { scene?: Scene })?.scene;
 	if (!sc) return;
 	const i = state.project.scenes.findIndex((x) => x.id === sc.id);
-	if (i >= 0) state.project.scenes[i] = sc;
-	else state.project.scenes.push(sc);
+	if (i >= 0) {
+		if (sceneIsStale(state.project.scenes[i], sc)) return;
+		state.project.scenes[i] = sc;
+	} else state.project.scenes.push(sc);
 	m.redraw();
 });
 serverLive.rpc.on("overlays.sceneDeleted", (data) => {
@@ -695,6 +732,19 @@ serverLive.rpc.on("overlays.variables", (data) => {
 serverLive.rpc.on("overlays.project", (data) => {
 	const p = (data as { project?: OverlayProject })?.project;
 	if (p) {
+		// An out-of-order project push must not roll back scenes whose local
+		// copy is already fresher (higher server rev) than the push.
+		const localRev = new Map(
+			state.project.scenes.map((s) => [s.id, s.rev] as const),
+		);
+		p.scenes = p.scenes.map((sc) => {
+			const lr = localRev.get(sc.id);
+			return typeof lr === "number" &&
+				typeof sc.rev === "number" &&
+				sc.rev < lr
+				? (state.project.scenes.find((x) => x.id === sc.id) ?? sc)
+				: sc;
+		});
 		state.project = p;
 		m.redraw();
 	}
@@ -740,10 +790,7 @@ function canvasArea(): m.Vnode {
 						const hit = target.closest<HTMLElement>("[data-element]");
 						if (hit?.dataset.element) startInlineEdit(hit.dataset.element);
 						// the selection box sits on top of the selected element
-						else if (
-							target.closest(".ov-selection") &&
-							state.selectedElementId
-						)
+						else if (target.closest(".ov-selection") && state.selectedElementId)
 							startInlineEdit(state.selectedElementId);
 					}}
 				>
@@ -798,10 +845,7 @@ function canvasArea(): m.Vnode {
  * element (same box, same font) so the edit is what-you-see. Enter commits
  * (Shift+Enter for a newline), Esc cancels, blur commits.
  */
-function inlineTextEdit(
-	elementId: string,
-	s: Scene | undefined,
-): m.Children {
+function inlineTextEdit(elementId: string, s: Scene | undefined): m.Children {
 	const e = s?.elements.find((x) => x.id === elementId);
 	if (!e || e.type !== "text") return null;
 	const p = (e.props ?? {}) as Record<string, unknown>;
@@ -822,9 +866,13 @@ function inlineTextEdit(
 		textAlign: ta,
 		padding: "0",
 		margin: "0",
-		border: "none",
+		border: "0",
 		outline: "2px solid var(--accent)",
-		background: "rgba(255,255,255,0.06)",
+		// opaque + untransformed: the original element stays rendered
+		// underneath, so a translucent or rotated textarea would double the
+		// glyphs / shear them
+		background: "#10131a",
+		transform: "none",
 		resize: "none",
 		overflow: "hidden",
 		width: "100%",
@@ -836,7 +884,9 @@ function inlineTextEdit(
 	return (
 		<div
 			class="ov-inline-edit"
-			style={elementStyle(e)}
+			// full opacity: elementStyle() carries the element's opacity, and
+			// a translucent wrapper would let the original text show through
+			style={{ ...elementStyle(e), opacity: 1 }}
 			onmousedown={(ev: MouseEvent) => ev.stopPropagation()}
 		>
 			<textarea
@@ -939,10 +989,6 @@ function layersPanel(): m.Vnode {
 	const frontFirst = [...els].reverse();
 	return (
 		<div class="ov-layers">
-			<div class="ov-layers-head">
-				<span class="ov-layers-title">{t("overlay.elements")}</span>
-				<span class="ov-layers-count">{els.length}</span>
-			</div>
 			<ul class="ov-layers-list">
 				{frontFirst.map((el) => {
 					const open = state.expandedElementId === el.id;
@@ -951,9 +997,7 @@ function layersPanel(): m.Vnode {
 							<div
 								class={
 									"ov-layer ov-el" +
-									(el.id === state.selectedElementId
-										? " ov-layer-sel"
-										: "")
+									(el.id === state.selectedElementId ? " ov-layer-sel" : "")
 								}
 								onclick={() => toggleElementRow(el.id)}
 							>
@@ -970,9 +1014,7 @@ function layersPanel(): m.Vnode {
 								>
 									<Icon
 										name="chevron"
-										class={
-											open ? "ov-chev ov-chev-open" : "ov-chev"
-										}
+										class={open ? "ov-chev ov-chev-open" : "ov-chev"}
 										width="14"
 										height="14"
 									/>
@@ -981,9 +1023,7 @@ function layersPanel(): m.Vnode {
 								{el.locked ? <span class="ov-layer-lock">🔒</span> : null}
 								{zorderButtons(el.id)}
 							</div>
-							{open ? (
-								<div class="ov-el-body">{elementProps(el)}</div>
-							) : null}
+							{open ? <div class="ov-el-body">{elementProps(el)}</div> : null}
 						</li>
 					);
 				})}
@@ -995,9 +1035,7 @@ function layersPanel(): m.Vnode {
 function inspector(): m.Vnode {
 	return (
 		<Card class="ov-rail">
-			<div class="ov-inspect">
-				{layersPanel()}
-			</div>
+			<div class="ov-inspect">{layersPanel()}</div>
 		</Card>
 	);
 }
@@ -1005,8 +1043,11 @@ function inspector(): m.Vnode {
 /** Property fields for one element, rendered inside its expanded list row. */
 function elementProps(e: OverlayElement): m.Vnode {
 	const tm = e.transform;
+	// Mutate the row's element's real transform in place. (An earlier version
+	// ran fn on a `{ ...el.transform }` copy that was discarded, so X/Y/W/H/
+	// rotation/opacity edits silently did nothing.)
 	const setT = (fn: (t: Transform) => void) =>
-		mutateElement((el) => fn({ ...el.transform }));
+		mutateElementOf(e.id, (el) => fn(el.transform));
 	const p = e.props;
 
 	return (
@@ -1017,7 +1058,7 @@ function elementProps(e: OverlayElement): m.Vnode {
 					type="text"
 					value={e.name}
 					oninput={(ev: Event) =>
-						mutateElement((el) => {
+						mutateElementOf(e.id, (el) => {
 							el.name = (ev.target as HTMLInputElement).value;
 						})
 					}
@@ -1078,7 +1119,7 @@ function elementProps(e: OverlayElement): m.Vnode {
 					type="checkbox"
 					checked={e.visible}
 					onchange={(ev: Event) =>
-						mutateElement((el) => {
+						mutateElementOf(e.id, (el) => {
 							el.visible = (ev.target as HTMLInputElement).checked;
 						})
 					}
@@ -1090,9 +1131,10 @@ function elementProps(e: OverlayElement): m.Vnode {
 					type="checkbox"
 					checked={e.locked}
 					onchange={(ev: Event) =>
-						mutateElement((el) => {
-							el.locked = (ev.target as HTMLInputElement).checked;
-						})
+						setElementLocked(
+							e.id,
+							(ev.target as HTMLInputElement).checked,
+						)
 					}
 				/>
 				{t("overlay.locked")}
@@ -1106,7 +1148,7 @@ function elementProps(e: OverlayElement): m.Vnode {
 							type="text"
 							value={String(p.text ?? "")}
 							oninput={(ev: Event) =>
-								mutateElement((el) => {
+								mutateElementOf(e.id, (el) => {
 									el.props.text = (ev.target as HTMLInputElement).value;
 								})
 							}
@@ -1119,7 +1161,7 @@ function elementProps(e: OverlayElement): m.Vnode {
 								type="number"
 								value={Number(p.fontSize ?? 48)}
 								oninput={(ev: Event) =>
-									mutateElement((el) => {
+									mutateElementOf(e.id, (el) => {
 										el.props.fontSize = Number(
 											(ev.target as HTMLInputElement).value,
 										);
@@ -1133,7 +1175,7 @@ function elementProps(e: OverlayElement): m.Vnode {
 								type="color"
 								value={String(p.color ?? "#ffffff")}
 								oninput={(ev: Event) =>
-									mutateElement((el) => {
+									mutateElementOf(e.id, (el) => {
 										el.props.color = (ev.target as HTMLInputElement).value;
 									})
 								}
@@ -1146,7 +1188,7 @@ function elementProps(e: OverlayElement): m.Vnode {
 							<select
 								value={String(p.fontWeight ?? 600)}
 								onchange={(ev: Event) =>
-									mutateElement((el) => {
+									mutateElementOf(e.id, (el) => {
 										el.props.fontWeight = Number(
 											(ev.target as HTMLSelectElement).value,
 										);
@@ -1164,10 +1206,8 @@ function elementProps(e: OverlayElement): m.Vnode {
 							<select
 								value={String(p.textAlign ?? "left")}
 								onchange={(ev: Event) =>
-									mutateElement((el) => {
-										el.props.textAlign = (
-											ev.target as HTMLSelectElement
-										).value;
+									mutateElementOf(e.id, (el) => {
+										el.props.textAlign = (ev.target as HTMLSelectElement).value;
 									})
 								}
 							>
@@ -1188,7 +1228,7 @@ function elementProps(e: OverlayElement): m.Vnode {
 						<select
 							value={String(p.shape ?? "rect")}
 							onchange={(ev: Event) =>
-								mutateElement((el) => {
+								mutateElementOf(e.id, (el) => {
 									el.props.shape = (ev.target as HTMLSelectElement).value;
 								})
 							}
@@ -1205,7 +1245,7 @@ function elementProps(e: OverlayElement): m.Vnode {
 								type="color"
 								value={String(p.fill ?? "#0ea5e9")}
 								oninput={(ev: Event) =>
-									mutateElement((el) => {
+									mutateElementOf(e.id, (el) => {
 										el.props.fill = (ev.target as HTMLInputElement).value;
 									})
 								}
@@ -1217,7 +1257,7 @@ function elementProps(e: OverlayElement): m.Vnode {
 								type="color"
 								value={String(p.stroke ?? "#000000")}
 								oninput={(ev: Event) =>
-									mutateElement((el) => {
+									mutateElementOf(e.id, (el) => {
 										el.props.stroke = (ev.target as HTMLInputElement).value;
 									})
 								}
@@ -1230,7 +1270,7 @@ function elementProps(e: OverlayElement): m.Vnode {
 							type="number"
 							value={Number(p.strokeWidth ?? 0)}
 							oninput={(ev: Event) =>
-								mutateElement((el) => {
+								mutateElementOf(e.id, (el) => {
 									el.props.strokeWidth = Number(
 										(ev.target as HTMLInputElement).value,
 									);
@@ -1249,10 +1289,8 @@ function elementProps(e: OverlayElement): m.Vnode {
 						<select
 							value={String(e.props.assetId ?? "")}
 							onchange={(ev: Event) =>
-								mutateElement((el) => {
-									el.props.assetId = (
-										ev.target as HTMLSelectElement
-									).value;
+								mutateElementOf(e.id, (el) => {
+									el.props.assetId = (ev.target as HTMLSelectElement).value;
 								})
 							}
 						>
@@ -1276,7 +1314,7 @@ function elementProps(e: OverlayElement): m.Vnode {
 									if (!f) return;
 									void uploadAsset(f).then((asset) => {
 										if (asset)
-											mutateElement((el) => {
+											mutateElementOf(e.id, (el) => {
 												el.props.assetId = asset.id;
 											});
 									});
@@ -1309,7 +1347,7 @@ function bindingRow(e: OverlayElement, prop: string): m.Vnode {
 				value={binding ? binding.variableId : ""}
 				onchange={(ev: Event) => {
 					const id = (ev.target as HTMLSelectElement).value;
-					mutateElement((el) => {
+					mutateElementOf(e.id, (el) => {
 						if (id) el.bindings[key] = { kind: "variable", variableId: id };
 						else delete el.bindings[key];
 					});
@@ -1459,9 +1497,7 @@ function runtimePanel(): m.Vnode {
 						<Button
 							label={<Icon name="copy" class="role-icon" />}
 							class={state.copied ? "icon-link ov-copied" : "icon-link"}
-							title={
-								state.copied ? t("overlay.copied") : t("overlay.copy")
-							}
+							title={state.copied ? t("overlay.copied") : t("overlay.copy")}
 							aria-label={t("overlay.copy")}
 							onclick={() => void copyRuntimeUrl(s)}
 						/>
@@ -1562,9 +1598,14 @@ function overlayList(): m.Vnode {
 											<input
 												class="ov-rename"
 												value={state.renameValue}
-												oninput={(ev: Event) => (state.renameValue = (ev.target as HTMLInputElement).value)}
+												oninput={(ev: Event) =>
+													(state.renameValue = (
+														ev.target as HTMLInputElement
+													).value)
+												}
 												onkeydown={(ev: KeyboardEvent) => {
-													if (ev.key === "Enter") (ev.target as HTMLInputElement).blur();
+													if (ev.key === "Enter")
+														(ev.target as HTMLInputElement).blur();
 													if (ev.key === "Escape") {
 														state.renamingSceneId = null;
 														m.redraw();
@@ -1582,7 +1623,7 @@ function overlayList(): m.Vnode {
 												}}
 											/>
 										) : (
-										<span class="dash-row-link">{s.name}</span>
+											<span class="dash-row-link">{s.name}</span>
 										)}
 									</td>
 									<td class="muted">/overlay/{s.slug}</td>
@@ -1616,21 +1657,13 @@ function overlayList(): m.Vnode {
 													}}
 												/>,
 												<Button
-													label={
-														<Icon name="delete" class="role-icon" />
-													}
+													label={<Icon name="delete" class="role-icon" />}
 													class="icon-link dash-delete"
 													title={t("overlay.delete_scene")}
 													aria-label={t("overlay.delete_scene")}
 													onclick={(ev: Event) => {
 														ev.stopPropagation();
-														if (
-															confirm(
-																t(
-																	"overlay.confirm_delete_scene",
-																),
-															)
-														)
+														if (confirm(t("overlay.confirm_delete_scene")))
 															void deleteScene(s.id);
 													}}
 												/>,

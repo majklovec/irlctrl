@@ -93,7 +93,11 @@ function shapeProps(raw: Record<string, unknown>): ShapeProps {
 	};
 }
 
-/** Positioning + shared visual style for any element. */
+/** Positioning + shared visual style for any element.
+ * NOTE: carries EVERYTHING the visual depends on inline (position, size,
+ * rotation PIVOT, whitespace) — the page stylesheets (overlay.css for the
+ * runtime, style.css for the editor) are NOT required to provide it. Both
+ * pages must stay pixel-identical, so never move these back to CSS. */
 export function elementStyle(element: OverlayElement): CSS {
 	const t = element.transform;
 	return {
@@ -103,6 +107,8 @@ export function elementStyle(element: OverlayElement): CSS {
 		width: `${t.width}px`,
 		height: `${t.height}px`,
 		transform: `rotate(${t.rotation}deg)`,
+		transformOrigin: "50% 50%",
+		whiteSpace: "pre",
 		opacity: `${t.opacity}`,
 		visibility: element.visible ? "visible" : "hidden",
 		boxSizing: "border-box",

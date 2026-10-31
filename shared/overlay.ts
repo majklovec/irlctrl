@@ -75,6 +75,12 @@ export interface Scene {
     slug: string;
     /** back-to-front order: index 0 renders first */
     elements: OverlayElement[];
+    /** Server-managed monotonic counter (bumped on every scene mutation).
+     * Editors ignore stale WS pushes that carry a lower rev than the
+     * freshest state they already applied, so out-of-order broadcasts can't
+     * clobber recent edits. Absent from scenes created before this field;
+     * normalization preserves it via spreadRest. */
+    rev?: number;
 }
 
 export interface OverlayProject {

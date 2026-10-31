@@ -984,7 +984,7 @@ input[type="checkbox"]:disabled:hover {
 }
 /* Inline SVGs carry only a viewBox, so CSS must size them (1em tracks text size) */
 .role-icon {
-    width: 1em;
+    /*    width: 1em; */
     height: 1em;
     flex: none;
     fill: none;
@@ -1759,460 +1759,492 @@ p.message {
 
 /* ── OBS overlay editor (/overlays/) ─────────────────────────────────── */
 .ov-layout {
-	display: grid;
-	grid-template-columns: 1fr 290px;
-	grid-template-rows: 1fr auto;
-	gap: 12px;
-	height: calc(100vh - 140px);
-	min-height: 480px;
+    display: grid;
+    grid-template-columns: 1fr 290px;
+    grid-template-rows: 1fr auto;
+    gap: 12px;
+    height: calc(100vh - 140px);
+    min-height: 480px;
 }
 .ov-right {
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
-	min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
 }
 .ov-center {
-	min-height: 0;
-	min-width: 0;
-	display: flex;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
 }
 .ov-rail,
 .ov-rail .card {
-	overflow-y: auto;
-	display: flex;
-	flex-direction: column;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
 }
 
 /* inline scene-name rename input (overlay list) */
 .ov-rename {
-	width: 100%;
-	min-width: 0;
+    width: 100%;
+    min-width: 0;
 }
 
 /* canvas */
 .ov-canvas-wrap {
-	flex: 1;
-	min-width: 0;
-	min-height: 0;
-	display: flex;
-	flex-direction: column;
-	border: 1px solid var(--border);
-	border-radius: 12px;
-	overflow: hidden;
-	background:
-		linear-gradient(45deg, #1a1e27 25%, transparent 25%) 0 0 / 24px 24px,
-		linear-gradient(-45deg, #1a1e27 25%, transparent 25%) 0 12px / 24px 24px,
-		linear-gradient(45deg, transparent 75%, #1a1e27 75%) 12px -12px / 24px 24px,
-		linear-gradient(-45deg, transparent 75%, #1a1e27 75%) 12px 0 / 24px 24px
-		#10131a;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    background:
+        linear-gradient(45deg, #1a1e27 25%, transparent 25%) 0 0 / 24px 24px,
+        linear-gradient(-45deg, #1a1e27 25%, transparent 25%) 0 12px / 24px 24px,
+        linear-gradient(45deg, transparent 75%, #1a1e27 75%) 12px -12px / 24px 24px,
+        linear-gradient(-45deg, transparent 75%, #1a1e27 75%) 12px 0 / 24px 24px
+            #10131a;
 }
 .ov-canvas-scroll {
-	flex: 1;
-	overflow: auto;
-	padding: 24px;
+    flex: 1;
+    overflow: auto;
+    padding: 24px;
 }
 .overlay-canvas-scaled {
-	position: relative;
-	box-shadow:
-		0 0 0 1px var(--border-strong),
-		0 12px 40px rgb(0 0 0 / 50%);
+    position: relative;
+    box-shadow:
+        0 0 0 1px var(--border-strong),
+        0 12px 40px rgb(0 0 0 / 50%);
 }
 .ov-selection {
-	position: absolute;
-	outline: 1.5px solid var(--accent);
-	outline-offset: 0;
-	cursor: move;
-	pointer-events: auto;
-	transform-origin: center center;
+    position: absolute;
+    outline: 1.5px solid var(--accent);
+    outline-offset: 0;
+    cursor: move;
+    pointer-events: auto;
+    transform-origin: center center;
 }
 .ov-selection:hover {
-	outline-color: var(--accent-hover);
+    outline-color: var(--accent-hover);
 }
 .ov-handle {
-	position: absolute;
-	width: 10px;
-	height: 10px;
-	background: var(--base);
-	border: 1.5px solid var(--accent);
-	border-radius: 3px;
-	z-index: 2;
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: var(--base);
+    border: 1.5px solid var(--accent);
+    border-radius: 3px;
+    z-index: 2;
 }
 .ov-handle.ov-nw {
-	top: -6px;
-	left: -6px;
-	cursor: nwse-resize;
+    top: -6px;
+    left: -6px;
+    cursor: nwse-resize;
 }
 .ov-handle.ov-n {
-	top: -6px;
-	left: calc(50% - 5px);
-	cursor: ns-resize;
+    top: -6px;
+    left: calc(50% - 5px);
+    cursor: ns-resize;
 }
 .ov-handle.ov-ne {
-	top: -6px;
-	right: -6px;
-	cursor: nesw-resize;
+    top: -6px;
+    right: -6px;
+    cursor: nesw-resize;
 }
 .ov-handle.ov-e {
-	top: calc(50% - 5px);
-	right: -6px;
-	cursor: ew-resize;
+    top: calc(50% - 5px);
+    right: -6px;
+    cursor: ew-resize;
 }
 .ov-handle.ov-se {
-	bottom: -6px;
-	right: -6px;
-	cursor: nwse-resize;
+    bottom: -6px;
+    right: -6px;
+    cursor: nwse-resize;
 }
 .ov-handle.ov-s {
-	bottom: -6px;
-	left: calc(50% - 5px);
-	cursor: ns-resize;
+    bottom: -6px;
+    left: calc(50% - 5px);
+    cursor: ns-resize;
 }
 .ov-handle.ov-sw {
-	bottom: -6px;
-	left: -6px;
-	cursor: nesw-resize;
+    bottom: -6px;
+    left: -6px;
+    cursor: nesw-resize;
 }
 .ov-handle.ov-w {
-	top: calc(50% - 5px);
-	left: -6px;
-	cursor: ew-resize;
+    top: calc(50% - 5px);
+    left: -6px;
+    cursor: ew-resize;
 }
 .ov-snap-line {
-	position: absolute;
-	background: var(--warn);
-	z-index: 3;
-	pointer-events: none;
+    position: absolute;
+    background: var(--warn);
+    z-index: 3;
+    pointer-events: none;
 }
 .ov-snap-line.ov-snap-v {
-	width: 1px;
-	top: 0;
-	bottom: 0;
+    width: 1px;
+    top: 0;
+    bottom: 0;
 }
 .ov-snap-line.ov-snap-h {
-	height: 1px;
-	left: 0;
-	right: 0;
+    height: 1px;
+    left: 0;
+    right: 0;
 }
 
 /* editor-only hover affordance (scoped so it never reaches the OBS runtime) */
 .ov-canvas-wrap .overlay-element {
-	cursor: move;
+    cursor: move;
+    /* keep drag/resize from starting a text selection on the element content */
+    user-select: none;
+}
+/* element content sizing: the runtime page gets these from overlay.css, which
+the editor page must NOT load (it carries document-level transparent/full-screen
+rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
+1:1 — without them images render at natural size and overflow their box. */
+.ov-canvas-wrap .overlay-text {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    overflow: visible;
+    line-height: 1.2;
+}
+.ov-canvas-wrap .overlay-image {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: fill;
+}
+.ov-canvas-wrap .overlay-shape {
+    width: 100%;
+    height: 100%;
 }
 .ov-canvas-wrap .overlay-element:hover {
-	outline: 1px dashed var(--accent);
-	outline-offset: 1px;
+    outline: 1px dashed var(--accent);
+    outline-offset: 1px;
 }
 
 /* inline text editing (double-click a text element) */
 .ov-inline-edit {
-	z-index: 5;
-	cursor: text;
+    z-index: 5;
+    cursor: text;
+    /* opaque wrapper + textarea fully hide the text element underneath,
+    so the glyphs never double up while editing */
+    background: #10131a;
 }
 .ov-inline-edit-input::selection {
-	background: color-mix(in srgb, var(--accent) 40%, transparent);
+    background: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 /* inspector */
 .ov-inspect {
-	display: flex;
-	flex-direction: column;
-	gap: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 /* z-order arrows (in each element row header) */
 .ov-zhead {
-	display: inline-flex;
-	gap: 3px;
-	flex: none;
-	margin-left: auto;
+    display: inline-flex;
+    gap: 3px;
+    flex: none;
+    margin-left: auto;
 }
 .ov-zhead .ov-zbtn {
-	width: 20px;
-	height: 20px;
-	padding: 0;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	font-size: 12px;
-	border: 1px solid var(--border);
-	border-radius: 5px;
-	background: transparent;
-	color: var(--text);
-	cursor: pointer;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
 }
 .ov-zhead .ov-zbtn:hover:not(:disabled) {
-	border-color: var(--accent);
-	color: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent);
 }
 .ov-zhead .ov-zbtn:disabled {
-	opacity: 0.35;
-	cursor: default;
+    opacity: 0.35;
+    cursor: default;
 }
 
 /* layers panel (per-element collapsible list at the top of the inspector) */
 .ov-layers {
-	display: flex;
-	flex-direction: column;
-	font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
 }
 .ov-layers-head {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	width: 100%;
-	padding: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 0;
 }
 .ov-layers-title {
-	flex: 1;
-	min-width: 0;
-	font-weight: 600;
-	font-size: 12px;
-	text-transform: uppercase;
-	letter-spacing: 0.04em;
-	color: var(--text);
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text);
 }
 .ov-layers-count {
-	padding: 0 7px;
-	min-width: 18px;
-	text-align: center;
-	font-size: 11px;
-	border-radius: 9px;
-	background: var(--card-subtle, rgba(127, 127, 127, 0.18));
-	color: var(--muted);
+    padding: 0 7px;
+    min-width: 18px;
+    text-align: center;
+    font-size: 11px;
+    border-radius: 9px;
+    background: var(--card-subtle, rgba(127, 127, 127, 0.18));
+    color: var(--muted);
 }
 .ov-layers-list {
-	list-style: none;
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	margin: 4px 0 0;
-	padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 4px 0 0;
+    padding: 0;
+}
+.ov-layers-list li {
+    border-bottom: 1px solid var(--border);
+}
+.ov-layers-list li:last-child {
+    border-bottom: none;
 }
 .ov-layer {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	width: 100%;
-	padding: 5px 8px;
-	background: transparent;
-	border: 1px solid transparent;
-	border-radius: 6px;
-	color: var(--text);
-	font-size: 13px;
-	cursor: pointer;
-	text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 5px 8px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
 }
 .ov-layer:hover {
-	background: var(--card-subtle, rgba(127, 127, 127, 0.12));
+    background: var(--card-subtle, rgba(127, 127, 127, 0.12));
 }
 .ov-layer-sel {
-	border-color: var(--accent);
-	background: color-mix(in srgb, var(--accent) 14%, transparent);
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 .ov-layer-sel:hover {
-	background: color-mix(in srgb, var(--accent) 18%, transparent);
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
 .ov-layer-name {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .ov-layer-lock {
-	font-size: 11px;
+    font-size: 11px;
 }
 /* per-element expand chevron (left of the element name) */
 .ov-el-chevbtn {
-	flex: none;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 20px;
-	height: 20px;
-	padding: 0;
-	border: none;
-	background: transparent;
-	color: var(--text);
-	cursor: pointer;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
 }
 .ov-el .ov-chev {
-	flex: none;
-	fill: none;
-	stroke: currentColor;
-	stroke-width: 2;
-	stroke-linecap: round;
-	stroke-linejoin: round;
-	transition: transform 0.15s ease;
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.15s ease;
 }
 .ov-el .ov-chev-open {
-	transform: rotate(90deg);
+    transform: rotate(90deg);
 }
 /* expanded property body for one element */
 .ov-el-body {
-	display: flex;
-	flex-direction: column;
-	gap: 10px;
-	padding: 8px 8px 10px 24px;
-	border-left: 2px solid var(--border);
-	margin: 2px 0 4px 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 8px 8px 10px 24px;
+    border-left: 2px solid var(--border);
+    margin: 2px 0 4px 15px;
 }
 .ov-field {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-	font-size: 13px;
-	color: var(--muted);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--muted);
 }
 .ov-field input,
 .ov-field select {
-	width: 100%;
+    width: 100%;
 }
 .ov-field input[type="color"] {
-	padding: 2px;
-	height: 32px;
+    padding: 2px;
+    height: 32px;
 }
 .ov-field input[type="range"] {
-	accent-color: var(--accent);
+    accent-color: var(--accent);
 }
 .ov-grid2 {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
 }
 .ov-lbl {
-	font-size: 12px;
+    font-size: 12px;
 }
 .ov-check {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
 }
 .ov-danger {
-	margin-top: 6px;
+    margin-top: 6px;
 }
 .ov-danger-btn {
-	border-color: var(--bad) !important;
-	color: var(--bad) !important;
+    border-color: var(--bad) !important;
+    color: var(--bad) !important;
 }
 .ov-danger-btn:hover {
-	background: color-mix(in srgb, var(--bad) 14%, transparent) !important;
+    background: color-mix(in srgb, var(--bad) 14%, transparent) !important;
 }
 
 /* footer panels */
 .ov-footers {
-	grid-column: 1 / -1;
-	display: grid;
-	grid-template-columns: 2fr 1fr 2fr 1fr;
-	gap: 12px;
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 2fr 1fr 2fr 1fr;
+    gap: 12px;
 }
 .ov-bottom {
-	min-width: 0;
-	max-height: 210px;
-	overflow-y: auto;
+    min-width: 0;
+    max-height: 210px;
+    overflow-y: auto;
 }
 .ov-newvar {
-	display: flex;
-	gap: 6px;
-	width: 100%;
+    display: flex;
+    gap: 6px;
+    width: 100%;
 }
 .ov-newvar input {
-	flex: 1;
-	min-width: 0;
+    flex: 1;
+    min-width: 0;
 }
 .ov-var-list {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-	margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
 }
 .ov-var {
-	display: flex;
-	align-items: center;
-	gap: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 .ov-var-name {
-	flex: 0 0 140px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+    flex: 0 0 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .ov-var input {
-	flex: 1;
-	min-width: 0;
+    flex: 1;
+    min-width: 0;
 }
 .ov-var-del {
-	background: none;
-	border: none;
-	color: var(--muted);
-	cursor: pointer;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
 }
 .ov-var-del:hover {
-	color: var(--bad);
+    color: var(--bad);
 }
 .ov-hint {
-	margin: 8px 0 0;
-	font-size: 12px;
+    margin: 8px 0 0;
+    font-size: 12px;
 }
 .ov-runtime {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
-	align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
 }
 .ov-url {
-	flex: 1;
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	padding: 4px 8px;
-	border: 1px solid var(--border);
-	border-radius: 6px;
-	font-size: 12px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
 }
 .ov-upload {
-	display: inline-block;
-	position: relative;
-	overflow: hidden;
-	cursor: pointer;
+    display: inline-block;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
 }
 .ov-upload input {
-	position: absolute;
-	inset: 0;
-	opacity: 0;
-	cursor: pointer;
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
 }
 .ov-upload-btn {
-	display: inline-block;
-	padding: 4px 10px;
-	border: 1px solid var(--accent);
-	border-radius: 6px;
-	color: var(--accent);
-	font-size: 12px;
-	text-align: center;
+    display: inline-block;
+    padding: 4px 10px;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    color: var(--accent);
+    font-size: 12px;
+    text-align: center;
 }
 .ov-upload-btn:hover {
-	background: color-mix(in srgb, var(--accent) 12%, transparent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 .ov-copied {
-	color: var(--ok, #3fb950);
+    color: var(--ok, #3fb950);
 }
 
 /* header toolbar */
 .ov-toolbar {
-	display: inline-flex;
-	align-items: center;
-	gap: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 .ov-adds,
 .ov-zoom {
-	display: inline-flex;
-	align-items: center;
-	gap: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
 .ov-zoom-val {
-	min-width: 44px;
-	text-align: center;
-	font-size: 12px;
-	color: var(--muted);
+    min-width: 44px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
 }

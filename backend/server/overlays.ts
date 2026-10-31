@@ -220,6 +220,9 @@ export function createOverlays({
         if (!store) throw new ApiError("Unknown scene", 404);
         const scene = findScene(store.project, sceneId);
         fn(scene);
+        // Monotonic counter so editors can drop stale (out-of-order) WS
+        // broadcasts that predate the freshest state they already applied.
+        scene.rev = (scene.rev ?? 0) + 1;
         revalidate(store.project);
         commit(owner, store);
         feed(owner, "overlays.scene", { scene });
