@@ -40,7 +40,9 @@ body {
     width: 100%;
     height: 100%;
     display: flex;
-    overflow: visible;
+    /* text is cropped to the element box, matching the editor's inline-edit
+    viewport (the editor mirrors this rule in style.css) */
+    overflow: hidden;
     line-height: 1.2;
 }
 

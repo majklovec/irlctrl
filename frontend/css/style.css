@@ -1878,6 +1878,26 @@ p.message {
     left: -6px;
     cursor: ew-resize;
 }
+/* line endpoint handles: A = top-left corner, B = bottom-right corner —
+   the two ends of the line; drag moves just that endpoint */
+.ov-line-end {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: var(--base);
+    border: 1.5px solid var(--accent);
+    border-radius: 50%;
+    z-index: 2;
+    cursor: crosshair;
+}
+.ov-line-end.ov-line-a {
+    top: -5px;
+    left: -5px;
+}
+.ov-line-end.ov-line-b {
+    bottom: -5px;
+    right: -5px;
+}
 .ov-snap-line {
     position: absolute;
     background: var(--warn);
@@ -1909,7 +1929,9 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
     width: 100%;
     height: 100%;
     display: flex;
-    overflow: visible;
+    /* cropped to the box (mirrors overlay.css) so the finished element looks
+    the same as it did in the inline-edit textarea */
+    overflow: hidden;
     line-height: 1.2;
 }
 .ov-canvas-wrap .overlay-image {
