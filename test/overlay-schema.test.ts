@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
+    DEFAULT_LINE_PROPS,
+    DEFAULT_RECTANGLE_PROPS,
     DEFAULT_TEXT_PROPS,
     defaultProject,
     generateOverlayToken,
@@ -179,6 +181,54 @@ describe("overlay schema", () => {
             parseElementInput({ ...textElement(), type: "video" }),
         ).toThrow();
         expect(() => parseElementInput({ ...textElement(), id: "" })).toThrow();
+    });
+
+    test("the legacy unified 'shape' type is no longer accepted", () => {
+        expect(() =>
+            parseElementInput({ ...textElement(), type: "shape" }),
+        ).toThrow();
+    });
+
+    test("rectangle props are normalized with type-specific ranges", () => {
+        const el = parseElementInput({
+            ...textElement(),
+            type: "rectangle",
+            props: {
+                fill: 5,
+                stroke: "#abc",
+                strokeWidth: -5,
+                radius: 999999,
+                customEffect: "glow",
+            },
+        });
+        expect(el.type).toBe("rectangle");
+        expect(el.props.fill).toBe(DEFAULT_RECTANGLE_PROPS.fill);
+        expect(el.props.strokeWidth).toBe(DEFAULT_RECTANGLE_PROPS.strokeWidth);
+        expect(el.props.radius).toBe(DEFAULT_RECTANGLE_PROPS.radius);
+        // unknown keys survive normalization
+        expect(el.props.customEffect).toBe("glow");
+    });
+
+    test("ellipse props are normalized with type-specific ranges", () => {
+        const el = parseElementInput({
+            ...textElement(),
+            type: "ellipse",
+            props: { fill: "#123456", strokeWidth: 7 },
+        });
+        expect(el.type).toBe("ellipse");
+        expect(el.props.fill).toBe("#123456");
+        expect(el.props.strokeWidth).toBe(7);
+    });
+
+    test("line props are normalized and in-range values kept", () => {
+        const el = parseElementInput({
+            ...textElement(),
+            type: "line",
+            props: { stroke: null, strokeWidth: 3 },
+        });
+        expect(el.type).toBe("line");
+        expect(el.props.stroke).toBe(DEFAULT_LINE_PROPS.stroke);
+        expect(el.props.strokeWidth).toBe(3);
     });
 
     test("bindings must be variable references and target existing variables", () => {

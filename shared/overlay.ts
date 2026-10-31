@@ -52,10 +52,20 @@ export interface Transform {
  * schema bump + sandbox; the type keeps the discriminator for that. */
 export type Binding = { kind: "variable"; variableId: string };
 
+/** Every supported element type. `shape` was split into the three distinct
+ * types rectangle / ellipse / line. */
+export type OverlayElementType =
+    | "text"
+    | "image"
+    | "rectangle"
+    | "ellipse"
+    | "line"
+    | "group";
+
 export type ElementBase = {
     id: string;
     name: string;
-    type: "text" | "image" | "shape" | "group";
+    type: OverlayElementType;
     transform: Transform;
     visible: boolean;
     locked: boolean;
@@ -302,26 +312,51 @@ export interface TextProps {
     align: "left" | "center" | "right";
 }
 
-export const DEFAULT_SHAPE_PROPS: Required<ShapeProps> = {
-    shape: "rect",
+/** Rectangle / ellipse / line are distinct element types now; each carries
+ * its own (slimmer) prop set instead of one `shape` discriminator. */
+export const DEFAULT_RECTANGLE_PROPS: Required<RectangleProps> = {
     fill: "#3b82f6",
     stroke: "#000000",
     strokeWidth: 0,
     radius: 0,
 };
 
-export interface ShapeProps {
-    shape: "rect" | "ellipse" | "line";
+export interface RectangleProps {
     fill: string;
     stroke: string;
     strokeWidth: number;
+    /** corner radius in px (0 = square corners) */
     radius: number;
+}
+
+export const DEFAULT_ELLIPSE_PROPS: Required<EllipseProps> = {
+    fill: "#3b82f6",
+    stroke: "#000000",
+    strokeWidth: 0,
+};
+
+export interface EllipseProps {
+    fill: string;
+    stroke: string;
+    strokeWidth: number;
+}
+
+export const DEFAULT_LINE_PROPS: Required<LineProps> = {
+    stroke: "#3b82f6",
+    strokeWidth: 4,
+};
+
+export interface LineProps {
+    /** the line's color */
+    stroke: string;
+    /** the line's thickness in px */
+    strokeWidth: number;
 }
 
 const COLOR_HEX = /^#[0-9a-f]{6}$/i;
 
 const normalizeProps = (
-    type: "text" | "image" | "shape" | "group",
+    type: OverlayElementType,
     raw: unknown,
 ): Record<string, unknown> => {
     // unknown keys are always preserved (forward compatibility)
@@ -360,18 +395,31 @@ const normalizeProps = (
                     : d.align;
             return out;
         }
-        case "shape": {
-            const d = DEFAULT_SHAPE_PROPS;
+        case "rectangle": {
+            const d = DEFAULT_RECTANGLE_PROPS;
             const out: Record<string, unknown> = {};
             for (const k of Object.keys(props)) out[k] = props[k];
-            out.shape =
-                props.shape === "ellipse" || props.shape === "line"
-                    ? props.shape
-                    : d.shape;
             out.fill = hex("fill", d.fill);
             out.stroke = hex("stroke", d.stroke);
             out.strokeWidth = num("strokeWidth", d.strokeWidth, 0, 500);
             out.radius = num("radius", d.radius, 0, 10000);
+            return out;
+        }
+        case "ellipse": {
+            const d = DEFAULT_ELLIPSE_PROPS;
+            const out: Record<string, unknown> = {};
+            for (const k of Object.keys(props)) out[k] = props[k];
+            out.fill = hex("fill", d.fill);
+            out.stroke = hex("stroke", d.stroke);
+            out.strokeWidth = num("strokeWidth", d.strokeWidth, 0, 500);
+            return out;
+        }
+        case "line": {
+            const d = DEFAULT_LINE_PROPS;
+            const out: Record<string, unknown> = {};
+            for (const k of Object.keys(props)) out[k] = props[k];
+            out.stroke = hex("stroke", d.stroke);
+            out.strokeWidth = num("strokeWidth", d.strokeWidth, 1, 500);
             return out;
         }
         case "image":
@@ -404,13 +452,15 @@ const normalizeElement = (raw: unknown): OverlayElement => {
         typeof raw.name === "string" && raw.name
             ? raw.name.slice(0, OVERLAY_LIMITS.nameMax)
             : "";
-    const type = raw.type;
+    const type = raw.type as OverlayElementType;
     if (
         !id ||
         !name ||
         (type !== "text" &&
             type !== "image" &&
-            type !== "shape" &&
+            type !== "rectangle" &&
+            type !== "ellipse" &&
+            type !== "line" &&
             type !== "group")
     )
         throw new Error("element needs id, name and a valid type");

@@ -29,7 +29,7 @@ import type {
 	Variable,
 	VariableValue,
 } from "../../shared/overlay";
-import { DEFAULT_SHAPE_PROPS, DEFAULT_TEXT_PROPS } from "../../shared/overlay";
+import { elementDef } from "./overlay-elements/registry";
 import { Icon } from "./components/icons";
 import { Button, Card, Page, ServerNav } from "./components/ui";
 import { t } from "./i18n";
@@ -294,9 +294,16 @@ function setElementLocked(elementId: string, locked: boolean): void {
 	void saveSceneElements(s);
 	m.redraw();
 }
-function addElement(type: "text" | "shape" | "image" | "group"): void {
+/** Types the user can create from the canvas toolbar. Each type's default
+ * props and size come from its `OverlayElementDef` — the core never
+ * hardcodes element-specific defaults. */
+function addElement(
+	type: "text" | "rectangle" | "ellipse" | "line" | "image",
+): void {
 	const s = scene();
 	if (!s) return;
+	const def = elementDef(type);
+	if (!def) return;
 	snapshot();
 	const el: OverlayElement = {
 		id: uuid(),
@@ -305,8 +312,8 @@ function addElement(type: "text" | "shape" | "image" | "group"): void {
 		transform: {
 			x: 120,
 			y: 120,
-			width: type === "text" ? 320 : 240,
-			height: type === "text" ? 80 : 160,
+			width: def.defaultSize.width,
+			height: def.defaultSize.height,
 			rotation: 0,
 			opacity: 1,
 		},
@@ -314,23 +321,13 @@ function addElement(type: "text" | "shape" | "image" | "group"): void {
 		locked: false,
 		parentId: null,
 		bindings: {},
-		props:
-			type === "text"
-				? { ...DEFAULT_TEXTPROPS_SAFE(), text: "New text" }
-				: type === "shape"
-					? { ...DEFAULT_SHAPE_PROPS }
-					: type === "image"
-						? { assetId: "" }
-						: {},
+		props: { ...def.defaultProps },
 	};
 	s.elements.push(el);
 	state.selectedElementId = el.id;
 	state.expandedElementId = el.id;
 	void saveSceneElements(s);
 	m.redraw();
-}
-function DEFAULT_TEXTPROPS_SAFE(): Record<string, unknown> {
-	return { ...DEFAULT_TEXT_PROPS };
 }
 function deleteElement(id: string): void {
 	const s = scene();
@@ -589,12 +586,6 @@ function startDrag(
 	m.redraw();
 }
 
-/** True for shape elements rendered as a line (two endpoint handles, not a
- * box). The line is drawn through the transform box (top-left → bottom-right
- * corner), so the corners ARE the line's endpoints. */
-function isLineElement(e: OverlayElement): boolean {
-	return e.type === "shape" && e.props.shape === "line";
-}
 function onDrag(ev: MouseEvent): void {
 	const d = state.drag;
 	if (!d) return;
@@ -878,10 +869,11 @@ function canvasArea(): m.Vnode {
 									startDrag(ev as MouseEvent, el.id, "move")
 								}
 							>
-								{isLineElement(el) ? (
-									// lines get endpoint handles (A = top-left
-									// corner, B = bottom-right corner of the box)
-									// instead of the rectangle's 8 box handles
+								{elementDef(el.type)?.handles === "endpoints" ? (
+									// endpoint elements (lines) get two endpoint
+									// handles (A = top-left corner, B =
+									// bottom-right corner of the box) — they can
+									// never present the box's 8 resize handles
 									(["a", "b"] as const).map((h) => (
 										<span
 											key={h}
@@ -896,7 +888,7 @@ function canvasArea(): m.Vnode {
 											}
 										/>
 									))
-								) : (
+								) : elementDef(el.type)?.handles === "box" ? (
 									["nw", "n", "ne", "e", "se", "s", "sw", "w"].map(
 										(h) => (
 											<span
@@ -913,7 +905,7 @@ function canvasArea(): m.Vnode {
 											/>
 										),
 									)
-								)}
+								) : null}
 							</div>
 						) : null}
 						{state.editingElementId
@@ -1134,7 +1126,10 @@ function elementProps(e: OverlayElement): m.Vnode {
 	// rotation/opacity edits silently did nothing.)
 	const setT = (fn: (t: Transform) => void) =>
 		mutateElementOf(e.id, (el) => fn(el.transform));
-	const p = e.props;
+	// The type-specific fields are published by the element's own `editForm`
+	// (OverlayElementDef) — the core renders only the common fields above and
+	// delegates everything else to the registry.
+	const def = elementDef(e.type);
 
 	return (
 		<>
@@ -1226,191 +1221,16 @@ function elementProps(e: OverlayElement): m.Vnode {
 				{t("overlay.locked")}
 			</label>
 
-			{e.type === "text" ? (
-				<>
-					<label class="ov-field">
-						{lbl(t("overlay.text"))}
-						<input
-							type="text"
-							value={String(p.text ?? "")}
-							oninput={(ev: Event) =>
-								mutateElementOf(e.id, (el) => {
-									el.props.text = (ev.target as HTMLInputElement).value;
-								})
-							}
-						/>
-					</label>
-					<div class="ov-grid2">
-						<label class="ov-field">
-							{lbl(t("overlay.font_size"))}
-							<input
-								type="number"
-								value={Number(p.fontSize ?? 48)}
-								oninput={(ev: Event) =>
-									mutateElementOf(e.id, (el) => {
-										el.props.fontSize = Number(
-											(ev.target as HTMLInputElement).value,
-										);
-									})
-								}
-							/>
-						</label>
-						<label class="ov-field">
-							{lbl(t("overlay.color"))}
-							<input
-								type="color"
-								value={String(p.color ?? "#ffffff")}
-								oninput={(ev: Event) =>
-									mutateElementOf(e.id, (el) => {
-										el.props.color = (ev.target as HTMLInputElement).value;
-									})
-								}
-							/>
-						</label>
-					</div>
-					<div class="ov-grid2">
-						<label class="ov-field">
-							{lbl(t("overlay.font_weight"))}
-							<select
-								value={String(p.fontWeight ?? 600)}
-								onchange={(ev: Event) =>
-									mutateElementOf(e.id, (el) => {
-										el.props.fontWeight = Number(
-											(ev.target as HTMLSelectElement).value,
-										);
-									})
-								}
-							>
-								<option value="400">400</option>
-								<option value="600">600</option>
-								<option value="700">700</option>
-								<option value="900">900</option>
-							</select>
-						</label>
-						<label class="ov-field">
-							{lbl(t("overlay.align"))}
-							<select
-								value={String(p.textAlign ?? "left")}
-								onchange={(ev: Event) =>
-									mutateElementOf(e.id, (el) => {
-										el.props.textAlign = (ev.target as HTMLSelectElement).value;
-									})
-								}
-							>
-								<option value="left">left</option>
-								<option value="center">center</option>
-								<option value="right">right</option>
-							</select>
-						</label>
-					</div>
-					{bindingRow(e, "text")}
-				</>
-			) : null}
-
-			{e.type === "shape" ? (
-				<>
-					<label class="ov-field">
-						{lbl(t("overlay.shape"))}
-						<select
-							value={String(p.shape ?? "rect")}
-							onchange={(ev: Event) =>
-								mutateElementOf(e.id, (el) => {
-									el.props.shape = (ev.target as HTMLSelectElement).value;
-								})
-							}
-						>
-							<option value="rect">rect</option>
-							<option value="ellipse">ellipse</option>
-							<option value="line">line</option>
-						</select>
-					</label>
-					<div class="ov-grid2">
-						<label class="ov-field">
-							{lbl(t("overlay.fill"))}
-							<input
-								type="color"
-								value={String(p.fill ?? "#0ea5e9")}
-								oninput={(ev: Event) =>
-									mutateElementOf(e.id, (el) => {
-										el.props.fill = (ev.target as HTMLInputElement).value;
-									})
-								}
-							/>
-						</label>
-						<label class="ov-field">
-							{lbl(t("overlay.stroke"))}
-							<input
-								type="color"
-								value={String(p.stroke ?? "#000000")}
-								oninput={(ev: Event) =>
-									mutateElementOf(e.id, (el) => {
-										el.props.stroke = (ev.target as HTMLInputElement).value;
-									})
-								}
-							/>
-						</label>
-					</div>
-					<label class="ov-field">
-						{lbl(t("overlay.stroke_width"))}
-						<input
-							type="number"
-							value={Number(p.strokeWidth ?? 0)}
-							oninput={(ev: Event) =>
-								mutateElementOf(e.id, (el) => {
-									el.props.strokeWidth = Number(
-										(ev.target as HTMLInputElement).value,
-									);
-								})
-							}
-						/>
-					</label>
-					{p.shape !== "line" ? bindingRow(e, "fill") : null}
-				</>
-			) : null}
-
-			{e.type === "image" ? (
-				<>
-					<label class="ov-field">
-						{lbl(t("overlay.asset"))}
-						<select
-							value={String(e.props.assetId ?? "")}
-							onchange={(ev: Event) =>
-								mutateElementOf(e.id, (el) => {
-									el.props.assetId = (ev.target as HTMLSelectElement).value;
-								})
-							}
-						>
-							<option value="">—</option>
-							{state.project.assets.map((a: Asset) => (
-								<option key={a.id} value={a.id}>
-									{a.filename}
-								</option>
-							))}
-						</select>
-					</label>
-					<span class="ov-field">
-						<span class="ov-upload ov-upload-btn">
-							<input
-								type="file"
-								accept="image/*"
-								onchange={(ev: Event) => {
-									const input = ev.target as HTMLInputElement;
-									const f = input.files?.[0];
-									input.value = "";
-									if (!f) return;
-									void uploadAsset(f).then((asset) => {
-										if (asset)
-											mutateElementOf(e.id, (el) => {
-												el.props.assetId = asset.id;
-											});
-									});
-								}}
-							/>
-							{t("overlay.upload")}
-						</span>
-					</span>
-				</>
-			) : null}
+			{def
+				? def.editForm({
+						element: e,
+						mutate: (fn) => mutateElementOf(e.id, fn),
+						assets: state.project.assets,
+						variables: state.project.variables,
+						upload: (f: File) =>
+							uploadAsset(f).then((a) => a?.id ?? null),
+					})
+				: null}
 
 			<div class="ov-danger">
 				<Button
@@ -1420,33 +1240,6 @@ function elementProps(e: OverlayElement): m.Vnode {
 				/>
 			</div>
 		</>
-	);
-}
-
-function bindingRow(e: OverlayElement, prop: string): m.Vnode {
-	const key = "props." + prop;
-	const binding = e.bindings[key];
-	return (
-		<label class="ov-field">
-			{lbl(t("overlay.binding") + " (" + prop + ")")}
-			<select
-				value={binding ? binding.variableId : ""}
-				onchange={(ev: Event) => {
-					const id = (ev.target as HTMLSelectElement).value;
-					mutateElementOf(e.id, (el) => {
-						if (id) el.bindings[key] = { kind: "variable", variableId: id };
-						else delete el.bindings[key];
-					});
-				}}
-			>
-				<option value="">{t("overlay.no_binding")}</option>
-				{state.project.variables.map((v: Variable) => (
-					<option key={v.id} value={v.id}>
-						{v.name}
-					</option>
-				))}
-			</select>
-		</label>
 	);
 }
 
@@ -1613,8 +1406,16 @@ function headerRight(): m.Vnode {
 					onclick={() => addElement("text")}
 				/>
 				<Button
-					label={t("overlay.add_shape")}
-					onclick={() => addElement("shape")}
+					label={t("overlay.add_rectangle")}
+					onclick={() => addElement("rectangle")}
+				/>
+				<Button
+					label={t("overlay.add_ellipse")}
+					onclick={() => addElement("ellipse")}
+				/>
+				<Button
+					label={t("overlay.add_line")}
+					onclick={() => addElement("line")}
 				/>
 				<Button
 					label={t("overlay.add_image")}
