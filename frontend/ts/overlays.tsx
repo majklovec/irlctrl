@@ -627,17 +627,35 @@ function onDrag(ev: MouseEvent): void {
 		// The edge opposite the dragged handle stays fixed, so w/n handles
 		// anchor the right/bottom edge and e/s handles the left/top edge
 		// (this also keeps the anchor stable after the ratio adjusts the size).
-		const x = h.includes("w") ? st.x + st.width - width : st.x;
-		const y = h.includes("n") ? st.y + st.height - height : st.y;
+		let x = h.includes("w") ? st.x + st.width - width : st.x;
+		let y = h.includes("n") ? st.y + st.height - height : st.y;
+		// Snap the new box's edges/center to the canvas + other elements,
+		// exactly like moving (applySnap mutates the transform in place).
+		const snapped = { ...st, x, y, width, height };
+		const { gx, gy } = applySnap(e, snapped);
+		state.snapX = gx;
+		state.snapY = gy;
+		x = snapped.x;
+		y = snapped.y;
+		let nw = snapped.width;
+		let nh = snapped.height;
+		// Snapping can shrink the box (two edges landing on one target) —
+		// re-clamp the size, keeping the same anchored edge.
+		if (nw < MIN) {
+			nw = MIN;
+			if (h.includes("w")) x = x + snapped.width - nw;
+		}
+		if (nh < MIN) {
+			nh = MIN;
+			if (h.includes("n")) y = y + snapped.height - nh;
+		}
 		e.transform = {
 			...st,
 			x: Math.round(x),
 			y: Math.round(y),
-			width: Math.round(width),
-			height: Math.round(height),
+			width: Math.round(nw),
+			height: Math.round(nh),
 		};
-		state.snapX = null;
-		state.snapY = null;
 		return;
 	}
 	// Line: drag one endpoint, the other stays fixed. All math happens in the
