@@ -2012,12 +2012,6 @@ p.message {
 .ov-layer-sel:hover {
 	background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
-.ov-layer-dot {
-	flex: none;
-	width: 10px;
-	height: 10px;
-	border-radius: 50%;
-}
 .ov-layer-name {
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -2026,7 +2020,7 @@ p.message {
 .ov-layer-lock {
 	font-size: 11px;
 }
-/* per-element expand chevron (right of the z-order buttons) */
+/* per-element expand chevron (left of the element name) */
 .ov-el-chevbtn {
 	flex: none;
 	display: inline-flex;

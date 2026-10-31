@@ -948,20 +948,6 @@ function zArrow(op: "front" | "forward" | "backward" | "back"): m.Vnode {
 	);
 }
 
-/** A small colored swatch per element type, for the layers list. */
-function layerColor(type: string): string {
-	switch (type) {
-		case "text":
-			return "var(--accent)";
-		case "image":
-			return "#a855f7";
-		case "shape":
-			return "#22c55e";
-		default:
-			return "var(--muted)";
-	}
-}
-
 /**
  * List of every element in the scene, topmost (front) first. Each element is
  * an individually collapsible row: its header carries the name plus the four
@@ -991,13 +977,6 @@ function layersPanel(): m.Vnode {
 								}
 								onclick={() => toggleElementRow(el.id)}
 							>
-								<span
-									class="ov-layer-dot"
-									style={{ background: layerColor(el.type) }}
-								/>
-								<span class="ov-layer-name">{el.name}</span>
-								{el.locked ? <span class="ov-layer-lock">🔒</span> : null}
-								{zorderButtons(el.id)}
 								<button
 									type="button"
 									class="ov-el-chevbtn"
@@ -1018,6 +997,9 @@ function layersPanel(): m.Vnode {
 										height="14"
 									/>
 								</button>
+								<span class="ov-layer-name">{el.name}</span>
+								{el.locked ? <span class="ov-layer-lock">🔒</span> : null}
+								{zorderButtons(el.id)}
 							</div>
 							{open ? (
 								<div class="ov-el-body">{elementProps(el)}</div>
@@ -1485,25 +1467,31 @@ function runtimePanel(): m.Vnode {
 			title={t("overlay.runtime_url")}
 			class="ov-bottom"
 			headActions={
-				<Button
-					label={<Icon name="sync" class="role-icon" />}
-					class="icon-link"
-					title={t("overlay.rotate")}
-					aria-label={t("overlay.rotate")}
-					onclick={() => void rotateToken()}
-				/>
+				<>
+					<Button
+						label={<Icon name="sync" class="role-icon" />}
+						class="icon-link"
+						title={t("overlay.rotate")}
+						aria-label={t("overlay.rotate")}
+						onclick={() => void rotateToken()}
+					/>
+					{s ? (
+						<Button
+							label={<Icon name="copy" class="role-icon" />}
+							class={state.copied ? "icon-link ov-copied" : "icon-link"}
+							title={
+								state.copied ? t("overlay.copied") : t("overlay.copy")
+							}
+							aria-label={t("overlay.copy")}
+							onclick={() => void copyRuntimeUrl(s)}
+						/>
+					) : null}
+				</>
 			}
 		>
 			{s ? (
 				<div class="ov-runtime">
 					<code class="ov-url">{runtimeUrl(s)}</code>
-					<Button
-						label={<Icon name="copy" class="role-icon" />}
-						class={state.copied ? "icon-link ov-copied" : "icon-link"}
-						title={state.copied ? t("overlay.copied") : t("overlay.copy")}
-						aria-label={t("overlay.copy")}
-						onclick={() => void copyRuntimeUrl(s)}
-					/>
 				</div>
 			) : (
 				<p class="muted">{t("overlay.no_selection")}</p>
