@@ -324,29 +324,17 @@ function deleteElement(id: string): void {
  * Reorder an element within `scene.elements` (back-to-front array order =
  * z-order). Works on locked elements too — stacking is not a positional edit.
  */
-function reorderElement(
-	elementId: string,
-	op: "front" | "forward" | "backward" | "back",
-): void {
+function reorderElement(elementId: string, op: "forward" | "backward"): void {
 	const s = scene();
 	if (!s) return;
 	const i = s.elements.findIndex((x) => x.id === elementId);
 	if (i < 0) return;
-	if (op === "front" && i === s.elements.length - 1) return;
-	if (op === "back" && i === 0) return;
 	if (op === "forward" && i === s.elements.length - 1) return;
 	if (op === "backward" && i === 0) return;
 	snapshot();
 	const list = [...s.elements];
 	const [el] = list.splice(i, 1);
-	const to =
-		op === "front"
-			? list.length
-			: op === "back"
-				? 0
-				: op === "forward"
-					? i + 1
-					: i - 1;
+	const to = op === "forward" ? i + 1 : i - 1;
 	list.splice(to, 0, el);
 	s.elements = list;
 	void saveSceneElements(s);
@@ -886,19 +874,17 @@ function lbl(label: string): m.Vnode {
 }
 
 /**
- * The four z-order controls (to-front / forward / backward / to-back) for one
- * element, rendered as compact arrow buttons in that element's list row.
+ * Z-order controls (forward / backward) for one element, rendered as compact
+ * arrow buttons in that element's list row.
  */
 function zorderButtons(elementId: string): m.Vnode {
 	const list = scene()?.elements ?? [];
 	const idx = list.findIndex((x) => x.id === elementId);
 	const atFront = idx === list.length - 1;
 	const atBack = idx === 0;
-	const ops: { op: "front" | "forward" | "backward" | "back"; dis: boolean; label: string }[] = [
-		{ op: "front", dis: atFront, label: t("overlay.bring_front") },
+	const ops: { op: "forward" | "backward"; dis: boolean; label: string }[] = [
 		{ op: "forward", dis: atFront, label: t("overlay.bring_forward") },
 		{ op: "backward", dis: atBack, label: t("overlay.send_backward") },
-		{ op: "back", dis: atBack, label: t("overlay.send_back") },
 	];
 	return (
 		<span class="ov-zhead" onclick={(e: MouseEvent) => e.stopPropagation()}>
@@ -922,13 +908,9 @@ function zorderButtons(elementId: string): m.Vnode {
 	);
 }
 
-/** Small up/down chevron glyph for a z-order button (single or double). */
-function zArrow(op: "front" | "forward" | "backward" | "back"): m.Vnode {
-	const up = op === "front" || op === "forward";
-	const dbl = op === "front" || op === "back";
-	const chev = (dy: number) =>
-		up ? `m6 ${15 + dy} 6 -6 6 6` : `m6 ${9 + dy} 6 6 6 -6`;
-	const paths = dbl ? [chev(-3.5), chev(3.5)] : [chev(0)];
+/** Small up/down chevron glyph for a z-order button. */
+function zArrow(op: "forward" | "backward"): m.Vnode {
+	const up = op === "forward";
 	return (
 		<svg
 			viewBox="0 0 24 24"
@@ -941,9 +923,7 @@ function zArrow(op: "front" | "forward" | "backward" | "back"): m.Vnode {
 			stroke-linecap="round"
 			stroke-linejoin="round"
 		>
-			{paths.map((d) => (
-				<path key={d} d={d} />
-			))}
+			<path d={up ? "m6 15 6 -6 6 6" : "m6 9 6 6 6 -6"} />
 		</svg>
 	);
 }

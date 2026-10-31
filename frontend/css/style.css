@@ -2031,11 +2031,8 @@ p.message {
 	padding: 0;
 	border: none;
 	background: transparent;
-	color: var(--muted);
-	cursor: pointer;
-}
-.ov-el-chevbtn:hover {
 	color: var(--text);
+	cursor: pointer;
 }
 .ov-el .ov-chev {
 	transition: transform 0.15s ease;
