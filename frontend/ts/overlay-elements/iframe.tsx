@@ -10,19 +10,21 @@ import type {
 	OverlayElementDef,
 } from "./core";
 import { drawIframe } from "./core";
-import { lbl } from "./fields";
+import { bindField } from "./fields";
 
 function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 	// `element` is already resolved by the renderer — drawIframe reads props.url.
 	return drawIframe(element) as Vnode;
 }
 
-function editForm({ element: e, mutate }: ElementProps): Vnode {
+function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 	const current = String(e.props.url ?? "");
 	return (
 		<>
-			<label class="ov-field">
-				{lbl(t("overlay.iframe_url"))}
+			{bindField(
+				e,
+				"props.url",
+				t("overlay.iframe_url"),
 				<input
 					type="text"
 					value={current}
@@ -31,8 +33,9 @@ function editForm({ element: e, mutate }: ElementProps): Vnode {
 							el.props.url = (ev.target as HTMLInputElement).value;
 						})
 					}
-				/>
-			</label>
+				/>,
+				{ mutate, variables },
+			)}
 		</>
 	);
 }

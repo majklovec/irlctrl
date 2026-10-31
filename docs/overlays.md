@@ -116,6 +116,17 @@ Every element attribute is bindable, through three path families:
   classic "show element when variable X is non-empty" use case; there is no
   separate show/hide binding kind.
 
+In the inspector, every bindable attribute gets a small, label-less checkbox
+directly next to its field (its tooltip is the only visible hint, e.g.
+"Bind to variable"). Checking it binds the attribute to the first project
+variable immediately and swaps the field's control for a select over the
+project variables; unchecking removes the binding. The toggle stays disabled
+while no variables exist, so a bound-but-unresolvable state can never be
+created. Transform fields and visibility live in the core inspector; the
+element-specific props get their toggles where the element's `editForm`
+renders its fields (via `bindField` in
+[overlay-elements/fields.tsx](../frontend/ts/overlay-elements/fields.tsx)).
+
 Resolution happens once per element at render time in
 `resolveElement` ([`overlay-elements/core.ts`](../frontend/ts/overlay-elements/core.ts))
 — editor canvas and runtime page share the exact same code path, so a bound
@@ -212,9 +223,9 @@ new type never touches `overlay-render.tsx`, `overlays.tsx` or `overlay.tsx`:
    [`registry.ts`](../frontend/ts/overlay-elements/registry.ts). `draw`
    receives the **resolved** element (bindings already applied) — read
    `element.props` / `element.transform` directly, never resolve again.
-   `propKeys` lists the prop names the consolidated **Bindings** section of
-   the inspector should offer as `props.<key>` selectors; transform fields
-   and `visible` are always offered automatically.
+   `propKeys` documents which prop names exist on the type; binding toggles
+   come for free on every field the `editForm` wraps in `bindField`
+   (transform fields and `visible` are toggled in the core inspector).
 3. Add the `overlay.*` i18n keys to `i18n/en.json` (mirror them into the
    other locale catalogs).
 4. Bump `OVERLAY_SCHEMA_VERSION` **only** if the change breaks existing

@@ -10,6 +10,7 @@ import { imageElement } from "./image";
 import { rectangleElement } from "./rectangle";
 import { ellipseElement } from "./ellipse";
 import { lineElement } from "./line";
+import { progressElement } from "./progress";
 import { iframeElement } from "./iframe";
 import { chatElement } from "./chat";
 import { groupElement } from "./group";
@@ -20,6 +21,7 @@ export const elementRegistry: Record<OverlayElementType, OverlayElementDef> = {
 	rectangle: rectangleElement,
 	ellipse: ellipseElement,
 	line: lineElement,
+	progress: progressElement,
 	iframe: iframeElement,
 	chat: chatElement,
 	group: groupElement,

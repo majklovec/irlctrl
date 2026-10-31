@@ -10,7 +10,7 @@ import type {
 	OverlayElementDef,
 } from "./core";
 import { strProp, numProp } from "./core";
-import { lbl } from "./fields";
+import { bindField } from "./fields";
 
 /**
  * Which box diagonal a drag delta runs along. The box is stored in min/abs
@@ -54,15 +54,18 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	});
 }
 
-function editForm({ element: e, mutate }: ElementProps): Vnode {
+function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 	const p = e.props;
+	const sp = { mutate, variables };
 	// A line is edited as two endpoints (see `handles`), so this form exposes
 	// ONLY line properties — never the rectangle/ellipse fill+radius editing.
 	return (
 		<>
 			<div class="ov-grid2">
-				<label class="ov-field">
-					{lbl(t("overlay.stroke"))}
+				{bindField(
+					e,
+					"props.stroke",
+					t("overlay.stroke"),
 					<input
 						type="color"
 						value={strProp(p, "stroke", DEFAULT_LINE_PROPS.stroke)}
@@ -71,10 +74,13 @@ function editForm({ element: e, mutate }: ElementProps): Vnode {
 								el.props.stroke = (ev.target as HTMLInputElement).value;
 							})
 						}
-					/>
-				</label>
-				<label class="ov-field">
-					{lbl(t("overlay.stroke_width"))}
+					/>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.strokeWidth",
+					t("overlay.stroke_width"),
 					<input
 						type="number"
 						value={numProp(p, "strokeWidth", DEFAULT_LINE_PROPS.strokeWidth)}
@@ -85,8 +91,9 @@ function editForm({ element: e, mutate }: ElementProps): Vnode {
 								);
 							})
 						}
-					/>
-				</label>
+					/>,
+					sp,
+				)}
 			</div>
 		</>
 	);

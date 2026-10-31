@@ -8,6 +8,7 @@ import { Badge } from "../../frontend/ts/components/ui";
 import { currentLanguage, t } from "../../frontend/ts/i18n";
 import type {
 	ChannelWidgetModule,
+	OverlayPreviewTarget,
 	WidgetContext,
 } from "../../frontend/ts/module-contracts";
 import type { ServerDashboardWidget } from "../../shared/types";
@@ -39,6 +40,7 @@ import {
 	CHAT_BANNED_TYPE,
 	type ChannelLive,
 	type ChatLive,
+	type ChatOverlayState,
 	type ChatPlatform,
 } from "./types";
 import "./styles.css";
@@ -660,7 +662,9 @@ const ChatFeed: m.Component<ChatFeedAttrs> = {
 
 // Stop the speech when the page is closed (the queue is global, so one
 // listener per chat widget is not needed).
-window.addEventListener("beforeunload", stopSpeech);
+if (typeof addEventListener === "function") {
+	addEventListener("beforeunload", stopSpeech);
+}
 
 /** The merged feed for every configured platform channel. */
 function body(w: ServerDashboardWidget, _ctx: WidgetContext): m.Children {
@@ -697,6 +701,105 @@ export function chatFeed(w: FeedWidget, showEmpty = true): m.Children {
 	});
 }
 
+// ── Inline overlay preview (no iframe) ────────────────────────────────────
+// Chromium with GPU compositing paints every iframe on its own opaque layer,
+// so a chat page in an iframe shows as a solid white box inside a transparent
+// editor canvas — CSS cannot make the layer transparent. Editors therefore
+// render the feed directly in the canvas DOM, polling the same token-
+// authenticated endpoint the standalone overlay page uses.
+
+/** The token-authenticated chat overlay page URL, parsed back to its target. */
+const OVERLAY_URL = /^\/chat\/([^/]+)\/([^/?#]+)/;
+
+function parseOverlayUrl(url: string): OverlayPreviewTarget | undefined {
+	const path =
+		typeof location !== "undefined" ? url.replace(location.origin, "") : url;
+	const ids = OVERLAY_URL.exec(path);
+	if (!ids) return undefined;
+	const params = new URL(url, location.origin).searchParams;
+	const token = params.get("token");
+	if (!token) return undefined;
+	return {
+		dashboardId: decodeURIComponent(ids[1]),
+		widgetId: decodeURIComponent(ids[2]),
+		token,
+	};
+}
+
+interface LivePreviewState {
+	state?: ChatOverlayState;
+	error: boolean;
+	timer?: ReturnType<typeof setInterval>;
+}
+
+async function livePreviewPoll(
+	s: LivePreviewState,
+	target: OverlayPreviewTarget,
+): Promise<void> {
+	try {
+		const response = await fetch(
+			`/api/chat/${encodeURIComponent(target.dashboardId)}/${encodeURIComponent(target.widgetId)}`,
+			{
+				headers: { authorization: `Bearer ${target.token}` },
+				cache: "no-store",
+				credentials: "omit",
+			},
+		);
+		if (!response.ok) throw new Error(`status ${response.status}`);
+		const next = (await response.json()) as ChatOverlayState;
+		onFrame?.("widget.snapshot", { chat: next.chat });
+		s.state = next;
+		s.error = false;
+	} catch (cause) {
+		console.error("[chat preview]", cause);
+		s.error = true;
+	} finally {
+		m.redraw();
+	}
+}
+
+/** The live chat feed rendered straight into an editor's canvas DOM — the
+ * module owns it (core reaches it only through the registry contract). */
+const LiveChatPreview: m.Component<OverlayPreviewTarget, LivePreviewState> = {
+	oninit(vnode) {
+		// `state` is pre-initialized by mithril; mutate it, never reassign.
+		vnode.state.error = true;
+		vnode.state.timer = setInterval(
+			() => void livePreviewPoll(vnode.state, vnode.attrs),
+			1000,
+		);
+		void livePreviewPoll(vnode.state, vnode.attrs);
+	},
+	onremove(vnode) {
+		clearInterval(vnode.state.timer);
+	},
+	view(vnode) {
+		const s = vnode.state;
+		return s.error
+			? m("p.chat-overlay-error", { role: "alert" }, "…")
+			: s.state
+				? chatFeed(s.state.widget, false)
+				: m("p.chat-overlay-error", { role: "alert" }, "…");
+	},
+};
+
+function overlayPreview(target: OverlayPreviewTarget): m.Vnode {
+	// `dash-widget-body` is the scoping class styles.css uses for the feed.
+	return m(
+		"div.chat-overlay-live dash-widget-body",
+		{
+			style: {
+				width: "100%",
+				height: "100%",
+				overflow: "hidden",
+				background: "transparent",
+				pointerEvents: "none",
+			},
+		},
+		m(LiveChatPreview, { ...target }),
+	);
+}
+
 const chatModule: ChannelWidgetModule<ServerDashboardWidget> = {
 	id: "chat",
 	kind: "widget",
@@ -713,6 +816,8 @@ const chatModule: ChannelWidgetModule<ServerDashboardWidget> = {
 	body,
 	badge,
 	onFrame,
+	parseOverlayUrl,
+	overlayPreview,
 };
 
 export default chatModule;

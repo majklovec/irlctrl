@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
     DEFAULT_LINE_PROPS,
+    DEFAULT_PROGRESS_PROPS,
     DEFAULT_RECTANGLE_PROPS,
     DEFAULT_TEXT_PROPS,
     defaultProject,
@@ -218,6 +219,21 @@ describe("overlay schema", () => {
         expect(el.type).toBe("ellipse");
         expect(el.props.fill).toBe("#123456");
         expect(el.props.strokeWidth).toBe(7);
+    });
+
+    test("progress props are normalized with type-specific ranges", () => {
+        const el = parseElementInput({
+            ...textElement(),
+            type: "progress",
+            props: { value: 150, fill: "#22c55e", background: "#fff", radius: -3 },
+        });
+        expect(el.type).toBe("progress");
+        // out-of-range value/radius fall back to defaults; fill is kept
+        expect(el.props.value).toBe(DEFAULT_PROGRESS_PROPS.value);
+        expect(el.props.fill).toBe("#22c55e");
+        // a 3-hex background is coerced to the default (hex must be #rrggbb)
+        expect(el.props.background).toBe(DEFAULT_PROGRESS_PROPS.background);
+        expect(el.props.radius).toBe(DEFAULT_PROGRESS_PROPS.radius);
     });
 
     test("chat element normalizes its url prop and preserves unknown keys", () => {

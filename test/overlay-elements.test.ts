@@ -49,6 +49,7 @@ const WELL_FORMED: Array<[OverlayElementType, Record<string, unknown>]> = [
     ],
     ["ellipse", { fill: "#3b82f6", stroke: "#000000", strokeWidth: 2 }],
     ["line", { stroke: "#3b82f6", strokeWidth: 4 }],
+    ["progress", { value: 40, fill: "#22c55e", background: "#e5e7eb", radius: 6 }],
     ["group", {}],
     ["iframe", { url: "https://example.com" }],
     ["chat", { url: "https://example.com/chat" }],
@@ -63,6 +64,7 @@ describe("element registry contract", () => {
             "iframe",
             "image",
             "line",
+            "progress",
             "rectangle",
             "text",
         ]);
@@ -75,6 +77,7 @@ describe("element registry contract", () => {
         expect(elementDef("line")!.handles).toBe("endpoints");
         expect(elementDef("rectangle")!.handles).toBe("box");
         expect(elementDef("ellipse")!.handles).toBe("box");
+        expect(elementDef("progress")!.handles).toBe("box");
         expect(elementDef("text")!.handles).toBe("box");
         expect(elementDef("image")!.handles).toBe("box");
         expect(elementDef("group")!.handles).toBe("none");
@@ -96,6 +99,11 @@ describe("element registry contract", () => {
         ).not.toEqual([]);
         expect(
             elementDef("image")!.validate(baseElement("image", {})),
+        ).not.toEqual([]);
+        expect(
+            elementDef("progress")!.validate(
+                baseElement("progress", { value: 140 }),
+            ),
         ).not.toEqual([]);
     });
 
@@ -120,6 +128,20 @@ describe("element registry contract", () => {
         // an unresolved element still shows its raw prop value
         const raw = elementDef("text")!.draw(el, ctx());
         expect(JSON.stringify(raw)).toContain("static");
+    });
+
+    test("progress draw() sizes the fill from value and clamps out-of-range", () => {
+        const at = (value: number) =>
+            JSON.stringify(
+                elementDef("progress")!.draw(
+                    baseElement("progress", { value }),
+                    ctx(),
+                ),
+            );
+        expect(at(40)).toContain("40%");
+        // values outside 0–100 are clamped so the fill can't overflow the track
+        expect(at(140)).toContain("100%");
+        expect(at(-5)).toContain("0%");
     });
 
     test("resolveElement(): props.* replaces the raw prop (no coercion)", () => {

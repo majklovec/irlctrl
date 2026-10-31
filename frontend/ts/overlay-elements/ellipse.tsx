@@ -10,7 +10,7 @@ import type {
 	OverlayElementDef,
 } from "./core";
 import { strProp, numProp } from "./core";
-import { lbl } from "./fields";
+import { bindField } from "./fields";
 
 function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	// `element` is already resolved by the renderer — props carry binding values.
@@ -28,13 +28,16 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	});
 }
 
-function editForm({ element: e, mutate }: ElementProps): Vnode {
+function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 	const p = e.props;
+	const sp = { mutate, variables };
 	return (
 		<>
 			<div class="ov-grid2">
-				<label class="ov-field">
-					{lbl(t("overlay.fill"))}
+				{bindField(
+					e,
+					"props.fill",
+					t("overlay.fill"),
 					<input
 						type="color"
 						value={strProp(p, "fill", DEFAULT_ELLIPSE_PROPS.fill)}
@@ -43,10 +46,13 @@ function editForm({ element: e, mutate }: ElementProps): Vnode {
 								el.props.fill = (ev.target as HTMLInputElement).value;
 							})
 						}
-					/>
-				</label>
-				<label class="ov-field">
-					{lbl(t("overlay.stroke"))}
+					/>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.stroke",
+					t("overlay.stroke"),
 					<input
 						type="color"
 						value={strProp(p, "stroke", DEFAULT_ELLIPSE_PROPS.stroke)}
@@ -55,11 +61,14 @@ function editForm({ element: e, mutate }: ElementProps): Vnode {
 								el.props.stroke = (ev.target as HTMLInputElement).value;
 							})
 						}
-					/>
-				</label>
+					/>,
+					sp,
+				)}
 			</div>
-			<label class="ov-field">
-				{lbl(t("overlay.stroke_width"))}
+			{bindField(
+				e,
+				"props.strokeWidth",
+				t("overlay.stroke_width"),
 				<input
 					type="number"
 					value={numProp(p, "strokeWidth", 0)}
@@ -70,8 +79,9 @@ function editForm({ element: e, mutate }: ElementProps): Vnode {
 							);
 						})
 					}
-				/>
-			</label>
+				/>,
+				sp,
+			)}
 		</>
 	);
 }

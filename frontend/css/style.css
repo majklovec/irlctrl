@@ -2121,6 +2121,9 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
 .ov-field select {
     width: 100%;
 }
+.ov-field input[type="checkbox"] {
+    width: auto;
+}
 .ov-field input[type="color"] {
     padding: 2px;
     height: 32px;
@@ -2134,29 +2137,33 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
     grid-template-columns: 1fr 1fr;
     gap: 10px;
 }
+.ov-gridcell {
+    min-width: 0;
+}
 .ov-lbl {
     font-size: 12px;
 }
-/* section heading inside the element inspector ("Text", "Bindings", …) */
-.ov-sec-head {
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--text);
-}
-/* consolidated bindings block — one row per bindable attribute */
-.ov-bindings {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding-top: 8px;
-    border-top: 1px solid var(--border);
-}
-.ov-bindings-row {
+/* one field's control + its inline binding toggle, side by side */
+.ov-field-row {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+.ov-field-ctl {
+    flex: 1;
+    min-width: 0;
+}
+/* variable picker shown in place of a field's control while bound */
+.ov-var-sel {
+    width: 100%;
+}
+/* the tiny, label-less per-field binding checkbox (tooltip carries the info) */
+.ov-bind-chk {
+    width: auto;
+    flex-shrink: 0;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--accent);
 }
 .ov-check {
     display: flex;

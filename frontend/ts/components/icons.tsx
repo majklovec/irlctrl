@@ -126,6 +126,12 @@ export const SHAPES = {
 	rectangle: <rect x="3" y="5" width="18" height="14" rx="1.5" />,
 	ellipse: <ellipse cx="12" cy="12" rx="9" ry="6.5" />,
 	line: <path d="M5 19 19 5" />,
+	progress: (
+		<>
+			<rect x="3" y="8" width="18" height="8" rx="4" />
+			<path d="M10 8v8" />
+		</>
+	),
 	image: (
 		<>
 			<rect x="3" y="4" width="18" height="16" rx="2" />

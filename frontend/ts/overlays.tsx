@@ -33,7 +33,7 @@ import { Icon } from "./components/icons";
 import { Button, Card, Page, ServerNav } from "./components/ui";
 import { t } from "./i18n";
 import type { ChatWidgetRef } from "./overlay-elements/core";
-import { bindingSection } from "./overlay-elements/fields";
+import { bindField, bindToggle, lbl } from "./overlay-elements/fields";
 import { lineFlipFromDelta } from "./overlay-elements/line";
 import { elementDef } from "./overlay-elements/registry";
 import {
@@ -105,19 +105,6 @@ const state = {
 
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
-
-/** The attributes every element exposes as bindable in the Bindings section,
- * keyed by the full binding path the schema accepts. Each element def's
- * `propKeys` are appended (as `props.<key>`) to form the full list. */
-const COMMON_BINDING_PATHS = [
-	"transform.x",
-	"transform.y",
-	"transform.width",
-	"transform.height",
-	"transform.rotation",
-	"transform.opacity",
-	"visible",
-];
 
 function scene(): Scene | undefined {
 	return state.project.scenes.find((s) => s.id === state.selectedSceneId);
@@ -366,7 +353,15 @@ function setElementLocked(elementId: string, locked: boolean): void {
  * props and size come from its `OverlayElementDef` — the core never
  * hardcodes element-specific defaults. */
 function addElement(
-	type: "text" | "rectangle" | "ellipse" | "line" | "image" | "iframe" | "chat",
+	type:
+		| "text"
+		| "rectangle"
+		| "ellipse"
+		| "line"
+		| "progress"
+		| "image"
+		| "iframe"
+		| "chat",
 ): void {
 	const s = scene();
 	if (!s) return;
@@ -908,8 +903,15 @@ function canvasArea(): m.Vnode {
 					style={{
 						width: C.width + "px",
 						height: C.height + "px",
-						transform: "scale(" + state.zoom + ")",
-						transformOrigin: "0 0",
+						// Zoom via the CSS `zoom` property, NOT `transform: scale()`.
+						// A transform promotes the canvas (and any <iframe> inside it,
+						// e.g. the chat element) to a GPU-composited layer, which on
+						// real-GPU Chromium/CEF paints an opaque white backing behind the
+						// iframe — a solid white box. `zoom` scales layout without creating
+						// a composited layer, so iframe elements stay transparent. The
+						// (clientX/Y - rect) / state.zoom math below is unaffected because
+						// getBoundingClientRect() already reflects `zoom`.
+						zoom: state.zoom,
 					}}
 					onmousedown={(ev: MouseEvent) => {
 						// clicking an element selects + begins a drag; clicking
@@ -1093,9 +1095,6 @@ function inlineTextEdit(elementId: string, s: Scene | undefined): m.Children {
 	);
 }
 
-function lbl(label: string): m.Vnode {
-	return <span class="ov-lbl">{label}</span>;
-}
 
 /**
  * Z-order controls (forward / backward) for one element, rendered as compact
@@ -1240,65 +1239,97 @@ function elementProps(e: OverlayElement): m.Vnode {
 
 			<div class="ov-grid2">
 				{[
-					[t("overlay.x"), tm.x, (n: number) => setT((x) => (x.x = n))],
-					[t("overlay.y"), tm.y, (n: number) => setT((x) => (x.y = n))],
 					[
+						"transform.x",
+						t("overlay.x"),
+						tm.x,
+						(n: number) => setT((x) => (x.x = n)),
+					],
+					[
+						"transform.y",
+						t("overlay.y"),
+						tm.y,
+						(n: number) => setT((x) => (x.y = n)),
+					],
+					[
+						"transform.width",
 						t("overlay.w"),
 						tm.width,
 						(n: number) => setT((x) => (x.width = Math.max(1, n))),
 					],
 					[
+						"transform.height",
 						t("overlay.h"),
 						tm.height,
 						(n: number) => setT((x) => (x.height = Math.max(1, n))),
 					],
 					[
+						"transform.rotation",
 						t("overlay.rotation"),
 						tm.rotation,
 						(n: number) => setT((x) => (x.rotation = n)),
 					],
-				].map(([label, value, on]) => (
-					<label class="ov-field" key={String(label)}>
-						{lbl(String(label))}
-						<input
-							type="number"
-							value={Number(value)}
-							oninput={(ev: Event) => {
-								const n = Number((ev.target as HTMLInputElement).value);
-								if (Number.isFinite(n)) (on as (n: number) => void)(n);
-							}}
-						/>
-					</label>
+				].map(([path, label, value, on]) => (
+					<div class="ov-gridcell" key={String(path)}>
+						{bindField(
+							e,
+							String(path),
+							String(label),
+							<input
+								type="number"
+								value={Number(value)}
+								oninput={(ev: Event) => {
+									const n = Number((ev.target as HTMLInputElement).value);
+									if (Number.isFinite(n)) (on as (n: number) => void)(n);
+								}}
+							/>,
+							{ mutate: (fn) => mutateElementOf(e.id, fn), variables: state.project.variables },
+						)}
+					</div>
 				))}
-				<label class="ov-field">
-					{lbl(t("overlay.opacity"))}
-					<input
-						type="range"
-						min="0"
-						max="1"
-						step="0.01"
-						value={tm.opacity}
-						oninput={(ev: Event) =>
-							setT((x) => {
-								x.opacity = Number((ev.target as HTMLInputElement).value);
-							})
-						}
-					/>
-				</label>
 			</div>
 
-			<label class="ov-check">
-				<input
-					type="checkbox"
-					checked={e.visible}
-					onchange={(ev: Event) =>
-						mutateElementOf(e.id, (el) => {
-							el.visible = (ev.target as HTMLInputElement).checked;
-						})
-					}
-				/>
-				{t("overlay.visible")}
-			</label>
+			<div class="ov-grid2">
+				<div class="ov-gridcell">
+					{bindField(
+						e,
+						"transform.opacity",
+						t("overlay.opacity"),
+						<input
+							type="range"
+							min="0"
+							max="1"
+							step="0.01"
+							value={tm.opacity}
+							oninput={(ev: Event) =>
+								setT((x) => {
+									x.opacity = Number((ev.target as HTMLInputElement).value);
+								})
+							}
+						/>,
+						{ mutate: (fn) => mutateElementOf(e.id, fn), variables: state.project.variables },
+					)}
+				</div>
+				<div class="ov-gridcell">
+					<div class="ov-check">
+						<input
+							id={`ov-visible-${e.id}`}
+							type="checkbox"
+							checked={e.visible}
+							onchange={(ev: Event) =>
+								mutateElementOf(e.id, (el) => {
+									el.visible = (ev.target as HTMLInputElement).checked;
+								})
+							}
+						/>
+						<span>{t("overlay.visible")}</span>
+						{bindToggle(e, "visible", {
+							mutate: (fn) => mutateElementOf(e.id, fn),
+							variables: state.project.variables,
+						})}
+					</div>
+				</div>
+			</div>
 			<label class="ov-check">
 				<input
 					type="checkbox"
@@ -1320,18 +1351,6 @@ function elementProps(e: OverlayElement): m.Vnode {
 						chatWidgets: state.chatWidgets,
 					})
 				: null}
-
-			{bindingSection(
-				e,
-				[
-					...COMMON_BINDING_PATHS,
-					...(def?.propKeys ?? []).map((k) => `props.${k}`),
-				],
-				{
-					mutate: (fn) => mutateElementOf(e.id, fn),
-					variables: state.project.variables,
-				},
-			)}
 
 			<div class="ov-danger">
 				<Button
@@ -1522,6 +1541,7 @@ function editorToolbar(): m.Vnode {
 		["rectangle", "overlay.add_rectangle"],
 		["ellipse", "overlay.add_ellipse"],
 		["line", "overlay.add_line"],
+		["progress", "overlay.add_progress"],
 		["image", "overlay.add_image"],
 		["chat", "overlay.add_chat"],
 		["iframe", "overlay.add_iframe"],

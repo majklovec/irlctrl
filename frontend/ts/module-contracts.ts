@@ -139,7 +139,23 @@ export interface ChannelWidgetModule<TWidget = ServerDashboardWidget> {
     badge(w: TWidget, ctx: WidgetContext): m.Children;
     /** Receive one dashboard-websocket frame and fold it into the module's own live state. */
     onFrame?(event: string, data: unknown): void;
+    /** Parse one of the module's token-authenticated overlay page URLs into its
+     * target; undefined for URLs the module does not own. Lets core pages (e.g.
+     * the overlay editor) recognize the module's pages without naming it. */
+    parseOverlayUrl?(url: string): OverlayPreviewTarget | undefined;
+    /** Inline live preview of the module's overlay page for editor canvases.
+     * Chromium composites iframes onto an opaque white layer (a white box in a
+     * transparent canvas), so editors render the feed directly instead. */
+    overlayPreview?(target: OverlayPreviewTarget): m.Vnode;
     log?: LogWording;
+}
+
+/** Target of a module-owned token-authenticated overlay page (the ids and
+ * token the page's URL carries), resolvable by `parseOverlayUrl`. */
+export interface OverlayPreviewTarget {
+	dashboardId: string;
+	widgetId: string;
+	token: string;
 }
 
 /** A dashboard widget offered once, not bound to one device: its config names

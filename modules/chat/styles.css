@@ -9,6 +9,15 @@
     line-height: 1.5;
 }
 
+/* Overlay canvas element: no scrollbar — the feed is clipped to the element
+   box and long lines wrap inside it, like on the standalone overlay page.
+   `white-space: normal` resets the `.overlay-element` `pre` inheritance so
+   lines actually wrap. */
+.dash-widget-body.chat-overlay-live .chat-feed {
+    overflow: hidden;
+    white-space: normal;
+}
+
 /* Card-head status: one platform icon per channel, green when online, red
    while disconnected. */
 .dash-widget-badge .chat-status {

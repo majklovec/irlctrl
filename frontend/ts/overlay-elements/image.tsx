@@ -9,6 +9,7 @@ import type {
 	OverlayElementDef,
 } from "./core";
 import { strProp } from "./core";
+import { bindField } from "./fields";
 
 function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	const assetId = strProp(element.props, "assetId", "");
@@ -31,11 +32,19 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	return m("img.overlay-image", { src: url, alt: element.name, draggable: false });
 }
 
-function editForm({ element: e, mutate, assets, upload }: ElementProps): Vnode {
+function editForm({
+	element: e,
+	mutate,
+	variables,
+	assets,
+	upload,
+}: ElementProps): Vnode {
 	return (
 		<>
-			<label class="ov-field">
-				{t("overlay.asset")}
+			{bindField(
+				e,
+				"props.assetId",
+				t("overlay.asset"),
 				<select
 					value={String(e.props.assetId ?? "")}
 					onchange={(ev: Event) =>
@@ -50,8 +59,9 @@ function editForm({ element: e, mutate, assets, upload }: ElementProps): Vnode {
 							{a.filename}
 						</option>
 					))}
-				</select>
-			</label>
+				</select>,
+				{ mutate, variables },
+			)}
 			<span class="ov-field">
 				<span class="ov-upload ov-upload-btn">
 					<input

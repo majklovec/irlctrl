@@ -110,14 +110,29 @@ export function elementStyle(
 	element: { transform: Transform; visible: boolean },
 ): CSS {
 	const t = element.transform;
+	// Rotated elements get `rotate(deg)` with the origin pinned to the
+	// element center. Unrotated elements must NOT carry a `transform` at
+	// all: Chromium (and CEF, used by OBS) promotes any transformed
+	// ancestor of an `<iframe>` to a composited layer and paints that
+	// layer opaque white — so even an identity `rotate(0deg)` turned
+	// iframe/chat elements into solid white boxes. Omitting `transform`
+	// keeps them transparent. See shared/overlay.tsx + overlay.css note.
 	return {
 		position: "absolute",
 		left: `${t.x}px`,
 		top: `${t.y}px`,
 		width: `${t.width}px`,
 		height: `${t.height}px`,
-		transform: `rotate(${t.rotation}deg)`,
-		transformOrigin: "50% 50%",
+		// Explicit: keep the wrapper transparent — on Chromium/CEF a
+		// transformed ancestor promotes iframe descendants to a composited
+		// layer that can otherwise paint an opaque white backing.
+		background: "transparent",
+		...(t.rotation
+			? {
+					transform: `rotate(${t.rotation}deg)`,
+					transformOrigin: "50% 50%",
+				}
+			: {}),
 		whiteSpace: "pre",
 		opacity: `${t.opacity}`,
 		visibility: element.visible ? "visible" : "hidden",
@@ -230,8 +245,9 @@ export type HandleMode = "box" | "endpoints" | "none";
 export interface OverlayElementDef {
 	readonly type: OverlayElementType;
 	readonly defaultProps: Record<string, unknown>;
-	/** Prop keys that accept a variable binding (rendered in the inspector's
-	 * Bindings section), e.g. text → ["text"]. Bound as `props.<key>`. */
+	/** Prop names that exist on the type; the inspector offers a binding
+	 * toggle on each field the `editForm` wraps in `bindField` — bound as
+	 * `props.<key>`, e.g. text → "props.text". */
 	readonly propKeys: readonly string[];
 	readonly defaultSize: { width: number; height: number };
 	/** Renders the element's contents. `element` is the RESOLVED element —

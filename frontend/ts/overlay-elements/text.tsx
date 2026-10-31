@@ -10,7 +10,7 @@ import type {
 	OverlayElementDef,
 } from "./core";
 import { strProp, numProp } from "./core";
-import { lbl } from "./fields";
+import { bindField } from "./fields";
 
 interface TextProps {
 	text: string;
@@ -60,12 +60,15 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	);
 }
 
-function editForm({ element: e, mutate }: ElementProps): Vnode {
+function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 	const p = e.props;
+	const sp = { mutate, variables };
 	return (
 		<>
-			<label class="ov-field">
-				{lbl(t("overlay.text"))}
+			{bindField(
+				e,
+				"props.text",
+				t("overlay.text"),
 				<input
 					type="text"
 					value={String(p.text ?? "")}
@@ -74,11 +77,14 @@ function editForm({ element: e, mutate }: ElementProps): Vnode {
 							el.props.text = (ev.target as HTMLInputElement).value;
 						})
 					}
-				/>
-			</label>
+				/>,
+				sp,
+			)}
 			<div class="ov-grid2">
-				<label class="ov-field">
-					{lbl(t("overlay.font_size"))}
+				{bindField(
+					e,
+					"props.fontSize",
+					t("overlay.font_size"),
 					<input
 						type="number"
 						value={Number(p.fontSize ?? 48)}
@@ -89,10 +95,13 @@ function editForm({ element: e, mutate }: ElementProps): Vnode {
 								);
 							})
 						}
-					/>
-				</label>
-				<label class="ov-field">
-					{lbl(t("overlay.color"))}
+					/>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.color",
+					t("overlay.color"),
 					<input
 						type="color"
 						value={String(p.color ?? "#ffffff")}
@@ -101,12 +110,15 @@ function editForm({ element: e, mutate }: ElementProps): Vnode {
 								el.props.color = (ev.target as HTMLInputElement).value;
 							})
 						}
-					/>
-				</label>
+					/>,
+					sp,
+				)}
 			</div>
 			<div class="ov-grid2">
-				<label class="ov-field">
-					{lbl(t("overlay.font_weight"))}
+				{bindField(
+					e,
+					"props.fontWeight",
+					t("overlay.font_weight"),
 					<select
 						value={String(p.fontWeight ?? 600)}
 						onchange={(ev: Event) =>
@@ -121,10 +133,13 @@ function editForm({ element: e, mutate }: ElementProps): Vnode {
 						<option value="600">600</option>
 						<option value="700">700</option>
 						<option value="900">900</option>
-					</select>
-				</label>
-				<label class="ov-field">
-					{lbl(t("overlay.align"))}
+					</select>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.textAlign",
+					t("overlay.align"),
 					<select
 						value={String(p.textAlign ?? "left")}
 						onchange={(ev: Event) =>
@@ -138,8 +153,9 @@ function editForm({ element: e, mutate }: ElementProps): Vnode {
 						<option value="left">left</option>
 						<option value="center">center</option>
 						<option value="right">right</option>
-					</select>
-				</label>
+					</select>,
+					sp,
+				)}
 			</div>
 		</>
 	);

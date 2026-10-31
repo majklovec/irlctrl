@@ -60,6 +60,7 @@ export type OverlayElementType =
     | "rectangle"
     | "ellipse"
     | "line"
+    | "progress"
     | "group"
     | "iframe"
     | "chat";
@@ -353,6 +354,24 @@ export interface EllipseProps {
     strokeWidth: number;
 }
 
+export const DEFAULT_PROGRESS_PROPS: Required<ProgressProps> = {
+    value: 25,
+    fill: "#22c55e",
+    background: "#e5e7eb",
+    radius: 6,
+};
+
+export interface ProgressProps {
+    /** progress percentage, 0–100 */
+    value: number;
+    /** color of the filled portion */
+    fill: string;
+    /** color of the empty track behind the fill */
+    background: string;
+    /** corner radius in px (0 = square corners) */
+    radius: number;
+}
+
 export const DEFAULT_LINE_PROPS: Required<LineProps> = {
     stroke: "#3b82f6",
     strokeWidth: 4,
@@ -459,6 +478,16 @@ const normalizeProps = (
             out.strokeWidth = num("strokeWidth", d.strokeWidth, 0, 500);
             return out;
         }
+        case "progress": {
+            const d = DEFAULT_PROGRESS_PROPS;
+            const out: Record<string, unknown> = {};
+            for (const k of Object.keys(props)) out[k] = props[k];
+            out.value = num("value", d.value, 0, 100);
+            out.fill = hex("fill", d.fill);
+            out.background = hex("background", d.background);
+            out.radius = num("radius", d.radius, 0, 10000);
+            return out;
+        }
         case "line": {
             const d = DEFAULT_LINE_PROPS;
             const out: Record<string, unknown> = {};
@@ -521,6 +550,7 @@ const normalizeElement = (raw: unknown): OverlayElement => {
             type !== "rectangle" &&
             type !== "ellipse" &&
             type !== "line" &&
+            type !== "progress" &&
             type !== "iframe" &&
             type !== "chat" &&
             type !== "group")
