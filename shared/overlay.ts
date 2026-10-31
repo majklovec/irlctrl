@@ -60,7 +60,9 @@ export type OverlayElementType =
     | "rectangle"
     | "ellipse"
     | "line"
-    | "group";
+    | "group"
+    | "iframe"
+    | "chat";
 
 export type ElementBase = {
     id: string;
@@ -361,6 +363,31 @@ export interface LineProps {
     flip: boolean;
 }
 
+export const DEFAULT_IFRAME_PROPS: Required<IframeProps> = {
+    url: "",
+};
+
+export interface IframeProps {
+    /**
+     * The page to embed. Any absolute URL; `""` renders a placeholder box.
+     */
+    url: string;
+};
+
+export const DEFAULT_CHAT_PROPS: Required<ChatProps> = {
+    url: "",
+};
+
+export interface ChatProps {
+    /**
+     * The chat module's live overlay URL
+     * (`/chat/<dashboardId>/<widgetId>?token=…`), set by the inspector's
+     * module picker; no free-form URL (a generic page goes in an iframe
+     * element). `""` renders a placeholder box.
+     */
+    url: string;
+};
+
 const COLOR_HEX = /^#[0-9a-f]{6}$/i;
 
 const normalizeProps = (
@@ -438,6 +465,20 @@ const normalizeProps = (
                 assetId: typeof props.assetId === "string" ? props.assetId : "",
                 ...spreadRest(props, ["assetId"]),
             };
+        case "iframe":
+            // A bare string (no scheme or path checks — the browser decides what
+            // a URL is worth loading); a missing value falls back to "".
+            return {
+                url: typeof props.url === "string" ? props.url : "",
+                ...spreadRest(props, ["url"]),
+            };
+        case "chat":
+            // The picker always writes the chat overlay URL (`?token=…`),
+            // which already contains percent-safe characters as-is.
+            return {
+                url: typeof props.url === "string" ? props.url : "",
+                ...spreadRest(props, ["url"]),
+            };
         case "group":
             return props;
     }
@@ -470,6 +511,8 @@ const normalizeElement = (raw: unknown): OverlayElement => {
             type !== "rectangle" &&
             type !== "ellipse" &&
             type !== "line" &&
+            type !== "iframe" &&
+            type !== "chat" &&
             type !== "group")
     )
         throw new Error("element needs id, name and a valid type");

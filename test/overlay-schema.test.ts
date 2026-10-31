@@ -220,6 +220,28 @@ describe("overlay schema", () => {
         expect(el.props.strokeWidth).toBe(7);
     });
 
+    test("chat element normalizes its url prop and preserves unknown keys", () => {
+        const el = parseElementInput({
+            ...textElement(),
+            type: "chat",
+            props: {
+                url: "https://example.com/chat/a/b?token=t",
+                customEffect: "glow",
+            },
+        });
+        expect(el.type).toBe("chat");
+        expect(el.props.url).toBe("https://example.com/chat/a/b?token=t");
+        expect(el.props.customEffect).toBe("glow");
+
+        // a missing url falls back to ""
+        const bare = parseElementInput({
+            ...textElement(),
+            type: "chat",
+            props: {},
+        });
+        expect(bare.props.url).toBe("");
+    });
+
     test("line props are normalized and in-range values kept", () => {
         const el = parseElementInput({
             ...textElement(),

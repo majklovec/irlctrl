@@ -31,6 +31,7 @@ import type {
 } from "../../shared/overlay";
 import { elementDef } from "./overlay-elements/registry";
 import { lineFlipFromDelta } from "./overlay-elements/line";
+import type { ChatWidgetRef } from "./overlay-elements/core";
 import { Icon } from "./components/icons";
 import { Button, Card, Page, ServerNav } from "./components/ui";
 import { t } from "./i18n";
@@ -94,6 +95,8 @@ const state = {
 	expandedElementId: null as string | null,
 	/** Text element being inline-edited on the canvas. */
 	editingElementId: null as string | null,
+	/** The user's chat modules (type "chat" widgets), for the chat picker. */
+	chatWidgets: [] as ChatWidgetRef[],
 };
 
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
@@ -155,6 +158,38 @@ async function load(): Promise<void> {
 		state.future = [];
 	}
 	state.loaded = true;
+	m.redraw();
+}
+
+/** Fetch the user's chat modules (dashboard widgets of type "chat") so the
+ * chat element's inspector can offer them as one-click targets. */
+async function loadChatModules(): Promise<void> {
+	const body = await api<{
+		dashboards: Array<{
+			id: string;
+			name: string;
+			widgets: Array<{
+				id: string;
+				type: string;
+				name: string;
+				config?: Record<string, string>;
+			}>;
+		}>;
+	}>("/api/dashboards");
+	const widgets: ChatWidgetRef[] = [];
+	for (const d of body?.dashboards ?? []) {
+		for (const w of d.widgets ?? []) {
+			if (w.type !== "chat") continue;
+			widgets.push({
+				dashboardId: d.id,
+				widgetId: w.id,
+				dashboardName: d.name,
+				name: w.name,
+				token: w.config?.token ?? "",
+			});
+		}
+	}
+	state.chatWidgets = widgets;
 	m.redraw();
 }
 
@@ -299,7 +334,7 @@ function setElementLocked(elementId: string, locked: boolean): void {
  * props and size come from its `OverlayElementDef` — the core never
  * hardcodes element-specific defaults. */
 function addElement(
-	type: "text" | "rectangle" | "ellipse" | "line" | "image",
+	type: "text" | "rectangle" | "ellipse" | "line" | "image" | "iframe" | "chat",
 ): void {
 	const s = scene();
 	if (!s) return;
@@ -1251,6 +1286,7 @@ function elementProps(e: OverlayElement): m.Vnode {
 						variables: state.project.variables,
 						upload: (f: File) =>
 							uploadAsset(f).then((a) => a?.id ?? null),
+						chatWidgets: state.chatWidgets,
 					})
 				: null}
 
@@ -1443,6 +1479,14 @@ function headerRight(): m.Vnode {
 					label={t("overlay.add_image")}
 					onclick={() => addElement("image")}
 				/>
+				<Button
+					label={t("overlay.add_chat")}
+					onclick={() => addElement("chat")}
+				/>
+				<Button
+					label={t("overlay.add_iframe")}
+					onclick={() => addElement("iframe")}
+				/>
 			</span>
 			<span class="ov-zoom">
 				<Button
@@ -1634,6 +1678,7 @@ function editorTitle(): m.Vnode {
 const overlaysPage: m.Component = {
 	oncreate() {
 		void load();
+		void loadChatModules();
 		window.addEventListener("keydown", onKey, true);
 	},
 	onremove() {
