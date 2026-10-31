@@ -33,12 +33,14 @@ import { Icon } from "./components/icons";
 import { Button, Card, Page, ServerNav } from "./components/ui";
 import { t } from "./i18n";
 import type { ChatWidgetRef } from "./overlay-elements/core";
+import { bindingSection } from "./overlay-elements/fields";
 import { lineFlipFromDelta } from "./overlay-elements/line";
 import { elementDef } from "./overlay-elements/registry";
 import {
 	assetUrl,
 	type ElementContext,
 	elementStyle,
+	resolveElement,
 	sceneElementsView,
 } from "./overlay-render";
 import { serverLive } from "./services/serverws";
@@ -104,6 +106,19 @@ const state = {
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
+/** The attributes every element exposes as bindable in the Bindings section,
+ * keyed by the full binding path the schema accepts. Each element def's
+ * `propKeys` are appended (as `props.<key>`) to form the full list. */
+const COMMON_BINDING_PATHS = [
+	"transform.x",
+	"transform.y",
+	"transform.width",
+	"transform.height",
+	"transform.rotation",
+	"transform.opacity",
+	"visible",
+];
+
 function scene(): Scene | undefined {
 	return state.project.scenes.find((s) => s.id === state.selectedSceneId);
 }
@@ -118,6 +133,11 @@ function ctx(): ElementContext {
 			state.project.variables.map((v) => [v.id, v.value as VariableValue]),
 		),
 	};
+}
+/** Resolved display transform (bindings applied) — for drag start, snapping,
+ * and the selection box, so bound elements behave like their shown geometry. */
+function resolvedTransform(e: OverlayElement): Transform {
+	return resolveElement(e, ctx().variables).transform;
 }
 function runtimeUrl(s: Scene): string {
 	return (
@@ -552,9 +572,12 @@ function applySnap(
 	const yTargets = [0, C.height, C.height / 2];
 	if (s)
 		for (const o of s.elements) {
-			if (o.id === e.id || !o.visible) continue;
-			xTargets.push(o.transform.x, o.transform.x + o.transform.width);
-			yTargets.push(o.transform.y, o.transform.y + o.transform.height);
+			if (o.id === e.id) continue;
+			// snap to the RESOLVED geometry so bound/hidden peers snap where shown
+			const rt = resolveElement(o, ctx().variables);
+			if (!rt.visible) continue;
+			xTargets.push(rt.transform.x, rt.transform.x + rt.transform.width);
+			yTargets.push(rt.transform.y, rt.transform.y + rt.transform.height);
 		}
 	const xEdges = [t.x, t.x + t.width / 2, t.x + t.width];
 	const yEdges = [t.y, t.y + t.height / 2, t.y + t.height];
@@ -603,6 +626,9 @@ function toggleElementRow(elementId: string): void {
 function startInlineEdit(elementId: string): void {
 	const e = scene()?.elements.find((x) => x.id === elementId);
 	if (!e || e.type !== "text" || e.locked) return;
+	// a bound `props.text` wins over the raw value — inline editing the raw
+	// text would be a no-op on screen, so don't offer it
+	if (e.bindings["props.text"]) return;
 	snapshot();
 	state.editingElementId = elementId;
 	state.selectedElementId = elementId;
@@ -637,7 +663,7 @@ function startDrag(
 		handle,
 		startX: p.x,
 		startY: p.y,
-		start: { ...e.transform },
+		start: { ...resolvedTransform(e) },
 		moved: false,
 	};
 	snapshot();
@@ -944,7 +970,7 @@ function canvasArea(): m.Vnode {
 						{el ? (
 							<div
 								class="ov-selection"
-								style={elementStyle(el)}
+								style={elementStyle(resolveElement(el, ctx().variables))}
 								onmousedown={(ev: Event) =>
 									startDrag(ev as MouseEvent, el.id, "move")
 								}
@@ -994,7 +1020,9 @@ function canvasArea(): m.Vnode {
 function inlineTextEdit(elementId: string, s: Scene | undefined): m.Children {
 	const e = s?.elements.find((x) => x.id === elementId);
 	if (!e || e.type !== "text") return null;
-	const p = (e.props ?? {}) as Record<string, unknown>;
+	// resolved props: a bound `props.text` wins over the raw value, so the
+	// textarea and its box show what's actually on screen
+	const p = resolveElement(e, ctx().variables).props;
 	const ts = (v: unknown, d: number) =>
 		typeof v === "number" && Number.isFinite(v) ? v : d;
 	const align = p.textAlign;
@@ -1032,7 +1060,7 @@ function inlineTextEdit(elementId: string, s: Scene | undefined): m.Children {
 			class="ov-inline-edit"
 			// full opacity: elementStyle() carries the element's opacity, and
 			// a translucent wrapper would let the original text show through
-			style={{ ...elementStyle(e), opacity: 1 }}
+			style={{ ...elementStyle(resolveElement(e, ctx().variables)), opacity: 1 }}
 			onmousedown={(ev: MouseEvent) => ev.stopPropagation()}
 		>
 			<textarea
@@ -1292,6 +1320,18 @@ function elementProps(e: OverlayElement): m.Vnode {
 						chatWidgets: state.chatWidgets,
 					})
 				: null}
+
+			{bindingSection(
+				e,
+				[
+					...COMMON_BINDING_PATHS,
+					...(def?.propKeys ?? []).map((k) => `props.${k}`),
+				],
+				{
+					mutate: (fn) => mutateElementOf(e.id, fn),
+					variables: state.project.variables,
+				},
+			)}
 
 			<div class="ov-danger">
 				<Button

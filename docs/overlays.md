@@ -40,22 +40,23 @@ z-order, index 0 renders at the back. Every element shares the same base shape
 | `locked`      | `true` = not editable in the inspector                                               |
 | `parentId`    | id of a `group` element, `null` for root elements                                    |
 | `props`       | type-specific content (see below); unknown keys are preserved on round-trip          |
-| `bindings`    | prop → variable map, see [Variables](#variables)                                     |
+| `bindings`    | attribute path → variable map (`props.*`, `transform.*`, `visible`), see [Binding](#binding) |
 
 ### Element types
 
 | Type         | Props                                                                                       | Selector handles |
 | ------------ | ------------------------------------------------------------------------------------------- | ---------------- |
-| `text`       | `text`*, `fontSize` (1–2000, 48), `fontFamily`, `color`, `fontWeight` (400/600/700/900), `lineHeight` (0.1–10), `textAlign` (left/center/right) | box |
+| `text`       | `text`, `fontSize` (1–2000, 48), `fontFamily`, `color`, `fontWeight` (400/600/700/900), `lineHeight` (0.1–10), `textAlign` (left/center/right) | box |
 | `image`      | `assetId` — references a project asset; a missing asset renders an empty placeholder box    | box |
 | `rectangle`  | `fill`, `stroke` (both `#rrggbb`), `strokeWidth` (0–500), `radius` (corner radius, 0 = square) | box |
 | `ellipse`    | `fill`, `stroke`, `strokeWidth`                                                             | box |
 | `line`       | `stroke`, `strokeWidth` (1–500), `flip` (box diagonal: false = TL→BR, true = TR→BL)         | two endpoint handles |
 | `group`      | none — a pure container; children are the elements whose `parentId` points at it            | none |
-| `iframe`     | `url`* — any absolute URL; `""` renders a dashed placeholder box                            | box |
+| `iframe`     | `url` — any absolute URL; `""` renders a dashed placeholder box                             | box |
 | `chat`       | `url` — set by the module picker only, points at a chat widget's live page (see [URL binding](#url-binding)) | box |
 
-\* `*` = prop can additionally be bound to a variable (below).
+Every element attribute — props, `transform` fields and `visible` — can be
+bound to a variable (see [Binding](#binding) below).
 
 `iframe` and `chat` share one renderer: the embedded page is display-only in
 the editor (`pointer-events: none` so drags/select fall through) and runs
@@ -90,20 +91,38 @@ Project-scoped named values, edited in the editor's *Variables* footer.
 
 ### Binding
 
-A binding maps one element prop to a variable and is stored on the element
-(v1 supports variable references only; an expression kind is reserved for a
-future schema bump):
+A binding maps one element attribute path to a variable and is stored on the
+element (only variable references are supported; an expression kind is
+reserved for a future schema bump):
 
 ```jsonc
-"bindings": { "props.url": { "kind": "variable", "variableId": "…" } }
+"bindings": {
+    "props.url": { "kind": "variable", "variableId": "…" },
+    "transform.x": { "kind": "variable", "variableId": "…" },
+    "visible": { "kind": "variable", "variableId": "…" }
+}
 ```
 
-Keys are `props.<propName>`. At render time (editor canvas and runtime page
-use the same code path, `resolveElementProps` in
-[`overlay-elements/core.ts`](../frontend/ts/overlay-elements/core.ts)) the
-variable's current value overwrites the prop. In v1 the bindable props are
-`text.text` and `iframe.url`. Deleting a variable removes every binding that
-references it (server-side, before the project is persisted).
+Every element attribute is bindable, through three path families:
+
+- **`props.<name>`** — the raw element prop. The variable value replaces the
+  prop value (no coercion; strings, numbers and booleans pass through).
+- **`transform.<field>`** — one of `x`, `y`, `width`, `height`, `rotation`,
+  `opacity`. The variable value is coerced to a number and must be finite;
+  `opacity` must additionally be in `0…1`, otherwise the binding is ignored
+  for that frame.
+- **`visible`** — the element is shown while the variable value is truthy
+  (non-empty string, non-zero number, or `true`). This is what powers the
+  classic "show element when variable X is non-empty" use case; there is no
+  separate show/hide binding kind.
+
+Resolution happens once per element at render time in
+`resolveElement` ([`overlay-elements/core.ts`](../frontend/ts/overlay-elements/core.ts))
+— editor canvas and runtime page share the exact same code path, so a bound
+element looks identical in both. Unknown paths are ignored, so stale
+bindings on element-type changes never break rendering. Deleting a variable
+removes every binding that references it (server-side, before the project is
+persisted).
 
 ## Events
 
@@ -183,18 +202,19 @@ The core (renderer, editor, runtime) only talks to the element registry, so a
 new type never touches `overlay-render.tsx`, `overlays.tsx` or `overlay.tsx`:
 
 1. Add the type to `OverlayElementType` in
-   [`shared/overlay.ts`](../shared/overlay.ts) plus a `DEFAULT_*_PROPS` shape,
-   a `DEFAULT_*_PROPS` shape and a `normalizeProps` case (the REST routes and
-   the registry are the only other places a new type shows up). Unknown
-   prop keys are preserved on round-trip — keep that true for forward
-   compatibility.
+   [`shared/overlay.ts`](../shared/overlay.ts) plus a `DEFAULT_*_PROPS` shape
+   and a `normalizeProps` case (the REST routes and the registry are the only
+   other places a new type shows up). Unknown prop keys are preserved on
+   round-trip — keep that true for forward compatibility.
 2. Create `frontend/ts/overlay-elements/<type>.tsx` implementing
    `OverlayElementDef` (`defaultProps`, `defaultSize`, `draw`, `editForm`,
-   `validate`, `handles`) and register it in
-   [`registry.ts`](../frontend/ts/overlay-elements/registry.ts). Compose the
-   inspector from the shared fields in
-   [`fields.tsx`](../frontend/ts/overlay-elements/fields.tsx) (`bindingRow`
-   for variable-bindable props).
+   `validate`, `handles`, `propKeys`) and register it in
+   [`registry.ts`](../frontend/ts/overlay-elements/registry.ts). `draw`
+   receives the **resolved** element (bindings already applied) — read
+   `element.props` / `element.transform` directly, never resolve again.
+   `propKeys` lists the prop names the consolidated **Bindings** section of
+   the inspector should offer as `props.<key>` selectors; transform fields
+   and `visible` are always offered automatically.
 3. Add the `overlay.*` i18n keys to `i18n/en.json` (mirror them into the
    other locale catalogs).
 4. Bump `OVERLAY_SCHEMA_VERSION` **only** if the change breaks existing

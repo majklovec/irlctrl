@@ -26,6 +26,7 @@ function validate(_element: OverlayElement): string[] {
 export const groupElement: OverlayElementDef = {
 	type: "group",
 	defaultProps: {},
+	propKeys: [],
 	defaultSize: { width: 0, height: 0 },
 	draw,
 	editForm,

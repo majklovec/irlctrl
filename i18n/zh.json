@@ -247,6 +247,7 @@
     "overlay.asset": "Image asset",
     "overlay.assets": "Assets",
     "overlay.binding": "Bind",
+    "overlay.bindings": "\u7ed1\u5b9a",
     "overlay.bring_front": "置顶",
     "overlay.bring_forward": "前移",
     "overlay.send_back": "置底",

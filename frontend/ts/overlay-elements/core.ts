@@ -11,6 +11,7 @@ import type {
 	Asset,
 	OverlayElement,
 	OverlayElementType,
+	Transform,
 	Variable,
 	VariableValue,
 } from "../../../shared/overlay";
@@ -34,34 +35,80 @@ export function assetUrl(asset: Asset): string {
 	return `data:${asset.mime};base64,${asset.dataBase64}`;
 }
 
-function bindTarget(bindingKey: string): string | null {
-	// bindings are keyed "props.<name>" in v1
-	if (bindingKey.startsWith("props.")) return bindingKey.slice("props.".length);
-	return null;
+export interface ResolvedElement {
+	props: Record<string, unknown>;
+	transform: Transform;
+	visible: boolean;
 }
 
-/** Merge variable bindings over the element's props (v1: variable refs). */
-export function resolveElementProps(
+/**
+ * Coerce a variable value to the number a `transform.*` binding carries.
+ * Rejects non-finite values and out-of-range opacity so a bad variable can't
+ * break the layout; returns `undefined` to skip the assignment.
+ */
+function bindTransformValue(raw: VariableValue, key: string): number | undefined {
+	const n = Number(raw);
+	if (!Number.isFinite(n)) return undefined;
+	if (key === "transform.opacity" && (n < 0 || n > 1)) return undefined;
+	return n;
+}
+
+/**
+ * Resolve every element attribute against the current variable values.
+ * Binding keys target any attribute: `props.<key>` replaces a prop,
+ * `transform.<field>` replaces one of x/y/width/height/rotation/opacity
+ * (number-coerced, must be finite), and `visible` replaces visibility.
+ * Unknown paths are ignored defensively. The renderer and editor resolve
+ * once per element and treat the result as the display state.
+ */
+export function resolveElement(
 	element: OverlayElement,
 	variables: Map<string, VariableValue>,
-): Record<string, unknown> {
+): ResolvedElement {
 	const props: Record<string, unknown> = { ...element.props };
+	const transform: Transform = { ...element.transform };
+	let visible = element.visible;
+
 	for (const [key, binding] of Object.entries(element.bindings)) {
 		if (binding.kind !== "variable") continue;
 		const value = variables.get(binding.variableId);
 		if (value === undefined) continue;
-		const target = bindTarget(key);
-		if (target) props[target] = value;
+
+		if (key === "visible") {
+			visible = Boolean(value);
+		} else if (key.startsWith("transform.")) {
+			const field = key.slice("transform.".length);
+			const n = bindTransformValue(value, key);
+			if (field && n !== undefined) {
+				transform[field as keyof Transform] = n;
+			}
+		} else if (key.startsWith("props.")) {
+			const field = key.slice("props.".length);
+			if (field) props[field] = value;
+		}
 	}
-	return props;
+	return { props, transform, visible };
+}
+
+/** Merge variable bindings over the element's props. Kept for callers/tests
+ * that only need the prop half of `resolveElement`. */
+export function resolveElementProps(
+	element: OverlayElement,
+	variables: Map<string, VariableValue>,
+): Record<string, unknown> {
+	return resolveElement(element, variables).props;
 }
 
 /** Positioning + shared visual style for any element.
+ * Pass the *resolved* element (output of `resolveElement`) so bound
+ * transform/opacity/visible render identically in the editor and OBS.
  * NOTE: carries EVERYTHING the visual depends on inline (position, size,
  * rotation PIVOT, whitespace) — the page stylesheets (overlay.css for the
  * runtime, style.css for the editor) are NOT required to provide it. Both
  * pages must stay pixel-identical, so never move these back to CSS. */
-export function elementStyle(element: OverlayElement): CSS {
+export function elementStyle(
+	element: { transform: Transform; visible: boolean },
+): CSS {
 	const t = element.transform;
 	return {
 		position: "absolute",
@@ -104,15 +151,9 @@ export function numProp(
  * `pointerEvents: "none"` lets the editor's mouse fall through to the
  * `.overlay-element` wrapper (drag/select); embedded pages are display-only.
  * No `sandbox` — the page runs its own scripts and authenticated fetches. */
-export function drawIframe(
-	element: OverlayElement,
-	ctx: ElementContext,
-): Children {
-	const url = strProp(
-		resolveElementProps(element, ctx.variables),
-		"url",
-		"",
-	);
+export function drawIframe(element: OverlayElement): Children {
+	// `element` is the resolved element from the renderer, so props are final.
+	const url = strProp(element.props, "url", "");
 	if (!url)
 		return m(
 			".overlay-shape",
@@ -189,7 +230,13 @@ export type HandleMode = "box" | "endpoints" | "none";
 export interface OverlayElementDef {
 	readonly type: OverlayElementType;
 	readonly defaultProps: Record<string, unknown>;
+	/** Prop keys that accept a variable binding (rendered in the inspector's
+	 * Bindings section), e.g. text → ["text"]. Bound as `props.<key>`. */
+	readonly propKeys: readonly string[];
 	readonly defaultSize: { width: number; height: number };
+	/** Renders the element's contents. `element` is the RESOLVED element —
+	 * its props/transform/visible already carry any binding values. Content
+	 * only; core wraps + positions it via elementStyle(). */
 	draw(element: OverlayElement, ctx: ElementContext): Children;
 	editForm(props: ElementProps): Children;
 	validate(element: OverlayElement): string[];

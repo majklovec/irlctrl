@@ -73,7 +73,17 @@ export type ElementBase = {
     locked: boolean;
     /** parent element id (group); root elements are null */
     parentId: string | null;
-    /** property path (e.g. `props.text`) → binding */
+    /**
+     * Attribute path → variable binding. Keys may target:
+     *
+     * - `props.<name>` — the raw element prop (text, url, fill, …); the
+     *   variable value replaces the prop value,
+     * - `transform.<field>` — x, y, width, height, rotation, opacity; the
+     *   variable value is coerced to a finite number (opacity must be 0–1),
+     * - `visible` — the element is shown when the variable value is truthy.
+     *
+     * `resolveElement` (frontend) evaluates all of them at render time.
+     */
     bindings: Record<string, Binding>;
     props: Record<string, unknown>;
 };

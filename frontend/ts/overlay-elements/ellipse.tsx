@@ -9,11 +9,12 @@ import type {
 	OverlayElement,
 	OverlayElementDef,
 } from "./core";
-import { resolveElementProps, strProp, numProp } from "./core";
-import { bindingRow, lbl } from "./fields";
+import { strProp, numProp } from "./core";
+import { lbl } from "./fields";
 
 function draw(element: OverlayElement, ctx: ElementContext): Vnode {
-	const p = resolveElementProps(element, ctx.variables);
+	// `element` is already resolved by the renderer — props carry binding values.
+	const p = element.props;
 	const fill = strProp(p, "fill", DEFAULT_ELLIPSE_PROPS.fill);
 	const stroke = strProp(p, "stroke", DEFAULT_ELLIPSE_PROPS.stroke);
 	const strokeWidth = numProp(p, "strokeWidth", 0);
@@ -27,7 +28,7 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	});
 }
 
-function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
+function editForm({ element: e, mutate }: ElementProps): Vnode {
 	const p = e.props;
 	return (
 		<>
@@ -71,7 +72,6 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 					}
 				/>
 			</label>
-			{bindingRow(e, "fill", { mutate, variables })}
 		</>
 	);
 }
@@ -86,6 +86,7 @@ function validate(e: OverlayElement): string[] {
 export const ellipseElement: OverlayElementDef = {
 	type: "ellipse",
 	defaultProps: { ...DEFAULT_ELLIPSE_PROPS },
+	propKeys: ["fill", "stroke", "strokeWidth"],
 	defaultSize: { width: 240, height: 160 },
 	draw,
 	editForm,

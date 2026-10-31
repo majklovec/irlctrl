@@ -293,6 +293,27 @@ describe("overlay schema", () => {
         expect(() => normalizeProject(raw)).toThrow();
     });
 
+    test("bindings may target any attribute path (props.*, transform.*, visible)", () => {
+        const raw = validV1Project();
+        raw.variables = [{ id: "v1", name: "x", type: "string", value: "0" }];
+        const el = (
+            raw.scenes[0] as { elements: Record<string, unknown>[] }
+        ).elements[0] as Record<string, unknown>;
+        (el as Record<string, unknown>).bindings = {
+            "props.title": { kind: "variable", variableId: "v1" },
+            "transform.x": { kind: "variable", variableId: "v1" },
+            "transform.opacity": { kind: "variable", variableId: "v1" },
+            visible: { kind: "variable", variableId: "v1" },
+        };
+        const ok = normalizeProject(raw);
+        expect(ok.scenes[0].elements[0].bindings).toEqual({
+            "props.title": { kind: "variable", variableId: "v1" },
+            "transform.x": { kind: "variable", variableId: "v1" },
+            "transform.opacity": { kind: "variable", variableId: "v1" },
+            visible: { kind: "variable", variableId: "v1" },
+        });
+    });
+
     test("image elements must reference existing assets", () => {
         const raw = validV1Project();
         (raw.scenes[0] as Record<string, unknown>).elements = [

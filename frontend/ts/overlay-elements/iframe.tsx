@@ -10,13 +10,14 @@ import type {
 	OverlayElementDef,
 } from "./core";
 import { drawIframe } from "./core";
-import { bindingRow, lbl } from "./fields";
+import { lbl } from "./fields";
 
-function draw(element: OverlayElement, ctx: ElementContext): Vnode {
-	return drawIframe(element, ctx) as Vnode;
+function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
+	// `element` is already resolved by the renderer — drawIframe reads props.url.
+	return drawIframe(element) as Vnode;
 }
 
-function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
+function editForm({ element: e, mutate }: ElementProps): Vnode {
 	const current = String(e.props.url ?? "");
 	return (
 		<>
@@ -32,7 +33,6 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 					}
 				/>
 			</label>
-			{bindingRow(e, "url", { mutate, variables })}
 		</>
 	);
 }
@@ -47,6 +47,7 @@ function validate(e: OverlayElement): string[] {
 export const iframeElement: OverlayElementDef = {
 	type: "iframe",
 	defaultProps: { ...DEFAULT_IFRAME_PROPS },
+	propKeys: ["url"],
 	defaultSize: { width: 360, height: 480 },
 	draw,
 	editForm,

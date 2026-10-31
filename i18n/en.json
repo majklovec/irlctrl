@@ -106,6 +106,7 @@
     "overlay.asset": "Image asset",
     "overlay.assets": "Assets",
     "overlay.binding": "Bind",
+    "overlay.bindings": "Bindings",
     "overlay.bring_front": "To front",
     "overlay.bring_forward": "Forward",
     "overlay.send_back": "To back",

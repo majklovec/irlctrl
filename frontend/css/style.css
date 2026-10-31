@@ -2127,6 +2127,7 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
 }
 .ov-field input[type="range"] {
     accent-color: var(--accent);
+    padding: 0.5rem 0;
 }
 .ov-grid2 {
     display: grid;
@@ -2135,6 +2136,27 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
 }
 .ov-lbl {
     font-size: 12px;
+}
+/* section heading inside the element inspector ("Text", "Bindings", …) */
+.ov-sec-head {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text);
+}
+/* consolidated bindings block — one row per bindable attribute */
+.ov-bindings {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}
+.ov-bindings-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 .ov-check {
     display: flex;

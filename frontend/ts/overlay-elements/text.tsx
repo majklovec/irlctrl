@@ -9,8 +9,8 @@ import type {
 	OverlayElement,
 	OverlayElementDef,
 } from "./core";
-import { resolveElementProps, strProp, numProp } from "./core";
-import { bindingRow, lbl } from "./fields";
+import { strProp, numProp } from "./core";
+import { lbl } from "./fields";
 
 interface TextProps {
 	text: string;
@@ -37,7 +37,8 @@ function textProps(p: Record<string, unknown>): TextProps {
 }
 
 function draw(element: OverlayElement, ctx: ElementContext): Vnode {
-	const props = textProps(resolveElementProps(element, ctx.variables));
+	// `element` is already resolved by the renderer — props carry binding values.
+	const props = textProps(element.props);
 	return m(
 		".overlay-text",
 		{
@@ -59,7 +60,7 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	);
 }
 
-function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
+function editForm({ element: e, mutate }: ElementProps): Vnode {
 	const p = e.props;
 	return (
 		<>
@@ -140,7 +141,6 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 					</select>
 				</label>
 			</div>
-			{bindingRow(e, "text", { mutate, variables })}
 		</>
 	);
 }
@@ -158,6 +158,15 @@ function validate(e: OverlayElement): string[] {
 export const textElement: OverlayElementDef = {
 	type: "text",
 	defaultProps: { ...DEFAULT_TEXT_PROPS },
+	propKeys: [
+		"text",
+		"fontSize",
+		"fontFamily",
+		"color",
+		"fontWeight",
+		"lineHeight",
+		"textAlign",
+	],
 	defaultSize: { width: 320, height: 80 },
 	draw,
 	editForm,

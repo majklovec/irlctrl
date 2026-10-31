@@ -28,8 +28,9 @@ function chatUrl(w: ChatWidgetRef): string {
 	);
 }
 
-function draw(element: OverlayElement, ctx: ElementContext): Vnode {
-	return drawIframe(element, ctx) as Vnode;
+function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
+	// `element` is already resolved by the renderer — drawIframe reads props.url.
+	return drawIframe(element) as Vnode;
 }
 
 function editForm({
@@ -72,6 +73,7 @@ function validate(e: OverlayElement): string[] {
 export const chatElement: OverlayElementDef = {
 	type: "chat",
 	defaultProps: { ...DEFAULT_CHAT_PROPS },
+	propKeys: ["url"],
 	defaultSize: { width: 360, height: 480 },
 	draw,
 	editForm,

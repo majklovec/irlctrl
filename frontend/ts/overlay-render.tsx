@@ -15,14 +15,18 @@ import type { OverlayElement } from "../../shared/overlay";
 import {
 	assetUrl,
 	elementStyle,
+	resolveElement,
 	resolveElementProps,
 } from "./overlay-elements/core";
-export { assetUrl, elementStyle, resolveElementProps };
+export { assetUrl, elementStyle, resolveElement, resolveElementProps };
 export type { CSS, ElementContext } from "./overlay-elements/core";
 import { elementDef } from "./overlay-elements/registry";
 import type { ElementContext } from "./overlay-elements/core";
 
 /** Render one element (content + positioning) for editor and runtime.
+ * Each element is resolved against its variable bindings ONCE here; both the
+ * positioning style and the element's `draw` receive the resolved element so
+ * bound props/transform/visible render identically in the editor and OBS.
  * Unknown element types resolve to no definition and render as an empty
  * (invisible) placeholder — core code never branches on element type. */
 export function overlayElementView(
@@ -30,13 +34,17 @@ export function overlayElementView(
 	ctx: ElementContext,
 ): Vnode {
 	const def = elementDef(element.type);
-	const content = def ? def.draw(element, ctx) : null;
+	const resolved = {
+		...element,
+		...resolveElement(element, ctx.variables),
+	};
+	const content = def ? def.draw(resolved, ctx) : null;
 	return m(
 		".overlay-element",
 		{
 			key: element.id,
 			"data-element": element.id,
-			style: elementStyle(element),
+			style: elementStyle(resolved),
 		},
 		content,
 	);

@@ -85,6 +85,7 @@ function validate(e: OverlayElement): string[] {
 export const imageElement: OverlayElementDef = {
 	type: "image",
 	defaultProps: { assetId: "" },
+	propKeys: ["assetId"],
 	defaultSize: { width: 240, height: 160 },
 	draw,
 	editForm,

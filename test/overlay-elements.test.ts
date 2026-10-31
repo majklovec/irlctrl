@@ -14,6 +14,9 @@ const { elementRegistry, elementDef } = await import(
 const { lineFlipFromDelta } = await import(
     "../frontend/ts/overlay-elements/line"
 );
+const { resolveElement, resolveElementProps, elementStyle } = await import(
+    "../frontend/ts/overlay-elements/core"
+);
 import {
     type OverlayElement,
     type OverlayElementType,
@@ -47,13 +50,17 @@ const WELL_FORMED: Array<[OverlayElementType, Record<string, unknown>]> = [
     ["ellipse", { fill: "#3b82f6", stroke: "#000000", strokeWidth: 2 }],
     ["line", { stroke: "#3b82f6", strokeWidth: 4 }],
     ["group", {}],
+    ["iframe", { url: "https://example.com" }],
+    ["chat", { url: "https://example.com/chat" }],
 ];
 
 describe("element registry contract", () => {
     test("every schema type is registered exactly once and self-consistent", () => {
         expect(Object.keys(elementRegistry).sort()).toEqual([
+            "chat",
             "ellipse",
             "group",
+            "iframe",
             "image",
             "line",
             "rectangle",
@@ -101,16 +108,137 @@ describe("element registry contract", () => {
         }
     });
 
-    test("draw() honors variable bindings resolved through the context", () => {
+    test("draw() renders the bound value when given a resolved element", () => {
         const variables = new Map<string, VariableValue>([
             ["v1", "bound text"],
         ]);
         const el = baseElement("text", { text: "static" });
         el.bindings = { "props.text": { kind: "variable", variableId: "v1" } };
-        const vnode = elementDef(
-            "text",
-        )!.draw(el, { assetUrls: new Map(), variables });
+        const resolved = { ...el, ...resolveElement(el, variables) };
+        const vnode = elementDef("text")!.draw(resolved, ctx());
         expect(JSON.stringify(vnode)).toContain("bound text");
+        // an unresolved element still shows its raw prop value
+        const raw = elementDef("text")!.draw(el, ctx());
+        expect(JSON.stringify(raw)).toContain("static");
+    });
+
+    test("resolveElement(): props.* replaces the raw prop (no coercion)", () => {
+        const variables = new Map<string, VariableValue>([
+            ["v1", "hello"],
+            ["v2", 42],
+        ]);
+        const el = baseElement("text", { text: "static", fontSize: 48 });
+        el.bindings = {
+            "props.text": { kind: "variable", variableId: "v1" },
+            "props.fontSize": { kind: "variable", variableId: "v2" },
+        };
+        const r = resolveElement(el, variables);
+        expect(r.props.text).toBe("hello");
+        expect(r.props.fontSize).toBe(42);
+        // unbound props and the element base are untouched
+        expect(r.props).not.toBe(el.props);
+        expect(el.props.text).toBe("static");
+        expect(r.transform).toEqual(el.transform);
+        expect(r.visible).toBe(true);
+    });
+
+    test("resolveElement(): transform.* coerces to finite numbers", () => {
+        const variables = new Map<string, VariableValue>([
+            ["v1", "10"],
+            ["v2", "0.5"],
+        ]);
+        const el = baseElement("text", { text: "x" });
+        el.bindings = {
+            "transform.x": { kind: "variable", variableId: "v1" },
+            "transform.opacity": { kind: "variable", variableId: "v2" },
+        };
+        const r = resolveElement(el, variables);
+        expect(r.transform.x).toBe(10);
+        expect(r.transform.opacity).toBe(0.5);
+        // only the bound fields change
+        expect(r.transform.y).toBe(el.transform.y);
+    });
+
+    test("resolveElement(): bad transform values are ignored", () => {
+        const variables = new Map<string, VariableValue>([
+            ["vNaN", "not-a-number"],
+            ["vInf", Infinity],
+            ["vOpBig", 5], // opacity > 1
+            ["vOpNeg", -1], // opacity < 0
+        ]);
+        const el = baseElement("text", { text: "x" });
+        el.bindings = {
+            "transform.x": { kind: "variable", variableId: "vNaN" },
+            "transform.width": { kind: "variable", variableId: "vInf" },
+            "transform.opacity": { kind: "variable", variableId: "vOpBig" },
+        };
+        const r = resolveElement(el, variables);
+        expect(r.transform.x).toBe(el.transform.x);
+        expect(r.transform.width).toBe(el.transform.width);
+        expect(r.transform.opacity).toBe(el.transform.opacity);
+        // negative opacity is rejected too
+        el.bindings = { "transform.opacity": { kind: "variable", variableId: "vOpNeg" } };
+        expect(resolveElement(el, variables).transform.opacity).toBe(
+            el.transform.opacity,
+        );
+    });
+
+    test("resolveElement(): visible binding follows variable truthiness", () => {
+        const variables = new Map<string, VariableValue>([
+            ["v1", ""],
+            ["v2", "show me"],
+            ["v3", 0],
+            ["v4", 7],
+        ]);
+        const el = baseElement("text", { text: "x" });
+        const vis = (id: string) => {
+            el.bindings = { visible: { kind: "variable", variableId: id } };
+            return resolveElement(el, variables).visible;
+        };
+        expect(vis("v1")).toBe(false); // empty string
+        expect(vis("v2")).toBe(true);
+        expect(vis("v3")).toBe(false); // zero
+        expect(vis("v4")).toBe(true);
+        // no binding at all keeps the raw flag
+        el.bindings = {};
+        el.visible = false;
+        expect(resolveElement(el, variables).visible).toBe(false);
+    });
+
+    test("resolveElement(): unknown paths and missing variables are ignored", () => {
+        const variables = new Map<string, VariableValue>([["v1", 123]]);
+        const el = baseElement("text", { text: "x" });
+        el.bindings = {
+            bogus: { kind: "variable", variableId: "v1" },
+            "props.": { kind: "variable", variableId: "v1" },
+            "transform.": { kind: "variable", variableId: "v1" },
+            "props.text": { kind: "variable", variableId: "missing" },
+        };
+        const r = resolveElement(el, variables);
+        expect(r).toEqual({
+            props: el.props,
+            transform: el.transform,
+            visible: true,
+        });
+    });
+
+    test("elementStyle() reflects resolved transform and visibility", () => {
+        const el = baseElement("text", { text: "x" });
+        el.transform = { x: 5, y: 10, width: 100, height: 50, rotation: 45, opacity: 0.5 };
+        el.visible = false;
+        const style = elementStyle(el) as Record<string, string>;
+        expect(style.left).toBe("5px");
+        expect(style.top).toBe("10px");
+        expect(style.transform).toBe("rotate(45deg)");
+        expect(style.opacity).toBe("0.5");
+        expect(style.visibility).toBe("hidden");
+    });
+
+    test("resolveElementProps() keeps returning the prop half only", () => {
+        const variables = new Map<string, VariableValue>([["v1", "bound"]]);
+        const el = baseElement("text", { text: "static" });
+        el.bindings = { "props.text": { kind: "variable", variableId: "v1" } };
+        expect(resolveElementProps(el, variables).text).toBe("bound");
     });
 
     test("lineFlipFromDelta: only opposite-sign components mirror the diagonal", () => {

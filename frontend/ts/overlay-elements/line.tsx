@@ -9,8 +9,8 @@ import type {
 	OverlayElement,
 	OverlayElementDef,
 } from "./core";
-import { resolveElementProps, strProp, numProp } from "./core";
-import { bindingRow, lbl } from "./fields";
+import { strProp, numProp } from "./core";
+import { lbl } from "./fields";
 
 /**
  * Which box diagonal a drag delta runs along. The box is stored in min/abs
@@ -23,7 +23,9 @@ export const lineFlipFromDelta = (dx: number, dy: number): boolean =>
 	dx * dy < 0;
 
 function draw(element: OverlayElement, ctx: ElementContext): Vnode {
-	const p = resolveElementProps(element, ctx.variables);
+	// `element` is already resolved by the renderer, so both props and
+	// transform carry any binding values — bound geometry works for free.
+	const p = element.props;
 	const t2 = element.transform;
 	// draw a line through the box, oriented along its w/h delta
 	const stroke = strProp(p, "stroke", DEFAULT_LINE_PROPS.stroke);
@@ -52,7 +54,7 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	});
 }
 
-function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
+function editForm({ element: e, mutate }: ElementProps): Vnode {
 	const p = e.props;
 	// A line is edited as two endpoints (see `handles`), so this form exposes
 	// ONLY line properties — never the rectangle/ellipse fill+radius editing.
@@ -86,7 +88,6 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 					/>
 				</label>
 			</div>
-			{bindingRow(e, "stroke", { mutate, variables })}
 		</>
 	);
 }
@@ -101,6 +102,7 @@ function validate(e: OverlayElement): string[] {
 export const lineElement: OverlayElementDef = {
 	type: "line",
 	defaultProps: { ...DEFAULT_LINE_PROPS },
+	propKeys: ["stroke", "strokeWidth", "flip"],
 	defaultSize: { width: 240, height: 160 },
 	draw,
 	editForm,

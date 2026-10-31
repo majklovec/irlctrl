@@ -15,21 +15,22 @@ export function lbl(label: string): Vnode {
 	return <span class="ov-lbl">{label}</span>;
 }
 
-/** A `props.<prop>` → variable binding select. v1 bindings are keyed
- * "props.<name>". Only needs the slice of `ElementProps` it uses. */
+/** A binding select for one attribute. `path` is the full binding key the
+ * schema accepts — `props.<name>`, `transform.<field>`, or `visible`. Only
+ * needs the slice of `ElementProps` it uses. */
 export function bindingRow(
 	e: OverlayElement,
-	prop: string,
+	path: string,
 	{
 		mutate,
 		variables,
 	}: Pick<ElementProps, "mutate" | "variables">,
 ): Vnode {
-	const key = "props." + prop;
+	const key = path;
 	const binding = e.bindings[key];
 	return (
 		<label class="ov-field">
-			{lbl(t("overlay.binding") + " (" + prop + ")")}
+			{lbl(path)}
 			<select
 				value={binding ? binding.variableId : ""}
 				onchange={(ev: Event) => {
@@ -48,5 +49,28 @@ export function bindingRow(
 				))}
 			</select>
 		</label>
+	);
+}
+
+/** The consolidated "Bindings" inspector section: one row for every attribute
+ * the element can bind. `paths` are full binding keys — the common transform
+ * / visible attrs plus each prop in the element def's `propKeys`. */
+export function bindingSection(
+	e: OverlayElement,
+	paths: readonly string[],
+	{
+		mutate,
+		variables,
+	}: Pick<ElementProps, "mutate" | "variables">,
+): Vnode {
+	return (
+		<div class="ov-bindings">
+			<span class="ov-sec-head">{t("overlay.bindings")}</span>
+			{paths.map((path) => (
+				<div key={path} class="ov-bindings-row">
+					{bindingRow(e, path, { mutate, variables })}
+				</div>
+			))}
+		</div>
 	);
 }
