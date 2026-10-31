@@ -46,6 +46,9 @@ export const Page = {
 				</span>,
 			]}
 		</header>,
+		v.attrs.toolbar !== undefined ? (
+			<div class="page-subbar">{v.attrs.toolbar}</div>
+		) : null,
 		<main>{v.children}</main>,
 		<Footer />,
 	],
@@ -53,6 +56,8 @@ export const Page = {
 	title?: m.Children;
 	nav?: m.Children;
 	headerRight?: m.Children;
+	/** Full-width strip rendered flush between the header and the content. */
+	toolbar?: m.Children;
 }>;
 
 export const TitleWithBack = {

@@ -105,6 +105,43 @@ export const SHAPES = {
 			<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
 		</>
 	),
+	undo: (
+		<>
+			<path d="M9 14 4 9l5-5" />
+			<path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+		</>
+	),
+	redo: (
+		<>
+			<path d="m15 14 5-5-5-5" />
+			<path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" />
+		</>
+	),
+	text: (
+		<>
+			<path d="M5 7V4h14v3" />
+			<path d="M12 4v16M8 20h8" />
+		</>
+	),
+	rectangle: <rect x="3" y="5" width="18" height="14" rx="1.5" />,
+	ellipse: <ellipse cx="12" cy="12" rx="9" ry="6.5" />,
+	line: <path d="M5 19 19 5" />,
+	image: (
+		<>
+			<rect x="3" y="4" width="18" height="16" rx="2" />
+			<circle cx="8.5" cy="9.5" r="1.5" />
+			<path d="m21 15-4.5-4.5L9 18" />
+		</>
+	),
+	chat: (
+		<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+	),
+	iframe: (
+		<>
+			<rect x="3" y="4" width="18" height="16" rx="2" />
+			<path d="M3 9h18" />
+		</>
+	),
 } as const;
 
 export type IconName = keyof typeof SHAPES;

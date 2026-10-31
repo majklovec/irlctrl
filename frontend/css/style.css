@@ -1763,7 +1763,8 @@ p.message {
     grid-template-columns: 1fr 290px;
     grid-template-rows: 1fr auto;
     gap: 12px;
-    height: calc(100vh - 140px);
+    /* 192px = header + the icon toolbar strip + main paddings + footer */
+    height: calc(100vh - 192px);
     min-height: 480px;
 }
 .ov-right {
@@ -2267,13 +2268,40 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
     color: var(--ok, #3fb950);
 }
 
-/* header toolbar */
-.ov-toolbar {
-    display: inline-flex;
+/* Second strip flush under the main header (the overlay editor's icon
+   toolbar): a flat, opaque bar with borderless, shadowless icon buttons —
+   hover shows a subtle highlight, like a graphics editor's menu bar. */
+.page-subbar {
+    display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
+    padding: 0.45rem 2.25rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--header-bg);
 }
-.ov-adds,
+.page-subbar .icon-link {
+    width: 2.25rem;
+    height: 2.25rem;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+}
+.page-subbar .icon-link:hover {
+    border: none;
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.page-subbar .icon-link:active {
+    transform: none;
+}
+.page-subbar .icon-link .role-icon {
+    height: 1.15em;
+}
+.ov-toolsep {
+    width: 1px;
+    height: 1.6rem;
+    margin: 0 4px;
+    background: var(--border);
+}
 .ov-zoom {
     display: inline-flex;
     align-items: center;

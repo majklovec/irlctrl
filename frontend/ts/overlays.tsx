@@ -29,12 +29,12 @@ import type {
 	Variable,
 	VariableValue,
 } from "../../shared/overlay";
-import { elementDef } from "./overlay-elements/registry";
-import { lineFlipFromDelta } from "./overlay-elements/line";
-import type { ChatWidgetRef } from "./overlay-elements/core";
 import { Icon } from "./components/icons";
 import { Button, Card, Page, ServerNav } from "./components/ui";
 import { t } from "./i18n";
+import type { ChatWidgetRef } from "./overlay-elements/core";
+import { lineFlipFromDelta } from "./overlay-elements/line";
+import { elementDef } from "./overlay-elements/registry";
 import {
 	assetUrl,
 	type ElementContext,
@@ -856,9 +856,7 @@ serverLive.rpc.on("overlays.project", (data) => {
 		);
 		p.scenes = p.scenes.map((sc) => {
 			const lr = localRev.get(sc.id);
-			return typeof lr === "number" &&
-				typeof sc.rev === "number" &&
-				sc.rev < lr
+			return typeof lr === "number" && typeof sc.rev === "number" && sc.rev < lr
 				? (state.project.scenes.find((x) => x.id === sc.id) ?? sc)
 				: sc;
 		});
@@ -915,22 +913,22 @@ function canvasArea(): m.Vnode {
 						class="overlay-canvas"
 						style={{ width: C.width + "px", height: C.height + "px" }}
 					>
-						{s ? (
-							sceneElementsView(
-								// The element being inline-edited is hidden:
-								// the editor's opaque textarea only covers the
-								// element's box, so any text glyphs overflowing
-								// it (overlay-text is overflow:visible) would
-								// still show through and look like duplicated
-								// text. The textarea shows the same value.
-								s.elements.map((x) =>
-									x.id === state.editingElementId
-										? { ...x, visible: false }
-										: x,
-								),
-								ctx(),
-							)
-						) : null}
+						{s
+							? sceneElementsView(
+									// The element being inline-edited is hidden:
+									// the editor's opaque textarea only covers the
+									// element's box, so any text glyphs overflowing
+									// it (overlay-text is overflow:visible) would
+									// still show through and look like duplicated
+									// text. The textarea shows the same value.
+									s.elements.map((x) =>
+										x.id === state.editingElementId
+											? { ...x, visible: false }
+											: x,
+									),
+									ctx(),
+								)
+							: null}
 						{s && state.snapX != null ? (
 							<div
 								class="ov-snap-line ov-snap-v"
@@ -951,43 +949,31 @@ function canvasArea(): m.Vnode {
 									startDrag(ev as MouseEvent, el.id, "move")
 								}
 							>
-								{elementDef(el.type)?.handles === "endpoints" ? (
-									// endpoint elements (lines) get two endpoint
-									// handles (A = top-left corner, B =
-									// bottom-right corner of the box) — they can
-									// never present the box's 8 resize handles
-									(["a", "b"] as const).map((h) => (
-										<span
-											key={h}
-											class={"ov-line-end ov-line-" + h}
-											onmousedown={(ev: Event) =>
-												startDrag(
-													ev as MouseEvent,
-													el.id,
-													"line",
-													h,
-												)
-											}
-										/>
-									))
-								) : elementDef(el.type)?.handles === "box" ? (
-									["nw", "n", "ne", "e", "se", "s", "sw", "w"].map(
-										(h) => (
+								{elementDef(el.type)?.handles === "endpoints"
+									? // endpoint elements (lines) get two endpoint
+										// handles (A = top-left corner, B =
+										// bottom-right corner of the box) — they can
+										// never present the box's 8 resize handles
+										(["a", "b"] as const).map((h) => (
 											<span
 												key={h}
-												class={"ov-handle ov-" + h}
+												class={"ov-line-end ov-line-" + h}
 												onmousedown={(ev: Event) =>
-													startDrag(
-														ev as MouseEvent,
-														el.id,
-														"resize",
-														h,
-													)
+													startDrag(ev as MouseEvent, el.id, "line", h)
 												}
 											/>
-										),
-									)
-								) : null}
+										))
+									: elementDef(el.type)?.handles === "box"
+										? ["nw", "n", "ne", "e", "se", "s", "sw", "w"].map((h) => (
+												<span
+													key={h}
+													class={"ov-handle ov-" + h}
+													onmousedown={(ev: Event) =>
+														startDrag(ev as MouseEvent, el.id, "resize", h)
+													}
+												/>
+											))
+										: null}
 							</div>
 						) : null}
 						{state.editingElementId
@@ -1193,11 +1179,7 @@ function layersPanel(): m.Vnode {
 }
 
 function inspector(): m.Vnode {
-	return (
-		<Card class="ov-rail">
-			<div class="ov-inspect">{layersPanel()}</div>
-		</Card>
-	);
+	return <div class="ov-inspect">{layersPanel()}</div>;
 }
 
 /** Property fields for one element, rendered inside its expanded list row. */
@@ -1294,10 +1276,7 @@ function elementProps(e: OverlayElement): m.Vnode {
 					type="checkbox"
 					checked={e.locked}
 					onchange={(ev: Event) =>
-						setElementLocked(
-							e.id,
-							(ev.target as HTMLInputElement).checked,
-						)
+						setElementLocked(e.id, (ev.target as HTMLInputElement).checked)
 					}
 				/>
 				{t("overlay.locked")}
@@ -1309,8 +1288,7 @@ function elementProps(e: OverlayElement): m.Vnode {
 						mutate: (fn) => mutateElementOf(e.id, fn),
 						assets: state.project.assets,
 						variables: state.project.variables,
-						upload: (f: File) =>
-							uploadAsset(f).then((a) => a?.id ?? null),
+						upload: (f: File) => uploadAsset(f).then((a) => a?.id ?? null),
 						chatWidgets: state.chatWidgets,
 					})
 				: null}
@@ -1497,54 +1475,64 @@ function runtimePanel(): m.Vnode {
 	);
 }
 
+/** Icon submenu below the main nav: undo/redo + one icon per element type. */
+function editorToolbar(): m.Vnode {
+	const adds = [
+		["text", "overlay.add_text"],
+		["rectangle", "overlay.add_rectangle"],
+		["ellipse", "overlay.add_ellipse"],
+		["line", "overlay.add_line"],
+		["image", "overlay.add_image"],
+		["chat", "overlay.add_chat"],
+		["iframe", "overlay.add_iframe"],
+	] as const;
+	return (
+		<div class="ov-toolrow" role="toolbar">
+			<Button
+				label={<Icon name="undo" class="role-icon" />}
+				class="icon-link"
+				title={`${t("overlay.undo")} (Ctrl+Z)`}
+				aria-label={t("overlay.undo")}
+				disabled={!state.past.length}
+				onclick={undo}
+			/>
+			<Button
+				label={<Icon name="redo" class="role-icon" />}
+				class="icon-link"
+				title={`${t("overlay.redo")} (Ctrl+Shift+Z)`}
+				aria-label={t("overlay.redo")}
+				disabled={!state.future.length}
+				onclick={redo}
+			/>
+			<span class="ov-toolsep" aria-hidden="true" />
+			{adds.map(([type, key]) => (
+				<Button
+					key={type}
+					label={<Icon name={type} class="role-icon" />}
+					class="icon-link"
+					title={t(key)}
+					aria-label={t(key)}
+					onclick={() => addElement(type)}
+				/>
+			))}
+		</div>
+	);
+}
+
 function headerRight(): m.Vnode {
 	return (
-		<span class="ov-toolbar">
-			<Button label={t("overlay.undo")} title="Ctrl+Z" onclick={undo} />
-			<Button label={t("overlay.redo")} title="Ctrl+Shift+Z" onclick={redo} />
-			<span class="ov-adds">
-				<Button
-					label={t("overlay.add_text")}
-					onclick={() => addElement("text")}
-				/>
-				<Button
-					label={t("overlay.add_rectangle")}
-					onclick={() => addElement("rectangle")}
-				/>
-				<Button
-					label={t("overlay.add_ellipse")}
-					onclick={() => addElement("ellipse")}
-				/>
-				<Button
-					label={t("overlay.add_line")}
-					onclick={() => addElement("line")}
-				/>
-				<Button
-					label={t("overlay.add_image")}
-					onclick={() => addElement("image")}
-				/>
-				<Button
-					label={t("overlay.add_chat")}
-					onclick={() => addElement("chat")}
-				/>
-				<Button
-					label={t("overlay.add_iframe")}
-					onclick={() => addElement("iframe")}
-				/>
-			</span>
-			<span class="ov-zoom">
-				<Button
-					label="−"
-					title={t("overlay.zoom_out")}
-					onclick={() => (state.zoom = clamp(state.zoom * 0.8, 0.1, 3))}
-				/>
-				<span class="ov-zoom-val">{Math.round(state.zoom * 100)}%</span>
-				<Button
-					label="+"
-					title={t("overlay.zoom_in")}
-					onclick={() => (state.zoom = clamp(state.zoom * 1.25, 0.1, 3))}
-				/>
-			</span>
+		<span class="ov-zoom">
+			<Button
+				label="−"
+				title={t("overlay.zoom_out")}
+				onclick={() => (state.zoom = clamp(state.zoom * 0.8, 0.1, 3))}
+			/>
+			<span class="ov-zoom-val">{Math.round(state.zoom * 100)}%</span>
+			<Button
+				label="+"
+				title={t("overlay.zoom_in")}
+				onclick={() => (state.zoom = clamp(state.zoom * 1.25, 0.1, 3))}
+			/>
 		</span>
 	);
 }
@@ -1745,6 +1733,7 @@ const overlaysPage: m.Component = {
 			<Page
 				title={editorTitle()}
 				nav={<ServerNav active="overlays" />}
+				toolbar={editorToolbar()}
 				headerRight={headerRight()}
 			>
 				<div class="ov-layout">
