@@ -9,6 +9,8 @@ export const PAGES = [
     "dashboards",
     "dashboardview",
     "dashboardadd",
+    "overlays",
+    "overlay",
 ] as const;
 
 export type PageName = (typeof PAGES)[number];

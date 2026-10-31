@@ -1,0 +1,59 @@
+/* OBS Browser Source runtime page: fully transparent, no chrome. */
+html,
+body,
+#app {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow: hidden;
+}
+
+body {
+    color: #fff;
+    font-family:
+        "Inter",
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
+}
+
+.overlay-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+    overflow: visible;
+}
+
+.overlay-element {
+    position: absolute;
+    transform-origin: 50% 50%;
+    box-sizing: border-box;
+    white-space: pre;
+}
+
+.overlay-text {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    /* text is cropped to the element box, matching the editor's inline-edit
+    viewport (the editor mirrors this rule in style.css) */
+    overflow: hidden;
+    line-height: 1.2;
+}
+
+.overlay-image {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: fill;
+}
+
+.overlay-shape {
+    width: 100%;
+    height: 100%;
+}

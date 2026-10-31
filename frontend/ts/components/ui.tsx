@@ -99,7 +99,7 @@ function closeProfileMenu(): void {
 /** Main menu of the control server: the device list, the dashboards page,
  * and the profile menu (profile page + sign out). */
 const ServerNavComponent: m.Component<{
-	active: "devices" | "dashboards" | "profile";
+	active: "devices" | "dashboards" | "overlays" | "profile";
 }> = {
 	oncreate() {
 		// The menu label is the session user's login name.
@@ -133,6 +133,13 @@ const ServerNavComponent: m.Component<{
 				aria-current={active === "dashboards" ? "page" : undefined}
 			>
 				{t("dash.title")}
+			</a>
+			<a
+				href="/overlays/"
+				class={active === "overlays" ? "nav-link active" : "nav-link"}
+				aria-current={active === "overlays" ? "page" : undefined}
+			>
+				{t("overlay.title")}
 			</a>
 			<span
 				class={profile.open ? "profile-menu open" : "profile-menu"}
@@ -169,7 +176,7 @@ const ServerNavComponent: m.Component<{
 	),
 };
 export const ServerNav = ServerNavComponent as MithrilJSXComponent<{
-	active: "devices" | "dashboards" | "profile";
+	active: "devices" | "dashboards" | "overlays" | "profile";
 }>;
 
 /** Drop the session cookie, then back to the login page. */
