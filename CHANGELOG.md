@@ -1,3 +1,12 @@
+# [2.4.0](https://github.com/majklovec/irlctrl/compare/v2.3.0...v2.4.0) (2026-11-01)
+
+
+### Features
+
+* enhance alert media and audio fields with improved layout and upload functionality ([fdd34fa](https://github.com/majklovec/irlctrl/commit/fdd34fac140e1be888cfb6344f0913dae52a6ed4))
+* implement WebSocket support for chat overlay with improved state management and error handling ([acf430a](https://github.com/majklovec/irlctrl/commit/acf430a09325f93a5f9ab3c7d5330f5be2037440))
+* zoom controls ([ffb773e](https://github.com/majklovec/irlctrl/commit/ffb773ea061aa7e6cf02661dfdfdbb328ec31770))
+
 # [2.3.0](https://github.com/majklovec/irlctrl/compare/v2.2.0...v2.3.0) (2026-11-01)
 
 
