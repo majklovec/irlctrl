@@ -7,7 +7,7 @@ import { t } from "../../../shared/ui/i18n";
 import type {
 	ChannelWidgetModule,
 	WidgetContext,
-} from "../../../shared/ui/module-contracts";
+} from "../../../shared/ui/module_contracts";
 import type { ServerDashboardWidget } from "../../../shared/types";
 import {
 	parseStatsSpec,
@@ -15,7 +15,7 @@ import {
 	statsSeriesCapFromConfig,
 	statsSpecsFromConfig,
 } from "./config";
-import { LineChart } from "./graph-linechart";
+import { LineChart } from "./graph_linechart";
 import { currentViewerTotal, mergeViewerSeries } from "./series";
 import type { StatsLive } from "./types";
 import "./styles.css";

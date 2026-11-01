@@ -3,7 +3,7 @@ import {
     type LogWording,
     logTranslate,
     wording,
-} from "../../../shared/logMessages";
+} from "../../../shared/log_messages";
 
 const log: LogWording = {
     methods: {

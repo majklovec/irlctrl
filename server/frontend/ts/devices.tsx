@@ -8,7 +8,7 @@ import { i18nReady, t } from "../../../shared/ui/i18n";
 import {
 	deviceSummaryColumnDefinitions,
 	deviceSummaryColumnsFor,
-} from "../../../shared/ui/module-registry";
+} from "../../../shared/ui/module_registry";
 import { serverLive } from "./services/serverws";
 import { mountPage, since } from "../../../shared/ui/util";
 

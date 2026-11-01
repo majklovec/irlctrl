@@ -5,8 +5,8 @@
  * new connections.
  */
 
-import type { LogEvent } from "../../shared/logMessages";
-import type { EmitOptions } from "../../shared/module-contract";
+import type { LogEvent } from "../../shared/log_messages";
+import type { EmitOptions } from "../../shared/module_contract";
 import { errorMessage } from "../../shared/util";
 import { logEntries, onLogEntry } from "./eventlog";
 import { buildStatus } from "./methods";

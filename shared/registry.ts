@@ -2,12 +2,12 @@
  * Backend module registry — discovery only, no device-process dependencies.
  *
  * Every modules/<id>/backend.ts default-exports a BackendModule registration
- * (shared/module-contract.ts). Discovery has two modes:
+ * (shared/module_contract.ts). Discovery has two modes:
  *
  *  - unbundled (bun server/backend/server.ts, bun test): a runtime directory
  *    scan anchored on import.meta.url — adding a module needs no edit here.
  *  - compiled binaries (bun build --compile): the build-time manifest
- *    generated/modules.backend.ts (scripts/gen-modules.ts); a compiled process
+ *    generated/modules.backend.ts (scripts/gen_modules.ts); a compiled process
  *    cannot readdir (import.meta.url lives in Bun's virtual /$bunfs mount).
  *
  * Malformed registrations are rejected at load with the module id in the
@@ -17,7 +17,7 @@
  */
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { registerLogWording } from "./logMessages";
+import { registerLogWording } from "./log_messages";
 import type {
     BackendModule,
     ChannelHub,
@@ -26,7 +26,7 @@ import type {
     ModulePage,
     ModuleWidget,
     WidgetConfigContext,
-} from "./module-contract";
+} from "./module_contract";
 import type { Role, RoleDefinition } from "./roles";
 import type { ServerDashboard, Status, WidgetConfigField } from "./types";
 import { appPath, MODULE_ROOTS } from "./paths";
@@ -37,7 +37,7 @@ export type {
     DashboardAction,
     DashboardActionEntry,
     DashboardActions,
-} from "./module-contract";
+} from "./module_contract";
 
 /**
  * Deterministic order: topological over declared `dependencies` (a module comes
@@ -115,6 +115,7 @@ function validate(mod: unknown, file: string): asserts mod is BackendModule {
         fn(name);
     strings("dependencies");
     strings("roles");
+    strings("legacyConfigKeys");
     strings("enabledByDefaultRoles");
     strings("secretFields");
     if (m.roleDefinitions !== undefined) {

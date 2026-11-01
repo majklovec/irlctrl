@@ -98,5 +98,8 @@
     "act.encoder.bitrate_low": "Bitrate 1.5 Mbps",
     "act.encoder.bitrate_high": "Bitrate 6 Mbps",
     "act.encoder.start": "Start encoder",
-    "act.encoder.stream_stop": "Stop stream"
+    "act.encoder.stream_stop": "Stop stream",
+    "role.encoder": "encoder",
+    "setup.role.encoder": "Encoder",
+    "setup.role.encoder_tag": "Captures a GStreamer pipeline and sends it over SRT"
 }

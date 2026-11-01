@@ -16,8 +16,8 @@ describe("module capability bus", () => {
     });
 
     test("reports a missing capability", () => {
-        expect(() => requireCapability("stream.srtla")).toThrow(
-            'capability "stream.srtla" is not provided by any module',
+        expect(() => requireCapability("stream.relay")).toThrow(
+            'capability "stream.relay" is not provided by any module',
         );
     });
 });

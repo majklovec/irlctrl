@@ -25,9 +25,9 @@ import {
 	widgetTypesFor,
 } from "./dashboard";
 import { t } from "../../../shared/ui/i18n";
-import { widgetModule } from "../../../shared/ui/module-registry";
+import { widgetModule } from "../../../shared/ui/module_registry";
 import { mountPage, setHeaderColor, uuid } from "../../../shared/ui/util";
-import { configSelectField } from "./widget-config-select";
+import { configSelectField } from "./widget_config_select";
 
 const ADD_PATH_RE = /\/dashboards\/add\/([^/]+)\/?$/;
 

@@ -7,7 +7,7 @@ import {
 	type LogEntry,
 	type LogEvent,
 	label,
-} from "../../logMessages";
+} from "../../log_messages";
 import { type Level, Icon } from "../components/icons";
 import { Card } from "../components/ui";
 import { t } from "../i18n";

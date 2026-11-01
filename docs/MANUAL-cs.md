@@ -41,7 +41,7 @@ flowchart LR
     R -- "SRTLA (bondované uplinky)" --> SRTLA[SRTLA přijímač]
 
     subgraph obs box
-        O[OBS Studio<br/>+ obs-controller]
+        O[OBS Studio<br/>+ obs]
     end
 
     subgraph ovládací server
@@ -85,7 +85,7 @@ Jeden klient zařízení, role dodávají moduly — vyberte ji přepínačem `-
 | `relay`    | **ano**  | Přijímá SRT od enkodéru a pomocí `srtla_send` jej odesílá přes všechna dostupná síťová připojení. Spravuje směrování podle zdrojových adres, soubor uplinků a modemy (ModemManager).                         | ano (agregace spojení / směrování) |
 | `encoder`  | ne       | Spouští [belacoder](https://github.com/BELABOX/belacoder) nebo [ceracoder](https://github.com/CERALIVE/ceracoder) s pipeline GStreamer a odesílá SRT do relay. Nepoužívá směrování, modemy ani `srtla_send`. | ne                                 |
 | `combined` | ne       | Kodér **i** relay na jednom zařízení: enkodér → místní `srtla_send` → agregovaná síťová připojení. Jediné tlačítko Start/Stop ovládá obě části.                                                              | ano                                |
-| `obs`      | ne       | Modul `obs-controller` se připojí k OBS Studio, předává jeho události a spouští přepínač scén podle datového toku.                                                                                             | ne                                 |
+| `obs`      | ne       | Modul `obs` se připojí k OBS Studio, předává jeho události a spouští přepínač scén podle datového toku.                                                                                             | ne                                 |
 | `broadcaster` | ne     | Modul `broadcaster` přijímá SRTLA přes `srtla_rec` a publikuje RTMP výstupy pomocí ffmpeg.                                                                                                                    | ne                                 |
 
 ### Uživatelské role (ovládací server)
@@ -108,7 +108,7 @@ Zařízení _patří_ uživateli, jehož **device token** byl použit, když se 
 | `belacoder` / `ceracoder` + GStreamer | `encoder`, `combined`                                                               |
 | `iproute2` + ModemManager (`mmcli`)   | bonding a správa modemů (`relay`, `combined`)                                       |
 | `srtla_rec` + ffmpeg                 | převod SRTLA na RTMP (`broadcaster`)                                                 |
-| OBS Studio s obs-websocket v5         | role `obs`, modul obs-controller, dashboardy se statistikou/chatem                  |
+| OBS Studio s obs-websocket v5         | role `obs`, modul obs, dashboardy se statistikou/chatem                  |
 | Reverzní proxy s TLS                  | produkční ovládací server (tokeny a relační cookies vyžadují `wss://` / `https://`) |
 
 Pro lokální checkout s přibalovanými binárkami explicitně přepište jejich cesty pomocí `ENCODER_BIN` a `SRTLA_SEND_BIN` (viz [Reference příkazové řádky](#12-reference-příkazové-řádky)).
@@ -196,7 +196,7 @@ docker compose up -d --build
 ```
 
 - **server** — ovládací server (`Dockerfile`, image `majkl/irlctrl-control`), UI na `:8090`.
-- **obs-client** — `client.ts --role obs`, modul `obs-controller` se připojuje k OBS na hostiteli (`ws://host.docker.internal:4455`).
+- **obs-client** — `client.ts --role obs`, modul `obs` se připojuje k OBS na hostiteli (`ws://host.docker.internal:4455`).
 - **relay** — `client.ts --role relay`, bonduje SRT ven přes `srtla_send` (`Dockerfile.device`, image `majkl/irlctrl-device`).
 - **encoder** — `client.ts --role encoder`, běží `ceracoder`/GStreamer a posílá SRT do relay; stejný device image, jiná role + `ENCODER_BIN`.
 - **broadcaster** — `client.ts --role broadcaster` spouští přijímač a publikační modul `client/modules/broadcaster`; cíle RTMP se konfigurují v nastavení zařízení a SRTLA přijímač naslouchá na UDP portu `5001`.
@@ -393,7 +393,7 @@ Pipeline lze importovat z GitHubu:
 
 ### 7.3 OBS spojení
 
-_Spojení s OBS Studio používané modulem obs-controller. Modul se po uložení restartuje._
+_Spojení s OBS Studio používané modulem obs. Modul se po uložení restartuje._
 - **OBS WebSocket URL** — např. `ws://127.0.0.1:4455`.
 - **OBS heslo** — heslo nastavené v OBS Studio (Settings → General/Stream). Ponechte prázdné pro zachování současného.
 
@@ -453,7 +453,7 @@ Každá volba, kterou enkodér nabízí (krok průvodce, karta encoder, nastaven
 
 ## 10. Modul OBS Studio & přepínač nízkého bitrate
 
-Modul **obs-controller** vlastní spojení [obs-websocket](https://github.com/obsproject/obsproject/obs-websocket) (v5) na spárovanou instanci OBS Studio a předává její události do událostního proudu zařízení. Nastavuje se v **Settings → OBS connection** (URL + heslo; modul se po uložení restartuje). Jeho konfigurační formulář nabízí:
+Modul **obs** vlastní spojení [obs-websocket](https://github.com/obsproject/obsproject/obs-websocket) (v5) na spárovanou instanci OBS Studio a předává její události do událostního proudu zařízení. Nastavuje se v **Settings → OBS connection** (URL + heslo; modul se po uložení restartuje). Jeho konfigurační formulář nabízí:
 
 | Volba                                | Význam                                                                                           |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------ |
@@ -606,7 +606,7 @@ Každá volba má ekvivalent v podobě proměnné prostředí. Řešení: **CLI 
 
 ### 12.3 Nastavení specifická pro moduly
 
-Připojení k OBS spravuje modul `obs-controller`; hodnoty lze zadat přes `OBS_URL` / `OBS_PASSWORD` nebo na stránce nastavení zařízení. RTMP výstupy, profily ffmpeg a nastavení SRTLA přijímače vlastní `client/modules/broadcaster`. Pro tyto role neexistuje samostatný vstupní bod klienta.
+Připojení k OBS spravuje modul `obs`; hodnoty lze zadat přes `OBS_URL` / `OBS_PASSWORD` nebo na stránce nastavení zařízení. RTMP výstupy, profily ffmpeg a nastavení SRTLA přijímače vlastní `client/modules/broadcaster`. Pro tyto role neexistuje samostatný vstupní bod klienta.
 
 ---
 

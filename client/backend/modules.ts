@@ -4,13 +4,13 @@
  * start/stop/restart, RPC ownership and gating, status / settings / setup
  * contributions, and autostart. Nothing here names a module id, method
  * prefix or status key: every decision reads the registration contract
- * (shared/module-contract.ts).
+ * (shared/module_contract.ts).
  */
 import type {
     BackendModule,
     ModuleSlice,
     Params,
-} from "../../shared/module-contract";
+} from "../../shared/module_contract";
 import { argFail } from "../../shared/args";
 import {
     ALL_MODULES,
@@ -24,7 +24,7 @@ import { runAutostart as runAutostartWith } from "./autostart";
 import { provideCapability } from "./capabilities";
 import { logEvent } from "./eventlog";
 import { ROLE } from "./config";
-import { buildModuleCore, type ModuleCore } from "./module-core";
+import { buildModuleCore, type ModuleCore } from "./module_core";
 import { pushModuleEvent } from "./push";
 import {
     completeSetup,
@@ -97,6 +97,14 @@ export function ensureModuleSlices(role: Role = effectiveRole()): ModulesState {
     const modules: ModulesState = { ...stored };
     for (const mod of DEVICE_MODULES) {
         const key = configKey(mod);
+        // A renamed module adopts the slice stored under its former key.
+        if (!(key in stored))
+            for (const legacy of mod.legacyConfigKeys ?? [])
+                if (legacy in modules) {
+                    stored[key] = modules[legacy];
+                    delete modules[legacy];
+                    break;
+                }
         modules[key] = deepMerge(defaultSlice(mod, role), stored[key]);
     }
     state.settings.modules = modules;
@@ -143,9 +151,16 @@ for (const mod of ALL_MODULES)
     for (const [name, impl] of Object.entries(mod.services?.capabilities ?? {}))
         provideCapability(name, impl);
 
-// Bind the process bag before start: a module's lazy objects must work —
-// reporting "stopped" — even when its start never runs.
-for (const mod of DEVICE_MODULES) mod.bind?.(core);
+/**
+ * Bind the process bag into every device module. Runs at discovery, before
+ * start: a module's lazy objects must work — reporting "stopped" — even when
+ * its start never runs. Tests that bind a stub bag into a module call it
+ * again to restore the real one (the test suite shares one process).
+ */
+export function bindModules(): void {
+    for (const mod of DEVICE_MODULES) mod.bind?.(core);
+}
+bindModules();
 
 // A configured device gets its slices completed at load (new modules / fields).
 if (!setupRequired) ensureModuleSlices();

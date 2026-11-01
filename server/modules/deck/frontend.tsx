@@ -13,7 +13,7 @@ import type {
 	DeviceLink,
 	FleetDashboardContext,
 	FleetDashboardWidget,
-} from "../../../shared/ui/module-contracts";
+} from "../../../shared/ui/module_contracts";
 import type { DeviceSummary } from "../../../shared/types";
 import { ButtonsGrid, type GridItem } from "./grids";
 import {

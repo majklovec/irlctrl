@@ -17,7 +17,7 @@
  *   config.ts       core CLI arguments and derived settings
  *   state.ts        persistent state (config file) — core settings + module sections
  *   modules.ts      module lifecycle: slices, start/stop, RPC ownership, status, setup
- *   module-core.ts  the process-services bag handed to modules
+ *   module_core.ts  the process-services bag handed to modules
  *   capabilities.ts module-to-module capability bus
  *   methods.ts      core WebSocket API methods + dispatch
  *   push.ts         status / module-event / log pushes to the local UI and the control server

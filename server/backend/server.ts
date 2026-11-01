@@ -6,7 +6,7 @@
  * Usage: bun server/backend/server.ts --port 8090
  */
 import { argEnv, flagOrEnv, intArgEnv } from "../../shared/args";
-import { createControlServer } from "./control-server";
+import { createControlServer } from "./control_server";
 
 const PORT = intArgEnv("--port", "SERVER_PORT", 8090, 1, 65535);
 const HOST = argEnv("--host", "SERVER_HOST", "0.0.0.0");

@@ -20,7 +20,7 @@ import type {
 	DeviceDashboardContext,
 	DeviceLink,
 	FleetDashboardContext,
-} from "../../../shared/ui/module-contracts";
+} from "../../../shared/ui/module_contracts";
 import {
 	destroyDeviceWidget,
 	deviceWidgetForType,
@@ -33,10 +33,10 @@ import {
 	widgetConfigFieldsForType,
 	widgetModuleForType,
 	widgetModuleTypes,
-} from "../../../shared/ui/module-registry";
+} from "../../../shared/ui/module_registry";
 import { RpcClient, socketUrl } from "../../../shared/ui/services/rpc";
 import { serverLive } from "./services/serverws";
-import { configSelectField } from "./widget-config-select";
+import { configSelectField } from "./widget_config_select";
 
 /** Device-independent widget types — offered once, with no device of their
  * own: the channel widgets (their data is fetched by the control server) and

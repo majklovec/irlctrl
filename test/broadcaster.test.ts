@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { ModuleCore } from "../client/backend/module-core";
-import type { ModuleStartContext } from "../shared/module-contract";
+import type { ModuleCore } from "../client/backend/module_core";
+import type { ModuleStartContext } from "../shared/module_contract";
 import broadcaster from "../client/modules/broadcaster/backend";
 import {
 	configuredOutputs,

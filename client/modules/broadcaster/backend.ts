@@ -15,12 +15,12 @@ import audioOnlyProfile from "./defaults/profiles/audio-only.json";
 import copyProfile from "./defaults/profiles/copy.json";
 import reencodeH264Profile from "./defaults/profiles/reencode-h264.json";
 import reencodeH265Profile from "./defaults/profiles/reencode-h265.json";
-import type { ModuleCore } from "../../backend/module-core";
+import type { ModuleCore } from "../../backend/module_core";
 import type {
 	BackendModule,
 	ModuleStartContext,
 	Params,
-} from "../../../shared/module-contract";
+} from "../../../shared/module_contract";
 import { ApiError } from "../../../shared/params";
 import { errorMessage } from "../../../shared/util";
 import type { SrtlaKeepalive } from "./types";

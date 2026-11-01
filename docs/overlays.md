@@ -6,7 +6,7 @@ served as transparent runtime pages that OBS loads with a **Browser Source**.
 - Editor: `/overlays/` (logged-in users only)
 - Runtime: `/overlay/<scene-slug>?token=<token>` (no session, token-gated)
 - Schema, limits and normalization: [`shared/overlay.ts`](../shared/overlay.ts)
-- Element modules: [`server/frontend/ts/overlay-elements/`](../server/frontend/ts/overlay-elements/)
+- Element modules: [`server/frontend/ts/overlay_elements/`](../server/frontend/ts/overlay_elements/)
 - Server: [`server/backend/overlays.ts`](../server/backend/overlays.ts)
 
 ## OBS setup
@@ -125,10 +125,10 @@ while no variables exist, so a bound-but-unresolvable state can never be
 created. Transform fields and visibility live in the core inspector; the
 element-specific props get their toggles where the element's `editForm`
 renders its fields (via `bindField` in
-[overlay-elements/fields.tsx](../server/frontend/ts/overlay-elements/fields.tsx)).
+[overlay_elements/fields.tsx](../server/frontend/ts/overlay_elements/fields.tsx)).
 
 Resolution happens once per element at render time in
-`resolveElement` ([`overlay-elements/core.ts`](../server/frontend/ts/overlay-elements/core.ts))
+`resolveElement` ([`overlay_elements/core.ts`](../server/frontend/ts/overlay_elements/core.ts))
 — editor canvas and runtime page share the exact same code path, so a bound
 element looks identical in both. Unknown paths are ignored, so stale
 bindings on element-type changes never break rendering. Deleting a variable
@@ -210,17 +210,17 @@ immediately.
 ## Adding a new element type
 
 The core (renderer, editor, runtime) only talks to the element registry, so a
-new type never touches `overlay-render.tsx`, `overlays.tsx` or `overlay.tsx`:
+new type never touches `overlay_render.tsx`, `overlays.tsx` or `overlay.tsx`:
 
 1. Add the type to `OverlayElementType` in
    [`shared/overlay.ts`](../shared/overlay.ts) plus a `DEFAULT_*_PROPS` shape
    and a `normalizeProps` case (the REST routes and the registry are the only
    other places a new type shows up). Unknown prop keys are preserved on
    round-trip — keep that true for forward compatibility.
-2. Create `server/frontend/ts/overlay-elements/<type>.tsx` implementing
+2. Create `server/frontend/ts/overlay_elements/<type>.tsx` implementing
    `OverlayElementDef` (`defaultProps`, `defaultSize`, `draw`, `editForm`,
    `validate`, `handles`, `propKeys`) and register it in
-   [`registry.ts`](../server/frontend/ts/overlay-elements/registry.ts). `draw`
+   [`registry.ts`](../server/frontend/ts/overlay_elements/registry.ts). `draw`
    receives the **resolved** element (bindings already applied) — read
    `element.props` / `element.transform` directly, never resolve again.
    `propKeys` documents which prop names exist on the type; binding toggles

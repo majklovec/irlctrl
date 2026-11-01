@@ -36,7 +36,7 @@ export class RpcClient {
         return !!this.ws && this.ws.readyState === WebSocket.OPEN;
     }
 
-    /** Subscribe to a server event ("status", "srtla.stats", …); returns an unsubscribe fn. */
+    /** Subscribe to a server event ("status", "relay.stats", …); returns an unsubscribe fn. */
     on(type: string, handler: EventHandler): () => void {
         let set = this.events.get(type);
         if (!set) {

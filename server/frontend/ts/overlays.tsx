@@ -32,17 +32,17 @@ import type {
 import { Icon } from "../../../shared/ui/components/icons";
 import { Button, Card, Page, ServerNav } from "../../../shared/ui/components/ui";
 import { t } from "../../../shared/ui/i18n";
-import type { ChatWidgetRef } from "./overlay-elements/core";
-import { bindField, bindToggle, lbl } from "./overlay-elements/fields";
-import { lineFlipFromDelta } from "./overlay-elements/line";
-import { elementDef } from "./overlay-elements/registry";
+import type { ChatWidgetRef } from "./overlay_elements/core";
+import { bindField, bindToggle, lbl } from "./overlay_elements/fields";
+import { lineFlipFromDelta } from "./overlay_elements/line";
+import { elementDef } from "./overlay_elements/registry";
 import {
 	assetUrl,
 	type ElementContext,
 	elementStyle,
 	resolveElement,
 	sceneElementsView,
-} from "./overlay-render";
+} from "./overlay_render";
 import { serverLive } from "./services/serverws";
 import { mountPage, uuid } from "../../../shared/ui/util";
 

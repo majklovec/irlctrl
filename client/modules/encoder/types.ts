@@ -23,15 +23,15 @@ export interface SrtlaState {
 }
 
 /** Runtime service the encoder consumes through the generic capability bus. */
-export interface SrtlaCapability {
-    srtlaStatus(): SrtlaState;
-    startSrtla(
+export interface RelayCapability {
+    relayStatus(): SrtlaState;
+    startRelay(
         listenPort: string,
         remoteHost: string,
         remotePort: string,
     ): Promise<SrtlaState>;
-    stopSrtla(): Promise<void>;
-    reloadSrtla(): Promise<void>;
+    stopRelay(): Promise<void>;
+    reloadRelay(): Promise<void>;
     target(): SrtlaTarget | undefined;
 }
 
@@ -109,7 +109,7 @@ export const BITRATE_KBPS = { min: 300, max: 30_000 } as const;
 export type EncoderStatus = Status & {
     state: {
         encoder: EncoderState;
-        srtla: SrtlaState;
+        relay: SrtlaState;
         stream?: SrtlaTarget;
     };
     audioSources: AudioSource[];
@@ -134,7 +134,7 @@ export type EncoderDeviceSummary = DeviceSummary & {
     maxBitrate?: number;
     /** Live srtla_send total, bytes/s across all links (the srtla module's summary). */
     bitrate?: number;
-    srtla?: SrtlaState;
+    relay?: SrtlaState;
     activeLinks?: number;
     totalLinks?: number;
 };

@@ -7,7 +7,7 @@ import {
     LOG_MAX,
     type LogEntry,
     type LogLevel,
-} from "../../shared/logMessages";
+} from "../../shared/log_messages";
 import { errorMessage } from "../../shared/util";
 import { LOG_FILE } from "./config";
 import { writeFileAtomic } from "./files";

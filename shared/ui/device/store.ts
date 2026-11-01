@@ -2,7 +2,7 @@
  * the device page runs the global `card` below, while dashboards create a host
  * for each viewer websocket. Module-owned form state stays in each module. */
 import m from "mithril";
-import { type LogEvent, label, methodLog } from "../../logMessages";
+import { type LogEvent, label, methodLog } from "../../log_messages";
 import { errorMessage } from "../../util";
 import type { DeviceInfo, ModulesView, Status } from "../types";
 import type { Level } from "../components/icons";

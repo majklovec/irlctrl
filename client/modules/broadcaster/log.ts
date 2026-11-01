@@ -1,6 +1,6 @@
 /** Log wording of the broadcaster module's methods (start / stop the
  * srtla_rec + ffmpeg stream). */
-import { type LogWording, wording } from "../../../shared/logMessages";
+import { type LogWording, wording } from "../../../shared/log_messages";
 
 const log: LogWording = {
 	methods: {

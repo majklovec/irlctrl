@@ -6,7 +6,7 @@
  * method on the device it names, picked from the action catalogue the
  * control server merges into that device's cached status (`status.actions`).
  */
-import type { ModuleWidget } from "../../../shared/module-contract";
+import type { ModuleWidget } from "../../../shared/module_contract";
 import {
     buttonDevices,
     DECK_DEFAULT_SIZE,

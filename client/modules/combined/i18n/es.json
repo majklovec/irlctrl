@@ -1,0 +1,5 @@
+{
+    "role.combined": "codificador + relay",
+    "setup.role.combined": "Combinado",
+    "setup.role.combined_tag": "Codifica y retransmite en un solo servicio"
+}

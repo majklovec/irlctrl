@@ -3,17 +3,17 @@
  * control server: the status / settings / setup / device-list envelopes and
  * the dashboard shapes.
  *
- * Module-specific wire shapes (encoder, srtla, obs-controller, ssh,
+ * Module-specific wire shapes (encoder, srtla, obs, ssh,
  * chat, stats) live in the owning module's `modules/<id>/types.ts`; a module
  * narrows these envelopes with its own view types (e.g. `Status & {...}`) and
  * the core never names a module field. The modules/ tree may not contribute
  * to this file.
  */
 import type { Language } from "./languages";
-import type { DashboardActionEntry } from "./module-contract";
+import type { DashboardActionEntry } from "./module_contract";
 import type { Role, RoleDefinition } from "./roles";
 
-export type { DashboardAction, DashboardActionEntry } from "./module-contract";
+export type { DashboardAction, DashboardActionEntry } from "./module_contract";
 export type { Role };
 
 /** One module's slice of the modules view: its enabled flag plus its non-secret settings. */

@@ -98,7 +98,7 @@ jobs:
             # generated/frontend-assets.ts); bundle it before the compiled build.
             - name: Generate control-server assets
               shell: bash
-              run: bun scripts/gen-control-server-assets.ts
+              run: bun scripts/gen_control_server_assets.ts
 
             - name: Build profiling binaries (native only)
               if: matrix.native == true

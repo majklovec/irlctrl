@@ -216,7 +216,7 @@ docker compose up -d --build
 ```
 
 -   **server** — `server/backend/server.ts`, řídicí server (`Dockerfile`, obraz `majkl/irlctrl-control`), webové rozhraní na portu `8090`.
--   **obs-client** — běžný `client/backend/client.ts --role obs` s modulem `obs-controller`; připojuje se k OBS na hostiteli přes `ws://host.docker.internal:4455`.
+-   **obs-client** — běžný `client/backend/client.ts --role obs` s modulem `obs`; připojuje se k OBS na hostiteli přes `ws://host.docker.internal:4455`.
 -   **relay** — `client/backend/client.ts --role relay`, agreguje SRT stream pomocí `srtla_send` (`Dockerfile.device`, obraz `majkl/irlctrl-device`).
 -   **encoder** — `client/backend/client.ts --role encoder`, spouští `ceracoder`/GStreamer a odesílá SRT do relé; používá stejný obraz zařízení, ale jinou roli a proměnnou `ENCODER_BIN`.
 -   **broadcaster** — `client/backend/client.ts --role broadcaster` spouští modul `client/modules/broadcaster` s ffmpeg; cíle se konfigurují v nastavení zařízení a SRTLA přijímač používá UDP port `5001`.
@@ -232,7 +232,7 @@ Enkodér toto oprávnění nepotřebuje. Při použití výchozí síťové konf
 Lokální koncový bod `/ws` a řídicí server používají stejný JSON protokol:
 -   Požadavek — `{ "id", "method", "params" }`
 -   Odpověď — `{ "type": "response", "id", "ok", … }`
--   Událost — `{ "type": "event", "event": "status" | "log" | "srtla.stats", "data": … }`
+-   Událost — `{ "type": "event", "event": "status" | "log" | "relay.stats", "data": … }`
 
 Seznam metod je uveden na začátku souboru [`client/backend/methods.ts`](client/backend/methods.ts). Metody, které neodpovídají roli daného zařízení, jsou odmítnuty s kódem 409.
 
@@ -259,8 +259,9 @@ Běží přímo na zařízení a každý se zobrazuje jako karta ve webovém roz
 | Modul            | Funkce                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `encoder`        | Spouští a spravuje proces enkodéru pro zařízení `encoder` a `combined`. Vyhledává pipeline (jejich identifikátory jsou cesty pod `--pipelines`, např. `rk3588/h265_hdmi_1440p25`), zajišťuje spuštění a automatické restartování a umožňuje měnit datový tok za běhu. Podporuje **belacoder** (datový tok se nastavuje pomocí souboru s minimální a maximální hodnotou, který se znovu načítá při SIGHUP) a **ceracoder** (konfigurace INI s nastavením balanceru). |
-| `srtla`          | Spravuje SRTLA na zařízeních `relay` a `combined`: proces `srtla_send`, plánovač, směrování zdrojů, výběr uplinků a integraci ModemManageru (`mmcli`) včetně stavu a ovládání modemů.                                                                                                                                                                                                                                                                                    |
-| `obs-controller` | Spravuje spojení `obs-websocket` verze 5 ([obs-websocket](https://github.com/obsproject/obs-websocket)) s propojenou instancí OBS Studio a předává její události do proudu událostí zařízení. Zajišťuje také **přepínač při nízkém datovém toku**: stavový automat ([`switcher-engine.ts`](client/modules/obs-controller/switcher-engine.ts)), který sleduje metriky SRT/OBS a přepíná OBS mezi scénami `normal`, `low` a `offline`.                                       |
+| `relay`          | Spravuje SRTLA na zařízeních `relay` a `combined`: proces `srtla_send`, plánovač, směrování zdrojů, výběr uplinků a integraci ModemManageru (`mmcli`) včetně stavu a ovládání modemů.                                                                                                                                                                                                                                                                                    |
+| `combined`       | Vlastní roli `combined` (jedno zařízení, které enkóduje i relayuje): přispívá pouze definicí role; práci odvádějí moduly `relay` a `encoder`, které roli obsluhují. |
+| `obs` | Spravuje spojení `obs-websocket` verze 5 ([obs-websocket](https://github.com/obsproject/obs-websocket)) s propojenou instancí OBS Studio a předává její události do proudu událostí zařízení. Zajišťuje také **přepínač při nízkém datovém toku**: stavový automat ([`switcher_engine.ts`](client/modules/obs/switcher_engine.ts)), který sleduje metriky SRT/OBS a přepíná OBS mezi scénami `normal`, `low` a `offline`.                                       |
 
 ### Widgety kanálů
 
@@ -301,9 +302,9 @@ Každý adresář `client/modules/<id>/` nebo `server/modules/<id>/` obsahuje p�
 
 Frontend používá stejnou identitu a navíc poskytuje komponentu widgetu `component`, obsah karty zařízení `cardBody(host, status)` a rozhraní pro připojení hubu a příjem dat widgetů. Podrobné tabulky jednotlivých polí jsou v [`client/modules/README.md`](client/modules/README.md).
 
-**Vyhledávání modulů** — backend při běhu prochází oba kořenové adresáře modulů pomocí `readdirSync` v souboru [`shared/registry.ts`](shared/registry.ts). Stačí přidat adresář a modul bude nalezen. Prohlížeč nemůže při běhu automaticky procházet soubory, proto `scripts/gen-modules.ts` vytváří manifest `generated/modules.frontend.ts`, který je ignorován Gitem a vychází ze stejného seznamu. Generování je zapojeno do `predev`.
+**Vyhledávání modulů** — backend při běhu prochází oba kořenové adresáře modulů pomocí `readdirSync` v souboru [`shared/registry.ts`](shared/registry.ts). Stačí přidat adresář a modul bude nalezen. Prohlížeč nemůže při běhu automaticky procházet soubory, proto `scripts/gen_modules.ts` vytváří manifest `generated/modules.frontend.ts`, který je ignorován Gitem a vychází ze stejného seznamu. Generování je zapojeno do `predev`.
 
-**Propojení jádra a modulů** — RPC metody se směrují prostřednictvím mapy vlastníků metod v registru, která vzniká z pole `methods` každého modulu. Rozhraní načítá karty a widgety pomocí přístupových funkcí v [`shared/ui/module-registry.ts`](shared/ui/module-registry.ts). Služby mezi moduly komunikují přes **sběrnici schopností (capability bus)**: modul zaregistruje schopnost pod názvem s tečkovou notací, například `stream.encoder` nebo `stream.srtla`, a ostatní moduly ji vyhledají podle názvu prostřednictvím [`client/backend/capabilities.ts`](client/backend/capabilities.ts), místo aby ji přímo importovaly.
+**Propojení jádra a modulů** — RPC metody se směrují prostřednictvím mapy vlastníků metod v registru, která vzniká z pole `methods` každého modulu. Rozhraní načítá karty a widgety pomocí přístupových funkcí v [`shared/ui/module_registry.ts`](shared/ui/module_registry.ts). Služby mezi moduly komunikují přes **sběrnici schopností (capability bus)**: modul zaregistruje schopnost pod názvem s tečkovou notací, například `stream.encoder` nebo `stream.relay`, a ostatní moduly ji vyhledají podle názvu prostřednictvím [`client/backend/capabilities.ts`](client/backend/capabilities.ts), místo aby ji přímo importovaly.
 
 Každý modul načítá svůj soubor `styles.css` jako vedlejší efekt importu, takže jádro nemusí vybírat CSS jednotlivých modulů podle jejich identifikátorů.
 
@@ -315,7 +316,7 @@ Názvy metod a událostí jsou pevně dané. Jejich přejmenování představuje
 
 ### Role OBS a broadcaster
 
-Obě funkce běží jako moduly standardního klienta `client/backend/client.ts`. Role `obs` používá modul `obs-controller` pro připojení k OBS Studio; roli `broadcaster` obsluhuje modul `broadcaster`, který přijímá SRTLA a publikuje RTMP přes `srtla_rec` a ffmpeg. Nastavení připojení a výstupů spravujte v zařízení.
+Obě funkce běží jako moduly standardního klienta `client/backend/client.ts`. Role `obs` používá modul `obs` pro připojení k OBS Studio; roli `broadcaster` obsluhuje modul `broadcaster`, který přijímá SRTLA a publikuje RTMP přes `srtla_rec` a ffmpeg. Nastavení připojení a výstupů spravujte v zařízení.
 
 ## Vývoj
 
@@ -333,7 +334,7 @@ bun run build:client     # → dist/client
 bun run build:server     # → dist/server
 ```
 
-Moduly se vyhledávají za běhu procházením adresářů `client/modules/` a `server/modules/`. Generované manifesty v `generated/` vytváří `scripts/gen-modules.ts`; tento krok je zapojen do `predev`, `pretest` a `prebuild:*`.
+Moduly se vyhledávají za běhu procházením adresářů `client/modules/` a `server/modules/`. Generované manifesty v `generated/` vytváří `scripts/gen_modules.ts`; tento krok je zapojen do `predev`, `pretest` a `prebuild:*`.
 
 Uživatelské rozhraní podporuje více jazyků prostřednictvím JSON katalogů v `i18n/` (12 jazyků). Překlady se podle potřeby poskytují prohlížeči z adresy `/i18n/<lang>.json`. Jazyk se nastavuje při prvním spuštění a lze jej kdykoli změnit pomocí výběru v záhlaví. Zařízení si volbu ukládá do konfiguračního souboru.
 

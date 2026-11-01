@@ -1,5 +1,5 @@
 /* The bound core bag and the module's persisted config sections. */
-import type { ModuleCore } from "../../backend/module-core";
+import type { ModuleCore } from "../../backend/module_core";
 import type { CeraConfig, EncoderConfig } from "./types";
 
 /** Bound at discovery and re-bound at start; a live binding for the other files. */

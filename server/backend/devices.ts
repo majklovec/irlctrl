@@ -5,7 +5,7 @@ import {
     type LogEntry,
     type LogEvent,
     type LogLevel,
-} from "../../shared/logMessages";
+} from "../../shared/log_messages";
 import {
     dashboardActionsFor,
     isRegisteredRole,

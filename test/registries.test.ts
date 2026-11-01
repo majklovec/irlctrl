@@ -19,14 +19,16 @@ import {
 
 /**
  * Registry order of the device modules: the registry's topological sort over
- * declared `dependencies` (encoder after srtla), ids visited alphabetically.
+ * declared `dependencies` (encoder after relay, combined after both), ids
+ * visited alphabetically.
  * Independent modules precede that chain.
  */
 const DEVICE_ORDER = [
     "broadcaster",
-    "srtla",
+    "relay",
     "encoder",
-    "obs-controller",
+    "combined",
+    "obs",
     "ssh",
 ];
 /** The channel widget modules (device-independent dashboard widgets). */
@@ -155,27 +157,30 @@ describe("module registries", () => {
     });
 
     test("device-card frontends cover every backend device-module id", () => {
-        // The ssh module lives on the settings page (its card is a settings.tsx
-        // ModuleDef, not a device card). Every other backend id must have
-        // exactly one card, and no extra card ids may exist.
+        // A module without a frontend.tsx has no card by design (ssh lives on
+        // the settings page, combined only contributes a role). Every other
+        // backend id must have exactly one card, and no extra card ids may exist.
         const cardIds = scanFrontends()
             .flatMap((fe) => fe.registrations)
             .filter((r) => r.kind === "device-card")
             .map((r) => r.id);
         const front = new Set(cardIds);
-        const missing = DEVICE_ORDER.filter((id) => !front.has(id) && id !== "ssh");
+        const withFrontend = new Set(scanFrontends().map((fe) => fe.dir));
+        const missing = DEVICE_ORDER.filter(
+            (id) => !front.has(id) && withFrontend.has(id),
+        );
         const extra = [...front].filter(
             (id) => !DEVICE_ORDER.includes(id),
         );
         expect(missing).toEqual([]);
         expect(extra).toEqual([]);
-        // The SRTLA card composes the routing table and modem panels.
-        const srtlaSrc = readFileSync(
-            join(moduleDir("srtla"), "frontend.tsx"),
+        // The relay card composes the routing table and modem panels.
+        const relaySrc = readFileSync(
+            join(moduleDir("relay"), "frontend.tsx"),
             "utf8",
         );
-        expect(srtlaSrc).toContain("mod-srtla-modems");
-        expect(srtlaSrc).toContain("interfacesCard");
+        expect(relaySrc).toContain("mod-relay-modems");
+        expect(relaySrc).toContain("interfacesCard");
     });
 
     test("widget frontends are separate from device modules", () => {
@@ -193,7 +198,7 @@ describe("module registries", () => {
 
     test("frontend registry discovers via the generated manifest (no per-module imports, no Glob)", () => {
         const src = readFileSync(
-            join(appDir, "shared", "ui", "module-registry.ts"),
+            join(appDir, "shared", "ui", "module_registry.ts"),
             "utf8",
         );
         expect(src).not.toMatch(/modules\/[\w-]+\/frontend/);
@@ -270,28 +275,28 @@ describe("module registries", () => {
         const devices = readPage("server", "devices.tsx");
 
         expect(app).not.toMatch(
-            /moduleCard\(["'](encoder|srtla|obs-controller)/,
+            /moduleCard\(["'](encoder|relay|obs)/,
         );
         expect(app).not.toMatch(/status\.role\s*[!=]|status\.modules/);
         expect(dashboard).not.toMatch(/ROLE_WIDGET_TYPES|CARD_MODULE/);
         expect(dashboard).not.toMatch(
             /case ["'](encoder|srtla|relay|combined|obs)["']/,
         );
-        expect(dashboard).not.toContain("modules/obs-controller");
+        expect(dashboard).not.toContain("modules/obs");
         expect(setup).not.toMatch(
             /encoderHost|srtlaRemoteHost|setup\.step\.encoder/,
         );
-        expect(devices).not.toMatch(/hasEncoder|\.encoder\b|\.srtla\b/);
+        expect(devices).not.toMatch(/hasEncoder|\.encoder\b|\.relay\b/);
     });
 
     test("device modules declare their frontend contributions", () => {
         const frontend = (id: string) =>
             readFileSync(join(moduleDir(id), "frontend.tsx"), "utf8");
         const encoder = frontend("encoder");
-        const srtla = frontend("srtla");
-        const obs = frontend("obs-controller");
+        const relay = frontend("relay");
+        const obs = frontend("obs");
 
-        for (const source of [encoder, srtla]) {
+        for (const source of [encoder, relay]) {
             expect(source).toContain("available:");
             expect(source).toContain("dashboardWidgets:");
             expect(source).toContain("setupSteps:");
@@ -309,7 +314,7 @@ describe("module registries", () => {
         const modulePage = join(moduleDir("encoder"), "pages", "pipelineedit.html");
         expect(existsSync(modulePage)).toBe(true);
         expect(readFileSync(modulePage, "utf8")).toContain(
-            "../pipeline-editor.tsx",
+            "../pipeline_editor.tsx",
         );
         expect(
             existsSync(join(appDir, "client", "frontend", "pages", "pipelineedit.html")),
@@ -328,19 +333,19 @@ describe("role presets from the registrations", () => {
                 .map(([key]) => key)
                 .sort();
         expect(on("relay")).toEqual(["relay", "ssh"]);
-        expect(on("combined")).toEqual(["encoder", "relay", "ssh"]);
+        expect(on("combined")).toEqual(["combined", "encoder", "relay", "ssh"]);
         expect(on("encoder")).toEqual(["encoder", "ssh"]);
-        expect(on("obs")).toEqual(["obs-controller"]);
+        expect(on("obs")).toEqual(["obs"]);
     });
 
-    test("a module's stored slice key follows its configKey", () => {
-        const srtla = ALL_MODULES.find((m) => m.id === "srtla");
-        expect(srtla?.configKey).toBe("relay");
+    test("a module's stored slice key is its id unless it declares a configKey", () => {
+        const relay = ALL_MODULES.find((m) => m.id === "relay");
+        expect(relay?.configKey).toBeUndefined();
         expect(defaultModules("relay")).toHaveProperty("relay");
         expect(defaultModules("relay")).not.toHaveProperty("srtla");
     });
 
-    test("status view exposes the combined SRTLA module flag", () => {
+    test("status view exposes the relay module flag", () => {
         const saved = state.settings.modules;
         try {
             state.settings.modules = defaultModules("relay");
@@ -356,13 +361,13 @@ describe("role presets from the registrations", () => {
         const role = state.settings.role;
         try {
             state.settings.modules = {
-                "obs-controller": {
+                "obs": {
                     enabled: true,
                     obsUrl: "ws://1.2.3.4:4455",
                 },
             };
             const modules = ensureModuleSlices("relay");
-            expect(modules["obs-controller"]).toMatchObject({
+            expect(modules["obs"]).toMatchObject({
                 enabled: true,
                 obsUrl: "ws://1.2.3.4:4455",
                 sceneEvents: true,

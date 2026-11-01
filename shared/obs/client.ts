@@ -9,7 +9,7 @@
  *
  * This file is pure library code — no CLI, no device registration, no
  * module-level side effects — so it is safe to import from the relay's
- * obs-controller module (which owns the low-bitrate switcher) and from the
+ * obs module (which owns the low-bitrate switcher) and from the
  * standalone obs-client.ts proxy.
  *
  * Runtime: Bun (global WebSocket + WebCrypto). No Node shims.

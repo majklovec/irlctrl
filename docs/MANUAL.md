@@ -41,7 +41,7 @@ flowchart LR
     R -- "SRTLA (bonded uplinks)" --> SRTLA[SRTLA receiver]
 
     subgraph obs box
-        O[OBS Studio<br/>+ obs-controller]
+        O[OBS Studio<br/>+ obs]
     end
 
     subgraph control server
@@ -85,7 +85,7 @@ One device client, with roles contributed by modules — choose one with `--role
 | `relay`    | **yes**  | Receives SRT from an encoder and bonds it out over all uplinks with `srtla_send`. Manages source routing, the uplinks file, and modems (ModemManager).                                                   | yes (bonding / routing) |
 | `encoder`  | no       | Runs [belacoder](https://github.com/BELABOX/belacoder) or [ceracoder](https://github.com/CERALIVE/ceracoder) with a GStreamer pipeline and sends SRT to a relay. No routing, no modems, no `srtla_send`. | no                      |
 | `combined` | no       | Encoder **and** relay in one box: encoder → local `srtla_send` → bonded uplinks. One Start/Stop drives both.                                                                                             | yes                     |
-| `obs`      | no       | The `obs-controller` module connects to OBS Studio, forwards events, and runs the low-bitrate scene switcher.                                                                                             | no                      |
+| `obs`      | no       | The `obs` module connects to OBS Studio, forwards events, and runs the low-bitrate scene switcher.                                                                                             | no                      |
 | `broadcaster` | no    | The `broadcaster` module receives SRTLA with `srtla_rec` and publishes RTMP outputs through ffmpeg.                                                                                                      | no                      |
 
 ### User roles (control server)
@@ -108,7 +108,7 @@ Devices are _owned_ by the user whose **device token** was present when the devi
 | `belacoder` / `ceracoder` + GStreamer | `encoder`, `combined`                                                                       |
 | `iproute2` + ModemManager (`mmcli`)   | bonding & modem management (`relay`, `combined`)                                            |
 | `srtla_rec` + ffmpeg                  | SRTLA-to-RTMP streaming (`broadcaster`)                                                     |
-| OBS Studio with obs-websocket v5      | `obs` role, obs-controller module, stats/chat dashboards                                    |
+| OBS Studio with obs-websocket v5      | `obs` role, obs module, stats/chat dashboards                                    |
 | TLS reverse proxy                     | production control server (`wss://` / `https://` are required for tokens + session cookies) |
 
 For a local checkout with the bundled binaries, override their paths explicitly with `ENCODER_BIN` and `SRTLA_SEND_BIN` (see [Command-line reference](#12-command-line-reference)).
@@ -196,7 +196,7 @@ docker compose up -d --build
 ```
 
 - **server** — the control server (`Dockerfile`, image `majkl/irlctrl-control`), UI on `:8090`.
-- **obs-client** — `client.ts --role obs`, using the `obs-controller` module to connect to host OBS (`ws://host.docker.internal:4455`).
+- **obs-client** — `client.ts --role obs`, using the `obs` module to connect to host OBS (`ws://host.docker.internal:4455`).
 - **relay** — `client.ts --role relay`, bonds SRT out via `srtla_send` (`Dockerfile.device`, image `majkl/irlctrl-device`).
 - **encoder** — `client.ts --role encoder`, runs `ceracoder`/GStreamer and sends SRT to the relay; same device image, different role + `ENCODER_BIN`.
 - **broadcaster** — `client.ts --role broadcaster`, runs the `client/modules/broadcaster` receiver/publisher; configure RTMP destinations in device settings and expose its SRTLA receiver on UDP `5001`.
@@ -395,7 +395,7 @@ Pipelines can be imported from GitHub:
 
 ### 7.3 OBS connection
 
-_Connection to OBS Studio used by the obs-controller module. The module is restarted after saving._
+_Connection to OBS Studio used by the obs module. The module is restarted after saving._
 - **OBS WebSocket URL** — e.g. `ws://127.0.0.1:4455`.
 - **OBS password** — the password configured in OBS Studio (Settings → General/Stream). Leave blank to keep the current one.
 
@@ -455,7 +455,7 @@ Every option an encoder exposes (wizard step, encoder card, settings):
 
 ## 10. OBS Studio module & low-bitrate switcher
 
-The **obs-controller** module owns the [obs-websocket](https://github.com/obsproject/obsproject/obs-websocket) (v5) connection to a paired OBS Studio instance and forwards its events into the device event stream. Configure it in **Settings → OBS connection** (URL + password; the module is restarted after saving). Its module config form offers:
+The **obs** module owns the [obs-websocket](https://github.com/obsproject/obsproject/obs-websocket) (v5) connection to a paired OBS Studio instance and forwards its events into the device event stream. Configure it in **Settings → OBS connection** (URL + password; the module is restarted after saving). Its module config form offers:
 
 | Option                               | Meaning                                                                 |
 | ------------------------------------ | ----------------------------------------------------------------------- |
@@ -608,7 +608,7 @@ Every flag has an environment-variable counterpart. Resolution order: **CLI flag
 
 ### 12.3 Module-specific settings
 
-OBS connection fields are owned by `obs-controller` and can be supplied through `OBS_URL` / `OBS_PASSWORD` or the device setup and settings pages. Broadcaster outputs, ffmpeg profiles, and SRTLA receiver settings are owned by `client/modules/broadcaster`; there is no separate client entrypoint or transport.
+OBS connection fields are owned by `obs` and can be supplied through `OBS_URL` / `OBS_PASSWORD` or the device setup and settings pages. Broadcaster outputs, ffmpeg profiles, and SRTLA receiver settings are owned by `client/modules/broadcaster`; there is no separate client entrypoint or transport.
 
 ---
 

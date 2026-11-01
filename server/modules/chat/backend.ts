@@ -23,7 +23,7 @@ import {
     chatSpecsFromConfig,
 } from "./config";
 import { ChatProvider } from "./providers/base";
-import { chatOverlayRoutes } from "./overlay-server";
+import { chatOverlayRoutes } from "./overlay_server";
 import { KickChatProvider } from "./providers/kick";
 import { TiktokChatProvider } from "./providers/tiktok";
 import { TwitchChatProvider } from "./providers/twitch";

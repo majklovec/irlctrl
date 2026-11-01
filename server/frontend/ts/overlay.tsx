@@ -18,7 +18,7 @@ import {
 	assetUrl,
 	overlayElementView,
 	sceneElementsView,
-} from "./overlay-render";
+} from "./overlay_render";
 import "../css/overlay.css";
 
 interface RuntimeState {

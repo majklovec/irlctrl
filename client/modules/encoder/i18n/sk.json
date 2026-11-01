@@ -98,5 +98,8 @@
     "act.encoder.bitrate_low": "Bitrate 1,5 Mb/s",
     "act.encoder.bitrate_high": "Bitrate 6 Mb/s",
     "act.encoder.start": "Spustiť enkodér",
-    "act.encoder.stream_stop": "Zastaviť stream"
+    "act.encoder.stream_stop": "Zastaviť stream",
+    "role.encoder": "enkodér",
+    "setup.role.encoder": "Enkodér",
+    "setup.role.encoder_tag": "Zachytáva GStreamer pipeline a odosiela ho cez SRT"
 }

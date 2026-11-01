@@ -27,7 +27,7 @@ WORKDIR /app
 # (`bun server/backend/server.ts`): modules are discovered by a runtime scan
 # of client/modules + server/modules and dynamically imported (the server
 # validates dashboards against the device modules too), and the web UI is
-# bundled at startup via scripts/gen-modules.ts + Bun.build.
+# bundled at startup via scripts/gen_modules.ts + Bun.build.
 COPY --from=builder /app/package.json /app/bun.lock ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/client ./client
@@ -39,7 +39,7 @@ COPY --from=builder /app/scripts ./scripts
 # Mithril). Without it Bun defaults to react/jsx-dev-runtime, which isn't a dep.
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
-# generated/ is gitignored and regenerated at startup (scripts/gen-modules.ts) —
+# generated/ is gitignored and regenerated at startup (scripts/gen_modules.ts) —
 # create it writable by the runtime user (1000:1000).
 RUN mkdir -p /app/generated && chown 1000:1000 /app/generated
 

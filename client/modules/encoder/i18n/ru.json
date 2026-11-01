@@ -98,5 +98,8 @@
     "act.encoder.bitrate_low": "Битрейт 1,5 Мбит/с",
     "act.encoder.bitrate_high": "Битрейт 6 Мбит/с",
     "act.encoder.start": "Запустить энкодер",
-    "act.encoder.stream_stop": "Остановить стрим"
+    "act.encoder.stream_stop": "Остановить стрим",
+    "role.encoder": "энкодер",
+    "setup.role.encoder": "Энкодер",
+    "setup.role.encoder_tag": "Захватывает pipeline GStreamer и отправляет его по SRT"
 }

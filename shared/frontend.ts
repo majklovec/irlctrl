@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { CLIENT_PAGES, SERVER_PAGES } from "./frontend-pages";
+import { CLIENT_PAGES, SERVER_PAGES } from "./frontend_pages";
 import { appPath, MODULE_ROOTS, PAGE_DIRS } from "./paths";
 import { isCompiledBinary } from "./util";
 
@@ -85,7 +85,7 @@ export async function createFrontend() {
             );
         }
     } else {
-        await Bun.$`bun scripts/gen-modules.ts`.quiet();
+        await Bun.$`bun scripts/gen_modules.ts`.quiet();
         const entries = frontendPageEntries();
         const result = await Bun.build({
             entrypoints: entries.map((entry) => entry.path),

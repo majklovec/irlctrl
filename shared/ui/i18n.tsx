@@ -22,7 +22,7 @@ import {
 	LANGUAGES,
 	type Language,
 } from "../languages";
-import { setLogTranslator } from "../logMessages";
+import { setLogTranslator } from "../log_messages";
 import type { MithrilJSXComponent } from "./jsx";
 
 export type { Language };

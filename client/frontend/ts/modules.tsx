@@ -1,7 +1,7 @@
 /**
  * Universal settings module framework.
  *
- * Each device module (encoder, obs-controller, ...) provides a
+ * Each device module (encoder, obs, ...) provides a
  * modules/<id>/settings.tsx that default-exports a ModuleDef owning its own
  * card body, visibility rules and configuration parameters. The framework
  * registers every def from the build-time manifest
@@ -12,15 +12,15 @@
  */
 import m from "mithril";
 import SETTINGS_MANIFEST from "../../../generated/modules.settings";
-import { registerLogWording } from "../../../shared/logMessages";
+import { registerLogWording } from "../../../shared/log_messages";
 import { errorMessage } from "../../../shared/util";
 import type { ModulesView, Settings } from "../../../shared/ui/types";
 import { Card } from "../../../shared/ui/components/ui";
 import { t } from "../../../shared/ui/i18n";
 import type { RpcClient } from "../../../shared/ui/services/rpc";
-import type { ModuleContext, ModuleDef } from "../../../shared/ui/module-contracts";
+import type { ModuleContext, ModuleDef } from "../../../shared/ui/module_contracts";
 
-export type { ModuleContext, ModuleDef } from "../../../shared/ui/module-contracts";
+export type { ModuleContext, ModuleDef } from "../../../shared/ui/module_contracts";
 
 interface moduleState {
 	message: string;
@@ -50,7 +50,7 @@ export function registerModule(def: ModuleDef): void {
 
 /**
  * Register every settings card found in the build-time manifest (one static
- * import per modules/<id>/settings.tsx, emitted by scripts/gen-modules.ts).
+ * import per modules/<id>/settings.tsx, emitted by scripts/gen_modules.ts).
  * The core names no module by id — adding a module with a settings.tsx
  * registers it here automatically (regeneration happens before the bundle).
  */
@@ -78,7 +78,7 @@ export function refreshDevice(input: {
 		const ctx = contextFor(def);
 		// Only refresh modules that will actually render; a hidden module's
 		// draft is irrelevant and its refresh may assume a module view that
-		// does not exist for this role (e.g. obs-controller on a relay).
+		// does not exist for this role (e.g. obs on a relay).
 		if (!def.visible(ctx)) continue;
 		def.refresh?.(ctx);
 	}

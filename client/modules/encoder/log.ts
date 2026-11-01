@@ -3,7 +3,7 @@ import {
     type LogWording,
     logTranslate,
     wording,
-} from "../../../shared/logMessages";
+} from "../../../shared/log_messages";
 
 const repoImported = (p: Record<string, unknown>) =>
     logTranslate("mlog.done.repo_imported", { repository: p.repository });

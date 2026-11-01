@@ -19,8 +19,9 @@ cases.
 │   └── modules/              # device modules (run on the box, serve a role)
 │       ├── README.md         # this file
 │       ├── encoder/
-│       ├── srtla/
-│       ├── obs-controller/
+│       ├── relay/
+│       ├── combined/         # role-only module (relay + encoder)
+│       ├── obs/
 │       ├── broadcaster/
 │       └── ssh/
 ├── server/                   # the control server
@@ -46,7 +47,7 @@ that serve its role.
 
 A module ships:
 -   `backend.ts` — default-exports a `BackendModule` (see
-    [`shared/module-contract.ts`](../shared/module-contract.ts)). Runs in Bun on
+    [`shared/module_contract.ts`](../shared/module_contract.ts)). Runs in Bun on
     the host: **no** mithril/DOM. It parses its own CLI arguments
     (`shared/args`), owns its persisted sections, validates its own RPC
     parameters (`shared/params`) and reaches the process only through the
@@ -55,11 +56,11 @@ A module ships:
     dashboard widget or a setup step need one; a settings-only module like
     `ssh` ships none). Default-exports a `FrontendModule` /
     `ChannelWidgetModule` (see
-    [`shared/ui/module-contracts.ts`](../shared/ui/module-contracts.ts)),
+    [`shared/ui/module_contracts.ts`](../shared/ui/module_contracts.ts)),
     or an array of them. Runs in the browser; **no** backend imports.
 -   `types.ts` — the module's own types, including its wire shapes (status
     fragment, method results, events). It may import core-owned _types_
-    (`ModuleCore` from `client/backend/module-core`, the core
+    (`ModuleCore` from `client/backend/module_core`, the core
     wire vocabulary in `shared/types`: `Status`, `DeviceSummary`, `SetupInfo`,
     `Settings`); it must not import another module. Cross-module services use
     named runtime capabilities; consumers type only the capability surface
@@ -68,7 +69,7 @@ A module ships:
     (dashboard widget); side-effect-imported by `frontend.tsx` /
     `settings.tsx`.
 -   optional `settings.tsx` — a settings-page card (`ModuleDef`, see
-    `shared/ui/module-contracts.ts`).
+    `shared/ui/module_contracts.ts`).
 -   optional role contributions — `roleDefinitions` on the backend
     registration. The registry validates role IDs, picks the declared
     default, and sends setup-selectable metadata to the frontend so the role
@@ -82,10 +83,10 @@ A module ships:
 -   optional `pages/*.html` — module-owned page entry points, bundled with the
     shared frontend assets and served at the paths the backend declares in
     `pages`.
--   any number of private helpers (`switcher-engine.ts`, `routing.ts`, …).
+-   any number of private helpers (`switcher_engine.ts`, `routing.ts`, …).
 
 Modules may import the dependency-free helpers in `shared/` (`args`, `params`,
-`i18n`, `util`, `validate`, `logMessages`, `types`, `obs/client`). They must not
+`i18n`, `util`, `validate`, `log_messages`, `types`, `obs/client`). They must not
 import `client/backend/*` (except the `ModuleCore` type) nor `shared/ui/*`
 beyond the contracts, components, store, i18n and util helpers a card needs.
 
@@ -100,12 +101,13 @@ beyond the contracts, components, store, i18n and util helpers a card needs.
 | `enabledByDefault?`                | `false` keeps the slice disabled on a fresh device even on its roles (opt-in modules)                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `enabledByDefaultRoles?`           | roles that receive an enabled default when the module serves multiple roles                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `requireEnabled?`                  | reject the methods (409) while the slice is disabled                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `configKey?`                       | key of the slice under `settings.modules` (default `id`; `srtla` keeps its historical `relay` key)                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `configKey?`                       | key of the slice under `settings.modules` (default `id`)                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `legacyConfigKeys?`                | former slice keys of a renamed module; a stored legacy slice is adopted under `configKey` on load                                                                                                                                                                                                                                                                                                                                                                    |
 | `configDefaults?`                  | defaults of the slice, deep-merged under the stored values at every load (new fields backfill, stored values win)                                                                                                                                                                                                                                                                                                                                                                                         |
 | `secretFields?`                    | slice fields the status masks as `{ configured }`                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `methods`, `events`                | the RPC methods it answers and the events it emits (frozen API names)                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `dispatch(method, params)`         | handle one call: validate `params` (throw `ApiError` from `shared/params`), act, return the result                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `log?`                             | log wording (`methods`, `reads`, `sections`, `labels`) merged into `shared/logMessages`; a method listed in `methods` is recorded in the event log and its response carries `logged: true`                                                                                                                                                                                                                                                                                                                |
+| `log?`                             | log wording (`methods`, `reads`, `sections`, `labels`) merged into `shared/log_messages`; a method listed in `methods` is recorded in the event log and its response carries `logged: true`                                                                                                                                                                                                                                                                                                                |
 | `dependencies?`                    | ids that must `start()` first; also orders status, resume and stop (reverse)                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `bind?(core)`                      | receive the process bag at discovery, before start (a disabled module is still bound, so lazy objects can report "stopped")                                                                                                                                                                                                                                                                                                                                                                               |
 | `start({config, emit, log, core})` | bring the module up; `config` is its slice                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -135,7 +137,7 @@ beyond the contracts, components, store, i18n and util helpers a card needs.
 `config.json` = the core keys (`uuid`, `hostname`, `role`, `remoteUrl`,
 `remoteToken`, `color`, `language`, `autostart`, `modules`) plus every other
 top-level key verbatim as a module section in `core.state.data`. A module reads
-and mutates its own sections (`data.srtla`, `data.encoder`, …)
+and mutates its own sections (`data.relay`, `data.encoder`, …)
 and calls `core.saveState()`; runtime state (pids, counters) stays in module
 variables. The per-module settings slices (`settings.modules[<configKey>]`)
 are seeded from `roles` + `configDefaults` when setup completes and backfilled
@@ -235,7 +237,7 @@ that depend on the device's live state. The registry calls it with the device's
 `status` on every status push, so the result tracks the device:
 
 ```ts
-// client/modules/obs-controller/backend.ts — one mute button per live audio source
+// client/modules/obs/backend.ts — one mute button per live audio source
 dashboardActions: (status) => [
 	{ id: "stream-start", label: "act.obs.stream_start", icon: "▶", method: "obs.request", params: { requestType: "StartStream" } },
 	// …
@@ -260,9 +262,9 @@ status). Return `[]` to hide a module from the catalogue for a given status.
     `backend.ts` default export and validates it structurally (a malformed
     registration fails the boot with the module id). Compiled binaries use the
     generated `generated/modules.backend.ts` manifest instead.
--   **Frontend** — `scripts/gen-modules.ts` writes `generated/modules.frontend.ts`
+-   **Frontend** — `scripts/gen_modules.ts` writes `generated/modules.frontend.ts`
     and `generated/modules.settings.ts` (one static import per
-    `modules/<id>/frontend.tsx` / `settings.tsx`); `shared/ui/module-registry.ts`
+    `modules/<id>/frontend.tsx` / `settings.tsx`); `shared/ui/module_registry.ts`
     and `client/frontend/ts/modules.tsx` import those manifests — no Glob, no module
     ids in core source. Regenerated by `predev` / `gen:modules`.
 
@@ -274,7 +276,7 @@ frontend pages must stay free of module feature branches.
 
 | name           | provider | consumers | shape                                                                      |
 | -------------- | -------- | --------- | -------------------------------------------------------------------------- |
-| `stream.srtla` | srtla    | encoder   | `{ srtlaStatus(), startSrtla(), stopSrtla(), reloadSrtla(), target() }`    |
+| `stream.relay` | relay    | encoder   | `{ relayStatus(), startRelay(), stopRelay(), reloadRelay(), target() }`    |
 
 Capabilities are looked up by name; providers and consumers remain isolated
 and depend only on the runtime methods they use.
@@ -282,8 +284,8 @@ and depend only on the runtime methods they use.
 ## Ordering
 
 `resolveOrder` (in `shared/registry.ts`) topologically sorts modules by their
-`dependencies` (cycle-safe; ids visited alphabetically). Today: `srtla` →
-`encoder` → `obs-controller` → `ssh`. `startModules` / `stopModules`
+`dependencies` (cycle-safe; ids visited alphabetically). Today: `relay` →
+`encoder` → `combined` → `obs` → `ssh`. `startModules` / `stopModules`
 (reverse) / `moduleStatuses` / autostart all iterate that order.
 
 ## Adding a module

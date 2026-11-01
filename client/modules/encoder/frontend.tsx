@@ -26,7 +26,7 @@ import type {
 	DeviceDashboardWidget,
 	FrontendModule,
 	ModuleSetupStep,
-} from "../../../shared/ui/module-contracts";
+} from "../../../shared/ui/module_contracts";
 import {
 	formatBitrate,
 	inRange,
@@ -129,9 +129,9 @@ function encoderState(host: DeviceCard): EncoderCardState {
 }
 
 const EncoderIssueBadge = {
-	view: ({ attrs: { role, e, srtla } }) => {
+	view: ({ attrs: { role, e, relay } }) => {
 		if (!e.running) return <Badge text={t("dev.badge.stopped")} kind="off" />;
-		if (role === "combined" && !srtla?.running)
+		if (role === "combined" && !relay?.running)
 			return <Badge text={t("dev.badge.srtla_send_down")} kind="warn" />;
 		if (!e.pid && e.restarts)
 			return <Badge text={t("dev.badge.restarting")} kind="warn" />;
@@ -140,17 +140,17 @@ const EncoderIssueBadge = {
 } as MithrilJSXComponent<{
 	role: Role | undefined;
 	e: EncoderState;
-	srtla: SrtlaState | undefined;
+	relay: SrtlaState | undefined;
 }>;
 
 function hasEncoderIssue(
 	role: Role | undefined,
 	encoder: EncoderState,
-	srtla: SrtlaState | undefined,
+	relay: SrtlaState | undefined,
 ): boolean {
 	return (
 		!encoder.running ||
-		(role === "combined" && !srtla?.running) ||
+		(role === "combined" && !relay?.running) ||
 		(!encoder.pid && !!encoder.restarts)
 	);
 }
@@ -364,11 +364,11 @@ const encoderSummaryColumns = [
 		header: () => t("mgmt.th.stream"),
 		cell: (device: DeviceSummary) => {
 			if (!device.online) return "—";
-			const { encoder, srtla, activeLinks } = device as EncoderDeviceSummary;
+			const { encoder, relay, activeLinks } = device as EncoderDeviceSummary;
 			if (!encoder) return "—";
-			if (hasEncoderIssue(device.role, encoder, srtla))
+			if (hasEncoderIssue(device.role, encoder, relay))
 				return (
-					<EncoderIssueBadge role={device.role} e={encoder} srtla={srtla} />
+					<EncoderIssueBadge role={device.role} e={encoder} relay={relay} />
 				);
 			if (activeLinks === 0)
 				return <Badge text={t("dev.badge.no_links")} kind="warn" />;
@@ -588,7 +588,7 @@ function streamButtons(host: DeviceCard, stopMethod: string): m.Children {
 	const canStop =
 		!!status &&
 		(status.state.encoder.running ||
-			(status.role === "combined" && status.state.srtla.running));
+			(status.role === "combined" && status.state.relay.running));
 	return (
 		<Actions>
 			<Button
@@ -697,10 +697,10 @@ function ceracoderControls(host: DeviceCard): m.Children {
 // ----------------------------------------------------------------------
 const stateBadge = ({
 	role,
-	state: { encoder, srtla },
+	state: { encoder, relay },
 }: EncoderStatus): m.Vnode =>
-	hasEncoderIssue(role, encoder, srtla) ? (
-		<EncoderIssueBadge role={role} e={encoder} srtla={srtla} />
+	hasEncoderIssue(role, encoder, relay) ? (
+		<EncoderIssueBadge role={role} e={encoder} relay={relay} />
 	) : (
 		<Badge text={t("dev.badge.streaming")} kind="on" />
 	);

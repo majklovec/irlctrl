@@ -13,7 +13,7 @@
 //   * unbundled (bun server/backend/server.ts, dev, tests): read from disk —
 //     the core file plus a scan of modules/*/i18n/;
 //   * compiled binaries (bun build --compile): the build-time manifest
-//     generated/i18n.ts (scripts/gen-modules.ts) inlines every catalog, as a
+//     generated/i18n.ts (scripts/gen_modules.ts) inlines every catalog, as a
 //     flat binary cannot scan a directory.
 //
 // The browser loads the same merged catalogs on demand from /i18n/<lang>.json
@@ -33,7 +33,7 @@ import {
     isLanguage,
     type Language,
 } from "./languages";
-import { setLogTranslator } from "./logMessages";
+import { setLogTranslator } from "./log_messages";
 import { appPath, CORE_I18N_DIR, MODULE_ROOTS } from "./paths";
 import { isCompiledBinary } from "./util";
 

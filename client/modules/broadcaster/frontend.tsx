@@ -11,7 +11,7 @@ import {
 } from "../../../shared/ui/components/ui";
 import { card, type DeviceCard } from "../../../shared/ui/device/store";
 import { t } from "../../../shared/ui/i18n";
-import type { FrontendModule } from "../../../shared/ui/module-contracts";
+import type { FrontendModule } from "../../../shared/ui/module_contracts";
 import type { DeviceSummary } from "../../../shared/types";
 import log from "./log";
 import { SRTLA_CUSTOM_SERVICE, srtlaService } from "./services";

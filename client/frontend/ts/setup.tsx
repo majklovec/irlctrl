@@ -19,8 +19,8 @@ import {
 	Select,
 } from "../../../shared/ui/components/ui";
 import { languageOptions, setLanguage, t } from "../../../shared/ui/i18n";
-import type { ModuleSetupStep } from "../../../shared/ui/module-contracts";
-import { setupStepsForRole } from "../../../shared/ui/module-registry";
+import type { ModuleSetupStep } from "../../../shared/ui/module_contracts";
+import { setupStepsForRole } from "../../../shared/ui/module_registry";
 import { RpcClient, socketUrl } from "../../../shared/ui/services/rpc";
 import { HOSTNAME_PATTERN, mountPage, setHeaderColor } from "../../../shared/ui/util";
 

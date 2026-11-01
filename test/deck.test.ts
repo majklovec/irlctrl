@@ -59,10 +59,10 @@ describe("dashboard action catalogue (status.actions)", () => {
         ).map((a) => a.key);
         expect(keys).toContain(dashboardActionKey("encoder", "stop"));
         // Disabled SRTLA module → neither relay nor modem actions.
-        expect(keys).not.toContain(dashboardActionKey("srtla", "reconfigure"));
-        expect(keys).not.toContain(dashboardActionKey("srtla", "reload"));
+        expect(keys).not.toContain(dashboardActionKey("relay", "reconfigure"));
+        expect(keys).not.toContain(dashboardActionKey("relay", "reload"));
         // not enabled at all (no slice) → no actions
-        expect(keys.some((k) => k.startsWith("obs-controller."))).toBe(false);
+        expect(keys.some((k) => k.startsWith("obs."))).toBe(false);
     });
 
     test("respects the module's roles and the method role overrides", () => {
@@ -72,7 +72,7 @@ describe("dashboard action catalogue (status.actions)", () => {
             status("relay", { encoder: true, relay: true }),
         ).map((a) => a.key);
         expect(relay.some((k) => k.startsWith("encoder."))).toBe(false);
-        expect(relay).toContain(dashboardActionKey("srtla", "stop"));
+        expect(relay).toContain(dashboardActionKey("relay", "stop"));
         // stream.stop is a combined-only method (methodRoles)
         const encoder = dashboardActionsFor(
             status("encoder", { encoder: true }),
@@ -103,7 +103,7 @@ describe("dashboard action catalogue (status.actions)", () => {
     });
 
     test("emits one mute/toggle action per live OBS audio source", () => {
-        const st = status("combined", { "obs-controller": true });
+        const st = status("combined", { "obs": true });
         // status() spreads module fragments to the top level, so the source
         // list lands at status.obs.audioSources (as the device reports it).
         st.obs = {
@@ -116,11 +116,11 @@ describe("dashboard action catalogue (status.actions)", () => {
         const keys = actions.map((a) => a.key);
         // base actions are always present
         expect(keys).toContain(
-            dashboardActionKey("obs-controller", "stream-start"),
+            dashboardActionKey("obs", "stream-start"),
         );
         // one toggle per source, keyed by the raw source name
         expect(keys).toContain(
-            dashboardActionKey("obs-controller", "mute:Desktop"),
+            dashboardActionKey("obs", "mute:Desktop"),
         );
         // a muted source offers to UNMUTE (sets inputMuted:false, 🔊)
         const desktop = actions.find((a) => a.id === "mute:Desktop")!;
@@ -144,14 +144,14 @@ describe("dashboard action catalogue (status.actions)", () => {
     });
 
     test("emits one scene-switch action per OBS scene", () => {
-        const st = status("combined", { "obs-controller": true });
+        const st = status("combined", { "obs": true });
         st.obs = { scenes: ["Live", "BRB"], currentScene: "Live" };
         const scenes = dashboardActionsFor(st).filter((a) =>
             a.id.startsWith("scene:"),
         );
         expect(scenes.map((a) => a.key)).toEqual([
-            dashboardActionKey("obs-controller", "scene:Live"),
-            dashboardActionKey("obs-controller", "scene:BRB"),
+            dashboardActionKey("obs", "scene:Live"),
+            dashboardActionKey("obs", "scene:BRB"),
         ]);
         // the live scene is marked
         expect(scenes.map((a) => a.icon)).toEqual(["🔴", "🎬"]);
@@ -168,7 +168,7 @@ describe("dashboard action catalogue (status.actions)", () => {
     test("the OBS factory hides mute buttons when no sources are reported", () => {
         // enabled module with no obs fragment → base actions only
         const keys = dashboardActionsFor(
-            status("combined", { "obs-controller": true }),
+            status("combined", { "obs": true }),
         ).map((a) => a.id);
         expect(keys).toContain("stream-start");
         expect(keys.some((k) => k.startsWith("mute:"))).toBe(false);
@@ -369,7 +369,7 @@ describe("deck widget config", () => {
         const ok = layout({ deviceId: "mine", actionId: "encoder.stop" });
         const orphan = layout(
             { deviceId: "mine", actionId: "encoder.stop" },
-            { deviceId: "mine", actionId: "obs-controller.stream-start" },
+            { deviceId: "mine", actionId: "obs.stream-start" },
         );
         const foreign = layout({
             deviceId: "theirs",
@@ -382,7 +382,7 @@ describe("deck widget config", () => {
             (config: Record<string, string>, strict: boolean) => () =>
                 validateDeviceWidgetConfig("deck", config, context(strict));
         expect(validate(ok, true)).not.toThrow();
-        expect(validate(orphan, true)).toThrow("obs-controller.stream-start");
+        expect(validate(orphan, true)).toThrow("obs.stream-start");
         expect(validate(foreign, true)).toThrow("Device not available: theirs");
         expect(validate(silent, true)).not.toThrow();
         expect(validate(gone, true)).toThrow("Device not available: gone");
@@ -398,6 +398,6 @@ describe("deck widget config", () => {
             orphanedButtons(parseButtons(orphan[DECK_FIELD]), (id) =>
                 id === "mine" ? st.actions : undefined,
             ).map((b) => b.actionId),
-        ).toEqual(["obs-controller.stream-start"]);
+        ).toEqual(["obs.stream-start"]);
     });
 });

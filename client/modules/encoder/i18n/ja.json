@@ -98,5 +98,8 @@
     "act.encoder.bitrate_low": "ビットレート 1.5 Mbps",
     "act.encoder.bitrate_high": "ビットレート 6 Mbps",
     "act.encoder.start": "エンコーダー開始",
-    "act.encoder.stream_stop": "ストリーム停止"
+    "act.encoder.stream_stop": "ストリーム停止",
+    "role.encoder": "エンコーダー",
+    "setup.role.encoder": "エンコーダー",
+    "setup.role.encoder_tag": "GStreamer パイプラインをキャプチャし、SRT で送信します"
 }

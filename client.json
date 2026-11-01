@@ -40,7 +40,7 @@
     "encoder": {
       "enabled": true
     },
-    "obs-controller": {
+    "obs": {
       "autoSwitch": true,
       "enabled": true,
       "failBehaviour": "pause",
@@ -84,7 +84,7 @@
       "enabled": true
     }
   },
-  "srtla": {
+  "relay": {
     "listenPort": "6000",
     "mode": "enhanced",
     "quality": true,

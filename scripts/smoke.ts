@@ -13,7 +13,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PAGES } from "../shared/frontend-pages";
+import { PAGES } from "../shared/frontend_pages";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const SERVER_ENTRY = "server/backend/server.ts";

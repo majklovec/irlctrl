@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { defaultModules, ensureModuleSlices } from "../client/backend/modules";
 import { fromConfig, state } from "../client/backend/state";
-import type { SwitcherConfig } from "../client/modules/obs-controller/types";
+import type { SwitcherConfig } from "../client/modules/obs/types";
 
 /**
  * The switcher rides on the OBS module slice; the module's `configDefaults`
  * complete every stored slice (`ensureModuleSlices`), so the obs slice must
  * always end up with a complete switcher set.
  */
-const OBS = "obs-controller";
+const OBS = "obs";
 
 /** The switcher fields as they live on the obs module slice (plus the obs
  * url, to prove the non-switcher obs fields survive the backfill). */
@@ -124,6 +124,26 @@ describe("switcher fields fold into the obs module slice", () => {
                     "number",
                 );
                 expect(obs.obsSourceName).toBe("SRTLA-1");
+            },
+        );
+    });
+
+    test("a slice stored under a module's legacy key is adopted on load", () => {
+        withStoredModules(
+            {
+                "obs-controller": {
+                    enabled: true,
+                    obsUrl: "ws://1.2.3.4:4455",
+                    obsPassword: "pw",
+                },
+            },
+            () => {
+                const modules = ensureModuleSlices("relay");
+                const obs = modules[OBS] as unknown as ObsSwitcherFields;
+                expect(obs.enabled).toBe(true);
+                expect(obs.obsUrl).toBe("ws://1.2.3.4:4455");
+                expectCompleteObsSwitcher("legacy", obs);
+                expect(modules["obs-controller"]).toBeUndefined();
             },
         );
     });

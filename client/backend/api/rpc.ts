@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { originAllowed, text, upgradeRequired } from "../../../shared/http";
-import { socketMessage } from "../../../shared/socket-message";
+import { socketMessage } from "../../../shared/socket_message";
 import { errorMessage } from "../../../shared/util";
 import { ALLOWED_ORIGINS } from "../config";
 import { handleRequest } from "../methods";

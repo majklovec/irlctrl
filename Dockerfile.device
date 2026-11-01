@@ -112,7 +112,7 @@ COPY --from=builder /app/scripts ./scripts
 # Mithril). Without it Bun defaults to react/jsx-dev-runtime, which isn't a dep.
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
-# generated/ is gitignored and regenerated at startup (scripts/gen-modules.ts) —
+# generated/ is gitignored and regenerated at startup (scripts/gen_modules.ts) —
 # create it writable by the runtime user (1000:1000).
 RUN mkdir -p /app/generated && chown 1000:1000 /app/generated
 

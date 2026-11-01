@@ -6,7 +6,7 @@ import { Badge, Page, TitleWithBack } from "../../../shared/ui/components/ui";
 import { LogCard } from "../../../shared/ui/device/log";
 import { act, connectDevice, st } from "../../../shared/ui/device/store";
 import { t } from "../../../shared/ui/i18n";
-import { moduleCards } from "../../../shared/ui/module-registry";
+import { moduleCards } from "../../../shared/ui/module_registry";
 import { mountPage } from "../../../shared/ui/util";
 
 // The store's websocket is lazy (surfaces like the dashboard import the store

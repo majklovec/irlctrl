@@ -3,17 +3,17 @@
  * devices — the encoder process (./encoder), pipeline and audio-source
  * discovery (./sources), pipeline files and GitHub pipeline repositories
  * (./pipelines, ./pipeline-repos), and combined streaming: srtla_send (the
- * srtla module, through the `stream.srtla` capability) fed by the encoder.
+ * srtla module, through the `stream.relay` capability) fed by the encoder.
  *
  * Persisted sections: `encoder` (last used config), `ceracoder`,
  * `pipelineRepositories`. Live process state is module-local.
  */
-import type { ModuleCore } from "../../backend/module-core";
+import type { ModuleCore } from "../../backend/module_core";
 import type {
     BackendModule,
     ModuleStartContext,
     Params,
-} from "../../../shared/module-contract";
+} from "../../../shared/module_contract";
 import {
     ApiError,
     optionalInt,
@@ -31,7 +31,7 @@ import { parseBitrates, parseEncoderConfig } from "./params";
 import {
     removePipelineRepository,
     syncPipelineRepository,
-} from "./pipeline-repos";
+} from "./pipeline_repos";
 import {
     createPipelineFile,
     deletePipelineFile,
@@ -40,10 +40,10 @@ import {
     updatePipelineFile,
 } from "./pipelines";
 import { listAudioSources, listPipelines } from "./sources";
-import type { EncoderConfig, SrtlaCapability, SrtlaTarget } from "./types";
+import type { EncoderConfig, RelayCapability, SrtlaTarget } from "./types";
 
-const srtla = (): SrtlaCapability =>
-    core.requireCapability<SrtlaCapability>("stream.srtla");
+const srtla = (): RelayCapability =>
+    core.requireCapability<RelayCapability>("stream.relay");
 
 /** Map a start failure to a status code: conflicts 409, bad pipeline / audio 400, else 500. */
 async function startChecked<T>(start: () => Promise<T>): Promise<T> {
@@ -74,32 +74,32 @@ async function startCombined(
     await encoder().validate(cfg); // fail before touching srtla_send
 
     const { listenPort, remoteHost, remotePort } = target;
-    const s = srtla().srtlaStatus();
+    const s = srtla().relayStatus();
     if (
         s.running &&
         (s.listenPort !== listenPort ||
             s.remoteHost !== remoteHost ||
             s.remotePort !== remotePort)
     )
-        await srtla().stopSrtla();
-    if (!srtla().srtlaStatus().running)
-        await srtla().startSrtla(listenPort, remoteHost, remotePort);
+        await srtla().stopRelay();
+    if (!srtla().relayStatus().running)
+        await srtla().startRelay(listenPort, remoteHost, remotePort);
 
     try {
         await encoder().start({ ...cfg, host: "127.0.0.1", port: listenPort });
     } catch (e: unknown) {
-        await srtla().stopSrtla();
+        await srtla().stopRelay();
         throw e;
     }
 }
 
 async function stopCombined(): Promise<void> {
     await encoder().stop();
-    await srtla().stopSrtla();
+    await srtla().stopRelay();
 }
 
 const streamView = () => ({
-    srtla: srtla().srtlaStatus(),
+    srtla: srtla().relayStatus(),
     encoder: encoder().status(),
 });
 
@@ -304,18 +304,11 @@ const encoderModule: BackendModule<ModuleCore> = {
             order: 20,
             setupSelectable: true,
         },
-        {
-            id: "combined",
-            titleKey: "role.combined",
-            taglineKey: "setup.role.combined_tag",
-            order: 30,
-            setupSelectable: true,
-        },
     ],
     secretFields: [],
     roles: ["encoder", "combined"],
     methodRoles: { "stream.start": ["combined"], "stream.stop": ["combined"] },
-    dependencies: ["srtla"],
+    dependencies: ["relay"],
     methods: [
         "encoder.status",
         "encoder.start",
