@@ -4,6 +4,7 @@
  * page and dashboard widgets show the same content. */
 import "./styles.css";
 import m from "mithril";
+import { confirmDialog } from "../../../shared/ui/components/confirm";
 import { Icon, OutlineIcon } from "../../../shared/ui/components/icons";
 import {
 	Actions,
@@ -674,8 +675,15 @@ function interfacesCard(host: DeviceCard, status: RelayStatus): m.Vnode {
 
 // ----------------------------------------------------------------- modem panels
 
-function modemAction(host: DeviceCard, method: string, index: number): void {
-	if (method === "modems.reset" && !confirm(t("dev.reset_confirm", { index })))
+async function modemAction(
+	host: DeviceCard,
+	method: string,
+	index: number,
+): Promise<void> {
+	if (
+		method === "modems.reset" &&
+		!(await confirmDialog(t("dev.reset_confirm", { index }), { danger: true }))
+	)
 		return;
 	void host.act(`modem:${method}:${index}`, method, { index });
 }
@@ -696,7 +704,7 @@ function modemPanel(host: DeviceCard, modem: ModemInfo): m.Vnode {
 				host.busy.has(`modem:${method}:${modem.index}`) ||
 				!!currentStatus(host)?.state.relay.running
 			}
-			onclick={() => modemAction(host, method, modem.index)}
+			onclick={() => void modemAction(host, method, modem.index)}
 		/>
 	);
 	const connected = modem.state === "connected";

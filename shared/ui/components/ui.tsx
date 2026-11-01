@@ -1,6 +1,7 @@
 /* Shared building blocks (header, cards, badges, definition lists, bound form controls)
  * for Mithril JSX views. These helpers keep markup consistent between pages. */
 import m from "mithril";
+import { apiJson, apiTry } from "../api_client";
 import { APP_VERSION } from "../../../generated/version";
 import { LanguageSelect, t } from "../i18n";
 import type { MithrilJSXComponent } from "../jsx";
@@ -108,15 +109,12 @@ const ServerNavComponent: m.Component<{
 }> = {
 	oncreate() {
 		// The menu label is the session user's login name.
-		void fetch("/api/whoami")
-			.then((r) => (r.ok ? (r.json() as Promise<{ user?: string }>) : null))
-			.then((body) => {
-				if (body?.user) {
-					profile.username = body.user;
-					m.redraw();
-				}
-			})
-			.catch(() => {});
+		void apiTry<{ user?: string }>("/api/whoami").then((body) => {
+			if (body?.user) {
+				profile.username = body.user;
+				m.redraw();
+			}
+		});
 		// Close the menu on any click outside of it.
 		document.addEventListener("click", closeProfileMenu);
 	},
@@ -187,7 +185,7 @@ export const ServerNav = ServerNavComponent as MithrilJSXComponent<{
 /** Drop the session cookie, then back to the login page. */
 async function logout(): Promise<void> {
 	try {
-		await fetch("/api/logout", { method: "POST" });
+		await apiJson("/api/logout", { method: "POST" });
 	} finally {
 		location.replace("/login");
 	}

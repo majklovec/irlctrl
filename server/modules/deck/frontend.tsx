@@ -6,6 +6,7 @@
  * catalogues of every device. */
 import "./styles.css";
 import m from "mithril";
+import { confirmDialog } from "../../../shared/ui/components/confirm";
 import { Badge } from "../../../shared/ui/components/ui";
 import { t } from "../../../shared/ui/i18n";
 import type {
@@ -108,12 +109,12 @@ async function press(
 	const label = labelOf(r, button);
 	if (
 		r.action.confirm &&
-		!window.confirm(
+		!(await confirmDialog(
 			t("deck.confirm", {
 				label,
 				device: deviceLabel(r.device, button.deviceId),
 			}),
-		)
+		))
 	)
 		return;
 	run.inflight.add(index);

@@ -207,6 +207,7 @@
     "dash.widget_kick": "Canal de Kick",
     "dash.widget_not_configured": "Sin configurar: indica un canal",
     "ui.cancel": "Cancelar",
+    "ui.ok": "Aceptar",
     "dash.widget_settings": "Ajustes",
     "dash.rename": "Cambiar nombre",
     "dash.default_name": "Panel",

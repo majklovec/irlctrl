@@ -14,6 +14,7 @@
  *     pipeline editor page (/pipelines/…).
  */
 import m from "mithril";
+import { confirmDialog } from "../../../shared/ui/components/confirm";
 import { Icon } from "../../../shared/ui/components/icons";
 import {
 	Actions,
@@ -175,7 +176,11 @@ async function deletePipeline(
 	ctx: ModuleContext,
 	pipeline: Pipeline,
 ): Promise<void> {
-	if (!window.confirm(t("set.pipeline_delete_confirm", { id: pipeline.id })))
+	if (
+		!(await confirmDialog(t("set.pipeline_delete_confirm", { id: pipeline.id }), {
+			danger: true,
+		}))
+	)
 		return;
 	const response = await ctx.run(() =>
 		ctx.rpc.call<PipelinesPayload>("pipelines.delete", {

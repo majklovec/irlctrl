@@ -207,6 +207,7 @@
     "dash.widget_kick": "Kick-Kanal",
     "dash.widget_not_configured": "Nicht konfiguriert - Kanalnamen eingeben",
     "ui.cancel": "Abbrechen",
+    "ui.ok": "OK",
     "dash.widget_settings": "Einstellungen",
     "dash.rename": "Umbenennen",
     "dash.default_name": "Übersicht",

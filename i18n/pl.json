@@ -207,6 +207,7 @@
     "dash.widget_kick": "Kanał Kick",
     "dash.widget_not_configured": "Niez skonfigurowano - podaj nazwę kanału",
     "ui.cancel": "Anuluj",
+    "ui.ok": "OK",
     "dash.widget_settings": "Ustawienia",
     "dash.rename": "Zmień nazwę",
     "dash.default_name": "Pulpit",

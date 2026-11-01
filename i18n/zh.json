@@ -207,6 +207,7 @@
     "dash.widget_kick": "Kick 频道",
     "dash.widget_not_configured": "未配置 - 请填写频道名",
     "ui.cancel": "取消",
+    "ui.ok": "确定",
     "dash.widget_settings": "设置",
     "dash.rename": "重命名",
     "dash.default_name": "仪表板",

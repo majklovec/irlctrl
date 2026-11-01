@@ -258,6 +258,7 @@
     "dash.widget_kick": "Kick channel",
     "dash.widget_not_configured": "Not configured - set a channel name",
     "ui.cancel": "Cancel",
+    "ui.ok": "OK",
     "dash.widget_settings": "Settings",
     "dash.rename": "Rename",
     "dash.default_name": "Dashboard",

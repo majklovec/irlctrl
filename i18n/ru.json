@@ -207,6 +207,7 @@
     "dash.widget_kick": "Kick-канал",
     "dash.widget_not_configured": "Не настроено - укажите канал",
     "ui.cancel": "Отмена",
+    "ui.ok": "ОК",
     "dash.widget_settings": "Настройки",
     "dash.rename": "Переименовать",
     "dash.default_name": "Панель управления",

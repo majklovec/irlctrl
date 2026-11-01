@@ -6,6 +6,7 @@
  * fetched here, on demand, so the editor core knows nothing about chat.
  */
 import m from "mithril";
+import { apiTry } from "../../../shared/ui/api_client";
 import type { Vnode } from "mithril";
 import { Icon } from "../../../shared/ui/components/icons";
 import { t } from "../../../shared/ui/i18n";
@@ -51,36 +52,30 @@ let widgets: ChatWidgetRef[] = [];
 let loading: Promise<void> | null = null;
 
 function loadWidgets(): Promise<void> {
-	loading ??= fetch("/api/dashboards", { cache: "no-store" })
-		.then((res) => (res.ok ? res.json() : null))
-		.then(
-			(
-				body: {
-					dashboards?: Array<{
-						id: string;
-						widgets?: Array<{
-							id: string;
-							type: string;
-							name: string;
-							config?: Record<string, string>;
-						}>;
-					}>;
-				} | null,
-			) => {
-				widgets = [];
-				for (const d of body?.dashboards ?? [])
-					for (const w of d.widgets ?? [])
-						if (w.type === "chat")
-							widgets.push({
-								dashboardId: d.id,
-								widgetId: w.id,
-								name: w.name,
-								token: w.config?.token ?? "",
-							});
-				m.redraw();
-			},
-		)
-		.catch(() => undefined)
+	loading ??= apiTry<{
+		dashboards?: Array<{
+			id: string;
+			widgets?: Array<{
+				id: string;
+				type: string;
+				name: string;
+				config?: Record<string, string>;
+			}>;
+		}>;
+	}>("/api/dashboards")
+		.then((body) => {
+			widgets = [];
+			for (const d of body?.dashboards ?? [])
+				for (const w of d.widgets ?? [])
+					if (w.type === "chat")
+						widgets.push({
+							dashboardId: d.id,
+							widgetId: w.id,
+							name: w.name,
+							token: w.config?.token ?? "",
+						});
+			m.redraw();
+		})
 		.finally(() => {
 			loading = null;
 		});

@@ -2334,3 +2334,36 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
     font-size: 12px;
     color: var(--muted);
 }
+
+/* Modal dialog (components/confirm.tsx): a dimmed backdrop and a centred card. */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(2px);
+}
+.modal {
+    width: min(28rem, 100%);
+    background: var(--card-solid);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.25rem;
+    box-shadow: var(--shadow);
+}
+.modal-title {
+    margin: 0 0 0.5rem;
+    font-size: 1.05rem;
+}
+.modal-body {
+    margin: 0;
+    white-space: pre-line;
+}
+.modal-actions {
+    justify-content: flex-end;
+    margin-top: 1rem;
+}

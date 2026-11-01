@@ -3,6 +3,7 @@
  * pushed live over the shared feed websocket, and live widget data flows over the
  * control server's per-device viewer websockets (d/<id>/ws). */
 import m from "mithril";
+import { apiTry } from "../../../shared/ui/api_client";
 import type {
 	DeviceInfo,
 	DeviceSummary,
@@ -122,13 +123,9 @@ export const devices: { list: DeviceSummary[] | null } = { list: null };
 // One fetch per navigation; afterwards the feed's devices.changed pushes
 // keep the list (and the widgets' titles / badges) live.
 export async function refreshDevices(): Promise<void> {
-	try {
-		const res = await fetch("/api/devices", { cache: "no-store" });
-		if (!res.ok) throw new Error(`HTTP ${res.status}`);
-		applyDeviceList((await res.json()) as DeviceSummary[]);
-	} catch {
-		// keep the last known list; connectivity is also visible in the live widgets
-	}
+	// on failure keep the last known list; connectivity is also visible in the live widgets
+	const list = await apiTry<DeviceSummary[]>("/api/devices");
+	if (list) applyDeviceList(list);
 }
 
 /** Apply a devices.snapshot / devices.changed push to the shared list. */

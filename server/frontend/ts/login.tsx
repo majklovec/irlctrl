@@ -2,6 +2,7 @@
 
 import m from "mithril";
 import logoUrl from "../../../shared/assets/img/logo-irlctrl.png";
+import { apiJson } from "../../../shared/ui/api_client";
 import { Card, Field, Footer, Input } from "../../../shared/ui/components/ui";
 import { i18nReady, LanguageSelect, t } from "../../../shared/ui/i18n";
 import { mountPage } from "../../../shared/ui/util";
@@ -25,18 +26,9 @@ async function submit(ev: Event): Promise<void> {
 	state.error = false;
 	m.redraw();
 	try {
-		const res = await fetch("/api/login", {
-			method: "POST",
-			headers: { "content-type": "application/json" },
-			body: JSON.stringify({
-				username: state.username,
-				password: state.password,
-			}),
+		await apiJson("/api/login", {
+			body: { username: state.username, password: state.password },
 		});
-		if (!res.ok) {
-			state.error = true;
-			return;
-		}
 		location.replace("/");
 	} catch {
 		state.error = true;

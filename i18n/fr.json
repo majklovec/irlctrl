@@ -207,6 +207,7 @@
     "dash.widget_kick": "Chaîne Kick",
     "dash.widget_not_configured": "Non configuré - indiquez un canal",
     "ui.cancel": "Annuler",
+    "ui.ok": "OK",
     "dash.widget_settings": "Réglages",
     "dash.rename": "Renommer",
     "dash.default_name": "Tableau de bord",

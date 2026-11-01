@@ -16,6 +16,7 @@
  * generated manifest (generated/modules.settings.ts) — no per-module imports.
  */
 import m from "mithril";
+import { confirmDialog } from "../../../shared/ui/components/confirm";
 import { Actions, Button, Field, Input } from "../../../shared/ui/components/ui";
 import { t } from "../../../shared/ui/i18n";
 import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
@@ -53,7 +54,12 @@ function adopt(status: SshStatus | null): void {
 }
 
 async function setRunning(ctx: ModuleContext, run: boolean): Promise<void> {
-	if (!run && !window.confirm(t("dev.ssh_stop_confirm", { user: draft.user })))
+	if (
+		!run &&
+		!(await confirmDialog(t("dev.ssh_stop_confirm", { user: draft.user }), {
+			danger: true,
+		}))
+	)
 		return;
 	// Start also persists the card's user (and the enabled flag) on the
 	// device — there is no separate Save button.
@@ -68,9 +74,12 @@ async function setRunning(ctx: ModuleContext, run: boolean): Promise<void> {
 
 /** Stage a fresh generated password (it lands on the account at SSH start). */
 async function newPassword(ctx: ModuleContext): Promise<void> {
-	if (!window.confirm(t("dev.ssh_reset_confirm", { user: draft.user }))) {
+	if (
+		!(await confirmDialog(t("dev.ssh_reset_confirm", { user: draft.user }), {
+			danger: true,
+		}))
+	)
 		return;
-	}
 	const result = await ctx.run(() =>
 		ctx.rpc.call<{ user: string; password: string }>("ssh.reset_password", {
 			user: draft.user,

@@ -1,5 +1,6 @@
 /* Profile page: change the login password and manage the device tokens. */
 import m from "mithril";
+import { apiJson } from "../../../shared/ui/api_client";
 import { Icon } from "../../../shared/ui/components/icons";
 import {
 	Actions,
@@ -64,13 +65,11 @@ function mergeTokens(loaded: Token[], current: Token[] | undefined): Token[] {
  * invitation history when this user is an admin. */
 async function load(): Promise<void> {
 	try {
-		const res = await fetch("/api/profile");
-		if (!res.ok) return;
-		const body = (await res.json()) as {
+		const body = await apiJson<{
 			username: string;
 			admin: boolean;
 			tokens: Token[];
-		};
+		}>("/api/profile");
 		state.username = body.username;
 		state.admin = body.admin;
 		state.tokens = mergeTokens(body.tokens, state.tokens);
@@ -84,9 +83,7 @@ async function load(): Promise<void> {
 /** GET /api/invitations → the admin's invitation history (newest first). */
 async function loadInvitations(): Promise<void> {
 	try {
-		const res = await fetch("/api/invitations");
-		if (!res.ok) return;
-		const body = (await res.json()) as { invitations: Invitation[] };
+		const body = await apiJson<{ invitations: Invitation[] }>("/api/invitations");
 		state.invitations = body.invitations;
 		render();
 	} catch {
@@ -99,10 +96,8 @@ function mintInvite(): void {
 	if (state.creatingInvite) return;
 	state.creatingInvite = true;
 	render();
-	void fetch("/api/invitations", { method: "POST" })
-		.then(async (res) => {
-			if (res.ok) await loadInvitations();
-		})
+	void apiJson("/api/invitations", { method: "POST" })
+		.then(() => loadInvitations())
 		.catch(() => {})
 		.finally(() => {
 			state.creatingInvite = false;
@@ -128,20 +123,14 @@ function changePassword(): void {
 	state.pwOk = false;
 	state.pwError = false;
 	render();
-	void fetch("/api/profile/password", {
-		method: "POST",
-		headers: { "content-type": "application/json" },
-		body: JSON.stringify({ current: state.current, new: state.next }),
+	void apiJson("/api/profile/password", {
+		body: { current: state.current, new: state.next },
 	})
-		.then(async (res) => {
-			if (res.ok) {
-				state.pwOk = true;
-				state.current = "";
-				state.next = "";
-				state.confirm = "";
-			} else {
-				state.pwError = true;
-			}
+		.then(() => {
+			state.pwOk = true;
+			state.current = "";
+			state.next = "";
+			state.confirm = "";
 		})
 		.catch(() => {
 			state.pwError = true;
@@ -158,10 +147,8 @@ function addToken(): void {
 	if (state.tokenBusy) return;
 	state.tokenBusy = true;
 	render();
-	void fetch("/api/profile/tokens", { method: "POST" })
-		.then(async (res) => {
-			if (!res.ok) throw new Error();
-			const token = ((await res.json()) as { token: Token }).token;
+	void apiJson<{ token: Token }>("/api/profile/tokens", { method: "POST" })
+		.then(({ token }) => {
 			state.tokens = [...(state.tokens ?? []), token];
 		})
 		.catch(() => {})
@@ -176,9 +163,9 @@ function removeToken(id: number): void {
 	if (state.removing) return;
 	state.removing = true;
 	render();
-	void fetch(`/api/profile/tokens/${id}`, { method: "DELETE" })
-		.then((res) => {
-			if (res.ok && state.tokens)
+	void apiJson(`/api/profile/tokens/${id}`, { method: "DELETE" })
+		.then(() => {
+			if (state.tokens)
 				state.tokens = state.tokens.filter((tk) => tk.id !== id);
 		})
 		.catch(() => {})

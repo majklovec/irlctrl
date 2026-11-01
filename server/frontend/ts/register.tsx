@@ -4,6 +4,7 @@
 
 import m from "mithril";
 import logoUrl from "../../../shared/assets/img/logo-irlctrl.png";
+import { ApiError, apiJson } from "../../../shared/ui/api_client";
 import { Card, Field, Footer, Input } from "../../../shared/ui/components/ui";
 import { i18nReady, LanguageSelect, t } from "../../../shared/ui/i18n";
 import { mountPage } from "../../../shared/ui/util";
@@ -53,11 +54,8 @@ function valid(): boolean {
  * failure the field stays visible — safer than silently allowing sign-up. */
 async function loadRegisterStatus(): Promise<void> {
 	try {
-		const res = await fetch("/api/register/status");
-		if (res.ok) {
-			const body = (await res.json()) as { needsInvite: boolean };
-			state.needsInvite = body.needsInvite;
-		}
+		const body = await apiJson<{ needsInvite: boolean }>("/api/register/status");
+		state.needsInvite = body.needsInvite;
 	} catch {
 		/* keep needsInvite true */
 	} finally {
@@ -80,29 +78,21 @@ async function submit(ev: Event): Promise<void> {
 	state.error = false;
 	m.redraw();
 	try {
-		const res = await fetch("/api/register", {
-			method: "POST",
-			headers: { "content-type": "application/json" },
-			body: JSON.stringify({
+		await apiJson("/api/register", {
+			body: {
 				username: state.username.trim(),
 				password: state.password,
 				invite: state.invite.trim(),
-			}),
+			},
 		});
-		if (!res.ok) {
-			let message = "register.error";
-			try {
-				const body = (await res.json()) as { error?: string };
-				if (body.error) message = mapError(body.error);
-			} catch {
-				/* keep the generic message */
-			}
-			state.error = message;
-			return;
-		}
 		location.replace("/login?registered=1");
-	} catch {
-		state.error = "register.error";
+	} catch (err) {
+		// the server's error string maps to a translated message; anything
+		// else (network, non-JSON) keeps the generic one
+		state.error =
+			err instanceof ApiError && err.status > 0 && !err.message.startsWith("HTTP ")
+				? mapError(err.message)
+				: "register.error";
 	} finally {
 		state.busy = false;
 		m.redraw();

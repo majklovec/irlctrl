@@ -207,6 +207,7 @@
     "dash.widget_kick": "Kickチャンネル",
     "dash.widget_not_configured": "未設定 - チャンネル名を入力してください",
     "ui.cancel": "キャンセル",
+    "ui.ok": "OK",
     "dash.widget_settings": "設定",
     "dash.rename": "名前を変更",
     "dash.default_name": "ダッシュボード",
