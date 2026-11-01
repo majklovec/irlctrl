@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import type { createFrontend } from "../../../shared/frontend";
-import type { createAuth } from "../auth";
+import type { createAuth } from "./auth";
 import { authenticatedHandler } from "./authenticated";
 
 type Auth = Awaited<ReturnType<typeof createAuth>>;

@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { randomUUID } from "node:crypto";
-import { checkColor } from "../../shared/params";
+import { checkColor } from "../../../shared/params";
 import {
     deviceWidgetConfigFields,
     initWidgetHub,
@@ -10,21 +10,21 @@ import {
     validateDeviceWidgetConfig,
     WIDGET_SIZES,
     widgetConfigFields,
-} from "../../shared/registry";
+} from "../../../shared/registry";
 import type {
     ServerDashboard,
     ServerDashboardWidget,
     Status,
     WidgetConfigField,
-} from "../../shared/contracts/wire";
-import { configFieldName } from "../../shared/contracts/wire";
+} from "../../../shared/contracts/wire";
+import { configFieldName } from "../../../shared/contracts/wire";
 import {
     dashboardsTopic,
     event,
     LOCAL_USER,
     type Publish,
     WIDGET_HUB_TOPIC,
-} from "./contracts";
+} from "../contracts";
 
 const DASH_PATH_RE = /^\/api\/dashboards(?:\/([\w.-]{1,64}))?$/;
 const DASH_COLUMNS = 12;

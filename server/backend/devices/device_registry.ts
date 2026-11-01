@@ -1,18 +1,18 @@
-import { text } from "../../shared/http";
-import { isLanguage, type Language, translate } from "../../shared/i18n";
+import { text } from "../../../shared/http";
+import { isLanguage, type Language, translate } from "../../../shared/i18n";
 import {
     LOG_MAX,
     type LogEntry,
     type LogEvent,
     type LogLevel,
-} from "../../shared/log_messages";
+} from "../../../shared/log_messages";
 import {
     dashboardActionsFor,
     isRegisteredRole,
-} from "../../shared/registry";
-import type { DeviceInfo, DeviceSummary, Status } from "../../shared/contracts/wire";
-import { parseJsonObject, textOf } from "../../shared/util";
-import { COLOR_RE, type Role } from "../../shared/validate";
+} from "../../../shared/registry";
+import type { DeviceInfo, DeviceSummary, Status } from "../../../shared/contracts/wire";
+import { parseJsonObject, textOf } from "../../../shared/util";
+import { COLOR_RE, type Role } from "../../../shared/validate";
 import {
     devicesTopic,
     event,
@@ -22,7 +22,7 @@ import {
     type Socket,
     viewersTopic,
     type WsData,
-} from "./contracts";
+} from "../contracts";
 
 const STALE_DEVICE_MS = 5 * 60 * 1000;
 const PRUNE_INTERVAL_MS = 30 * 1000;

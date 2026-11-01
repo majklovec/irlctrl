@@ -5,13 +5,14 @@
  *
  * The core brings up the generic services (persistent state, event log, the
  * local web UI / WebSocket API, the outbound control-server link, autostart)
- * and drives the modules discovered in modules/<id>/backend.ts. Everything
- * device-specific — bonding uplinks, modems, srtla_send, the encoder, OBS,
- * sshd — is a module: it parses its own CLI arguments, owns its config
- * sections and answers its own RPC methods (see modules/README.md).
+ * and drives the modules discovered in client/modules/<id>/backend.ts.
+ * Everything device-specific is a module: it parses its own CLI arguments,
+ * owns its config sections and answers its own RPC methods (see
+ * client/modules/README.md). The core names no module.
  *
  * The web UI/API is always on (`--host`/`--port`); the role comes from
- * `--role` (default `relay`) and decides which modules serve the box.
+ * `--role` (default: the role a module marks `default`) and decides which
+ * modules serve the box.
  *
  * Core client files (client/backend/):
  *   config.ts       core CLI arguments and derived settings
@@ -28,9 +29,9 @@
  *
  * Usage:
  *   bun client/backend/client.ts [--config /path/to/config.json] [--dry-run]
- *   bun client/backend/client.ts --port 8085 --role combined
+ *   bun client/backend/client.ts --port 8085 --role <role>
  *   CONTROL_SERVER_TOKEN=secret bun client/backend/client.ts --remote wss://ctl.example.com/device
- * Module options (e.g. --pipelines, --srtla-reload) are documented in the README.
+ * Module options are documented in the README.
  */
 
 import { flag } from "../../shared/args";

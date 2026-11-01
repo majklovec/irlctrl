@@ -1,4 +1,4 @@
-import type { createAuth } from "../auth";
+import type { createAuth } from "./auth";
 
 type Auth = Awaited<ReturnType<typeof createAuth>>;
 

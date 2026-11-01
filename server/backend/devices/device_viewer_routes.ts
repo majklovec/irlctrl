@@ -6,11 +6,11 @@ import {
     upgradeRequired,
 } from "../../../shared/http";
 import { socketMessage } from "../../../shared/socket_message";
-import type { createAuth } from "../auth";
+import type { createAuth } from "../auth/auth";
 import { ID_RE, LOCAL_USER, type WsData } from "../contracts";
-import type { createDevices } from "../devices";
+import type { createDevices } from "./device_registry";
 import { socketAdapter } from "../socket";
-import { unauthenticatedResponse } from "./authenticated";
+import { unauthenticatedResponse } from "../auth/authenticated";
 
 type Auth = Awaited<ReturnType<typeof createAuth>>;
 type Devices = ReturnType<typeof createDevices>;

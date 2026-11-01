@@ -7,10 +7,10 @@ import {
     upgradeRequired,
 } from "../../../shared/http";
 import { modulePage } from "../../../shared/registry";
-import type { createAuth } from "../auth";
+import type { createAuth } from "../auth/auth";
 import { ID_RE, LOCAL_USER } from "../contracts";
-import type { createDevices } from "../devices";
-import { authenticatedHandler } from "./authenticated";
+import type { createDevices } from "./device_registry";
+import { authenticatedHandler } from "../auth/authenticated";
 
 type Auth = Awaited<ReturnType<typeof createAuth>>;
 type Devices = ReturnType<typeof createDevices>;

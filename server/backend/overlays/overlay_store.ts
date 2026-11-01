@@ -5,7 +5,7 @@
  *   - the editor live feed (the shared `dashboards:<user>` topic), and
  *   - the runtime feed (`overlay-runtime:<user>`) consumed by the
  *     token-authenticated OBS runtime pages (their WS is wired in
- *     plugins/overlays.ts).
+ *     overlay_routes.ts).
  *
  * Runtime pages authenticate with the project token (chat-overlay pattern:
  * `?token=…`, constant-time compare) — no cookie, because a Browser Source
@@ -31,14 +31,14 @@ import {
     parseVariableValueInput,
     type Scene,
     type Variable,
-} from "../../shared/overlay";
-import { event, type Publish } from "./contracts";
+} from "../../../shared/overlay";
+import { event, type Publish } from "../contracts";
 
 // single ApiError class shared with shared/overlay.ts so `instanceof`
 // classification (400 vs 500) works across the module boundary
-export { ApiError } from "../../shared/params";
+export { ApiError } from "../../../shared/params";
 
-import { ApiError } from "../../shared/params";
+import { ApiError } from "../../../shared/params";
 
 interface Store {
     project: OverlayProject;

@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
 import type { createFrontend } from "../../../shared/frontend";
 import { faviconResponse, notFound, text } from "../../../shared/http";
-import type { createAuth } from "../auth";
+import type { createAuth } from "./auth";
 
 type Auth = Awaited<ReturnType<typeof createAuth>>;
 type Frontend = Awaited<ReturnType<typeof createFrontend>>;

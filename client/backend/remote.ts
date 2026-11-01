@@ -15,7 +15,7 @@
  *     use), the response comes back over this socket.
  *
  * On connect a hello is sent first:
- *   { "type": "hello", "id": "<device uuid>", "role": "relay|encoder|combined",
+ *   { "type": "hello", "id": "<device uuid>", "role": "<role id>",
  *     "hostname": "<display name>", "color": "<header color>", "token"?: "<token>" }
  * The token is also sent as `Authorization: Bearer <token>` on the upgrade.
  *

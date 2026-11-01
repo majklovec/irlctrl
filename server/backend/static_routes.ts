@@ -10,10 +10,10 @@
 
 import staticPlugin from "@elysia/static";
 import { Elysia } from "elysia";
-import { i18nResponse } from "../../../shared/http";
-import { catalog } from "../../../shared/i18n";
-import { appPath, ASSETS_DIR } from "../../../shared/paths";
-import { isCompiledBinary } from "../../../shared/util";
+import { i18nResponse } from "../../shared/http";
+import { catalog } from "../../shared/i18n";
+import { appPath, ASSETS_DIR } from "../../shared/paths";
+import { isCompiledBinary } from "../../shared/util";
 
 // These assets are tiny and path-stable, so revalidate on every request to
 // match the previous hand-rolled `no-cache` behavior.

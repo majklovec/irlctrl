@@ -12,7 +12,7 @@ served as transparent runtime pages that OBS loads with a **Browser Source**.
 - Built-in elements: [`server/modules/overlay_elements/`](../server/modules/overlay_elements/);
   the chat element lives in the chat module
   ([`server/modules/chat/overlay_elements.tsx`](../server/modules/chat/overlay_elements.tsx))
-- Server: [`server/backend/overlays.ts`](../server/backend/overlays.ts)
+- Server: [`server/backend/overlays/`](../server/backend/overlays/)
 
 ## OBS setup
 
@@ -143,7 +143,7 @@ persisted).
 ## Events
 
 Every mutation goes over REST and is fanned out to two WebSocket topics
-(see `feed`/`runtime` in [`server/backend/overlays.ts`](../server/backend/overlays.ts)):
+(see `feed`/`runtime` in [`server/backend/overlays/overlay_store.ts`](../server/backend/overlays/overlay_store.ts)):
 
 1. **Editor feed** — topic `dashboards:<user>` on the shared `WS /dashboards/ws`
    (cookie session). Delivered to every open editor tab, so multiple editors

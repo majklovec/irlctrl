@@ -189,7 +189,7 @@ device it names — one widget (offered once per dashboard) can drive any number
 of the user's devices. The widget never names a module — it reads each
 device's **action catalogue** off `status.actions`, which the control server
 merges from the registrations of every module that is enabled on that device
-and serves its role (`server/backend/devices.ts` → `dashboardActionsFor` in
+and serves its role (`server/backend/devices/device_registry.ts` → `dashboardActionsFor` in
 `shared/registry.ts`).
 
 Declare actions on the backend registration; nothing else is needed:

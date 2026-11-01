@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
-import type { createAuth } from "../auth";
-import type { createDevices } from "../devices";
-import { authenticatedHandler } from "./authenticated";
+import type { createAuth } from "../auth/auth";
+import type { createDevices } from "./device_registry";
+import { authenticatedHandler } from "../auth/authenticated";
 
 type Auth = Awaited<ReturnType<typeof createAuth>>;
 type Devices = ReturnType<typeof createDevices>;

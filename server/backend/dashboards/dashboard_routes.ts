@@ -2,16 +2,16 @@ import { Elysia } from "elysia";
 import type { createFrontend } from "../../../shared/frontend";
 import { originAllowed, text, upgradeRequired } from "../../../shared/http";
 import { widgetHubSnapshot } from "../../../shared/registry";
-import type { createAuth } from "../auth";
+import type { createAuth } from "../auth/auth";
 import {
     dashboardsTopic,
     devicesTopic,
     event,
     WIDGET_HUB_TOPIC,
 } from "../contracts";
-import type { createDashboards } from "../dashboards";
-import type { createDevices } from "../devices";
-import { authenticatedHandler, unauthenticatedResponse } from "./authenticated";
+import type { createDashboards } from "./dashboard_store";
+import type { createDevices } from "../devices/device_registry";
+import { authenticatedHandler, unauthenticatedResponse } from "../auth/authenticated";
 
 type Auth = Awaited<ReturnType<typeof createAuth>>;
 type Dashboards = ReturnType<typeof createDashboards>;

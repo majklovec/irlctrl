@@ -12,10 +12,10 @@
 import { Elysia } from "elysia";
 import type { createFrontend } from "../../../shared/frontend";
 import { upgradeRequired } from "../../../shared/http";
-import type { createAuth } from "../auth";
+import type { createAuth } from "../auth/auth";
 import { event } from "../contracts";
-import { ApiError, type Overlays, overlayRuntimeTopic } from "../overlays";
-import { authenticatedHandler } from "./authenticated";
+import { ApiError, type Overlays, overlayRuntimeTopic } from "./overlay_store";
+import { authenticatedHandler } from "../auth/authenticated";
 
 type Auth = Awaited<ReturnType<typeof createAuth>>;
 type Frontend = Awaited<ReturnType<typeof createFrontend>>;

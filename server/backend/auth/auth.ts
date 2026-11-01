@@ -5,9 +5,9 @@ import {
     scryptSync,
     timingSafeEqual,
 } from "node:crypto";
-import { text } from "../../shared/http";
-import { openDatabase } from "./db";
-import { LOCAL_USER } from "./contracts";
+import { text } from "../../../shared/http";
+import { openDatabase } from "../db";
+import { LOCAL_USER } from "../contracts";
 
 export async function createAuth({
     noAuth,
