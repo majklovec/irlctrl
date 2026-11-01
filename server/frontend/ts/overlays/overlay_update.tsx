@@ -1,11 +1,12 @@
 /** @jsx m */
 /*
  * Overlay editor page (/overlays/edit/<scene id>/):
- *   toolbar:    undo/redo + one "add" button per registered element type
+ *   toolbar:    undo/redo + one "add" button per registered element type,
+ *               and the runtime URL (dialog: the OBS source URL, copy/rotate)
  *   center:     zoomable canvas — select / drag / resize / nudge / snap
  *   right rail: the layers list, each row expanding into the element's
  *               inspector (transform, props, bindings)
- *   footers:    variables (live), runtime URL (copy/rotate)
+ *   footers:    variables (live)
  *
  * The scene renders through the SHARED overlay render views so the preview is
  * pixel-identical to the OBS runtime; the editor only layers a selection box +
@@ -24,7 +25,7 @@ import m from "mithril";
 import { canvasArea } from "./editor/canvas";
 import { onKey } from "./editor/keyboard";
 import { inspector } from "./editor/layers";
-import { runtimePanel } from "./editor/runtime_panel";
+import { runtimeDialog } from "./editor/runtime_dialog";
 import { editorTitle, editorToolbar } from "./editor/toolbar";
 import { variablesPanel } from "./editor/variables";
 import {
@@ -62,11 +63,9 @@ const overlayUpdatePage: m.Component = {
 				<div class="ov-layout">
 					<div class="ov-center">{canvasArea()}</div>
 					<div class="ov-right">{inspector()}</div>
-					<div class="ov-footers">
-						{variablesPanel()}
-						{runtimePanel()}
-					</div>
+					<div class="ov-footers">{variablesPanel()}</div>
 				</div>
+				{state.runtimeDialogOpen ? runtimeDialog() : null}
 			</Page>
 		);
 	},

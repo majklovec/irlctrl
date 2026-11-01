@@ -66,6 +66,8 @@ export const state = {
     expandedElementId: null as string | null,
     /** Text element being inline-edited on the canvas. */
     editingElementId: null as string | null,
+    /** Runtime URL dialog (opened from the toolbar icon) is open. */
+    runtimeDialogOpen: false,
 };
 
 /** Page URLs: the list and one editor page per scene (linkable). */

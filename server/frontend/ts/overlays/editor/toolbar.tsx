@@ -55,9 +55,16 @@ export function editorToolbar(): m.Vnode {
 					onclick={() => (state.zoom = clamp(state.zoom * 1.25, 0.1, 3))}
 				/>
 			</span>
+			<span class="ov-toolsep" aria-hidden="true" />
+			<IconButton
+				label={t("overlay.runtime_url")}
+				title={t("overlay.runtime_url")}
+				icon={<Icon name="view" class="role-icon" />}
+				onclick={() => (state.runtimeDialogOpen = true)}
+			/>
 		</Toolbar>
 	);
-}
+	}
 
 /** Editor header: back-to-list link + "Overlays / <scene>". */
 export function editorTitle(): m.Vnode {

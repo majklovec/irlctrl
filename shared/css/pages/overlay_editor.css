@@ -580,7 +580,7 @@ identically here and on the runtime page */
 .ov-footers {
     grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: 2fr 1fr 2fr 1fr;
+    grid-template-columns: 1fr;
     gap: 12px;
 }
 .ov-bottom {
@@ -662,6 +662,13 @@ identically here and on the runtime page */
     border: 1px solid var(--border);
     border-radius: 6px;
     font-size: 12px;
+}
+/* in the runtime URL dialog the URL must be fully readable — let it wrap
+instead of truncating */
+.modal .ov-runtime .ov-url {
+    white-space: normal;
+    word-break: break-all;
+    line-height: 1.4;
 }
 .ov-upload {
     display: inline-block;
