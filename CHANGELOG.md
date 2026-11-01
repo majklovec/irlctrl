@@ -1,3 +1,10 @@
+# [2.2.0](https://github.com/majklovec/irlctrl/compare/v2.1.0...v2.2.0) (2026-11-01)
+
+
+### Features
+
+* implement runtime URL dialog with copy and rotate functionality ([5e4ec81](https://github.com/majklovec/irlctrl/commit/5e4ec81c309a31a75047997e4667a5fb66843966))
+
 # [2.1.0](https://github.com/majklovec/irlctrl/compare/v2.0.0...v2.1.0) (2026-11-01)
 
 
