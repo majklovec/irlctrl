@@ -390,18 +390,12 @@ function editForm({
 				t("overlay.alert_event"),
 				<input
 					type="text"
-					list="ov-alert-variables"
 					value={event}
 					placeholder={t("overlay.alert_event_hint")}
 					oninput={set("event")}
 				/>,
 				sp,
 			)}
-			<datalist id="ov-alert-variables">
-				{variables.map((v) => (
-					<option key={v.name} value={v.name} />
-				))}
-			</datalist>
 			<div class="ov-grid2">
 				{bindField(
 					e,

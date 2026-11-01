@@ -199,7 +199,7 @@ export function elementProps(e: OverlayElement): m.Vnode {
 				/>
 			</label>
 
-			<div class="ov-grid2">
+			<div class="ov-grid4">
 				{[
 					[
 						"transform.x",

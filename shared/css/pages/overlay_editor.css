@@ -3,7 +3,7 @@
 /* ── OBS overlay editor (/overlays/) ─────────────────────────────────── */
 .ov-layout {
     display: grid;
-    grid-template-columns: 1fr 290px;
+    grid-template-columns: 1fr 380px;
     grid-template-rows: 1fr auto;
     gap: 12px;
     /* 192px = header + the icon toolbar strip + main paddings + footer */
@@ -354,7 +354,7 @@ identically here and on the runtime page */
 .ov-inspect {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 6px;
 }
 /* row-header controls: visibility/lock toggles + z-order arrows */
 .ov-zhead {
@@ -498,15 +498,15 @@ identically here and on the runtime page */
 .ov-el-body {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 8px 8px 10px 24px;
+    gap: 6px;
+    padding: 6px 6px 8px 20px;
     border-left: 2px solid var(--border);
     margin: 2px 0 4px 15px;
 }
 .ov-field {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
     font-size: 13px;
     color: var(--muted);
 }
@@ -514,21 +514,31 @@ identically here and on the runtime page */
 .ov-field select {
     width: 100%;
 }
+/* compact controls in the inspector */
+.ov-inspect input,
+.ov-inspect select {
+    padding: 0.1rem;
+}
 .ov-field input[type="checkbox"] {
     width: auto;
 }
 .ov-field input[type="color"] {
     padding: 2px;
-    height: 32px;
+    height: 28px;
 }
 .ov-field input[type="range"] {
     accent-color: var(--accent);
-    padding: 0.5rem 0;
+    padding: 0.15rem 0;
 }
 .ov-grid2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    gap: 4px;
+}
+.ov-grid4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
 }
 .ov-gridcell {
     min-width: 0;

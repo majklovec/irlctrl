@@ -8,7 +8,7 @@
  * specific to a single element type.)
  */
 import m from "mithril";
-import type { Vnode } from "mithril";
+import type { Vnode, VnodeDOM } from "mithril";
 import type { Variable } from "../../overlay";
 import { t } from "../i18n";
 import type { ElementProps, OverlayElement } from "./element";
@@ -83,12 +83,24 @@ function varSelect(
 	);
 }
 
+/** Selects and checkboxes offer a fixed choice set, so a variable binding
+ * has no meaning for them — no toggle is shown and any stored binding is
+ * ignored. */
+function isBindable(control: Vnode): boolean {
+	const dom = control as VnodeDOM;
+	if (typeof dom.tag !== "string") return true;
+	if (dom.tag === "select") return false;
+	if (dom.tag === "input") return (dom.attrs as { type?: string } | null)?.type !== "checkbox";
+	return true;
+}
+
 /** One inspector field with an inline binding toggle. `title` is the label
  * shown above the control, `path` the full binding key the schema accepts
  * (`props.<name>`, `transform.<field>`, or `visible`) and `input` the
  * field's normal control. While the small, label-less checkbox on the right
  * (see `bindToggle`) is checked, `input` is replaced by a select over the
- * project variables. */
+ * project variables. The toggle is omitted for selects and checkboxes
+ * (see `isBindable`). */
 export function bindField(
 	e: OverlayElement,
 	path: string,
@@ -96,7 +108,8 @@ export function bindField(
 	input: Vnode,
 	props: Pick<ElementProps, "mutate" | "variables">,
 ): Vnode {
-	const bound = e.bindings[path] !== undefined;
+	const bindable = isBindable(input);
+	const bound = bindable && e.bindings[path] !== undefined;
 	return (
 		<div class="ov-field">
 			<span class="ov-lbl">{title}</span>
@@ -104,7 +117,7 @@ export function bindField(
 				<div class="ov-field-ctl">
 					{bound ? varSelect(e, path, props.variables, { mutate: props.mutate }) : input}
 				</div>
-				{bindToggle(e, path, props)}
+				{bindable ? bindToggle(e, path, props) : null}
 			</div>
 		</div>
 	);
