@@ -80,28 +80,23 @@ export interface Overlays {
      */
     runtimeScene(token: string, slug: string): RuntimeScene | null;
     /**
-     * Token-authenticated revalue for the per-variable URL that the editor's
-     * Variables panel copies (`/overlay/variables/:id?token=…&value=…`).
-     * `null` when the token is unknown (the route 404s — token probes must not
-     * leak project existence, same as the runtime page); a missing/bad value
-     * throws ApiError(400), an unknown id ApiError(404).
-     */
-    setVariableByToken(
-        token: string,
-        variableId: string,
-        value: unknown,
-    ): { status: number; body: Record<string, unknown> } | null;
-    /**
-    * Token-authenticated clear for the per-variable URL without a value
-    * (`/overlay/variables/:id?token=…`) — the runtime page uses this to
-    * empty a trigger variable once the alert it fired has finished. The
-    * value becomes the type's neutral empty value: number → 0, boolean →
-    * false, color → "#000000", string → "". `null` when the token is
-    * unknown (404, no existence leak); an unknown id throws ApiError(404).
+    * Token-authenticated batch revalue for the variables endpoint
+    * (`GET /overlay/variables?token=…&<name>=<value>…` and
+    * `POST /overlay/variables?token=…` with a JSON
+    * `{<name>: value|null}` body). `values` maps variable name → raw
+    * value;
+    * `null`/`""` empties the variable to its type's neutral value
+    * (number → 0, boolean → false, color → "#000000", string → "") — the
+    * runtime page uses that to empty a trigger variable once the alert it
+    * fired has finished. The whole batch lands in one commit and one
+    * `overlays.variables` frame. `null` when the token is unknown (the
+    * route 404s — token probes must not leak project existence, same as
+    * the runtime page); an empty batch or an unknown name throws
+    * ApiError(404/400), a bad value ApiError(400).
     */
-    clearVariableByToken(
+    setVariablesByToken(
        token: string,
-       variableId: string,
+       values: Record<string, unknown>,
     ): { status: number; body: Record<string, unknown> } | null;
 }
 
@@ -190,9 +185,25 @@ export function createOverlays({
         return store;
     }
 
-    /** Re-validate the whole project (cross references included). */
+    /** Re-validate the whole project (cross references included). On a
+     * failure the in-memory project is rolled back to its pre-call state so a
+     * rejected mutation can't wedge the store, and the raw validation Error
+     * is raised as a 400 so API clients see the reason instead of a 500. */
     const revalidate = (project: OverlayProject): void => {
-        normalizeProject(project as unknown as Record<string, unknown>);
+        const snapshot = JSON.stringify(project);
+        try {
+            normalizeProject(project as unknown as Record<string, unknown>);
+        } catch (e) {
+            try {
+                Object.assign(project, JSON.parse(snapshot));
+            } catch {
+                // best effort only — the throw below is what matters
+            }
+            throw new ApiError(
+                e instanceof Error ? e.message : "overlay project is invalid",
+                400,
+            );
+        }
     };
 
     const commit = (owner: string, store: Store): void => {
@@ -375,6 +386,22 @@ export function createOverlays({
                     if (!isRecord(body.element))
                         throw new ApiError("element is required");
                     const element = parseElementInput(body.element);
+                    const store = stores.get(user);
+                    if (!store) throw new ApiError("Unknown scene", 404);
+                    // checked up front so a stale id fails with a 400 naming
+                    // the problem, not a 500 deep in revalidate
+                    if (
+                        Object.values(element.bindings ?? {}).some(
+                            (b) =>
+                                !store.project.variables.some(
+                                    (v) => v.id === b.variableId,
+                                ),
+                        )
+                    )
+                        throw new ApiError(
+                            "element binds to an unknown variable",
+                            400,
+                        );
                     const scene = mutateScene(user, id, (s) => {
                         const i = s.elements.findIndex(
                             (e) => e.id === element.id,
@@ -662,34 +689,61 @@ export function createOverlays({
         return null;
     }
 
-    function setVariableByToken(
+    function setVariablesByToken(
         token: string,
-        variableId: string,
-        value: unknown,
+        values: Record<string, unknown>,
     ): { status: number; body: Record<string, unknown> } | null {
         const hit = runtimeStore(token);
         if (!hit) return null;
         const [user, store] = hit;
-        const variable = store.project.variables.find(
-            (v) => v.id === variableId,
-        );
-        if (!variable) throw new ApiError("Unknown variable", 404);
-        if (value === undefined || value === null)
-            throw new ApiError("value query parameter is required", 400);
-        // URL values are strings; map "true"/"false" onto boolean
-        // variables (the parser's !!truthy would turn "false" into true)
-        let raw: unknown = value;
-        if (variable.type === "boolean" && typeof value === "string") {
-            const s = value.trim().toLowerCase();
-            if (s === "true" || s === "1") raw = true;
-            else if (s === "false" || s === "0") raw = false;
-            else
-                throw new ApiError(
-                    `${variable.name} must be true or false`,
-                );
+        // names are unique per project, so the token endpoint keys on
+        // names (ids are internal, names are what triggers match on)
+        const names = Object.keys(values);
+        if (names.length === 0)
+            throw new ApiError("at least one variable is required", 400);
+        for (const name of names) {
+            const variable = store.project.variables.find(
+                (v) => v.name === name,
+            );
+            if (!variable) throw new ApiError("Unknown variable", 404);
+            const raw = values[name];
+            // null/"" clears: the type's neutral empty value
+            if (raw === null || raw === undefined || raw === "") {
+                variable.value =
+                    variable.type === "number"
+                        ? 0
+                        : variable.type === "boolean"
+                          ? false
+                          : variable.type === "color"
+                            ? "#000000"
+                            : "";
+                continue;
+            }
+            // querystring values are strings; map "true"/"false" onto
+            // boolean variables (the parser's !!truthy would turn
+            // "false" into true)
+            let value: unknown = raw;
+            if (variable.type === "boolean" && typeof raw === "string") {
+                const s = raw.trim().toLowerCase();
+                if (s === "true" || s === "1") value = true;
+                else if (s === "false" || s === "0") value = false;
+                else
+                    throw new ApiError(
+                        `${variable.name} must be true or false`,
+                    );
+            }
+            variable.value = parseVariableValueInput(value, variable);
         }
-        variable.value = parseVariableValueInput(raw, variable);
-        revalidate(store.project);
+        // one commit + one frame for the whole batch, so a live scene
+        // sees all the new values in a single render
+        try {
+            revalidate(store.project);
+        } catch {
+            // a revalidation failure here means internal cross-references are
+            // off in a way the caller can't have caused — keep the token
+            // endpoint's no-leak contract (bare 404, like an unknown variable)
+            throw new ApiError("Not found", 404);
+        }
         commit(user, store);
         feed(user, "overlays.variables", {
             variables: store.project.variables,
@@ -697,30 +751,10 @@ export function createOverlays({
         runtime(user, "overlays.variables", {
             variables: store.project.variables,
         });
-        return { status: 200, body: { ok: true, variable } };
-    }
-
-    function clearVariableByToken(
-        token: string,
-        variableId: string,
-    ): { status: number; body: Record<string, unknown> } | null {
-        const hit = runtimeStore(token);
-        if (!hit) return null;
-        const variable =
-            hit[1].project.variables.find((v) => v.id === variableId);
-        if (!variable) throw new ApiError("Unknown variable", 404);
-        // each neutral literal parses straight to the type's neutral value
-        return setVariableByToken(
-            token,
-            variableId,
-            variable.type === "number"
-                ? "0"
-                : variable.type === "boolean"
-                  ? "false"
-                  : variable.type === "color"
-                    ? "#000000"
-                    : "",
-        );
+        return {
+            status: 200,
+            body: { ok: true, variables: store.project.variables },
+        };
     }
 
     return {
@@ -740,7 +774,6 @@ export function createOverlays({
                 assets: store.project.assets,
             };
         },
-        setVariableByToken,
-        clearVariableByToken,
+        setVariablesByToken,
     };
 }

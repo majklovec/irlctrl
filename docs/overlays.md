@@ -85,14 +85,20 @@ Project-scoped named values, edited in the editor's *Variables* footer.
   bound elements re-render live in the runtime page.
 - **Modify URL** — each row of the *Variables* footer shows a copy icon next
   to the name; it copies the variable's token URL
-  (`<origin>/overlay/variables/<id>?token=…`). Appending `&value=…` and
-  fetching the URL (browser, curl, script) sets the value — typed per
+  (`<origin>/overlay/variables?token=…&<name>=`). Completing the URL with a
+  value and fetching it (browser, curl, script) sets the value — typed per
   variable: `number` accepts finite numbers, `boolean` accepts `true`/`false`,
-  `color` accepts `#rrggbb`, `string` accepts anything. The fetch returns
-  `{"ok":true,"variable":{…}}` and fans out exactly like an in-editor edit
-  (editor feed + runtime feed, so a live scene re-renders). A missing token
-  or variable 404s; a bad value 400s. The token is a write credential for
-  that variable — treat the URL like a password.
+  `color` accepts `#rrggbb`, `string` accepts anything. Several variables can
+  be set in one fetch — append `<name2>=<value2>…` — and an empty value
+  (`<name>=`) empties the variable to its neutral value (0 / false /
+  `#000000` / ""). `POST /overlay/variables?token=…` accepts the same batch
+  as a JSON body (`{<name>: value|null}`, typed JSON values, `null`/`""`
+  empties). The
+  fetch returns `{"ok":true,"variables":[…]}` and fans out exactly like an
+  in-editor edit (editor feed + runtime feed, so a live scene re-renders) —
+  the whole batch in one frame. A missing token or variable 404s; a bad value
+  400s. The token is a write credential for the project's variables — treat
+  the URL like a password.
 
 ### Binding
 
@@ -173,13 +179,13 @@ Notes:
   server closes the WS with 1008).
 - Trigger-based elements (v1: the `Alert` element) key off **variable
   names**: when any variable is **revalued to a non-empty value** — by the
-  editor, the `/overlay/variables/<id>?token=…&value=…` endpoint, or the API —
+  editor, the `/overlay/variables` endpoint, or the API —
   the runtime page fires every alert whose trigger variable matches that
   variable's name. Empty values are never triggers, and a frame repeating the
   last fired value (a re-delivery) doesn't re-fire. Once an alert's duration
   has run, the runtime page **empties the trigger variable** the same way (the
-  token endpoint without `&value=`), so a burst of equal values — e.g. a
-  follower event redelivered — reads as a single trigger, not a loop of
+  token endpoint with an empty value: `<id>=`), so a burst of equal values —
+  e.g. a follower event redelivered — reads as a single trigger, not a loop of
   self-clearing alerts.
 
 ## URL binding
@@ -188,7 +194,8 @@ Notes:
 | ------------------------------------------ | -------------------------- | ------------------------------------------ |
 | `/overlays/`                               | cookie session             | the editor page                             |
 | `/overlay/<scene-slug>`                    | project token in `?token=` | the transparent runtime page (OBS Browser Source); a bad token renders a blank page |
-| `/overlay/variables/<id>?token=`           | project token              | one variable; with `&value=…` it revalues it, without `&value=` it empties it (the variable's neutral value: 0 / false / `#000000` / ""), returns the new variable in both cases |
+| `/overlay/variables?token=&<name>=<value>…`| project token              | revalue variables from the querystring (several `<name>=<value>` pairs per fetch; an empty value empties the variable to its neutral value: 0 / false / `#000000` / ""), returns the new variable list |
+| `POST /overlay/variables?token=`           | project token              | revalue variables from a JSON body `{<name>: value\|null}` (`null`/`""` empties), returns the new variable list |
 | `/overlay/<scene-slug>/ws?token=`          | project token              | the runtime live feed (WebSocket)           |
 | `/chat/<dashboardId>/<widgetId>?token=`    | per-widget token           | a chat widget's live page                   |
 

@@ -61,7 +61,7 @@ export const state = {
     newVariableType: "string",
     copied: false,
     /** Variable whose modify URL was just copied (icon turns green). */
-    copiedVariableId: null as string | null,
+    copiedVariableName: null as string | null,
     /** Element currently expanded in the inspector list (accordion). */
     expandedElementId: null as string | null,
     /** Text element being inline-edited on the canvas. */
@@ -121,14 +121,16 @@ export function runtimeUrl(s: Scene): string {
     );
 }
 
-/** Token-authenticated URL that revalues one variable: append `&value=…`. */
-export function variableUrl(id: string): string {
+/** Token-authenticated URL that revalues one variable: complete the
+ * trailing `…&<name>=` with a value, leave it empty to clear the variable. */
+export function variableUrl(name: string): string {
     return (
         location.origin +
-        "/overlay/variables/" +
-        encodeURIComponent(id) +
-        "?token=" +
-        state.token
+        "/overlay/variables?token=" +
+        state.token +
+        "&" +
+        encodeURIComponent(name) +
+        "="
     );
 }
 
@@ -454,12 +456,12 @@ export async function copyRuntimeUrl(s: Scene): Promise<void> {
     }
 }
 
-export async function copyVariableUrl(id: string): Promise<void> {
+export async function copyVariableUrl(name: string): Promise<void> {
     try {
-        await navigator.clipboard.writeText(variableUrl(id));
-        state.copiedVariableId = id;
+        await navigator.clipboard.writeText(variableUrl(name));
+        state.copiedVariableName = name;
         setTimeout(() => {
-            state.copiedVariableId = null;
+            state.copiedVariableName = null;
             m.redraw();
         }, 1500);
     } catch {

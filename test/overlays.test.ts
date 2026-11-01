@@ -326,6 +326,59 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                     .length,
             ).toBe(1);
 
+            // a binding to a nonexistent variable is rejected with a 400 and
+            // must not wedge the in-memory project — the scene stays editable
+            // afterwards (a failed revalidate used to leave stale state and
+            // 500 every later mutation)
+            const staleBindingRes = await fetch(
+                `${baseUrl}/api/overlays/scenes/${sceneBody.scene.id}/elements`,
+                {
+                    method: "PUT",
+                    headers: { cookie, "content-type": "application/json" },
+                    body: JSON.stringify({
+                        element: {
+                            id: crypto.randomUUID(),
+                            name: "orphan",
+                            type: "text",
+                            transform: {
+                                x: 0,
+                                y: 0,
+                                width: 100,
+                                height: 20,
+                                rotation: 0,
+                                opacity: 1,
+                            },
+                            visible: true,
+                            locked: false,
+                            parentId: null,
+                            bindings: {
+                                "props.text": {
+                                    variableId: crypto.randomUUID(),
+                                },
+                            },
+                            props: { text: "orphan" },
+                        },
+                    }),
+                },
+            );
+            expect(staleBindingRes.status).toBe(400);
+            const healedRes = await fetch(
+                `${baseUrl}/api/overlays/scenes/${sceneBody.scene.id}/elements`,
+                {
+                    method: "PUT",
+                    headers: { cookie, "content-type": "application/json" },
+                    body: JSON.stringify({
+                        element: { ...element, props: { text: "Healed" } },
+                    }),
+                },
+            );
+            expect(healedRes.status).toBe(200);
+            const healedScene = (await healedRes.json()) as {
+                scene: { elements: { props?: { text?: string } }[] };
+            };
+            expect(healedScene.scene.elements).toHaveLength(1);
+            expect(healedScene.scene.elements[0].props?.text).toBe("Healed");
+
             // ── variables ──
             const varRes = await fetch(`${baseUrl}/api/overlays/variables`, {
                 method: "POST",
@@ -337,6 +390,23 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                 variable: { id: string; name: string };
             };
             expect(varBody.variable.name).toBe("score");
+
+            // a second number + a boolean, so the token endpoint's
+            // multi-value batches can be tested
+            // the token endpoint keys variables on their NAMES (unique per
+            // project), so these stay literal in the requests below
+            const livesRes = await fetch(`${baseUrl}/api/overlays/variables`, {
+                method: "POST",
+                headers: { cookie, "content-type": "application/json" },
+                body: JSON.stringify({ name: "lives", type: "number" }),
+            });
+            expect(livesRes.status).toBe(201);
+            const liveRes = await fetch(`${baseUrl}/api/overlays/variables`, {
+                method: "POST",
+                headers: { cookie, "content-type": "application/json" },
+                body: JSON.stringify({ name: "live", type: "boolean" }),
+            });
+            expect(liveRes.status).toBe(201);
 
             const setVarRes = await fetch(
                 `${baseUrl}/api/overlays/variables/${varBody.variable.id}`,
@@ -362,9 +432,9 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
             );
             expect(
                 (
-                    variablesEvent.data as { variables: { value: number }[] }
+                    variablesEvent.data as { variables: { value: number | boolean }[] }
                 ).variables.map((v) => v.value),
-            ).toEqual([42]);
+            ).toEqual([42, 0, false]);
 
             // variable type is enforced
             const badVarRes = await fetch(
@@ -378,13 +448,18 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
             expect(badVarRes.status).toBe(400);
 
             // ── token-gated variable modification (copy icon in the editor) ──
+            // every query param except the token is <id>=<value>
             const tokenVarRes = await fetch(
-                `${baseUrl}/overlay/variables/${varBody.variable.id}?token=${token}&value=7`,
+                `${baseUrl}/overlay/variables?token=${token}&score=7`,
             );
             expect(tokenVarRes.status).toBe(200);
             expect(await tokenVarRes.json()).toMatchObject({
                 ok: true,
-                variable: { name: "score", value: 7 },
+                variables: [
+                    { name: "score", value: 7 },
+                    { name: "lives", value: 0 },
+                    { name: "live", value: false },
+                ],
             });
 
             // the editor feed sees the same update
@@ -398,65 +473,144 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
             );
             expect(
                 (
-                    tokenVarEvent.data as { variables: { value: number }[] }
+                    tokenVarEvent.data as {
+                        variables: { value: number | boolean }[];
+                    }
                 ).variables.map((v) => v.value),
-            ).toEqual([7]);
+            ).toEqual([7, 0, false]);
 
             // bad token → 404 (no existence leak),
             // bad value → 400, unknown id → 404
             expect(
                 (
                     await fetch(
-                        `${baseUrl}/overlay/variables/${varBody.variable.id}?token=deadbeef&value=7`,
+                        `${baseUrl}/overlay/variables?token=deadbeef&score=7`,
                     )
                 ).status,
             ).toBe(404);
             expect(
                 (
                     await fetch(
-                        `${baseUrl}/overlay/variables/${varBody.variable.id}?token=${token}&value=not-a-number`,
+                        `${baseUrl}/overlay/variables?token=${token}&score=not-a-number`,
                     )
                 ).status,
             ).toBe(400);
             expect(
                 (
                     await fetch(
-                        `${baseUrl}/overlay/variables/${varBody.variable.id}?token=${token}&value=not-a-number`,
+                        `${baseUrl}/overlay/variables?token=${token}&live=sometimes`,
                     )
                 ).status,
             ).toBe(400);
             expect(
                 (
                     await fetch(
-                        `${baseUrl}/overlay/variables/nope?token=${token}&value=7`,
+                        `${baseUrl}/overlay/variables?token=${token}&nope=7`,
                     )
                 ).status,
             ).toBe(404);
+            // a bare token (no <id> params) sets nothing → 400
+            expect(
+                (await fetch(`${baseUrl}/overlay/variables?token=${token}`))
+                    .status,
+            ).toBe(400);
 
-            // no value → clear: the variable is emptied to its type's
+            // the boolean variable maps the querystring's "true"/"false"
+            // (a bare !!truthy would turn "false" into true)
+            const boolVarRes = await fetch(
+                `${baseUrl}/overlay/variables?token=${token}&live=false`,
+            );
+            expect(boolVarRes.status).toBe(200);
+            expect(await boolVarRes.json()).toMatchObject({
+                ok: true,
+                variables: [
+                    { name: "score", value: 7 },
+                    { name: "lives", value: 0 },
+                    { name: "live", value: false },
+                ],
+            });
+
+            // a batch: several <id>=<value> pairs land in one commit + one
+            // frame
+            const batchRes = await fetch(
+                `${baseUrl}/overlay/variables?token=${token}&score=9&lives=3&live=true`,
+            );
+            expect(batchRes.status).toBe(200);
+            expect(await batchRes.json()).toMatchObject({
+                ok: true,
+                variables: [
+                    { name: "score", value: 9 },
+                    { name: "lives", value: 3 },
+                    { name: "live", value: true },
+                ],
+            });
+            const batchEvent = await nextFrame(
+                editorSocket,
+                (f) => {
+                    const variables = (
+                        f.data as { variables?: { name: string; value: unknown }[] }
+                    ).variables ?? [];
+                    return (
+                        f.event === "overlays.variables" &&
+                        variables.length === 3 &&
+                        variables.every((v) =>
+                            (
+                                { score: 9, lives: 3, live: true } as Record<
+                                    string,
+                                    unknown
+                                >
+                            )[v.name] === v.value,
+                        )
+                    );
+                },
+            );
+            expect(
+                (
+                    batchEvent.data as { variables: { name: string }[] }
+                ).variables.map((v) => v.name),
+            ).toEqual(["score", "lives", "live"]);
+
+            // empty value → clear: the variable is emptied to its type's
             // neutral value (number → 0) and the clear is pushed to the feed
             const clearVarRes = await fetch(
-                `${baseUrl}/overlay/variables/${varBody.variable.id}?token=${token}`,
+                `${baseUrl}/overlay/variables?token=${token}&score=`,
             );
             expect(clearVarRes.status).toBe(200);
             expect(await clearVarRes.json()).toMatchObject({
                 ok: true,
-                variable: { name: "score", value: 0 },
+                variables: [
+                    { name: "score", value: 0 },
+                    { name: "lives", value: 3 },
+                    { name: "live", value: true },
+                ],
             });
             const clearVarEvent = await nextFrame(
                 editorSocket,
-                (f) =>
-                    f.event === "overlays.variables" &&
-                    (
-                        (f.data as { variables?: { value: number }[] })
-                            .variables ?? []
-                    ).every((v) => v.value === 0),
+                (f) => {
+                    const variables = (
+                        f.data as { variables?: { name: string; value: unknown }[] }
+                    ).variables ?? [];
+                    // the full 3-variable frame: stale single-variable frames
+                    // (e.g. from variable creation) must not match
+                    return (
+                        f.event === "overlays.variables" &&
+                        variables.length === 3 &&
+                        variables.every((v) =>
+                            (
+                                { score: 0, lives: 3, live: true } as Record<
+                                    string,
+                                    unknown
+                                >
+                            )[v.name] === v.value,
+                        )
+                    );
+                },
             );
             expect(
                 (
-                    clearVarEvent.data as { variables: { value: number }[] }
-                ).variables.map((v) => v.value),
-            ).toEqual([0]);
+                    clearVarEvent.data as { variables: { name: string }[] }
+                ).variables.map((v) => v.name),
+            ).toEqual(["score", "lives", "live"]);
 
             // the runtime feed gets the revalue and the clear (this is what
             // the runtime page diffs for trigger firing + auto-empty)
@@ -470,13 +624,13 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                 );
                 expect(
                     (
-                        clearSnapshot.data as { variables: { value: number }[] }
+                        clearSnapshot.data as { variables: { value: unknown }[] }
                     ).variables.map((v) => v.value),
-                ).toEqual([0]);
+                ).toEqual([0, 3, true]);
                 expect(
                     (
                         await fetch(
-                            `${baseUrl}/overlay/variables/${varBody.variable.id}?token=${token}&value=5`,
+                            `${baseUrl}/overlay/variables?token=${token}&score=5`,
                         )
                     ).status,
                 ).toBe(200);
@@ -485,19 +639,19 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                     (f) =>
                         f.event === "overlays.variables" &&
                         (
-                            (f.data as { variables?: { value: number }[] })
+                            (f.data as { variables?: { value: unknown }[] })
                                 .variables ?? []
                         ).some((v) => v.value === 5),
                 );
                 expect(
                     (
-                        clearLive.data as { variables: { value: number }[] }
+                        clearLive.data as { variables: { value: unknown }[] }
                     ).variables.map((v) => v.value),
-                ).toEqual([5]);
+                ).toEqual([5, 3, true]);
                 expect(
                     (
                         await fetch(
-                            `${baseUrl}/overlay/variables/${varBody.variable.id}?token=${token}`,
+                            `${baseUrl}/overlay/variables?token=${token}&score=`,
                         )
                     ).status,
                 ).toBe(200);
@@ -506,32 +660,154 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                     (f) =>
                         f.event === "overlays.variables" &&
                         (
-                            (f.data as { variables?: { value: number }[] })
+                            (f.data as { variables?: { value: unknown }[] })
                                 .variables ?? []
-                        ).every((v) => v.value === 0),
+                        ).every((v) =>
+                            [0, 3, true].includes(v.value as unknown),
+                        ),
                 );
                 expect(
                     (
-                        clearCleared.data as { variables: { value: number }[] }
+                        clearCleared.data as { variables: { value: unknown }[] }
                     ).variables.map((v) => v.value),
-                ).toEqual([0]);
+                ).toEqual([0, 3, true]);
             } finally {
                 clearSocket.close();
             }
             expect(
                 (
                     await fetch(
-                        `${baseUrl}/overlay/variables/nope?token=${token}`,
+                        `${baseUrl}/overlay/variables?token=${token}&nope=`,
                     )
                 ).status,
             ).toBe(404);
             expect(
                 (
                     await fetch(
-                        `${baseUrl}/overlay/variables/nope?token=deadbeef`,
+                        `${baseUrl}/overlay/variables?token=deadbeef&nope=`,
                     )
                 ).status,
             ).toBe(404);
+
+            // ── POST /overlay/variables: JSON body, typed values ──
+            const postVarRes = await fetch(
+                `${baseUrl}/overlay/variables?token=${token}`,
+                {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ score: 11, lives: 2, live: true }),
+                },
+            );
+            expect(postVarRes.status).toBe(200);
+            expect(await postVarRes.json()).toMatchObject({
+                ok: true,
+                variables: [
+                    { name: "score", value: 11 },
+                    { name: "lives", value: 2 },
+                    { name: "live", value: true },
+                ],
+            });
+            const postVarEvent = await nextFrame(
+                editorSocket,
+                (f) =>
+                    f.event === "overlays.variables" &&
+                    (
+                        (f.data as { variables?: { name: string; value: unknown }[] })
+                            .variables ?? []
+                    ).every((v) =>
+                        ({
+                            score: 11,
+                            lives: 2,
+                            live: true,
+                        } as Record<string, unknown>)[v.name] === v.value,
+                    ),
+            );
+            expect(
+                (
+                    postVarEvent.data as { variables: { name: string }[] }
+                ).variables.map((v) => v.name),
+            ).toEqual(["score", "lives", "live"]);
+
+            // null (and "") clear; JSON booleans need no string mapping
+            const postClearRes = await fetch(
+                `${baseUrl}/overlay/variables?token=${token}`,
+                {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ score: null, lives: "", live: false }),
+                },
+            );
+            expect(postClearRes.status).toBe(200);
+            expect(await postClearRes.json()).toMatchObject({
+                ok: true,
+                variables: [
+                    { name: "score", value: 0 },
+                    { name: "lives", value: 0 },
+                    { name: "live", value: false },
+                ],
+            });
+
+            // bad bodies → 400, unknown name → 404, bad token → 404
+            const badJsonRes = await fetch(
+                `${baseUrl}/overlay/variables?token=${token}`,
+                {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: "not json",
+                },
+            );
+            expect(badJsonRes.status).toBe(400);
+            expect(
+                (
+                    await fetch(`${baseUrl}/overlay/variables?token=${token}`, {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify([1, 2, 3]),
+                    })
+                ).status,
+            ).toBe(400);
+            expect(
+                (
+                    await fetch(`${baseUrl}/overlay/variables?token=${token}`, {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({}),
+                    })
+                ).status,
+            ).toBe(400);
+            expect(
+                (
+                    await fetch(
+                        `${baseUrl}/overlay/variables?token=${token}`,
+                        {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify({ nope: 1 }),
+                        },
+                    )
+                ).status,
+            ).toBe(404);
+            expect(
+                (
+                    await fetch(`${baseUrl}/overlay/variables?token=deadbeef`, {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ score: 1 }),
+                    })
+                ).status,
+            ).toBe(404);
+            expect(
+                (
+                    await fetch(
+                        `${baseUrl}/overlay/variables?token=${token}`,
+                        {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify({ score: "NaN" }),
+                        },
+                    )
+                ).status,
+            ).toBe(400);
 
             // a slug cannot collide with another scene in the same project
             const secondSceneRes = await fetch(`${baseUrl}/api/overlays/scenes`, {
@@ -604,7 +880,7 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                 );
                 expect(
                     (snapshot.data as { variables: { value: number }[] }).variables,
-                ).toHaveLength(1);
+                ).toHaveLength(3);
 
                 const patchRes = await fetch(
                     `${baseUrl}/api/overlays/scenes/${sceneBody.scene.id}/elements`,

@@ -137,7 +137,7 @@
     "overlay.confirm_delete_scene": "Delete this scene and all of its elements?",
     "overlay.copied": "Copied!",
     "overlay.copy": "Copy URL",
-    "overlay.copy_variable_url": "Copy variable URL (append &value=… to modify the variable)",
+    "overlay.copy_variable_url": "Скопировать URL переменной (добавьте значение, чтобы изменить переменную)",
     "overlay.delete": "Delete",
     "overlay.delete_scene": "Delete scene",
     "overlay.elements": "Элементы",

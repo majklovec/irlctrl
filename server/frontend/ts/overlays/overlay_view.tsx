@@ -77,15 +77,16 @@ const triggeredVariables = new Map<string, VariableValue>();
 let ws: WebSocket | undefined;
 let delay = 1000;
 
-/** Empty a variable through the token endpoint (no value = clear), so an
- * alert re-fires on the next (non-empty) revaluation, not while its own
- * clear frame is round-tripping. */
-function clearVariable(id: string): void {
+/** Empty a variable through the token endpoint (empty value = clear), so
+ * an alert re-fires on the next (non-empty) revaluation, not while its
+ * own clear frame is round-tripping. */
+function clearVariable(name: string): void {
 	void fetch(
-		"/overlay/variables/" +
-			encodeURIComponent(id) +
-			"?token=" +
-			encodeURIComponent(token),
+		"/overlay/variables?token=" +
+			encodeURIComponent(token) +
+			"&" +
+			encodeURIComponent(name) +
+			"=",
 		{ method: "GET" },
 	).catch(() => {});
 }
@@ -184,7 +185,7 @@ function runtimeCtx(): ElementContext {
 function scheduleTriggerLifecycle(
 	elementId: string,
 	duration: number,
-	variableId?: string,
+	variableName?: string,
 ): void {
 	const [outroId, removeId] = triggerTimers.get(elementId) ?? [0, 0];
 	clearTimeout(outroId);
@@ -195,7 +196,7 @@ function scheduleTriggerLifecycle(
 			setTimeout(() => {
 				state.activeTriggers.delete(elementId);
 				triggerTimers.delete(elementId);
-				if (variableId) clearVariable(variableId);
+				if (variableName) clearVariable(variableName);
 				m.redraw();
 			}, duration),
 		];
@@ -211,17 +212,17 @@ function fireVariableTrigger(v: Variable): void {
 		const n = Number(v.value);
 		if (Number.isFinite(n)) payload.amount = n;
 	}
-	handleTrigger(v.name, v.id, payload);
+	handleTrigger(v.name, v.name, payload);
 }
 
 /** Route a trigger to every trigger-driven element in the scene. An element
  * claims the trigger (returns a duration) only when its configured event
  * name matches — and, for variation alerts, when the amount condition
- * holds. `variableId` (the revalued variable) is emptied when the claim
+ * holds. `variableName` (the revalued variable) is emptied when the claim
  * expires, so the next trigger starts from an empty value. */
 function handleTrigger(
 	eventName: string,
-	variableId: string | undefined,
+	variableName: string | undefined,
 	payload: Record<string, unknown>,
 ): void {
 	const scene = state.scene;
@@ -239,7 +240,7 @@ function handleTrigger(
 			expiresAt: now + duration,
 			payload,
 		});
-		scheduleTriggerLifecycle(element.id, duration, variableId);
+		scheduleTriggerLifecycle(element.id, duration, variableName);
 	}
 }
 

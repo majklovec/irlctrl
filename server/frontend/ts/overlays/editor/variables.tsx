@@ -55,17 +55,17 @@ export function variablesPanel(): m.Vnode {
 							<button
 								type="button"
 								class={
-									state.copiedVariableId === v.id
+									state.copiedVariableName === v.name
 										? "ov-var-copy ov-copied"
 										: "ov-var-copy"
 								}
 								title={
-									state.copiedVariableId === v.id
+									state.copiedVariableName === v.name
 										? t("overlay.copied")
 										: t("overlay.copy_variable_url")
 								}
 								aria-label={t("overlay.copy_variable_url")}
-								onclick={() => void copyVariableUrl(v.id)}
+								onclick={() => void copyVariableUrl(v.name)}
 							>
 								<Icon name="copy" class="role-icon" />
 							</button>
