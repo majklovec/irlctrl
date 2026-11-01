@@ -47,7 +47,7 @@ that serve its role.
 
 A module ships:
 -   `backend.ts` — default-exports a `BackendModule` (see
-    [`shared/module_contract.ts`](../shared/module_contract.ts)). Runs in Bun on
+    [`shared/contracts/backend_module.ts`](../../shared/contracts/backend_module.ts)). Runs in Bun on
     the host: **no** mithril/DOM. It parses its own CLI arguments
     (`shared/args`), owns its persisted sections, validates its own RPC
     parameters (`shared/params`) and reaches the process only through the
@@ -56,12 +56,12 @@ A module ships:
     dashboard widget or a setup step need one; a settings-only module like
     `ssh` ships none). Default-exports a `FrontendModule` /
     `ChannelWidgetModule` (see
-    [`shared/ui/module_contracts.ts`](../shared/ui/module_contracts.ts)),
+    [`shared/contracts/frontend_module.ts`](../../shared/contracts/frontend_module.ts)),
     or an array of them. Runs in the browser; **no** backend imports.
 -   `types.ts` — the module's own types, including its wire shapes (status
     fragment, method results, events). It may import core-owned _types_
     (`ModuleCore` from `client/backend/module_core`, the core
-    wire vocabulary in `shared/types`: `Status`, `DeviceSummary`, `SetupInfo`,
+    wire vocabulary in `shared/contracts/wire`: `Status`, `DeviceSummary`, `SetupInfo`,
     `Settings`); it must not import another module. Cross-module services use
     named runtime capabilities; consumers type only the capability surface
     they need, without importing provider types.
@@ -69,7 +69,7 @@ A module ships:
     (dashboard widget); side-effect-imported by `frontend.tsx` /
     `settings.tsx`.
 -   optional `settings.tsx` — a settings-page card (`ModuleDef`, see
-    `shared/ui/module_contracts.ts`).
+    `shared/contracts/frontend_module.ts`).
 -   optional role contributions — `roleDefinitions` on the backend
     registration. The registry validates role IDs, picks the declared
     default, and sends setup-selectable metadata to the frontend so the role

@@ -1,7 +1,7 @@
 /* Control server device list — a Mithril view fed by the server's live device
  * list (devices.snapshot / devices.changed over the shared feed websocket). */
 import m from "mithril";
-import type { DeviceSummary } from "../../../shared/ui/types";
+import type { DeviceSummary } from "../../../shared/contracts/wire";
 import { RoleTag } from "../../../shared/ui/components/icons";
 import { Badge, Card, Page, ServerNav } from "../../../shared/ui/components/ui";
 import { i18nReady, t } from "../../../shared/ui/i18n";

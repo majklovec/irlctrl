@@ -26,7 +26,7 @@ import type {
 	DeviceDashboardWidget,
 	FrontendModule,
 	ModuleSetupStep,
-} from "../../../shared/ui/module_contracts";
+} from "../../../shared/contracts/frontend_module";
 import {
 	formatBitrate,
 	inRange,
@@ -38,7 +38,7 @@ import type {
 	Role,
 	SetupInfo,
 	Status,
-} from "../../../shared/types";
+} from "../../../shared/contracts/wire";
 import log from "./log";
 import type {
 	CeraBalancer,

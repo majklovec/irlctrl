@@ -3,7 +3,7 @@
  * dashboards.changed); the initial fetch only loads the page before the socket
  * opens. */
 import m from "mithril";
-import type { ServerDashboard } from "../../../shared/ui/types";
+import type { ServerDashboard } from "../../../shared/contracts/wire";
 import { Icon } from "../../../shared/ui/components/icons";
 import { Button, Card, Input, Page, ServerNav } from "../../../shared/ui/components/ui";
 import { t } from "../../../shared/ui/i18n";

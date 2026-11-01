@@ -2,7 +2,7 @@
  * Backend module registry — discovery only, no device-process dependencies.
  *
  * Every modules/<id>/backend.ts default-exports a BackendModule registration
- * (shared/module_contract.ts). Discovery has two modes:
+ * (shared/contracts/backend_module.ts). Discovery has two modes:
  *
  *  - unbundled (bun server/backend/server.ts, bun test): a runtime directory
  *    scan anchored on import.meta.url — adding a module needs no edit here.
@@ -26,9 +26,9 @@ import type {
     ModulePage,
     ModuleWidget,
     WidgetConfigContext,
-} from "./module_contract";
-import type { Role, RoleDefinition } from "./roles";
-import type { ServerDashboard, Status, WidgetConfigField } from "./types";
+} from "./contracts/backend_module";
+import type { Role, RoleDefinition } from "./contracts/roles";
+import type { ServerDashboard, Status, WidgetConfigField } from "./contracts/wire";
 import { appPath, MODULE_ROOTS } from "./paths";
 import { isCompiledBinary } from "./util";
 
@@ -37,7 +37,7 @@ export type {
     DashboardAction,
     DashboardActionEntry,
     DashboardActions,
-} from "./module_contract";
+} from "./contracts/backend_module";
 
 /**
  * Deterministic order: topological over declared `dependencies` (a module comes

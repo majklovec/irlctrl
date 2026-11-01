@@ -23,7 +23,7 @@ import type {
     ServerDashboardWidget,
     Status,
     WidgetConfigField,
-} from "../types";
+} from "../contracts/wire";
 import { type DeviceCard, setFrontendEventSink } from "./device/store";
 import type {
     ChannelWidgetModule,
@@ -34,9 +34,9 @@ import type {
     FrontendModule,
     FrontendRegistration,
     ModuleSetupStep,
-} from "./module_contracts";
+} from "../contracts/frontend_module";
 
-export type { FrontendModule, WidgetContext } from "./module_contracts";
+export type { FrontendModule, WidgetContext } from "../contracts/frontend_module";
 
 const isRegistration = (mod: unknown): mod is FrontendRegistration =>
     typeof mod === "object" &&

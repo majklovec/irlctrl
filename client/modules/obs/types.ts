@@ -3,8 +3,8 @@
  * other modules): the low-bitrate switcher's wire shapes, the module's
  * settings slice and its view of the status envelope.
  */
-import type { Emit } from "../../../shared/module_contract";
-import type { ModuleSliceView, ModulesView, Status } from "../../../shared/types";
+import type { Emit } from "../../../shared/contracts/backend_module";
+import type { ModuleSliceView, ModulesView, Status } from "../../../shared/contracts/wire";
 
 export type { Emit };
 

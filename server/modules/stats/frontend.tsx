@@ -7,8 +7,8 @@ import { t } from "../../../shared/ui/i18n";
 import type {
 	ChannelWidgetModule,
 	WidgetContext,
-} from "../../../shared/ui/module_contracts";
-import type { ServerDashboardWidget } from "../../../shared/types";
+} from "../../../shared/contracts/frontend_module";
+import type { ServerDashboardWidget } from "../../../shared/contracts/wire";
 import {
 	parseStatsSpec,
 	STATS_EDITOR_FIELDS,

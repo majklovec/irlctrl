@@ -7,7 +7,7 @@
 import m from "mithril";
 import { errorMessage } from "../../../shared/util";
 import { DEFAULT_COLOR } from "../../../shared/validate";
-import type { ModulesView, Settings } from "../../../shared/ui/types";
+import type { ModulesView, Settings } from "../../../shared/contracts/wire";
 import {
 	Actions,
 	Break,

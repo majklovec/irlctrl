@@ -10,7 +10,7 @@ import {
     dashboardActionsFor,
     isRegisteredRole,
 } from "../../shared/registry";
-import type { DeviceInfo, DeviceSummary, Status } from "../../shared/types";
+import type { DeviceInfo, DeviceSummary, Status } from "../../shared/contracts/wire";
 import { parseJsonObject, textOf } from "../../shared/util";
 import { COLOR_RE, type Role } from "../../shared/validate";
 import {

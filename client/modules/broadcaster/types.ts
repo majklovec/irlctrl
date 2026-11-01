@@ -2,7 +2,7 @@
  * Local types for the broadcaster module (never imported by the core or
  * other modules).
  */
-import type { DeviceSummary, Status } from "../../../shared/types";
+import type { DeviceSummary, Status } from "../../../shared/contracts/wire";
 
 /** The lifecycle of the srtla_rec + ffmpeg stream on the relay. */
 export type SrtlaStreamState = "idle" | "starting" | "running" | "stopping";

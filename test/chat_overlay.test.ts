@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { runInNewContext } from "node:vm";
 import { chatOverlayRoutes } from "../server/modules/chat/overlay_server";
 import type { ChatSnapshot } from "../server/modules/chat/types";
-import type { ServerDashboard } from "../shared/types";
+import type { ServerDashboard } from "../shared/contracts/wire";
 
 function fixture() {
     const config: Record<string, string> = {

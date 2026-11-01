@@ -28,14 +28,14 @@ import { t } from "../../../shared/ui/i18n";
 import type {
 	DeviceDashboardWidget,
 	FrontendModule,
-} from "../../../shared/ui/module_contracts";
+} from "../../../shared/contracts/frontend_module";
 import {
 	formatBitrate,
 	formatSpeed,
 	inRange,
 	since,
 } from "../../../shared/ui/util";
-import type { DeviceSummary, SetupInfo } from "../../../shared/types";
+import type { DeviceSummary, SetupInfo } from "../../../shared/contracts/wire";
 import log from "./log";
 import type {
 	ModemInfo,

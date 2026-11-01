@@ -4,7 +4,7 @@
  * passes its reactive `widgets` array; here we reconcile the grid to it. */
 import { GridStack, type GridStackWidget } from "gridstack";
 import m from "mithril";
-import type { ServerDashboardWidget } from "../../../shared/ui/types";
+import type { ServerDashboardWidget } from "../../../shared/contracts/wire";
 import { type WidgetActions, widgetInner, widgetSize } from "./dashboard";
 import type { MithrilJSXComponent } from "../../../shared/ui/jsx";
 

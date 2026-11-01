@@ -1,7 +1,7 @@
 /*
  * Local types for the ssh module (never imported by the core or other modules).
  */
-import type { ModuleSliceView } from "../../../shared/types";
+import type { ModuleSliceView } from "../../../shared/contracts/wire";
 
 /** The persisted configuration slice of the ssh module (the `modules.ssh` state). */
 export interface SshModuleConfig {

@@ -4,7 +4,7 @@ import type {
     Settings,
     SetupInfo,
     Status,
-} from "../../../shared/types";
+} from "../../../shared/contracts/wire";
 export interface SrtlaTarget {
     listenPort: string;
     remoteHost: string;

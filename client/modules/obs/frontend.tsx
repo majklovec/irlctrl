@@ -33,9 +33,9 @@ import type {
 	DeviceDashboardWidget,
 	FrontendModule,
 	ModuleSetupStep,
-} from "../../../shared/ui/module_contracts";
+} from "../../../shared/contracts/frontend_module";
 import { since, uuid } from "../../../shared/ui/util";
-import type { Role, SetupInfo } from "../../../shared/types";
+import type { Role, SetupInfo } from "../../../shared/contracts/wire";
 import type { ObsModuleView, ObsStatus, SwitcherStatus } from "./types";
 import { VUMeter, type VuLevels } from "./vu_meter";
 

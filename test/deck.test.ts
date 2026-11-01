@@ -18,7 +18,7 @@ import {
     validateDeviceWidgetConfig,
     WIDGET_SIZES,
 } from "../shared/registry";
-import type { Status } from "../shared/types";
+import type { Status } from "../shared/contracts/wire";
 
 const status = (
     role: Status["role"],

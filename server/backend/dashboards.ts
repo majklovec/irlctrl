@@ -16,8 +16,8 @@ import type {
     ServerDashboardWidget,
     Status,
     WidgetConfigField,
-} from "../../shared/types";
-import { configFieldName } from "../../shared/types";
+} from "../../shared/contracts/wire";
+import { configFieldName } from "../../shared/contracts/wire";
 import {
     dashboardsTopic,
     event,

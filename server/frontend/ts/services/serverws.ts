@@ -4,7 +4,7 @@
  * channel-widget frames the dashboard pages subscribe to separately. One
  * auto-reconnecting socket per page; pages register the events they need.
  * Handlers are plain subscribers — callers redraw themselves. */
-import type { DeviceSummary, ServerDashboard } from "../../../../shared/ui/types";
+import type { DeviceSummary, ServerDashboard } from "../../../../shared/contracts/wire";
 import { RpcClient, socketUrl } from "../../../../shared/ui/services/rpc";
 
 /** A `dashboards.changed` event: the dashboard object (create/update) or

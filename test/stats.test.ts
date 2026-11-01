@@ -10,7 +10,7 @@ import {
 } from "../server/modules/stats/config";
 import { currentViewerTotal, mergeViewerSeries } from "../server/modules/stats/series";
 import type { StatsLive } from "../server/modules/stats/types";
-import { visibleWidgetConfigFields } from "../shared/types";
+import { visibleWidgetConfigFields } from "../shared/contracts/wire";
 
 describe("stats channel configuration", () => {
     test("stats editor fields render without keyed-fragment holes", () => {

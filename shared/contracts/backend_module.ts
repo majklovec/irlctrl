@@ -10,9 +10,9 @@
  * settings / setup / log wording / pages / widgets through the optional hooks
  * below. The core never names a module id, method prefix or status key.
  */
-import type { LogWording } from "./log_messages";
+import type { LogWording } from "../log_messages";
 import type { AnyElysia } from "elysia";
-import type { ServerDashboard, Status, WidgetConfigField } from "./types";
+import type { ServerDashboard, Status, WidgetConfigField } from "./wire";
 import type { Role, RoleDefinition } from "./roles";
 
 export type Params = Record<string, unknown>;

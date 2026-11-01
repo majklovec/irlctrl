@@ -32,7 +32,7 @@
 import { randomUUID } from "node:crypto";
 import { LANGUAGES, setCurrentLanguage, t } from "../../shared/i18n";
 import { isLoggedMethod, methodLog } from "../../shared/log_messages";
-import type { Params } from "../../shared/module_contract";
+import type { Params } from "../../shared/contracts/backend_module";
 import {
     ApiError,
     checkColor,

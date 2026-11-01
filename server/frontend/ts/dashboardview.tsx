@@ -9,7 +9,7 @@
  * the dashboard from the server. */
 import m from "mithril";
 import { DEFAULT_COLOR } from "../../../shared/validate";
-import type { ServerDashboard, ServerDashboardWidget } from "../../../shared/ui/types";
+import type { ServerDashboard, ServerDashboardWidget } from "../../../shared/contracts/wire";
 import { Icon } from "../../../shared/ui/components/icons";
 import { Page, ServerNav, TitleWithBack } from "../../../shared/ui/components/ui";
 import {

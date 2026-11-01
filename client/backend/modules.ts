@@ -4,13 +4,13 @@
  * start/stop/restart, RPC ownership and gating, status / settings / setup
  * contributions, and autostart. Nothing here names a module id, method
  * prefix or status key: every decision reads the registration contract
- * (shared/module_contract.ts).
+ * (shared/contracts/backend_module.ts).
  */
 import type {
     BackendModule,
     ModuleSlice,
     Params,
-} from "../../shared/module_contract";
+} from "../../shared/contracts/backend_module";
 import { argFail } from "../../shared/args";
 import {
     ALL_MODULES,

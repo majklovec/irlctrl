@@ -13,7 +13,7 @@ import type {
     BackendModule,
     ModuleStartContext,
     Params,
-} from "../../../shared/module_contract";
+} from "../../../shared/contracts/backend_module";
 import {
     ApiError,
     optionalInt,

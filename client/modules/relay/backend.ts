@@ -11,7 +11,7 @@ import { join } from "node:path";
 import type { ModuleCore } from "../../backend/module_core";
 import { argEnv, argv, enumArgEnv } from "../../../shared/args";
 import { t } from "../../../shared/i18n";
-import type { BackendModule, Emit, Params } from "../../../shared/module_contract";
+import type { BackendModule, Emit, Params } from "../../../shared/contracts/backend_module";
 import {
     ApiError,
     oneOf,

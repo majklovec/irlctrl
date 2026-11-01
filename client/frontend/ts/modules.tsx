@@ -14,13 +14,13 @@ import m from "mithril";
 import SETTINGS_MANIFEST from "../../../generated/modules.settings";
 import { registerLogWording } from "../../../shared/log_messages";
 import { errorMessage } from "../../../shared/util";
-import type { ModulesView, Settings } from "../../../shared/ui/types";
+import type { ModulesView, Settings } from "../../../shared/contracts/wire";
 import { Card } from "../../../shared/ui/components/ui";
 import { t } from "../../../shared/ui/i18n";
 import type { RpcClient } from "../../../shared/ui/services/rpc";
-import type { ModuleContext, ModuleDef } from "../../../shared/ui/module_contracts";
+import type { ModuleContext, ModuleDef } from "../../../shared/contracts/frontend_module";
 
-export type { ModuleContext, ModuleDef } from "../../../shared/ui/module_contracts";
+export type { ModuleContext, ModuleDef } from "../../../shared/contracts/frontend_module";
 
 interface moduleState {
 	message: string;

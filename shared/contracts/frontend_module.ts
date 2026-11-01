@@ -15,9 +15,9 @@ import type {
     Status,
     ModulesView,
     WidgetConfigField,
-} from "./types";
-import type { DeviceCard } from "./device/store";
-import type { RpcClient } from "./services/rpc";
+} from "./wire";
+import type { DeviceCard } from "../ui/device/store";
+import type { RpcClient } from "../ui/services/rpc";
 
 export interface ModuleSetupStep {
     id: string;

@@ -271,8 +271,8 @@ existing session-only behavior.
 ### How the module system works
 
 Each `client/modules/<id>/` or `server/modules/<id>/` is a plugin the core discovers by directory; it ships:
--   `backend.ts` — the backend registration (runs in Bun on the host; no DOM). It parses its own CLI arguments, owns its config sections, validates and answers its own RPC methods, and contributes status / settings / setup / log wording / pages / widgets through the hooks of the contract in [`shared/module_contract.ts`](shared/module_contract.ts).
--   `frontend.tsx` — the frontend registration (mithril components; no backend imports): the device card, dashboard widgets, setup steps, device-list columns and event handlers (contract in [`shared/ui/module_contracts.ts`](shared/ui/module_contracts.ts)).
+-   `backend.ts` — the backend registration (runs in Bun on the host; no DOM). It parses its own CLI arguments, owns its config sections, validates and answers its own RPC methods, and contributes status / settings / setup / log wording / pages / widgets through the hooks of the contract in [`shared/contracts/backend_module.ts`](shared/contracts/backend_module.ts).
+-   `frontend.tsx` — the frontend registration (mithril components; no backend imports): the device card, dashboard widgets, setup steps, device-list columns and event handlers (contract in [`shared/contracts/frontend_module.ts`](shared/contracts/frontend_module.ts)).
 -   `types.ts` (its own wire types), `styles.css`, `i18n/<lang>.json` (its own translations), optional `settings.tsx` (settings-page card), `log.ts` (log wording shared by both sides), `pages/*.html` (module-owned pages), and any private helpers.
 
 **Discovery** — the backend is a runtime `readdirSync` scan of both module roots in [`shared/registry.ts`](shared/registry.ts) (compiled binaries use the generated manifest): add a directory and it appears. The browser bundle cannot glob at runtime, so `scripts/gen_modules.ts` writes the gitignored `generated/modules.*.ts` manifests from the same scan (wired into `predev`).

@@ -6,7 +6,7 @@
  */
 
 import type { LogEvent } from "../../shared/log_messages";
-import type { EmitOptions } from "../../shared/module_contract";
+import type { EmitOptions } from "../../shared/contracts/backend_module";
 import { errorMessage } from "../../shared/util";
 import { logEntries, onLogEntry } from "./eventlog";
 import { buildStatus } from "./methods";

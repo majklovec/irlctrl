@@ -9,11 +9,11 @@
  * the core never names a module field. The modules/ tree may not contribute
  * to this file.
  */
-import type { Language } from "./languages";
-import type { DashboardActionEntry } from "./module_contract";
+import type { Language } from "../languages";
+import type { DashboardActionEntry } from "./backend_module";
 import type { Role, RoleDefinition } from "./roles";
 
-export type { DashboardAction, DashboardActionEntry } from "./module_contract";
+export type { DashboardAction, DashboardActionEntry } from "./backend_module";
 export type { Role };
 
 /** One module's slice of the modules view: its enabled flag plus its non-secret settings. */

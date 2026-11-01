@@ -5,7 +5,7 @@
  * only contributes the role definition (and its translations) and orders
  * itself after both of them.
  */
-import type { BackendModule } from "../../../shared/module_contract";
+import type { BackendModule } from "../../../shared/contracts/backend_module";
 import type { ModuleCore } from "../../backend/module_core";
 
 const registration: BackendModule<ModuleCore> = {

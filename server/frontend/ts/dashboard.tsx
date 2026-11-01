@@ -11,8 +11,8 @@ import type {
 	ServerDashboardWidget,
 	Status,
 	WidgetType,
-} from "../../../shared/ui/types";
-import { configFieldName, visibleWidgetConfigFields } from "../../../shared/ui/types";
+} from "../../../shared/contracts/wire";
+import { configFieldName, visibleWidgetConfigFields } from "../../../shared/contracts/wire";
 import { Badge, Button } from "../../../shared/ui/components/ui";
 import { createCardHost, type DeviceCard } from "../../../shared/ui/device/store";
 import { t } from "../../../shared/ui/i18n";
@@ -20,7 +20,7 @@ import type {
 	DeviceDashboardContext,
 	DeviceLink,
 	FleetDashboardContext,
-} from "../../../shared/ui/module_contracts";
+} from "../../../shared/contracts/frontend_module";
 import {
 	destroyDeviceWidget,
 	deviceWidgetForType,

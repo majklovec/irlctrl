@@ -1,5 +1,5 @@
 /* Types owned by the combined SRTLA, interface-routing and modem domain. */
-import type { DeviceSummary, Status } from "../../../shared/types";
+import type { DeviceSummary, Status } from "../../../shared/contracts/wire";
 
 export interface Iface {
     iface: string;

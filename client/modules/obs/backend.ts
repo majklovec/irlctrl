@@ -16,7 +16,7 @@ import type {
     DashboardAction,
     ModuleSlice,
     Params,
-} from "../../../shared/module_contract";
+} from "../../../shared/contracts/backend_module";
 import {
     DEFAULT_EVENT_SUBSCRIPTIONS,
     EventSubscription,
@@ -31,7 +31,7 @@ import {
     optionalStringList,
     requireString,
 } from "../../../shared/params";
-import type { Status } from "../../../shared/types";
+import type { Status } from "../../../shared/contracts/wire";
 import { type AudioSource, AudioSourceTracker } from "./audio_sources";
 import { SceneTracker } from "./scenes";
 import { collectSrtSample, type SrtBaseline } from "./srt_metrics";

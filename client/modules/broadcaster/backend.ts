@@ -20,7 +20,7 @@ import type {
 	BackendModule,
 	ModuleStartContext,
 	Params,
-} from "../../../shared/module_contract";
+} from "../../../shared/contracts/backend_module";
 import { ApiError } from "../../../shared/params";
 import { errorMessage } from "../../../shared/util";
 import type { SrtlaKeepalive } from "./types";

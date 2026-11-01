@@ -25,7 +25,7 @@
  */
 
 import { asLanguage } from "../../shared/i18n";
-import type { DeviceSummary } from "../../shared/types";
+import type { DeviceSummary } from "../../shared/contracts/wire";
 import { errorMessage, scrubUrl, textOf } from "../../shared/util";
 import { APP_VERSION } from "../../shared/version";
 import {

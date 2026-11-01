@@ -10,8 +10,8 @@ import type {
 	ChannelWidgetModule,
 	OverlayPreviewTarget,
 	WidgetContext,
-} from "../../../shared/ui/module_contracts";
-import type { ServerDashboardWidget } from "../../../shared/types";
+} from "../../../shared/contracts/frontend_module";
+import type { ServerDashboardWidget } from "../../../shared/contracts/wire";
 import {
 	CHAT_CONFIG_FIELDS,
 	CHAT_PLATFORMS,

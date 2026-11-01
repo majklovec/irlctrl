@@ -19,7 +19,7 @@ import {
     type Language,
     setCurrentLanguage,
 } from "../../shared/i18n";
-import type { ModuleSlice } from "../../shared/module_contract";
+import type { ModuleSlice } from "../../shared/contracts/backend_module";
 import { stableStringify } from "../../shared/util";
 import { DEFAULT_COLOR, type Role } from "../../shared/validate";
 import {

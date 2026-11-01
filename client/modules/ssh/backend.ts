@@ -10,7 +10,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import type { ModuleCore } from "../../backend/module_core";
 import { t } from "../../../shared/i18n";
-import type { BackendModule } from "../../../shared/module_contract";
+import type { BackendModule } from "../../../shared/contracts/backend_module";
 import log from "./log";
 import type { SshHostStatus, SshModuleConfig, SshPasswordReset } from "./types";
 

@@ -1,8 +1,8 @@
 import { Buffer } from "node:buffer";
 import { timingSafeEqual } from "node:crypto";
 import { Elysia } from "elysia";
-import type { ControlRouteContext } from "../../../shared/module_contract";
-import type { ServerDashboardWidget } from "../../../shared/types";
+import type { ControlRouteContext } from "../../../shared/contracts/backend_module";
+import type { ServerDashboardWidget } from "../../../shared/contracts/wire";
 import { chatSpecsFromConfig } from "./config";
 import type { ChatOverlayState, ChatSnapshot } from "./types";
 

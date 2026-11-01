@@ -12,8 +12,8 @@ import type {
 	ServerDashboard,
 	ServerDashboardWidget,
 	WidgetType,
-} from "../../../shared/ui/types";
-import { configFieldName, visibleWidgetConfigFields } from "../../../shared/ui/types";
+} from "../../../shared/contracts/wire";
+import { configFieldName, visibleWidgetConfigFields } from "../../../shared/contracts/wire";
 import { Button, Field, Input, Page, ServerNav } from "../../../shared/ui/components/ui";
 import {
 	devices,
