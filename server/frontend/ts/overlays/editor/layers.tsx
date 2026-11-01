@@ -1,7 +1,10 @@
 import { Button } from "@ui/components/";
 import m from "mithril";
 import type { OverlayElement, Transform } from "../../../../../shared/overlay";
-import { Icon } from "../../../../../shared/ui/components/icons";
+import {
+	Icon,
+	type IconName,
+} from "../../../../../shared/ui/components/icons";
 import { t } from "../../../../../shared/ui/i18n";
 import {
 	bindField,
@@ -21,10 +24,11 @@ import {
 } from "../overlay_store";
 
 /**
- * Z-order controls (forward / backward) for one element, rendered as compact
- * arrow buttons in that element's list row.
+ * Row-header controls for one element: the visibility and lock toggles
+ * (eye / lock icons) in front of the forward / backward z-order arrows.
  */
 export function zorderButtons(elementId: string): m.Vnode {
+	const el = scene()?.elements.find((x) => x.id === elementId);
 	const list = scene()?.elements ?? [];
 	const idx = list.findIndex((x) => x.id === elementId);
 	const atFront = idx === list.length - 1;
@@ -33,8 +37,49 @@ export function zorderButtons(elementId: string): m.Vnode {
 		{ op: "forward", dis: atFront, label: t("overlay.bring_forward") },
 		{ op: "backward", dis: atBack, label: t("overlay.send_backward") },
 	];
+	const toggles: {
+		name: IconName;
+		on: boolean;
+		stateCls: string;
+		label: string;
+		run: () => void;
+	}[] = el
+		? [
+				{
+					name: el.visible ? "view" : "view-off",
+					on: el.visible,
+					stateCls: el.visible ? "" : " ov-zbtn-hidden",
+					label: t("overlay.visible"),
+					run: () =>
+						mutateElementOf(elementId, (e) => (e.visible = !e.visible)),
+				},
+				{
+					name: "lock",
+					on: el.locked,
+					stateCls: el.locked ? " ov-zbtn-locked" : "",
+					label: t("overlay.locked"),
+					run: () => setElementLocked(elementId, !el.locked),
+				},
+			]
+		: [];
 	return (
 		<span class="ov-zhead" onclick={(e: MouseEvent) => e.stopPropagation()}>
+			{toggles.map(({ name, on, stateCls, label, run }) => (
+				<button
+					key={name}
+					type="button"
+					class={"ov-zbtn" + stateCls}
+					title={label}
+					aria-label={label}
+					aria-pressed={on}
+					onclick={(ev: MouseEvent) => {
+						ev.stopPropagation();
+						run();
+					}}
+				>
+					<Icon name={name} class="role-icon" width="13" height="13" />
+				</button>
+			))}
 			{ops.map(({ op, dis, label }) => (
 				<button
 					key={op}
@@ -77,9 +122,10 @@ export function zArrow(op: "forward" | "backward"): m.Vnode {
 
 /**
  * List of every element in the scene, topmost (front) first. Each element is
- * an individually collapsible row: its header carries the name plus the four
- * z-order buttons, and expanding reveals the element's property fields.
- * Clicking a row also selects the element on the canvas.
+ * an individually collapsible row: its header carries the name plus the
+ * visibility/lock toggles and the z-order buttons, and expanding reveals the
+ * element's property fields. Clicking a row also selects the element on the
+ * canvas.
  */
 export function layersPanel(): m.Vnode {
 	const els = scene()?.elements ?? [];
@@ -117,7 +163,6 @@ export function layersPanel(): m.Vnode {
 									/>
 								</button>
 								<span class="ov-layer-name">{el.name}</span>
-								{el.locked ? <span class="ov-layer-lock">🔒</span> : null}
 								{zorderButtons(el.id)}
 							</div>
 							{open ? <div class="ov-el-body">{elementProps(el)}</div> : null}

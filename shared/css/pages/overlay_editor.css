@@ -219,7 +219,7 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
     flex-direction: column;
     gap: 10px;
 }
-/* z-order arrows (in each element row header) */
+/* row-header controls: visibility/lock toggles + z-order arrows */
 .ov-zhead {
     display: inline-flex;
     gap: 3px;
@@ -237,12 +237,20 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
     border: 1px solid var(--border);
     border-radius: 5px;
     background: transparent;
+    box-shadow: none;
     color: var(--text);
     cursor: pointer;
 }
 .ov-zhead .ov-zbtn:hover:not(:disabled) {
     border-color: var(--accent);
     color: var(--accent);
+}
+/* state colours: locked → light red, hidden → gray (override hover) */
+.ov-zhead .ov-zbtn-locked {
+    color: color-mix(in srgb, var(--bad) 70%, white);
+}
+.ov-zhead .ov-zbtn-hidden {
+    color: var(--muted);
 }
 .ov-zhead .ov-zbtn:disabled {
     opacity: 0.35;
@@ -322,9 +330,6 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-.ov-layer-lock {
-    font-size: 11px;
 }
 /* per-element expand chevron (left of the element name) */
 .ov-el-chevbtn {
@@ -428,6 +433,7 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
 .ov-danger-btn {
     border-color: var(--bad) !important;
     color: var(--bad) !important;
+    background: none !important;
 }
 .ov-danger-btn:hover {
     background: color-mix(in srgb, var(--bad) 14%, transparent) !important;
