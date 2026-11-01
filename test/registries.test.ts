@@ -157,17 +157,23 @@ describe("module registries", () => {
     });
 
     test("device-card frontends cover every backend device-module id", () => {
-        // A module without a frontend.tsx has no card by design (ssh lives on
-        // the settings page, combined only contributes a role). Every other
-        // backend id must have exactly one card, and no extra card ids may exist.
-        const cardIds = scanFrontends()
+        // A module without a frontend.tsx (ssh lives on the settings page) or
+        // with only a card-less `contributions` registration (combined owns a
+        // role, nothing to show) has no card by design. Every other backend id
+        // must have exactly one card, and no extra card ids may exist.
+        const fronts = scanFrontends();
+        const cardIds = fronts
             .flatMap((fe) => fe.registrations)
             .filter((r) => r.kind === "device-card")
             .map((r) => r.id);
         const front = new Set(cardIds);
-        const withFrontend = new Set(scanFrontends().map((fe) => fe.dir));
+        const expectsCard = new Set(
+            fronts
+                .filter((fe) => fe.registrations.some((r) => r.kind !== "contributions"))
+                .map((fe) => fe.dir),
+        );
         const missing = DEVICE_ORDER.filter(
-            (id) => !front.has(id) && withFrontend.has(id),
+            (id) => !front.has(id) && expectsCard.has(id),
         );
         const extra = [...front].filter(
             (id) => !DEVICE_ORDER.includes(id),

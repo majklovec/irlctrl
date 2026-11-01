@@ -107,6 +107,18 @@ export function destroyDeviceWidget(type: string, widgetId: string): void {
     fleetWidgetForType(type)?.destroy?.(widgetId);
 }
 
+/** Role pictograms, composed from the modules that provide the roles. */
+const ROLE_ICONS = new Map<Role, () => m.Vnode>();
+for (const mod of FRONTS)
+    if (mod.kind === "device-card" || mod.kind === "contributions")
+        for (const [role, icon] of Object.entries(mod.roleIcons ?? {}))
+            ROLE_ICONS.set(role, icon);
+
+/** The pictogram of a role, when its module contributes one. */
+export function roleIcon(role: Role): m.Vnode | undefined {
+    return ROLE_ICONS.get(role)?.();
+}
+
 /** Fleet widgets (offered once, not bound to one device) by type. */
 const FLEET_WIDGETS = new Map<string, FleetDashboardWidget>();
 for (const mod of FRONTS)

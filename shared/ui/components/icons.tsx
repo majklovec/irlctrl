@@ -4,51 +4,14 @@
  * namespace automatically, so plain tag names render as SVG children. */
 
 import m from "mithril";
-import type { Role } from "../../contracts/roles";
-import { t } from "../i18n";
 import type { MithrilJSXComponent } from "../jsx";
 
 /** Single source of every icon in the app: raw 24×24 SVG contents, stroked with
- * the current text colour. Role pictograms (a video camera for the encoder, a
- * broadcasting antenna for the relay, a transmission tower for the broadcaster)
- * live directly as their `Role`-named entries. */
+ * the current text colour. Role pictograms are not here: the modules that
+ * provide the roles contribute them (`roleIcons` on their frontend
+ * registration, drawn with `OutlineIcon`) and components/role_tag.tsx
+ * resolves them through the module registry. */
 export const SHAPES = {
-	encoder: (
-		<>
-			<rect x="2" y="6" width="14" height="12" rx="2" />
-			<path d="M16 10.5 22 7v10l-6-3.5z" />
-		</>
-	),
-	relay: (
-		<>
-			<circle cx="12" cy="9" r="2" />
-			<path d="M12 11v11M9 22h6" />
-			<path d="M8.5 5.5a5 5 0 0 0 0 7M15.5 5.5a5 5 0 0 1 0 7" />
-			<path d="M5.6 2.6a9 9 0 0 0 0 12.8M18.4 2.6a9 9 0 0 1 0 12.8" />
-		</>
-	),
-	obs: (
-		<>
-			<rect x="2" y="3" width="20" height="14" rx="2" />
-			<path d="m9 7 5 3.5L9 14z" />
-			<path d="M8 21h8M12 17v4" />
-		</>
-	),
-	broadcaster: (
-		<>
-			<path d="M12 3v18" />
-			<path d="m7 21 5-16 5 16" />
-			<path d="M8.25 17h7.5" />
-			<path d="M5.5 3a9.5 9.5 0 0 0 0 14" />
-			<path d="M18.5 3a9.5 9.5 0 0 1 0 14" />
-		</>
-	),
-	combined: (
-		<>
-			<circle cx="12" cy="12" r="9" />
-			<path d="M12 3v18M3 12h18" />
-		</>
-	),
 	info: (
 		<>
 			<circle cx="12" cy="12" r="10" />
@@ -170,13 +133,13 @@ export const Icon = {
 	),
 } as MithrilJSXComponent<{ name: IconName } & m.Attributes>;
 
-/** Generic role marker with the translated role as tooltip. */
-export const RoleTag = {
-	view: ({ attrs: { role } }) => (
-		<span class="role" title={t(`role.${role}`)}>
-			{isIconName(role) ? (
-				<Icon name={role} class={`role-icon role-icon-${role}`} />
-			) : null}
-		</span>
+/** A 24×24 outline icon from arbitrary SVG children — what a module uses to
+ * draw its own pictograms (role icons, overlay element icons) in the same
+ * style as the built-in set. */
+export const OutlineIcon = {
+	view: ({ attrs, children }) => (
+		<svg viewBox="0 0 24 24" aria-hidden="true" {...attrs}>
+			{children}
+		</svg>
 	),
-} as MithrilJSXComponent<{ role: Role }>;
+} as MithrilJSXComponent<m.Attributes>;

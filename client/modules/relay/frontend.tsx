@@ -4,7 +4,7 @@
  * page and dashboard widgets show the same content. */
 import "./styles.css";
 import m from "mithril";
-import { Icon } from "../../../shared/ui/components/icons";
+import { Icon, OutlineIcon } from "../../../shared/ui/components/icons";
 import {
 	Actions,
 	Badge,
@@ -56,6 +56,16 @@ type EncoderStreamButtons = (
 	host: DeviceCard,
 	stopMethod: string,
 ) => m.Children;
+
+/** The role pictogram (the summary column header and the role tag share it). */
+const relayIcon = () => (
+	<OutlineIcon class="role-icon role-icon-relay">
+		<circle cx="12" cy="9" r="2" />
+		<path d="M12 11v11M9 22h6" />
+		<path d="M8.5 5.5a5 5 0 0 0 0 7M15.5 5.5a5 5 0 0 1 0 7" />
+		<path d="M5.6 2.6a9 9 0 0 0 0 12.8M18.4 2.6a9 9 0 0 1 0 12.8" />
+	</OutlineIcon>
+);
 
 function startCombinedStream(host: DeviceCard): void {
 	const start = host.getCapability<EncoderStart>("encoder.start");
@@ -214,7 +224,7 @@ const relaySummaryColumns = [
 		order: 40,
 		available: (device: DeviceSummary) => device.role !== "encoder",
 		header: () => [
-			<Icon name="relay" class="role-icon role-icon-relay" />,
+			relayIcon(),
 			` ${t("setup.step.relay")}`,
 		],
 		cell: (device: DeviceSummary) => {
@@ -751,7 +761,8 @@ export function srtlaComposite(host: DeviceCard, status: RelayStatus): m.Vnode {
 const relayModule: FrontendModule = {
 	id: "relay",
 	kind: "device-card",
-	title: "SRTLA",
+	title: "Relay",
+	roleIcons: { relay: relayIcon },
 	order: 20,
 	log,
 	available: (status) => status.role === "relay" || status.role === "combined",

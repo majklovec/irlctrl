@@ -147,7 +147,7 @@ const ChatPicker: m.ClosureComponent<ElementProps> = () => {
 };
 
 function editForm(props: ElementProps): Vnode {
-	return m(ChatPicker, props) as Vnode;
+	return m(ChatPicker, props) as unknown as Vnode;
 }
 
 function validate(e: OverlayElement): string[] {

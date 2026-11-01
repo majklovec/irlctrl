@@ -38,8 +38,6 @@
     --ok: #22c55e;
     --warn: #f59e0b;
     --bad: #ef4444;
-    --encoder: #ff6c6c;
-    --relay: #38bdf8;
 
     --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
     --ring: color-mix(in srgb, var(--accent) 35%, transparent);
@@ -992,12 +990,6 @@ input[type="checkbox"]:disabled:hover {
     stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
-}
-.role-icon-encoder {
-    color: var(--encoder);
-}
-.role-icon-relay {
-    color: var(--relay);
 }
 .role .role-icon + .role-icon {
     margin-left: -0.1rem;

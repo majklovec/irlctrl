@@ -70,3 +70,8 @@ a.link-button.secondary:focus-visible {
 select[name="pipeline"] {
     width: 100%;
 }
+
+/* The encoder role's accent: its pictogram in role tags, setup and the device list. */
+.role-icon-encoder {
+    color: #ff6c6c;
+}

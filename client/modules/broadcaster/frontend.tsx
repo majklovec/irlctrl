@@ -2,6 +2,7 @@
  * device and the start / stop actions. The RTMP destination and ffmpeg output
  * profile are edited on the Settings page (this card shows them). */
 import m from "mithril";
+import { OutlineIcon } from "../../../shared/ui/components/icons";
 import {
 	Actions,
 	Badge,
@@ -201,6 +202,17 @@ const broadcasterModule: FrontendModule = {
 	id: "broadcaster",
 	kind: "device-card",
 	title: "SRTLA → RTMP",
+	roleIcons: {
+		broadcaster: () => (
+			<OutlineIcon class="role-icon role-icon-broadcaster">
+			<path d="M12 3v18" />
+			<path d="m7 21 5-16 5 16" />
+			<path d="M8.25 17h7.5" />
+			<path d="M5.5 3a9.5 9.5 0 0 0 0 14" />
+			<path d="M18.5 3a9.5 9.5 0 0 1 0 14" />
+			</OutlineIcon>
+		),
+	},
 	order: 20,
 	available: (status) => status.role === "broadcaster",
 	defaultSize: { w: 4, h: 4 },

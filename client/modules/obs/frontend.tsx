@@ -8,6 +8,7 @@
  */
 import "./styles.css";
 import m from "mithril";
+import { OutlineIcon } from "../../../shared/ui/components/icons";
 import {
 	Actions,
 	Badge,
@@ -1214,6 +1215,15 @@ const obsControllerModule: FrontendModule = (() => {
 	return {
 		id: "obs",
 		kind: "device-card",
+		roleIcons: {
+			obs: () => (
+				<OutlineIcon class="role-icon role-icon-obs">
+				<rect x="2" y="3" width="20" height="14" rx="2" />
+				<path d="m9 7 5 3.5L9 14z" />
+				<path d="M8 21h8M12 17v4" />
+				</OutlineIcon>
+			),
+		},
 		title: "OBS",
 		order: 30,
 		setupSteps: [obsSetupStep],

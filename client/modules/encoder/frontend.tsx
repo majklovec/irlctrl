@@ -1,6 +1,6 @@
 /* Encoder card: status rows, the stream form and (on ceracoder devices) bitrate control. */
 import m from "mithril";
-import { Icon } from "../../../shared/ui/components/icons";
+import { Icon, OutlineIcon } from "../../../shared/ui/components/icons";
 import {
 	Actions,
 	Badge,
@@ -51,6 +51,14 @@ import type {
 } from "./types";
 import { BITRATE_KBPS } from "./types";
 import "./styles.css";
+
+/** The role pictogram (the summary column header and the role tag share it). */
+const encoderIcon = () => (
+	<OutlineIcon class="role-icon role-icon-encoder">
+		<rect x="2" y="6" width="14" height="12" rx="2" />
+		<path d="M16 10.5 22 7v10l-6-3.5z" />
+	</OutlineIcon>
+);
 
 interface EncoderFields {
 	pipeline: string;
@@ -405,7 +413,7 @@ const encoderSummaryColumns = [
 		available: (device: DeviceSummary) =>
 			device.role === "encoder" || device.role === "combined",
 		header: () => [
-			<Icon name="encoder" class="role-icon role-icon-encoder" />,
+			encoderIcon(),
 			` ${t("setup.step.encoder")}`,
 		],
 		cell: (device: DeviceSummary) => {
@@ -968,6 +976,7 @@ const encoderModule: FrontendModule = {
 	id: "encoder",
 	kind: "device-card",
 	title: "Encoder",
+	roleIcons: { encoder: encoderIcon },
 	order: 10,
 	available: (status) =>
 		status.role === "encoder" || status.role === "combined",

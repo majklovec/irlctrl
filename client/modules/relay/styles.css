@@ -108,3 +108,8 @@ td meter.share {
     width: 50px;
     margin-right: 0.35rem;
 }
+
+/* The relay role's accent: its pictogram in role tags, setup and the device list. */
+.role-icon-relay {
+    color: #38bdf8;
+}

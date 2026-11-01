@@ -4,7 +4,7 @@ import m from "mithril";
 import { errorMessage } from "../../../shared/util";
 import { DEFAULT_COLOR, HOSTNAME_RE } from "../../../shared/validate";
 import type { Role, SetupInfo } from "../../../shared/contracts/wire";
-import { Icon, isIconName } from "../../../shared/ui/components/icons";
+
 import {
 	Actions,
 	Break,
@@ -20,7 +20,7 @@ import {
 } from "../../../shared/ui/components/ui";
 import { languageOptions, setLanguage, t } from "../../../shared/ui/i18n";
 import type { ModuleSetupStep } from "../../../shared/contracts/frontend_module";
-import { setupStepsForRole } from "../../../shared/ui/module_registry";
+import { roleIcon, setupStepsForRole } from "../../../shared/ui/module_registry";
 import { RpcClient, socketUrl } from "../../../shared/ui/services/rpc";
 import { HOSTNAME_PATTERN, mountPage, setHeaderColor } from "../../../shared/ui/util";
 
@@ -108,7 +108,7 @@ const roleCard = (
 			checked={f.role === value}
 			onchange={() => (f.role = value)}
 		/>
-		{isIconName(value) ? <Icon name={value} class="role-icon" /> : null}
+		{roleIcon(value) ?? null}
 		<span class="role-name">{name}</span>
 		{tagline ? <span class="role-tagline">{tagline}</span> : null}
 	</label>
