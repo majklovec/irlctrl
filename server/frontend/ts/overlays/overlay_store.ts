@@ -87,13 +87,16 @@ export const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 export const clamp = (v: number, a: number, b: number) =>
     Math.min(b, Math.max(a, v));
 
+export const roundToStep = (v: number, step: number) =>
+    Math.round(v / step) * step;
+
 /** Fit the whole canvas into the editor viewport (clamped to the zoom limits). */
 export function fitZoom(): void {
     const c = state.project.canvas;
     const scroll = document.querySelector<HTMLElement>(".ov-canvas-scroll");
     if (!scroll || !c.width || !c.height) return;
-    // 2×24px padding of .ov-canvas-scroll
-    const pad = 48;
+
+    const pad = 0;
     state.zoom = clamp(
         Math.min(
             (scroll.clientWidth - pad) / c.width,

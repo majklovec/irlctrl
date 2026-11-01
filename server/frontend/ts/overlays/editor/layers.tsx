@@ -205,25 +205,25 @@ export function elementProps(e: OverlayElement): m.Vnode {
 						"transform.x",
 						t("overlay.x"),
 						tm.x,
-						(n: number) => setT((x) => (x.x = n)),
+						(n: number) => setT((x) => (x.x = Math.round(n))),
 					],
 					[
 						"transform.y",
 						t("overlay.y"),
 						tm.y,
-						(n: number) => setT((x) => (x.y = n)),
+						(n: number) => setT((x) => (x.y = Math.round(n))),
 					],
 					[
 						"transform.width",
 						t("overlay.w"),
 						tm.width,
-						(n: number) => setT((x) => (x.width = Math.max(1, n))),
+						(n: number) => setT((x) => (x.width = Math.max(1, Math.round(n)))),
 					],
 					[
 						"transform.height",
 						t("overlay.h"),
 						tm.height,
-						(n: number) => setT((x) => (x.height = Math.max(1, n))),
+						(n: number) => setT((x) => (x.height = Math.max(1, Math.round(n)))),
 					],
 					[
 						"transform.rotation",
@@ -239,7 +239,7 @@ export function elementProps(e: OverlayElement): m.Vnode {
 							String(label),
 							<input
 								type="number"
-								value={Number(value)}
+								value={Math.round(Number(value))}
 								oninput={(ev: Event) => {
 									const n = Number((ev.target as HTMLInputElement).value);
 									if (Number.isFinite(n)) (on as (n: number) => void)(n);

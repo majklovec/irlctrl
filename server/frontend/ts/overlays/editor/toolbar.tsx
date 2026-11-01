@@ -8,6 +8,7 @@ import {
 	clamp,
 	LIST_URL,
 	redo,
+	roundToStep,
 	scene,
 	state,
 	undo,
@@ -45,14 +46,18 @@ export function editorToolbar(): m.Vnode {
 					label={t("overlay.zoom_out")}
 					title={t("overlay.zoom_out")}
 					icon={<Icon name="zoom-out" class="role-icon" />}
-					onclick={() => (state.zoom = clamp(state.zoom * 0.8, 0.1, 3))}
+					onclick={() =>
+						(state.zoom = roundToStep(clamp(state.zoom - 0.05, 0.1, 3), 0.05))
+					}
 				/>
-				<span class="ov-zoom-val">{Math.round(state.zoom * 100)}%</span>
+				<span class="ov-zoom-val">{Math.round(state.zoom * 1000) / 10}%</span>
 				<IconButton
 					label={t("overlay.zoom_in")}
 					title={t("overlay.zoom_in")}
 					icon={<Icon name="zoom-in" class="role-icon" />}
-					onclick={() => (state.zoom = clamp(state.zoom * 1.25, 0.1, 3))}
+					onclick={() =>
+						(state.zoom = roundToStep(clamp(state.zoom + 0.05, 0.1, 3), 0.05))
+					}
 				/>
 			</span>
 			<span class="ov-toolsep" aria-hidden="true" />
@@ -70,7 +75,7 @@ export function editorToolbar(): m.Vnode {
 			/>
 		</Toolbar>
 	);
-	}
+}
 
 /** Editor header: back-to-list link + "Overlays / <scene>". */
 export function editorTitle(): m.Vnode {

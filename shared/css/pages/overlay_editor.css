@@ -44,7 +44,7 @@
     display: flex;
     flex-direction: column;
     border: 1px solid var(--border);
-    border-radius: 12px;
+
     overflow: hidden;
     background:
         linear-gradient(45deg, var(--canvas-check) 25%, transparent 25%) 0 0 /
@@ -59,7 +59,6 @@
 .ov-canvas-scroll {
     flex: 1;
     overflow: auto;
-    padding: 24px;
 }
 .overlay-canvas-scaled {
     position: relative;
@@ -532,15 +531,18 @@ identically here and on the runtime page */
     accent-color: var(--accent);
     padding: 0.15rem 0;
 }
-.ov-grid2 {
+.ov-grid2,
+.ov-grid3,
+.ov-grid4 {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 4px;
 }
+.ov-grid3 {
+    grid-template-columns: 1fr 1fr 1fr;
+}
 .ov-grid4 {
-    display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 4px;
 }
 .ov-gridcell {
     min-width: 0;
