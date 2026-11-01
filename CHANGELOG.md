@@ -1,3 +1,53 @@
+# [2.0.0](https://github.com/majklovec/irlctrl/compare/v1.21.0...v2.0.0) (2026-11-01)
+
+
+* refactor!: snake_case file names, rename srtla→relay and obs-controller→obs, add combined module ([6bcb371](https://github.com/majklovec/irlctrl/commit/6bcb37157c40dfaabae149f6a96fc51fb09a3ea3))
+
+
+### Bug Fixes
+
+* **boot:** regenerate generated/ before the application graph loads ([05cde65](https://github.com/majklovec/irlctrl/commit/05cde655c2f490143343808cac18b4cc914762ed))
+* **control-server:** overlay editor duplication, selection, z-order ([f17a048](https://github.com/majklovec/irlctrl/commit/f17a0480e1a27659dba15f64fe4c213d72211cdf))
+* **line:** implement line diagonal flipping based on drag delta and add tests ([03f435c](https://github.com/majklovec/irlctrl/commit/03f435c0d28c1ea8dc2ae2231e8e63e25a2b5380))
+* **overlays:** add line endpoint handles for shape elements and adjust overflow behavior ([ec4ed1b](https://github.com/majklovec/irlctrl/commit/ec4ed1b1e80601ec045ca46294e3cb0ccdcff328))
+* **overlays:** add server-managed monotonic counter to Scene for handling stale WS pushes ([3eae414](https://github.com/majklovec/irlctrl/commit/3eae4142b4b2fe8b532d6ad879349eedbfd01830))
+* **overlays:** enhance drag snapping logic for element resizing and clamping ([c94e638](https://github.com/majklovec/irlctrl/commit/c94e6387cb57195c5710a01371591b0b33859616))
+* **overlays:** stroke element-row chevron with currentColor ([d3124ea](https://github.com/majklovec/irlctrl/commit/d3124ea35af35d4e609f80ee5d67d1e86e7ff367))
+* **resize:**  redraw on moce, implement variable revalue via token-authenticated URL and update documentation ([c15e2d9](https://github.com/majklovec/irlctrl/commit/c15e2d93bb50705adae96c560c8b4e3af2d53332))
+
+
+### Features
+
+* add progress overlay element with properties and bindings ([f54decf](https://github.com/majklovec/irlctrl/commit/f54decf8b466e1558cb39d6f3e261c6cd90d6782))
+* **control-server:** inline canvas text editing + row collapse toggle ([fad7fd5](https://github.com/majklovec/irlctrl/commit/fad7fd5121f8682f60f79fa0b9fb211dedd58bb4))
+* **control-server:** inspector element list + header z-order arrows ([cc286b7](https://github.com/majklovec/irlctrl/commit/cc286b7792dfc6eb86fcfa89904098a8ab9dc624))
+* **control-server:** OBS overlay editor (M1) ([b0038bb](https://github.com/majklovec/irlctrl/commit/b0038bb0c491245cb037e301c6e8fcde05a09530))
+* **control-server:** per-element collapsible inspector rows with own z-order buttons ([2517514](https://github.com/majklovec/irlctrl/commit/25175147b661a621b358afb1a4b405e925571236))
+* **control-server:** remove redundant Scenes rail from overlay editor ([f99e722](https://github.com/majklovec/irlctrl/commit/f99e7228084283972fc22401087aed1a43865d30))
+* **control-server:** show overlays list before the editor ([208adb9](https://github.com/majklovec/irlctrl/commit/208adb9475f4ae81bda2bfd1fc5fa0d38f3202bc))
+* **control-server:** z-order arrows in Elements header, drop Inspector title ([d86a244](https://github.com/majklovec/irlctrl/commit/d86a244b83ebda8d100848a201550d059b745a38))
+* enhance overlay element bindings and styling ([ac8bdd6](https://github.com/majklovec/irlctrl/commit/ac8bdd660ca7b3ca8ce9d1048b97b772dcd367b9))
+* **overlays:** add chat and iframe elements with corresponding properties and UI integration ([4854942](https://github.com/majklovec/irlctrl/commit/4854942d1ed51a69ee1b07426087998a748094c6))
+* **overlays:** implement toolbar with undo/redo and element addition buttons ([8503475](https://github.com/majklovec/irlctrl/commit/85034756a2bc46a0b43e90689565de4297d47c25))
+* **overlays:** inline Runtime URL icons in header row; chevron before element name ([6860e65](https://github.com/majklovec/irlctrl/commit/6860e65716cf9355302b3196f26fe5df53694842))
+* **overlays:** replace Assets panel with per-image-element upload; icon buttons in Runtime URL card ([880ea0b](https://github.com/majklovec/irlctrl/commit/880ea0b09135b5847d7fc218ab94cf7ecec47f9e))
+* **overlays:** white collapse chevron; keep only forward/backward z-order ([ec99a38](https://github.com/majklovec/irlctrl/commit/ec99a38a8ebb7055df9b8427695589f11570dcaf))
+* **toolbar:** add zoom in/out buttons to editor toolbar and update styles ([e313ee8](https://github.com/majklovec/irlctrl/commit/e313ee8a13a6d26ccd586e62ee8f7dea4eab960f))
+* **ui:** component library — one file per component, new primitives ([e3fd4ee](https://github.com/majklovec/irlctrl/commit/e3fd4ee78fe2473389d8f4aea033785b14374e4d))
+
+
+### BREAKING CHANGES
+
+* device RPC methods/events `srtla.*` are now `relay.*`,
+the status carries `state.relay` / `relayTarget` / `relayOptions` /
+`summary.relay` instead of the `srtla*` keys, the capability is
+`stream.relay`, and the module ids `srtla` / `obs-controller` are `relay` /
+`obs` (settings slices, dashboard action ids, i18n keys). Devices and the
+control server must be upgraded together; stored device configs and
+dashboards are migrated automatically on first start.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
 # [1.21.0](https://github.com/majklovec/irlctrl/compare/v1.20.0...v1.21.0) (2026-10-30)
 
 
