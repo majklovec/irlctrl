@@ -15,9 +15,10 @@
  * Default-exports its ModuleDef; the settings framework registers it from the
  * generated manifest (generated/modules.settings.ts) — no per-module imports.
  */
+
+import { Actions, Button, Field, Input } from "@ui/components";
 import m from "mithril";
 import { confirmDialog } from "../../../shared/ui/components/confirm";
-import { Actions, Button, Field, Input } from "../../../shared/ui/components/ui";
 import { t } from "../../../shared/ui/i18n";
 import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
 import log from "./log";

@@ -1,9 +1,9 @@
 /* Sign-in page: exchanges a username + password for the session cookie. */
 
+import { Card, Field, Footer, Input } from "@ui/components";
 import m from "mithril";
 import logoUrl from "../../../shared/assets/img/logo-irlctrl.png";
 import { apiJson } from "../../../shared/ui/api_client";
-import { Card, Field, Footer, Input } from "../../../shared/ui/components/ui";
 import { i18nReady, LanguageSelect, t } from "../../../shared/ui/i18n";
 import { mountPage } from "../../../shared/ui/util";
 

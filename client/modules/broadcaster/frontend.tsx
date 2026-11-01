@@ -1,19 +1,14 @@
 /* SRTLA → RTMP card: the stream lifecycle (srtla_rec + ffmpeg) on this
  * device and the start / stop actions. The RTMP destination and ffmpeg output
  * profile are edited on the Settings page (this card shows them). */
+
+import { Actions, Badge, Button, Card, DefinitionList } from "@ui/components";
 import m from "mithril";
-import { OutlineIcon } from "../../../shared/ui/components/icons";
-import {
-	Actions,
-	Badge,
-	Button,
-	Card,
-	DefinitionList,
-} from "../../../shared/ui/components/ui";
-import { card, type DeviceCard } from "../../../shared/ui/device/store";
-import { t } from "../../../shared/ui/i18n";
 import type { FrontendModule } from "../../../shared/contracts/frontend_module";
 import type { DeviceSummary } from "../../../shared/contracts/wire";
+import { OutlineIcon } from "../../../shared/ui/components/icons";
+import { card, type DeviceCard } from "../../../shared/ui/device/store";
+import { t } from "../../../shared/ui/i18n";
 import log from "./log";
 import { SRTLA_CUSTOM_SERVICE, srtlaService } from "./services";
 import "./styles.css";
@@ -158,9 +153,7 @@ function broadcasterCardBody(
 						s.outputs.length === 0 ||
 						host.pending("broadcaster-start")
 					}
-					onclick={() =>
-						host.press("broadcaster-start", "broadcaster.start")
-					}
+					onclick={() => host.press("broadcaster-start", "broadcaster.start")}
 				/>
 				<Button
 					label={t("ui.stop")}
@@ -168,9 +161,7 @@ function broadcasterCardBody(
 					disabled={
 						!running || transitional || host.pending("broadcaster-stop")
 					}
-					onclick={() =>
-						host.press("broadcaster-stop", "broadcaster.stop")
-					}
+					onclick={() => host.press("broadcaster-stop", "broadcaster.stop")}
 				/>
 			</Actions>
 		</Card>
@@ -205,11 +196,11 @@ const broadcasterModule: FrontendModule = {
 	roleIcons: {
 		broadcaster: () => (
 			<OutlineIcon class="role-icon role-icon-broadcaster">
-			<path d="M12 3v18" />
-			<path d="m7 21 5-16 5 16" />
-			<path d="M8.25 17h7.5" />
-			<path d="M5.5 3a9.5 9.5 0 0 0 0 14" />
-			<path d="M18.5 3a9.5 9.5 0 0 1 0 14" />
+				<path d="M12 3v18" />
+				<path d="m7 21 5-16 5 16" />
+				<path d="M8.25 17h7.5" />
+				<path d="M5.5 3a9.5 9.5 0 0 0 0 14" />
+				<path d="M18.5 3a9.5 9.5 0 0 1 0 14" />
 			</OutlineIcon>
 		),
 	},

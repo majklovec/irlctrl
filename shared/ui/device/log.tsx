@@ -8,8 +8,8 @@ import {
 	type LogEvent,
 	label,
 } from "../../log_messages";
-import { type Level, Icon } from "../components/icons";
-import { Card } from "../components/ui";
+import { Card } from "../components";
+import { Icon, type Level } from "../components/icons";
 import { t } from "../i18n";
 import type { MithrilJSXComponent } from "../jsx";
 

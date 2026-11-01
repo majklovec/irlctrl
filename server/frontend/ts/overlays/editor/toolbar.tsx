@@ -1,12 +1,12 @@
+import { IconButton, Toolbar } from "@ui/components";
 import m from "mithril";
 import { Icon } from "../../../../../shared/ui/components/icons";
-import { IconButton, Toolbar } from "../../../../../shared/ui/components/ui";
 import { t } from "../../../../../shared/ui/i18n";
 import { addableElements } from "../../../../../shared/ui/overlay/registry";
 import {
-	LIST_URL,
 	addElement,
 	clamp,
+	LIST_URL,
 	redo,
 	scene,
 	state,

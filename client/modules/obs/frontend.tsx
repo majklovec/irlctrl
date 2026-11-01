@@ -7,8 +7,6 @@
  * Rendered on the device page and in one stateful dashboard instance per widget.
  */
 import "./styles.css";
-import m from "mithril";
-import { OutlineIcon } from "../../../shared/ui/components/icons";
 import {
 	Actions,
 	Badge,
@@ -25,18 +23,20 @@ import {
 	NumberField,
 	Options,
 	Select,
-} from "../../../shared/ui/components/ui";
-import { card, type DeviceCard } from "../../../shared/ui/device/store";
-import { t } from "../../../shared/ui/i18n";
-import type { MithrilJSXComponent } from "../../../shared/ui/jsx";
+} from "@ui/components";
+import m from "mithril";
 import type {
 	DeviceDashboardContext,
 	DeviceDashboardWidget,
 	FrontendModule,
 	ModuleSetupStep,
 } from "../../../shared/contracts/frontend_module";
-import { since, uuid } from "../../../shared/ui/util";
 import type { Role, SetupInfo } from "../../../shared/contracts/wire";
+import { OutlineIcon } from "../../../shared/ui/components/icons";
+import { card, type DeviceCard } from "../../../shared/ui/device/store";
+import { t } from "../../../shared/ui/i18n";
+import type { MithrilJSXComponent } from "../../../shared/ui/jsx";
+import { since, uuid } from "../../../shared/ui/util";
 import type { ObsModuleView, ObsStatus, SwitcherStatus } from "./types";
 import { VUMeter, type VuLevels } from "./vu_meter";
 
@@ -1116,8 +1116,7 @@ function isObsUrl(value: string): boolean {
 	try {
 		const url = new URL(value.trim());
 		return (
-			(url.protocol === "ws:" || url.protocol === "wss:") &&
-			url.hostname !== ""
+			(url.protocol === "ws:" || url.protocol === "wss:") && url.hostname !== ""
 		);
 	} catch {
 		return false;
@@ -1132,8 +1131,7 @@ const obsSetupStep: ModuleSetupStep = {
 	isValid: () => isObsUrl(setupFields.obsUrl),
 	render(_role: Role, info: SetupInfo) {
 		if (!setupFieldsInitialized) {
-			if (typeof info.obsUrl === "string")
-				setupFields.obsUrl = info.obsUrl;
+			if (typeof info.obsUrl === "string") setupFields.obsUrl = info.obsUrl;
 			setupFieldsInitialized = true;
 		}
 		return (
@@ -1218,26 +1216,21 @@ const obsControllerModule: FrontendModule = (() => {
 		roleIcons: {
 			obs: () => (
 				<OutlineIcon class="role-icon role-icon-obs">
-				<rect x="2" y="3" width="20" height="14" rx="2" />
-				<path d="m9 7 5 3.5L9 14z" />
-				<path d="M8 21h8M12 17v4" />
+					<rect x="2" y="3" width="20" height="14" rx="2" />
+					<path d="m9 7 5 3.5L9 14z" />
+					<path d="M8 21h8M12 17v4" />
 				</OutlineIcon>
 			),
 		},
 		title: "OBS",
 		order: 30,
 		setupSteps: [obsSetupStep],
-		available: (status) =>
-			status.modules["obs"]?.enabled === true,
+		available: (status) => status.modules["obs"]?.enabled === true,
 		dashboardWidgets: obsDashboardWidgets,
 		defaultSize: { w: 6, h: 13 },
 		minSize: { w: 4, h: 4 },
 		component: (status) => (
-			<Card
-				title={t("obs.card")}
-				class="mod-obs"
-				headActions={panel.head()}
-			>
+			<Card title={t("obs.card")} class="mod-obs" headActions={panel.head()}>
 				{panel.component(
 					status
 						? { host: card, status: status as ObsStatus, live: null }

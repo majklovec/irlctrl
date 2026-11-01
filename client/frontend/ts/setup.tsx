@@ -1,9 +1,5 @@
 /* First-run setup wizard — shared language, identity and control steps plus
  * setup contributions registered by the device modules. */
-import m from "mithril";
-import { errorMessage } from "../../../shared/util";
-import { DEFAULT_COLOR, HOSTNAME_RE } from "../../../shared/validate";
-import type { Role, SetupInfo } from "../../../shared/contracts/wire";
 
 import {
 	Actions,
@@ -17,12 +13,23 @@ import {
 	Input,
 	Page,
 	Select,
-} from "../../../shared/ui/components/ui";
-import { languageOptions, setLanguage, t } from "../../../shared/ui/i18n";
+} from "@ui/components";
+import m from "mithril";
 import type { ModuleSetupStep } from "../../../shared/contracts/frontend_module";
-import { roleIcon, setupStepsForRole } from "../../../shared/ui/module_registry";
+import type { Role, SetupInfo } from "../../../shared/contracts/wire";
+import { languageOptions, setLanguage, t } from "../../../shared/ui/i18n";
+import {
+	roleIcon,
+	setupStepsForRole,
+} from "../../../shared/ui/module_registry";
 import { RpcClient, socketUrl } from "../../../shared/ui/services/rpc";
-import { HOSTNAME_PATTERN, mountPage, setHeaderColor } from "../../../shared/ui/util";
+import {
+	HOSTNAME_PATTERN,
+	mountPage,
+	setHeaderColor,
+} from "../../../shared/ui/util";
+import { errorMessage } from "../../../shared/util";
+import { DEFAULT_COLOR, HOSTNAME_RE } from "../../../shared/validate";
 
 interface WizardStep {
 	id: string;
@@ -94,11 +101,7 @@ const stepFrame = (
 	</fieldset>
 );
 
-const roleCard = (
-	value: Role,
-	name: string,
-	tagline?: string,
-): m.Vnode => (
+const roleCard = (value: Role, name: string, tagline?: string): m.Vnode => (
 	<label class="role-card">
 		<input
 			type="radio"
@@ -175,9 +178,7 @@ function coreStep(step: CoreStep): WizardStep {
 							roleCard(
 								definition.id,
 								t(definition.titleKey),
-								definition.taglineKey
-									? t(definition.taglineKey)
-									: undefined,
+								definition.taglineKey ? t(definition.taglineKey) : undefined,
 							),
 						),
 					);

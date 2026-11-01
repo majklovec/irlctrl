@@ -1,6 +1,6 @@
+import { Button, Card } from "@ui/components";
 import m from "mithril";
 import { Icon } from "../../../../../shared/ui/components/icons";
-import { Button, Card } from "../../../../../shared/ui/components/ui";
 import { t } from "../../../../../shared/ui/i18n";
 import {
 	copyVariableUrl,

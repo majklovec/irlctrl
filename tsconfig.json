@@ -7,6 +7,9 @@
         "jsx": "react",
         "jsxFactory": "m",
         "jsxFragmentFactory": "m.Fragment",
-        "module": "preserve"
+        "module": "preserve",
+        "paths": {
+            "@ui/*": ["./shared/ui/*"]
+        }
     }
 }

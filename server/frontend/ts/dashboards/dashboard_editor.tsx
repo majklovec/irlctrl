@@ -9,14 +9,7 @@
  * with optimistic concurrency: a 409 reloads the server copy and toasts the
  * conflict. Broadcast `dashboards.changed` events rebase the dashboard from
  * the server. */
-import m from "mithril";
-import { ApiError, apiJson, apiTry } from "../../../../shared/ui/api_client";
-import { DEFAULT_COLOR } from "../../../../shared/validate";
-import type {
-	ServerDashboard,
-	ServerDashboardWidget,
-} from "../../../../shared/contracts/wire";
-import { Icon } from "../../../../shared/ui/components/icons";
+
 import {
 	IconButton,
 	Page,
@@ -24,7 +17,24 @@ import {
 	TitleWithBack,
 	Toast,
 	useToast,
-} from "../../../../shared/ui/components/ui";
+} from "@ui/components";
+import m from "mithril";
+import type {
+	ServerDashboard,
+	ServerDashboardWidget,
+} from "../../../../shared/contracts/wire";
+import { ApiError, apiJson, apiTry } from "../../../../shared/ui/api_client";
+import { Icon } from "../../../../shared/ui/components/icons";
+import { t } from "../../../../shared/ui/i18n";
+import { mountPage, setHeaderColor } from "../../../../shared/ui/util";
+import { DEFAULT_COLOR } from "../../../../shared/validate";
+import { GridDashboard } from "./dashboard_grid";
+import {
+	DASHBOARD_LIST_URL,
+	dashboardAddUrl,
+	dashboardUpdateUrl,
+	dashboardViewUrl,
+} from "./dashboard_urls";
 import {
 	ensureDashboardsWs,
 	refreshDevices,
@@ -33,15 +43,6 @@ import {
 	syncConnectionsFor,
 	type WidgetActions,
 } from "./dashboard_widgets";
-import { GridDashboard } from "./dashboard_grid";
-import {
-	DASHBOARD_LIST_URL,
-	dashboardAddUrl,
-	dashboardUpdateUrl,
-	dashboardViewUrl,
-} from "./dashboard_urls";
-import { t } from "../../../../shared/ui/i18n";
-import { mountPage, setHeaderColor } from "../../../../shared/ui/util";
 
 const SAVE_DEBOUNCE_MS = 500;
 const PATH_RE = /\/dashboards\/(?:view|edit)\/([^/]+)\/?$/;

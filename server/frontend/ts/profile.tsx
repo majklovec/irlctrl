@@ -1,7 +1,5 @@
 /* Profile page: change the login password and manage the device tokens. */
-import m from "mithril";
-import { apiJson } from "../../../shared/ui/api_client";
-import { Icon } from "../../../shared/ui/components/icons";
+
 import {
 	Actions,
 	Badge,
@@ -14,7 +12,10 @@ import {
 	Input,
 	Page,
 	ServerNav,
-} from "../../../shared/ui/components/ui";
+} from "@ui/components";
+import m from "mithril";
+import { apiJson } from "../../../shared/ui/api_client";
+import { Icon } from "../../../shared/ui/components/icons";
 import { i18nReady, t } from "../../../shared/ui/i18n";
 import { mountPage } from "../../../shared/ui/util";
 

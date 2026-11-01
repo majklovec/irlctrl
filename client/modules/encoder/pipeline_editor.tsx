@@ -8,7 +8,7 @@
  * the WebSocket URL and the back link are derived from the device base
  * (everything before /pipelines/). Saving returns to the settings page.
  */
-import m from "mithril";
+
 import {
 	Button,
 	ConnectionBadge,
@@ -17,7 +17,8 @@ import {
 	Input,
 	Page,
 	TitleWithBack,
-} from "../../../shared/ui/components/ui";
+} from "@ui/components";
+import m from "mithril";
 import { t } from "../../../shared/ui/i18n";
 import { RpcClient, socketUrl } from "../../../shared/ui/services/rpc";
 import { mountPage, setHeaderColor } from "../../../shared/ui/util";

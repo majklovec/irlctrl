@@ -10,17 +10,24 @@
  * status message), an RPC runner that routes errors into the module's status
  * line, and the Card shell.
  */
+
+import { Card } from "@ui/components";
 import m from "mithril";
 import SETTINGS_MANIFEST from "../../../generated/modules.settings";
-import { registerLogWording } from "../../../shared/log_messages";
-import { errorMessage } from "../../../shared/util";
+import type {
+	ModuleContext,
+	ModuleDef,
+} from "../../../shared/contracts/frontend_module";
 import type { ModulesView, Settings } from "../../../shared/contracts/wire";
-import { Card } from "../../../shared/ui/components/ui";
+import { registerLogWording } from "../../../shared/log_messages";
 import { t } from "../../../shared/ui/i18n";
 import type { RpcClient } from "../../../shared/ui/services/rpc";
-import type { ModuleContext, ModuleDef } from "../../../shared/contracts/frontend_module";
+import { errorMessage } from "../../../shared/util";
 
-export type { ModuleContext, ModuleDef } from "../../../shared/contracts/frontend_module";
+export type {
+	ModuleContext,
+	ModuleDef,
+} from "../../../shared/contracts/frontend_module";
 
 interface moduleState {
 	message: string;

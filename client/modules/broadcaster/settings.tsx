@@ -1,5 +1,3 @@
-import m from "mithril";
-import { Icon } from "../../../shared/ui/components/icons";
 import {
 	Actions,
 	Break,
@@ -10,11 +8,13 @@ import {
 	Input,
 	Options,
 	Select,
-} from "../../../shared/ui/components/ui";
+} from "@ui/components";
+import m from "mithril";
+import type { ModuleSliceView } from "../../../shared/contracts/wire";
+import { Icon } from "../../../shared/ui/components/icons";
 import { t } from "../../../shared/ui/i18n";
 import type { MithrilJSXComponent } from "../../../shared/ui/jsx";
 import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
-import type { ModuleSliceView } from "../../../shared/contracts/wire";
 import {
 	SRTLA_CUSTOM_SERVICE,
 	SRTLA_SERVICES,

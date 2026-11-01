@@ -6,10 +6,9 @@
  * widget's config button. The widget lands on the next
  * free grid slot and the page returns to the (live) dashboard view. A 409
  * conflict reloads the server copy; the widget is not added twice. */
+
+import { Button, Field, Input, Page, ServerNav } from "@ui/components";
 import m from "mithril";
-import { ApiError, apiJson, apiTry } from "../../../../shared/ui/api_client";
-import { dashboardViewUrl } from "./dashboard_urls";
-import { DEFAULT_COLOR } from "../../../../shared/validate";
 import type {
 	ServerDashboard,
 	ServerDashboardWidget,
@@ -19,13 +18,12 @@ import {
 	configFieldName,
 	visibleWidgetConfigFields,
 } from "../../../../shared/contracts/wire";
-import {
-	Button,
-	Field,
-	Input,
-	Page,
-	ServerNav,
-} from "../../../../shared/ui/components/ui";
+import { ApiError, apiJson, apiTry } from "../../../../shared/ui/api_client";
+import { t } from "../../../../shared/ui/i18n";
+import { widgetModule } from "../../../../shared/ui/module_registry";
+import { mountPage, setHeaderColor, uuid } from "../../../../shared/ui/util";
+import { DEFAULT_COLOR } from "../../../../shared/validate";
+import { dashboardViewUrl } from "./dashboard_urls";
 import {
 	devices,
 	independentTypes,
@@ -35,9 +33,6 @@ import {
 	widgetSize,
 	widgetTypesFor,
 } from "./dashboard_widgets";
-import { t } from "../../../../shared/ui/i18n";
-import { widgetModule } from "../../../../shared/ui/module_registry";
-import { mountPage, setHeaderColor, uuid } from "../../../../shared/ui/util";
 import { configSelectField } from "./widget_config_select";
 
 const ADD_PATH_RE = /\/dashboards\/add\/([^/]+)\/?$/;

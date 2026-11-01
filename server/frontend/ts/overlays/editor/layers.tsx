@@ -1,7 +1,7 @@
+import { Button } from "@ui/components";
 import m from "mithril";
 import type { OverlayElement, Transform } from "../../../../../shared/overlay";
 import { Icon } from "../../../../../shared/ui/components/icons";
-import { Button } from "../../../../../shared/ui/components/ui";
 import { t } from "../../../../../shared/ui/i18n";
 import {
 	bindField,

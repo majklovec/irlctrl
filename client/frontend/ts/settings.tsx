@@ -4,10 +4,7 @@
  * module's own configuration card lives in `modules/<id>/settings.tsx` and
  * is auto-registered by the module framework from the generated manifest.
  */
-import m from "mithril";
-import { errorMessage } from "../../../shared/util";
-import { DEFAULT_COLOR } from "../../../shared/validate";
-import type { ModulesView, Settings } from "../../../shared/contracts/wire";
+
 import {
 	Actions,
 	Break,
@@ -21,16 +18,24 @@ import {
 	Page,
 	Select,
 	TitleWithBack,
-} from "../../../shared/ui/components/ui";
+} from "@ui/components";
+import m from "mithril";
+import type { ModulesView, Settings } from "../../../shared/contracts/wire";
 import { t } from "../../../shared/ui/i18n";
+import { RpcClient, socketUrl } from "../../../shared/ui/services/rpc";
+import {
+	HOSTNAME_PATTERN,
+	mountPage,
+	setHeaderColor,
+} from "../../../shared/ui/util";
+import { errorMessage } from "../../../shared/util";
+import { DEFAULT_COLOR } from "../../../shared/validate";
 import {
 	bind,
 	refreshDevice,
 	renderModuleCards,
 	setDraftRole,
 } from "./modules";
-import { RpcClient, socketUrl } from "../../../shared/ui/services/rpc";
-import { HOSTNAME_PATTERN, mountPage, setHeaderColor } from "../../../shared/ui/util";
 
 const state = {
 	connected: false,

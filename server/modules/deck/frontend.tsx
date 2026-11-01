@@ -5,10 +5,8 @@
  * that device's RPC. The config editor (pencil) composes the layout from the
  * catalogues of every device. */
 import "./styles.css";
+import { Badge } from "@ui/components";
 import m from "mithril";
-import { confirmDialog } from "../../../shared/ui/components/confirm";
-import { Badge } from "../../../shared/ui/components/ui";
-import { t } from "../../../shared/ui/i18n";
 import type {
 	DashboardWidgetModule,
 	DeviceLink,
@@ -16,6 +14,8 @@ import type {
 	FleetDashboardWidget,
 } from "../../../shared/contracts/frontend_module";
 import type { DeviceSummary } from "../../../shared/contracts/wire";
+import { confirmDialog } from "../../../shared/ui/components/confirm";
+import { t } from "../../../shared/ui/i18n";
 import { ButtonsGrid, type GridItem } from "./grids";
 import {
 	type ButtonConfig,
@@ -219,9 +219,7 @@ function grid(
 			}}
 			renderCell={(id) => {
 				const i = Number(id);
-				return i >= 0 && i < deck.length
-					? keyContent(ctx, deck[i], i)
-					: null;
+				return i >= 0 && i < deck.length ? keyContent(ctx, deck[i], i) : null;
 			}}
 		/>
 	);
@@ -346,9 +344,7 @@ function configError(
 	const state = editorFor(values);
 	if (state.deck.some((b) => resolve(ctx, b).state === "orphan"))
 		return t("deck.orphan_blocks_save");
-	const bad = state.deck.findIndex(
-		(b) => parseParamsText(b.paramsText).error,
-	);
+	const bad = state.deck.findIndex((b) => parseParamsText(b.paramsText).error);
 	if (bad >= 0) return t("deck.params_invalid", { index: bad + 1 });
 	return undefined;
 }
@@ -370,9 +366,7 @@ function catalogueFor(
 			</p>
 		);
 	if (actions.length === 0)
-		return (
-			<p class="muted deck-catalogue-note">{t("deck.none_available")}</p>
-		);
+		return <p class="muted deck-catalogue-note">{t("deck.none_available")}</p>;
 	const byModule = new Map<string, DashboardActionEntry[]>();
 	for (const a of actions) {
 		const list = byModule.get(a.moduleTitle) ?? [];

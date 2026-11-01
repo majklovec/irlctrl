@@ -16,8 +16,9 @@
  * kit's bound controls target a fixed state object, which doesn't fit a
  * canvas editor).
  */
+
+import { Page, ServerNav } from "@ui/components";
 import m from "mithril";
-import { Page, ServerNav } from "../../../../shared/ui/components/ui";
 import { t } from "../../../../shared/ui/i18n";
 import { mountPage } from "../../../../shared/ui/util";
 import { canvasArea } from "./editor/canvas";

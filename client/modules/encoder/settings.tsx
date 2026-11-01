@@ -13,9 +13,7 @@
  *     the pipelines directory; creating and editing open the dedicated
  *     pipeline editor page (/pipelines/…).
  */
-import m from "mithril";
-import { confirmDialog } from "../../../shared/ui/components/confirm";
-import { Icon } from "../../../shared/ui/components/icons";
+
 import {
 	Actions,
 	Badge,
@@ -27,7 +25,10 @@ import {
 	IconButton,
 	IconLink,
 	Input,
-} from "../../../shared/ui/components/ui";
+} from "@ui/components";
+import m from "mithril";
+import { confirmDialog } from "../../../shared/ui/components/confirm";
+import { Icon } from "../../../shared/ui/components/icons";
 import { t } from "../../../shared/ui/i18n";
 import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
 import "./styles.css";

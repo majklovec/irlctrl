@@ -1,5 +1,3 @@
-import m from "mithril";
-import { Icon } from "../../../../shared/ui/components/icons";
 import {
 	Button,
 	Card,
@@ -11,8 +9,10 @@ import {
 	ServerNav,
 	Table,
 	Toolbar,
-} from "../../../../shared/ui/components/ui";
+} from "@ui/components";
+import m from "mithril";
 import { confirmDialog } from "../../../../shared/ui/components/confirm";
+import { Icon } from "../../../../shared/ui/components/icons";
 import { t } from "../../../../shared/ui/i18n";
 import { mountPage } from "../../../../shared/ui/util";
 import {

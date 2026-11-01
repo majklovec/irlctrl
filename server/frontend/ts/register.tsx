@@ -2,10 +2,10 @@
  * first account bootstraps as admin; everyone after needs an invite, which the
  * /api/register/status probe (plus a ?invite= link) drives showing the field. */
 
+import { Card, Field, Footer, Input } from "@ui/components";
 import m from "mithril";
 import logoUrl from "../../../shared/assets/img/logo-irlctrl.png";
 import { ApiError, apiJson } from "../../../shared/ui/api_client";
-import { Card, Field, Footer, Input } from "../../../shared/ui/components/ui";
 import { i18nReady, LanguageSelect, t } from "../../../shared/ui/i18n";
 import { mountPage } from "../../../shared/ui/util";
 
@@ -54,7 +54,9 @@ function valid(): boolean {
  * failure the field stays visible — safer than silently allowing sign-up. */
 async function loadRegisterStatus(): Promise<void> {
 	try {
-		const body = await apiJson<{ needsInvite: boolean }>("/api/register/status");
+		const body = await apiJson<{ needsInvite: boolean }>(
+			"/api/register/status",
+		);
 		state.needsInvite = body.needsInvite;
 	} catch {
 		/* keep needsInvite true */
@@ -90,7 +92,9 @@ async function submit(ev: Event): Promise<void> {
 		// the server's error string maps to a translated message; anything
 		// else (network, non-JSON) keeps the generic one
 		state.error =
-			err instanceof ApiError && err.status > 0 && !err.message.startsWith("HTTP ")
+			err instanceof ApiError &&
+			err.status > 0 &&
+			!err.message.startsWith("HTTP ")
 				? mapError(err.message)
 				: "register.error";
 	} finally {

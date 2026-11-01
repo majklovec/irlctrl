@@ -2,8 +2,14 @@
  * management page and by the read-only dashboard view page. The device list is
  * pushed live over the shared feed websocket, and live widget data flows over the
  * control server's per-device viewer websockets (d/<id>/ws). */
+
+import { Badge, Button } from "@ui/components";
 import m from "mithril";
-import { apiTry } from "../../../../shared/ui/api_client";
+import type {
+	DeviceDashboardContext,
+	DeviceLink,
+	FleetDashboardContext,
+} from "../../../../shared/contracts/frontend_module";
 import type {
 	DeviceInfo,
 	DeviceSummary,
@@ -17,17 +23,12 @@ import {
 	configFieldName,
 	visibleWidgetConfigFields,
 } from "../../../../shared/contracts/wire";
-import { Badge, Button } from "../../../../shared/ui/components/ui";
+import { apiTry } from "../../../../shared/ui/api_client";
 import {
 	createCardHost,
 	type DeviceCard,
 } from "../../../../shared/ui/device/store";
 import { t } from "../../../../shared/ui/i18n";
-import type {
-	DeviceDashboardContext,
-	DeviceLink,
-	FleetDashboardContext,
-} from "../../../../shared/contracts/frontend_module";
 import {
 	destroyDeviceWidget,
 	deviceWidgetForType,

@@ -1,6 +1,5 @@
 /* Encoder card: status rows, the stream form and (on ceracoder devices) bitrate control. */
-import m from "mithril";
-import { Icon, OutlineIcon } from "../../../shared/ui/components/icons";
+
 import {
 	Actions,
 	Badge,
@@ -18,27 +17,29 @@ import {
 	numberAttrs,
 	Options,
 	Select,
-} from "../../../shared/ui/components/ui";
-import { card, type DeviceCard } from "../../../shared/ui/device/store";
-import { t } from "../../../shared/ui/i18n";
-import type { MithrilJSXComponent } from "../../../shared/ui/jsx";
+} from "@ui/components";
+import m from "mithril";
 import type {
 	DeviceDashboardWidget,
 	FrontendModule,
 	ModuleSetupStep,
 } from "../../../shared/contracts/frontend_module";
-import {
-	formatBitrate,
-	inRange,
-	optionalNumber,
-	since,
-} from "../../../shared/ui/util";
 import type {
 	DeviceSummary,
 	Role,
 	SetupInfo,
 	Status,
 } from "../../../shared/contracts/wire";
+import { Icon, OutlineIcon } from "../../../shared/ui/components/icons";
+import { card, type DeviceCard } from "../../../shared/ui/device/store";
+import { t } from "../../../shared/ui/i18n";
+import type { MithrilJSXComponent } from "../../../shared/ui/jsx";
+import {
+	formatBitrate,
+	inRange,
+	optionalNumber,
+	since,
+} from "../../../shared/ui/util";
 import log from "./log";
 import type {
 	CeraBalancer,
@@ -412,10 +413,7 @@ const encoderSummaryColumns = [
 		order: 30,
 		available: (device: DeviceSummary) =>
 			device.role === "encoder" || device.role === "combined",
-		header: () => [
-			encoderIcon(),
-			` ${t("setup.step.encoder")}`,
-		],
+		header: () => [encoderIcon(), ` ${t("setup.step.encoder")}`],
 		cell: (device: DeviceSummary) => {
 			const { encoder } = device as EncoderDeviceSummary;
 			if (!encoder) return "—";
