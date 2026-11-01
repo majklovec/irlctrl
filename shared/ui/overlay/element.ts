@@ -303,16 +303,17 @@ export interface OverlayElementDef {
 	};
 	/** Present = the element is trigger-driven: it renders only while a
 	 * runtime trigger has it active (the editor always renders its design
-	 * state). The runtime page calls this for every revalued variable
-	 * whose name matches the element's trigger event; it returns the
-	 * display duration in ms when this instance fires on the event
-	 * (evaluating any variation/condition props),
-	 * `undefined` when the event doesn't claim it. Side effects (audio,
-	 * TTS) belong in here so they fire exactly when the element does.
-	 * The runtime only calls this for a revaluation to a NON-empty value,
-	 * and empties the variable again when the claim expires — the element
-	 * therefore starts from an empty value on every trigger. `ctx` carries
-	 * the live asset URLs and variable values. */
+	 * state). The runtime page calls this for every alert event
+	 * (`GET /overlay/alert/<name>` → `overlays.alert` frame) whose name
+	 * matches the element's trigger event; it returns the display duration
+	 * in ms when this instance fires on the event (evaluating any
+	 * variation/condition props), `undefined` when the event doesn't claim
+	 * it. Side effects (audio, TTS) belong in here so they play when the
+	 * event arrives. Consecutive claims on the same element queue FIFO:
+	 * the element's visual display starts when the previous claim
+	 * expires. `ctx` carries the live asset URLs and variable values;
+	 * values set by the trigger endpoint persist — the runtime never
+	 * empties them. */
 	onTrigger?(
 		element: OverlayElement,
 		eventName: string,

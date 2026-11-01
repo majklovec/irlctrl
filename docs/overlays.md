@@ -167,6 +167,7 @@ Every mutation goes over REST and is fanned out to two WebSocket topics
 | `overlays.project`    | `{project}`                | canvas resize; asset upload/delete (full project, editor-only)     | ✔      | – |
 | `overlays.canvas`     | `{canvas}`                 | canvas resize (runtime gets the slim payload)                      | –      | ✔ |
 | `overlays.assets`     | `{assets}`                 | asset upload/delete                                                | –      | ✔  |
+| `overlays.alert`      | `{name, payload}`          | `GET /overlay/alert/<name>` was called (the trigger event)         | –      | ✔  |
 | `overlays.token`      | `{token}`                  | token rotation                                                     | ✔      | –  |
 
 Notes:
@@ -177,16 +178,20 @@ Notes:
 - The runtime page holds its last known state on disconnect and reconnects
   with exponential backoff (1 s → 30 s); a bad token keeps it blank (the
   server closes the WS with 1008).
-- Trigger-based elements (v1: the `Alert` element) key off **variable
-  names**: when any variable is **revalued to a non-empty value** — by the
-  editor, the `/overlay/variables` endpoint, or the API —
-  the runtime page fires every alert whose trigger variable matches that
-  variable's name. Empty values are never triggers, and a frame repeating the
-  last fired value (a re-delivery) doesn't re-fire. Once an alert's duration
-  has run, the runtime page **empties the trigger variable** the same way (the
-  token endpoint with an empty value: `<id>=`), so a burst of equal values —
-  e.g. a follower event redelivered — reads as a single trigger, not a loop of
-  self-clearing alerts.
+- Trigger-based elements (v1: the `Alert` element) fire off **named
+  events**: `GET /overlay/alert/<name>?token=…[&<name>=<value>…]` publishes
+  an `overlays.alert` frame and the runtime page shows every alert whose
+  *Event* prop equals `<name>`. Consecutive triggers on the same element
+  **queue FIFO** — a second trigger while the first is on air starts right
+  when the first expires (different elements fire independently). Any
+  `?<name>=<value>` pairs set project variables in the same call (typed
+  like the variables endpoint, 404/400 on unknown/bad values) — and they
+  **persist**: the runtime page never clears them (variation `amount`
+  thresholds read the variable, so templates and TTS see the trigger's
+  values while the alert is on air). A bare trigger without values
+  (`/overlay/alert/follow?token=…`) is valid; `<name>` does not need to be
+  a variable, it just needs to match an element's *Event* prop on the
+  runtime page.
 
 ## URL binding
 
@@ -196,6 +201,7 @@ Notes:
 | `/overlay/<scene-slug>`                    | project token in `?token=` | the transparent runtime page (OBS Browser Source); a bad token renders a blank page |
 | `/overlay/variables?token=&<name>=<value>…`| project token              | revalue variables from the querystring (several `<name>=<value>` pairs per fetch; an empty value empties the variable to its neutral value: 0 / false / `#000000` / ""), returns the new variable list |
 | `POST /overlay/variables?token=`           | project token              | revalue variables from a JSON body `{<name>: value\|null}` (`null`/`""` empties), returns the new variable list |
+| `/overlay/alert/<name>?token=…[&<name>=<value>…]` | project token      | trigger every alert element whose *Event* prop equals `<name>` (queues FIFO per element); optional `<name>=<value>` pairs set project variables (persist), returns `{"ok":true,"name":…,"variables":[…]}` |
 | `/overlay/<scene-slug>/ws?token=`          | project token              | the runtime live feed (WebSocket)           |
 | `/chat/<dashboardId>/<widgetId>?token=`    | per-widget token           | a chat widget's live page                   |
 

@@ -7,6 +7,9 @@
  *                                  empty value clears (token auth)
  *   POST /overlay/variables?…      revalue variables from a JSON body
  *                                  {<name>: value|null} (token auth)
+ *   GET  /overlay/alert/:name?…    trigger an alert whose element event
+ *                                  matches <name>; optional ?<name>=<value>
+ *                                  pairs set project variables (token auth)
  *   WS   /overlay/:slug/ws?token=… the runtime live feed (token auth)
  *   …    /api/overlays…            the editor REST API (cookie auth)
  *
@@ -24,24 +27,21 @@ import { ApiError, type Overlays, overlayRuntimeTopic } from "./overlay_store";
 type Auth = Awaited<ReturnType<typeof createAuth>>;
 type Frontend = Awaited<ReturnType<typeof createFrontend>>;
 
-/** Shared handler for the token-authenticated variables endpoint: runs the
- * batch against the store, maps errors to JSON, and 404s an unknown token
- * (a token probe must not leak project existence, exactly like
- * /overlay/:slug). */
-function variablesHandler(
-    overlays: Overlays,
-    valuesOf: (request: Request) => Promise<Record<string, unknown>>,
-) {
-    return async ({ request }: { request: Request }): Promise<Response> => {
+/** Runs a token-authenticated store action and maps the outcome: ApiError
+ * → JSON `{ok:false, error, code}`, `null` → 404 "Not found" (a token probe
+ * must not leak project existence, exactly like /overlay/:slug). */
+function tokenJson(
+    action: () => Promise<
+        { status: number; body: Record<string, unknown> } | null
+    >,
+): Promise<Response> {
+    return (async (): Promise<Response> => {
         let result: {
             status: number;
             body: Record<string, unknown>;
         } | null;
         try {
-            result = overlays.setVariablesByToken(
-                runtimeToken(request),
-                await valuesOf(request),
-            );
+            result = await action();
         } catch (err: unknown) {
             const code = err instanceof ApiError ? err.code : 500;
             return Response.json(
@@ -62,7 +62,16 @@ function variablesHandler(
                 { status: 404 },
             );
         return Response.json(result.body, { status: result.status });
-    };
+    })();
+}
+
+/** Query params of the token endpoints, `token` excluded:
+ * `?<name>=<value>…` pairs. */
+function queryValues(request: Request): Record<string, string> {
+    const values: Record<string, string> = {};
+    for (const [name, value] of new URL(request.url).searchParams)
+        if (name !== TOKEN_PARAM) values[name] = value;
+    return values;
 }
 
 const RUNTIME_HEADERS = {
@@ -105,40 +114,55 @@ export function overlayRoutes(
                 frontend.htmlResponse("overlay_update"),
             ),
         )
-        // before /overlay/:slug — the static path must win over the slug
+        // before /overlay/:slug — the static paths must win over the slug
         .get(
             "/overlay/variables",
-            variablesHandler(overlays, (request) => {
-                // every query param except the token is <name>=<value>; an
-                // empty value clears the variable (its neutral value),
-                // which is how the runtime page empties a finished alert
-                const values: Record<string, string> = {};
-                for (const [name, value] of new URL(request.url).searchParams)
-                    if (name !== TOKEN_PARAM) values[name] = value;
-                return Promise.resolve(values);
-            }),
+            ({ request }) =>
+                tokenJson(() =>
+                    overlays.setVariablesByToken(
+                        runtimeToken(request),
+                        queryValues(request),
+                    ),
+                ),
         )
         .post(
             "/overlay/variables",
-            variablesHandler(overlays, async (request) => {
-                // JSON body: {<name>: value|null} — null/"" clears
-                let body: unknown;
-                try {
-                    body = await request.json();
-                } catch {
-                    throw new ApiError("body must be valid JSON", 400);
-                }
-                if (
-                    typeof body !== "object" ||
-                    body === null ||
-                    Array.isArray(body)
-                )
-                    throw new ApiError(
-                        "body must be a JSON object of variable name → value",
-                        400,
+            ({ request }) =>
+                tokenJson(async () => {
+                    // JSON body: {<name>: value|null} — null/"" clears
+                    let body: unknown;
+                    try {
+                        body = await request.json();
+                    } catch {
+                        throw new ApiError("body must be valid JSON", 400);
+                    }
+                    if (
+                        typeof body !== "object" ||
+                        body === null ||
+                        Array.isArray(body)
+                    )
+                        throw new ApiError(
+                            "body must be a JSON object of variable name → value",
+                            400,
+                        );
+                    return overlays.setVariablesByToken(
+                        runtimeToken(request),
+                        body as Record<string, unknown>,
                     );
-                return body as Record<string, unknown>;
-            }),
+                }),
+        )
+        .get(
+            "/overlay/alert/:name",
+            ({ request, params }) =>
+                tokenJson(() => {
+                    // query pairs (if any) set project variables; the
+                    // trigger itself is the URL's <name>
+                    return overlays.triggerAlertByToken(
+                        runtimeToken(request),
+                        decodeURIComponent(params.name),
+                        queryValues(request),
+                    );
+                }),
         )
         .get("/overlay/:slug", () => runtimePage(frontend))
         .all(

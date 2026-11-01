@@ -84,19 +84,32 @@ export interface Overlays {
     * (`GET /overlay/variables?token=…&<name>=<value>…` and
     * `POST /overlay/variables?token=…` with a JSON
     * `{<name>: value|null}` body). `values` maps variable name → raw
-    * value;
-    * `null`/`""` empties the variable to its type's neutral value
-    * (number → 0, boolean → false, color → "#000000", string → "") — the
-    * runtime page uses that to empty a trigger variable once the alert it
-    * fired has finished. The whole batch lands in one commit and one
-    * `overlays.variables` frame. `null` when the token is unknown (the
-    * route 404s — token probes must not leak project existence, same as
-    * the runtime page); an empty batch or an unknown name throws
-    * ApiError(404/400), a bad value ApiError(400).
+    * value; `null`/`""` empties the variable to its type's neutral value
+    * (number → 0, boolean → false, color → "#000000", string → ""). The
+    * whole batch lands in one commit and one `overlays.variables` frame.
+    * `null` when the token is unknown (the route 404s — token probes must
+    * not leak project existence, same as the runtime page); an empty
+    * batch, an unknown name, or a bad value throws ApiError(404/400).
     */
     setVariablesByToken(
-       token: string,
-       values: Record<string, unknown>,
+        token: string,
+        values: Record<string, unknown>,
+    ): { status: number; body: Record<string, unknown> } | null;
+    /**
+     * Token-authenticated alert trigger for
+     * `GET /overlay/alert/<name>?token=…&<name>=<value>…`: publishes an
+     * `overlays.alert` frame (`{name, payload}`) on the runtime topic;
+     * the runtime page shows every alert element whose `event` prop
+     * equals `name`, queuing consecutive triggers per element. Any query
+     * values are applied to same-named project variables first (they
+     * persist — the new trigger model never empties them). `null` when
+     * the token is unknown; `name` is not validated against project
+     * state (it just needs to match an element on the client).
+     */
+    triggerAlertByToken(
+        token: string,
+        name: string,
+        values: Record<string, unknown>,
     ): { status: number; body: Record<string, unknown> } | null;
 }
 
@@ -689,19 +702,18 @@ export function createOverlays({
         return null;
     }
 
-    function setVariablesByToken(
-        token: string,
+    /** Apply a token-endpoint value batch to the project variables in
+     * place: unknown names 404, null/"" empties to the type's neutral
+     * value, booleans map "true"/"false"/"0"/"1". Throws ApiError on any
+     * problem before any value is applied. Shared by the variables and
+     * alert trigger endpoints. */
+    function applyTokenValues(
+        store: Store,
         values: Record<string, unknown>,
-    ): { status: number; body: Record<string, unknown> } | null {
-        const hit = runtimeStore(token);
-        if (!hit) return null;
-        const [user, store] = hit;
+    ): void {
         // names are unique per project, so the token endpoint keys on
         // names (ids are internal, names are what triggers match on)
-        const names = Object.keys(values);
-        if (names.length === 0)
-            throw new ApiError("at least one variable is required", 400);
-        for (const name of names) {
+        for (const name of Object.keys(values)) {
             const variable = store.project.variables.find(
                 (v) => v.name === name,
             );
@@ -734,14 +746,27 @@ export function createOverlays({
             }
             variable.value = parseVariableValueInput(value, variable);
         }
+    }
+
+    function setVariablesByToken(
+        token: string,
+        values: Record<string, unknown>,
+    ): { status: number; body: Record<string, unknown> } | null {
+        const hit = runtimeStore(token);
+        if (!hit) return null;
+        const [user, store] = hit;
+        if (Object.keys(values).length === 0)
+            throw new ApiError("at least one variable is required", 400);
+        applyTokenValues(store, values);
         // one commit + one frame for the whole batch, so a live scene
         // sees all the new values in a single render
         try {
             revalidate(store.project);
         } catch {
-            // a revalidation failure here means internal cross-references are
-            // off in a way the caller can't have caused — keep the token
-            // endpoint's no-leak contract (bare 404, like an unknown variable)
+            // a revalidation failure here means internal cross-references
+            // are off in a way the caller can't have caused — keep the
+            // token endpoint's no-leak contract (bare 404, like an unknown
+            // variable)
             throw new ApiError("Not found", 404);
         }
         commit(user, store);
@@ -754,6 +779,46 @@ export function createOverlays({
         return {
             status: 200,
             body: { ok: true, variables: store.project.variables },
+        };
+    }
+
+    /** Trigger an alert through its event name (the `<name>` in
+     * `GET /overlay/alert/<name>`): the event is pushed to the runtime
+     * topic as an `overlays.alert` frame. Any query values are applied
+     * to same-named project variables first (one commit + one
+     * `overlays.variables` frame, so templates/`amount` render live
+     * values — and they persist, the new trigger model never empties
+     * them). `null` when the token is unknown (the route 404s, same
+     * no-leak contract as the variables endpoint); unknown variable
+     * names and bad values throw ApiError(404/400). */
+    function triggerAlertByToken(
+        token: string,
+        name: string,
+        values: Record<string, unknown>,
+    ): { status: number; body: Record<string, unknown> } | null {
+        const hit = runtimeStore(token);
+        if (!hit) return null;
+        const [user, store] = hit;
+        applyTokenValues(store, values);
+        if (Object.keys(values).length > 0) {
+            try {
+                revalidate(store.project);
+            } catch {
+                // no-leak contract, same as setVariablesByToken
+                throw new ApiError("Not found", 404);
+            }
+            commit(user, store);
+            feed(user, "overlays.variables", {
+                variables: store.project.variables,
+            });
+            runtime(user, "overlays.variables", {
+                variables: store.project.variables,
+            });
+        }
+        runtime(user, "overlays.alert", { name, payload: values });
+        return {
+            status: 200,
+            body: { ok: true, name, variables: store.project.variables },
         };
     }
 
@@ -775,5 +840,6 @@ export function createOverlays({
             };
         },
         setVariablesByToken,
+        triggerAlertByToken,
     };
 }

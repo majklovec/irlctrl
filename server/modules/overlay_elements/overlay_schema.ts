@@ -204,9 +204,10 @@ export const groupSchema: OverlayElementSchema = {
     normalizeProps: () => ({}),
 };
 
-/** Alert element: fires when its trigger variable (a project variable,
- * named by `props.event`) is revalued, shows media + token text for
- * `duration` ms, then fades out (TODO.md "Alert element"). */
+/** Alert element: fires for the named event `props.event` (published by
+ * `GET /overlay/alert/<name>`), shows media + token text for `duration` ms,
+ * then fades out (TODO.md "Alert element"). Consecutive triggers on the
+ * same element queue FIFO. */
 export const ALERT_INTRO_ANIMATIONS = [
     "none",
     "fadeIn",

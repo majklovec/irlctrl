@@ -906,6 +906,147 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                 runtimeSocket.close();
             }
 
+            // ── GET /overlay/alert/<name>: the dedicated trigger endpoint ──
+            // an alert element listens for a named event; the endpoint fires
+            // it by name and optional ?<name>=<value> pairs set project
+            // variables (which persist — the endpoint never clears them)
+            const alertUpsertRes = await fetch(
+                `${baseUrl}/api/overlays/scenes/${sceneBody.scene.id}/elements`,
+                {
+                    method: "PUT",
+                    headers: { cookie, "content-type": "application/json" },
+                    body: JSON.stringify({
+                        element: {
+                            id: crypto.randomUUID(),
+                            name: "test alert",
+                            type: "alert",
+                            transform: {
+                                x: 0,
+                                y: 0,
+                                width: 400,
+                                height: 200,
+                                rotation: 0,
+                                opacity: 1,
+                            },
+                            visible: true,
+                            locked: false,
+                            parentId: null,
+                            bindings: {},
+                            props: { event: "test.alert" },
+                        },
+                    }),
+                },
+            );
+            expect(alertUpsertRes.status).toBe(200);
+
+            const alertSocket = await connectSocket(
+                `${baseUrl.replace(/^http/, "ws")}/overlay/${sceneBody.scene.slug}/ws?token=${token}`,
+            );
+            try {
+                await nextFrame(
+                    alertSocket,
+                    (f) => f.event === "overlays.snapshot",
+                );
+
+                // values ride along as query pairs, the trigger is the
+                // URL's <name>
+                const alertRes = await fetch(
+                    `${baseUrl}/overlay/alert/test.alert?token=${token}&score=4&live=true`,
+                );
+                expect(alertRes.status).toBe(200);
+                expect(await alertRes.json()).toMatchObject({
+                    ok: true,
+                    name: "test.alert",
+                    variables: [
+                        { name: "score", value: 4 },
+                        { name: "lives", value: 0 },
+                        { name: "live", value: true },
+                    ],
+                });
+
+                // both frames land on the runtime socket: the revalued
+                // variables first (so templates/`amount` render live),
+                // then the alert event (the name the elements match on)
+                await nextFrame(
+                    alertSocket,
+                    (f) =>
+                        f.event === "overlays.variables" &&
+                        (
+                            (f.data as {
+                                variables?: { name: string; value: unknown }[];
+                            })
+                                .variables ?? []
+                        ).every((v) =>
+                            ({
+                                score: 4,
+                                lives: 0,
+                                live: true,
+                            } as Record<string, unknown>)[v.name] === v.value,
+                        ),
+                );
+                const alertEvent = await nextFrame(
+                    alertSocket,
+                    (f) =>
+                        f.event === "overlays.alert" &&
+                        (f.data as { name?: string }).name === "test.alert",
+                );
+                expect(alertEvent.data).toMatchObject({
+                    name: "test.alert",
+                    payload: { score: "4", live: "true" },
+                });
+
+                // the values persisted (the new model never clears them)
+                const afterAlert = (await (
+                    await fetch(`${baseUrl}/api/overlays`, { headers: { cookie } })
+                ).json()) as {
+                    project: { variables: { name: string; value: unknown }[] };
+                };
+                expect(
+                    Object.fromEntries(
+                        afterAlert.project.variables.map((v) => [v.name, v.value]),
+                    ),
+                ).toMatchObject({ score: 4, lives: 0, live: true });
+
+                // unknown variable in the batch → 404, bad token → 404
+                expect(
+                    (
+                        await fetch(
+                            `${baseUrl}/overlay/alert/test.alert?token=${token}&nope=1`,
+                        )
+                    ).status,
+                ).toBe(404);
+                expect(
+                    (
+                        await fetch(
+                            `${baseUrl}/overlay/alert/test.alert?token=deadbeef`,
+                        )
+                    ).status,
+                ).toBe(404);
+
+                // a bare trigger (no values) is fine — the name just needs
+                // to match an element on the client; the alert frame is
+                // published either way
+                const bareAlertRes = await fetch(
+                    `${baseUrl}/overlay/alert/no.such.event?token=${token}`,
+                );
+                expect(bareAlertRes.status).toBe(200);
+                expect(await bareAlertRes.json()).toMatchObject({
+                    ok: true,
+                    name: "no.such.event",
+                });
+                expect(
+                    await nextFrame(
+                        alertSocket,
+                        (f) =>
+                            f.event === "overlays.alert" &&
+                            (f.data as { name?: string }).name ===
+                                "no.such.event",
+                    ),
+                ).toBeTruthy();
+            } finally {
+                alertSocket.close();
+            }
+
             // ── token rotation ──
             const rotateRes = await fetch(`${baseUrl}/api/overlays/token/rotate`, {
                 method: "POST",

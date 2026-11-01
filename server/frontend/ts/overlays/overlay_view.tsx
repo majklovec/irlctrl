@@ -5,15 +5,15 @@
  * - one project token in the URL query; a bad token just renders an empty page
  * - initial state + live updates over WS /overlay/:slug/ws
  * - on disconnect: hold last-known state, reconnect with exponential backoff
- * - a revalued variable fires the alerts that listen for its name; once the
- *   alert's duration has run, the page clears the variable (same token
- *   endpoint, no value) so a stream of repeats reads as a single trigger
+ * - an `overlays.alert` frame shows every alert element whose event matches
+ *   the frame's name; an element already showing an alert queues the new
+ *   one FIFO and starts it when the current one expires (variables set by
+ *   the trigger endpoint persist — they are never cleared here)
  */
 import m from "mithril";
 import type {
 	Asset,
 	Canvas,
-	OverlayElement,
 	Scene,
 	Variable,
 	VariableValue,
@@ -26,7 +26,6 @@ import {
 import { elementDef } from "../../../../shared/ui/overlay/registry";
 import {
 	assetUrl,
-	overlayElementView,
 	sceneElementsView,
 } from "./overlay_render";
 import "../../css/overlay.css";
@@ -69,27 +68,15 @@ const triggerTimers = new Map<
 	[ReturnType<typeof setTimeout>, ReturnType<typeof setTimeout>]
 >();
 
-/** variable id -> the last non-empty value we fired a trigger for; a later
- * frame with the SAME value is a re-delivery (or the alert's own clear
- * round-trip), not a new trigger */
-const triggeredVariables = new Map<string, VariableValue>();
+/** element id -> FIFO of pending alerts (the element is showing an earlier
+ * one); drained when the element's current trigger expires */
+const alertQueues = new Map<
+	string,
+	{ eventName: string; payload: Record<string, unknown> }[]
+>();
 
 let ws: WebSocket | undefined;
 let delay = 1000;
-
-/** Empty a variable through the token endpoint (empty value = clear), so
- * an alert re-fires on the next (non-empty) revaluation, not while its
- * own clear frame is round-tripping. */
-function clearVariable(name: string): void {
-	void fetch(
-		"/overlay/variables?token=" +
-			encodeURIComponent(token) +
-			"&" +
-			encodeURIComponent(name) +
-			"=",
-		{ method: "GET" },
-	).catch(() => {});
-}
 
 function variableMap(): Map<string, Variable["value"]> {
 	return new Map(state.variables.map((v) => [v.id, v.value]));
@@ -132,29 +119,20 @@ function handleMessage(raw: MessageEvent, first: { open: boolean }): void {
 			if (scene && scene.id === state.scene?.id) state.scene = scene;
 			break;
 		}
-		case "overlays.variables": {
-			if (Array.isArray(data.variables)) {
-				const next = data.variables as Variable[];
-				const previous = new Map(
-					state.variables.map((v) => [v.name, v.value]),
-				);
-				state.variables = next;
-				// A revalued variable is a trigger: fire every alert that
-				// listens for the variable's name — but empty values are
-				// never triggers (they are how a finished alert empties
-				// its variable), and a frame repeating the LAST fired
-				// value is a re-delivery, not a new trigger.
-				for (const v of next) {
-					if (v.value === "") continue;
-					const previousValue =
-						previous.get(v.name) ?? triggeredVariables.get(v.id);
-					if (previousValue === v.value) continue;
-					triggeredVariables.set(v.id, v.value);
-					fireVariableTrigger(v);
-				}
-			}
+		case "overlays.variables":
+			// values only render into templates/`amount`; triggering is the
+			// dedicated `overlays.alert` frame
+			if (Array.isArray(data.variables))
+				state.variables = data.variables as Variable[];
 			break;
-		}
+		case "overlays.alert":
+			// fired by GET /overlay/alert/<name>: show every alert element
+			// whose event matches <name>, queueing per element
+			handleTrigger(
+				String(data.name ?? ""),
+				(data.payload ?? {}) as Record<string, unknown>,
+			);
+			break;
 		case "overlays.assets":
 			if (Array.isArray(data.assets)) state.assets = data.assets;
 			break;
@@ -177,16 +155,10 @@ function runtimeCtx(): ElementContext {
 	};
 }
 
-/** End a trigger-driven element's life: play the outro window, then remove
- * it from the page. Re-firing restarts the whole cycle. When the element's
- * trigger variable is known, the variable is emptied at expiry — the alert
- * re-fires on the next non-empty revaluation, so a burst of equal values
- * reads as one trigger, not a self-clearing loop. */
-function scheduleTriggerLifecycle(
-	elementId: string,
-	duration: number,
-	variableName?: string,
-): void {
+/** Show a claimed trigger: active until its duration runs out, with the
+ * outro window fading it. When an alert was queued for this element (it
+ * was already showing one), the next one starts right at expiry. */
+function scheduleTriggerLifecycle(elementId: string, duration: number): void {
 	const [outroId, removeId] = triggerTimers.get(elementId) ?? [0, 0];
 	clearTimeout(outroId);
 	clearTimeout(removeId);
@@ -196,33 +168,42 @@ function scheduleTriggerLifecycle(
 			setTimeout(() => {
 				state.activeTriggers.delete(elementId);
 				triggerTimers.delete(elementId);
-				if (variableName) clearVariable(variableName);
+				const queue = alertQueues.get(elementId);
+				if (queue && queue.length > 0) {
+					const [next, ...rest] = queue;
+					if (rest.length > 0)
+						alertQueues.set(elementId, rest);
+					else alertQueues.delete(elementId);
+					activateTrigger(elementId, next.payload, next.duration);
+				}
 				m.redraw();
 			}, duration),
 		];
 	triggerTimers.set(elementId, timers);
 }
 
-/** A revalued variable fires its alerts: the variable's name is the trigger
- * name, the new value the payload (a numeric value also surfaces as
- * `amount`, which variation/TTS thresholds compare against). */
-function fireVariableTrigger(v: Variable): void {
-	const payload: Record<string, unknown> = { value: v.value };
-	if (v.value !== "") {
-		const n = Number(v.value);
-		if (Number.isFinite(n)) payload.amount = n;
-	}
-	handleTrigger(v.name, v.name, payload);
+function activateTrigger(
+	elementId: string,
+	payload: Record<string, unknown>,
+	duration: number,
+): void {
+	const now = Date.now();
+	state.activeTriggers.set(elementId, {
+		startedAt: now,
+		expiresAt: now + duration,
+		payload,
+	});
+	scheduleTriggerLifecycle(elementId, duration);
 }
 
-/** Route a trigger to every trigger-driven element in the scene. An element
- * claims the trigger (returns a duration) only when its configured event
- * name matches — and, for variation alerts, when the amount condition
- * holds. `variableName` (the revalued variable) is emptied when the claim
- * expires, so the next trigger starts from an empty value. */
+/** Route an `overlays.alert` frame to every trigger-driven element in the
+ * scene. An element claims the trigger (returns a duration) only when its
+ * configured event name matches — and, for variation alerts, when the
+ * amount condition holds. Claims on an element that is still showing an
+ * earlier alert are queued FIFO and start at that alert's expiry (the
+ * values the trigger endpoint set persist; nothing is cleared here). */
 function handleTrigger(
 	eventName: string,
-	variableName: string | undefined,
 	payload: Record<string, unknown>,
 ): void {
 	const scene = state.scene;
@@ -234,13 +215,14 @@ function handleTrigger(
 		const duration = def.onTrigger(element, eventName, payload, ctx);
 		if (duration === undefined || !Number.isFinite(duration) || duration <= 0)
 			continue;
-		const now = Date.now();
-		state.activeTriggers.set(element.id, {
-			startedAt: now,
-			expiresAt: now + duration,
-			payload,
-		});
-		scheduleTriggerLifecycle(element.id, duration, variableName);
+		if (state.activeTriggers.has(element.id)) {
+			// the element is showing an earlier alert: queue this claim
+			const queue = alertQueues.get(element.id) ?? [];
+			queue.push({ payload, duration });
+			alertQueues.set(element.id, queue);
+			continue;
+		}
+		activateTrigger(element.id, payload, duration);
 	}
 }
 

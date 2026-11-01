@@ -1,15 +1,16 @@
 /** @jsx m */
 /*
  * Alert element — a trigger-driven overlay (TODO.md "Alert element").
- * It fires when a project variable is revalued: the variable's name is the
- * trigger name (`props.event`), and when one arrives it shows a media +
- * template-text composition with intro/outro animations, an optional audio
- * sting and TTS, for `duration` ms, then removes itself.
+ * It fires for a named event: `GET /overlay/alert/<name>` shows this alert
+ * while `<name>` equals `props.event`, rendering a media + template-text
+ * composition with intro/outro animations, an optional audio sting and TTS,
+ * for `duration` ms. Consecutive triggers on the same element queue FIFO.
+ * Values set by the trigger endpoint persist (the runtime never clears
+ * them).
  *
  * Template tokens `{name}` resolve against a project variable of that name
- * first, then against a key of the trigger payload (the revalued variable's
- * value arrives as `value`/`amount`); token segments render in the accent
- * colour.
+ * first, then against a key of the trigger payload (the alert endpoint's
+ * `?<name>=<value>` pairs); token segments render in the accent colour.
  */
 
 import type { Vnode } from "mithril";
@@ -98,6 +99,22 @@ function alertProps(p: Record<string, unknown>): AlertUiProps {
 }
 
 const clamp01 = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n);
+
+// OBS browser sources load without a user gesture, so Chrome silently ignores
+// speechSynthesis.speak() until the engine is "unlocked" by a one-off silent
+// utterance. We do that once per page load, on the first TTS trigger.
+let ttsUnlocked = false;
+/** Unlock Web Speech for gesture-less contexts. @returns true when it just
+ * unlocked (the caller should skip `speechSynthesis.cancel()` so the silent
+ * utterance is not killed before it registers). */
+function unlockTts(): boolean {
+	if (ttsUnlocked) return false;
+	if (typeof window === "undefined" || !("speechSynthesis" in window))
+		return false;
+	window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+	ttsUnlocked = true;
+	return true;
+}
 
 // ── template parser ──────────────────────────────────────────────────────
 
@@ -303,19 +320,23 @@ function onTrigger(
 		if (amount >= p.ttsMinAmount) {
 			const sentence = [
 				templateText(p.titleTemplate, ctx, payload),
+				"... : ...",
 				templateText(p.messageTemplate, ctx, payload),
 			]
 				.filter(Boolean)
 				.join(" ")
 				.trim();
 			if (sentence) {
+				const justUnlocked = unlockTts();
 				const utterance = new SpeechSynthesisUtterance(sentence);
 				utterance.volume = clamp01(p.ttsVolume);
 				const voice = window.speechSynthesis
 					.getVoices()
 					.find((v) => v.name === p.ttsVoice || v.voiceURI === p.ttsVoice);
 				if (voice) utterance.voice = voice;
-				window.speechSynthesis.cancel(); // fast triggers: replace, don't queue
+				// fast triggers: replace, don't queue — but a cancel() right
+				// after unlock would kill the silent unlock utterance
+				if (!justUnlocked) window.speechSynthesis.cancel();
 				window.speechSynthesis.speak(utterance);
 			}
 		}
