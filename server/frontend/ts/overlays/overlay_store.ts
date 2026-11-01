@@ -136,6 +136,18 @@ export function variableUrl(name: string): string {
     );
 }
 
+/** How many field bindings in the current scene follow the given variable.
+ * Zero variables read as "unused", so the panel can flag them. */
+export function variableUsage(variableId: string): number {
+    const s = scene();
+    if (!s) return 0;
+    let n = 0;
+    for (const e of s.elements)
+        for (const b of Object.values(e.bindings))
+            if (b.kind === "variable" && b.variableId === variableId) n++;
+    return n;
+}
+
 /** Fetch the project; an editor page passes the scene id its URL names. */
 export async function load(sceneId: string | null = null): Promise<void> {
     const body = await apiTry<{ project: OverlayProject; token: string }>(

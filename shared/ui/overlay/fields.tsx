@@ -1,85 +1,109 @@
 /** @jsx m */
 /*
  * Shared inspector building blocks. Every element's `editForm` composes its
- * type-specific fields out of `bindField`, so all elements share one look
- * and one binding affordance: a tiny label-less checkbox next to each field
- * (info on hover); checked, the field's control swaps to a variable picker.
- * (Element *content* lives in the per-element modules; nothing here is
- * specific to a single element type.)
+ * type-specific fields out of `bindField`, so all elements share one look and
+ * one binding affordance. While unbound, a field shows its normal control plus
+ * a compact **bind select** on the right (a chain icon next to a dropdown; pick
+ * a variable to bind). While bound, the control is replaced by a **pill** —
+ * the linked variable by name, switchable inline, with an ✕ to detach. (Element
+ * *content* lives in the per-element modules; nothing here is specific to a
+ * single element type.)
  */
 import m from "mithril";
 import type { Vnode, VnodeDOM } from "mithril";
 import type { Variable } from "../../overlay";
 import { t } from "../i18n";
+import { Icon } from "../components/icons";
 import type { ElementProps, OverlayElement } from "./element";
 
 export function lbl(label: string): Vnode {
 	return <span class="ov-lbl">{label}</span>;
 }
 
-/** The small, label-less binding checkbox (its `title` tooltip is the only
- * visible info). Checking binds `path` to the first variable, unchecking
- * removes the binding; without a single variable the toggle stays disabled
- * so no half-set binding is ever stored. */
-export function bindToggle(
-	e: OverlayElement,
-	path: string,
-	{
-		mutate,
-		variables,
-	}: Pick<ElementProps, "mutate" | "variables">,
+/** The unbound bind affordance: a chain icon beside a native select. The
+ * select's empty value *is* the "not bound" state, so there is no open/closed
+ * state to manage. With no variables defined it carries a single "No
+ * variables" option (nothing to bind to). */
+function bindSelect(
+	variables: Variable[],
+	onpick: (id: string) => void,
 ): Vnode {
+	if (variables.length === 0)
+		return (
+			<span class="ov-bind">
+				<span class="ov-icon" aria-hidden="true">
+					<Icon name="link" />
+				</span>
+				<select class="ov-bind-sel" disabled value="">
+					<option value="">{t("overlay.no_variables")}</option>
+				</select>
+			</span>
+		);
 	return (
-		<input
-			type="checkbox"
-			class="ov-bind-chk"
-			title={t("overlay.bind_variable")}
-			aria-label={t("overlay.bind_variable")}
-			checked={e.bindings[path] !== undefined}
-			disabled={e.bindings[path] === undefined && variables.length === 0}
-			onchange={(ev: Event) =>
-				mutate((el) => {
-					if ((ev.target as HTMLInputElement).checked) {
-						const first = variables[0];
-						if (first)
-							el.bindings[path] = { kind: "variable", variableId: first.id };
-					} else {
-						delete el.bindings[path];
-					}
-				})
-			}
-		/>
+		<span class="ov-bind">
+			<span class="ov-icon" aria-hidden="true">
+				<Icon name="link" />
+			</span>
+			<select
+				class="ov-bind-sel"
+				value=""
+				aria-label={t("overlay.bind_variable")}
+				onchange={(ev: Event) => {
+					const id = (ev.target as HTMLSelectElement).value;
+					if (id) onpick(id);
+				}}
+			>
+				<option value="" disabled hidden>
+					{t("overlay.bind_variable")}
+				</option>
+				{variables.map((v) => (
+					<option key={v.id} value={v.id}>
+						{v.name}
+					</option>
+				))}
+			</select>
+		</span>
 	);
 }
 
-/** Variable picker shown in place of a field's normal control while the
- * field is bound. */
-function varSelect(
-	e: OverlayElement,
-	path: string,
+/** A field bound to a variable: a compact pill — a chain icon, the linked
+ * variable's name, a switcher that changes it in place, and an ✕ to detach.
+ * Rendering it in place of the field's normal control makes the binding
+ * obvious at a glance. */
+function boundPill(
 	variables: Variable[],
-	{ mutate }: Pick<ElementProps, "mutate">,
+	variableId: string,
+	onpick: (id: string) => void,
 ): Vnode {
-	const binding = e.bindings[path];
 	return (
-		<select
-			class="ov-var-sel"
-			value={binding ? binding.variableId : ""}
-			onchange={(ev: Event) => {
-				const id = (ev.target as HTMLSelectElement).value;
-				mutate((el) => {
-					if (id)
-						el.bindings[path] = { kind: "variable", variableId: id };
-					else delete el.bindings[path];
-				});
-			}}
-		>
-			{variables.map((v: Variable) => (
-				<option key={v.id} value={v.id}>
-					{v.name}
-				</option>
-			))}
-		</select>
+		<span class="ov-bound">
+			<span class="ov-icon" aria-hidden="true">
+				<Icon name="link" />
+			</span>
+			<select
+				class="ov-var-pick"
+				value={variableId}
+				aria-label={t("overlay.bind_variable")}
+				onchange={(ev: Event) => {
+					const id = (ev.target as HTMLSelectElement).value;
+					if (id) onpick(id);
+				}}
+			>
+				{variables.map((v) => (
+					<option key={v.id} value={v.id}>
+						{v.name}
+					</option>
+				))}
+			</select>
+			<button
+				class="ov-unbind"
+				type="button"
+				label={t("overlay.unbind_variable")}
+				onclick={() => onpick("")}
+			>
+				<Icon name="close" />
+			</button>
+		</span>
 	);
 }
 
@@ -94,13 +118,13 @@ function isBindable(control: Vnode): boolean {
 	return true;
 }
 
-/** One inspector field with an inline binding toggle. `title` is the label
- * shown above the control, `path` the full binding key the schema accepts
- * (`props.<name>`, `transform.<field>`, or `visible`) and `input` the
- * field's normal control. While the small, label-less checkbox on the right
- * (see `bindToggle`) is checked, `input` is replaced by a select over the
- * project variables. The toggle is omitted for selects and checkboxes
- * (see `isBindable`). */
+/** One inspector field with an inline binding affordance. `title` is the
+ * label shown above the control, `path` the full binding key the schema
+ * accepts (`props.<name>`, `transform.<field>`, or `visible`) and `input` the
+ * field's normal control. Unbound fields render `input` plus a bind select
+ * (see `bindSelect`) on the right; bound fields replace `input` with a pill
+ * (see `boundPill`) naming the linked variable. The affordance is omitted for
+ * selects and checkboxes (see `isBindable`). */
 export function bindField(
 	e: OverlayElement,
 	path: string,
@@ -109,15 +133,30 @@ export function bindField(
 	props: Pick<ElementProps, "mutate" | "variables">,
 ): Vnode {
 	const bindable = isBindable(input);
-	const bound = bindable && e.bindings[path] !== undefined;
+	const { mutate, variables } = props;
+	if (!bindable)
+		return (
+			<div class="ov-field">
+				<span class="ov-lbl">{title}</span>
+				{input}
+			</div>
+		);
+
+	const binding = e.bindings[path];
+	const setPick = (id: string) =>
+		mutate((el) => {
+			if (id) el.bindings[path] = { kind: "variable", variableId: id };
+			else delete el.bindings[path];
+		});
+
 	return (
 		<div class="ov-field">
 			<span class="ov-lbl">{title}</span>
 			<div class="ov-field-row">
 				<div class="ov-field-ctl">
-					{bound ? varSelect(e, path, props.variables, { mutate: props.mutate }) : input}
+					{binding ? boundPill(variables, binding.variableId, setPick) : input}
 				</div>
-				{bindable ? bindToggle(e, path, props) : null}
+				{binding ? null : bindSelect(variables, setPick)}
 			</div>
 		</div>
 	);
