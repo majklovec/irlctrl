@@ -1,0 +1,44 @@
+/* Badges and definition lists. */
+
+.badge {
+    display: inline-block;
+    padding: 0.2rem 0.65rem;
+    border-radius: var(--radius-pill);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    background: var(--border);
+}
+/* tinted badges carry their shade in --tint */
+.badge.on,
+.badge.off,
+.badge.warn {
+    background: color-mix(in srgb, var(--tint) 20%, transparent);
+    color: var(--tint);
+    border: 1px solid color-mix(in srgb, var(--tint) 35%, transparent);
+}
+.badge.on {
+    --tint: var(--ok);
+}
+.badge.off {
+    --tint: var(--bad);
+}
+.badge.warn {
+    --tint: var(--warn);
+}
+
+/* Label column keeps its natural width when space is plentiful but shrinks
+   (labels wrap) in narrow containers, so values always get the rest. */
+dl {
+    display: grid;
+    grid-template-columns: minmax(min-content, max-content) 1fr;
+    gap: 0.3rem 1rem;
+    margin: 0 0 1rem;
+}
+dt {
+    color: var(--muted);
+}
+dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}

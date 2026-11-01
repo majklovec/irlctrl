@@ -1,0 +1,133 @@
+/* Page header: brand, main nav, profile menu. */
+
+header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem 2rem;
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--header-bg-blur);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+
+/* Brand logo at the head of the page header (links home). */
+.brand {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+.brand-logo {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    display: block;
+}
+
+header > .actions {
+    margin-left: auto;
+}
+
+/* Main menu in the server header (device list / dashboards) */
+.main-nav {
+    display: flex;
+    min-width: 0;
+}
+.main-nav > span {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+}
+
+.nav-link {
+    padding: 0.5rem 0;
+    border-bottom: 2px solid transparent;
+    text-decoration: none;
+    color: var(--muted);
+    font-weight: 600;
+    transition:
+        color var(--t),
+        border-color var(--t);
+}
+
+.nav-link:hover {
+    color: var(--text);
+    border-bottom-color: var(--border-strong);
+}
+.nav-link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+}
+
+.nav-link.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+}
+
+/* Keep the profile trigger in the header's top-right, separate from navigation. */
+header:has(.profile-menu) {
+    position: relative;
+    z-index: 50;
+}
+header:has(.profile-menu) > .actions {
+    margin-right: 3.25rem;
+}
+.main-nav .profile-menu {
+    position: absolute;
+    right: 1.25rem;
+    z-index: 40;
+}
+.profile-menu-trigger {
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+.profile-menu-trigger:hover {
+    background: var(--accent-hover);
+}
+.profile-menu-trigger:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+.profile-menu-dropdown {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.5rem);
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    min-width: 10rem;
+    padding: 0.25rem 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-sm);
+}
+.profile-menu-dropdown > * {
+    display: block;
+    width: 100%;
+    padding: 0.45rem 0.9rem;
+    font: inherit;
+    text-align: left;
+    color: var(--text);
+    background: none;
+    border: 0;
+    cursor: pointer;
+    text-decoration: none;
+}
+.profile-menu-dropdown > *:hover,
+.profile-menu-dropdown > *:focus-visible {
+    background: color-mix(in srgb, var(--bg) 55%, transparent);
+    outline: none;
+}

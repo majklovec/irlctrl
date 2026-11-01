@@ -1,0 +1,80 @@
+/* Checkbox and check labels. */
+
+/* Author `display` rules (e.g. label grid) would otherwise defeat the hidden attribute */
+[hidden] {
+    display: none;
+}
+form .break {
+    flex-basis: 100%;
+    height: 0;
+}
+/* One repeatable row inside a grouped form (e.g. an RTMP output): wraps full
+ * width under the group's legend and lays out its fields like the form. */
+form .output-row {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: end;
+}
+label.check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    align-self: center;
+    cursor: pointer;
+    user-select: none;
+}
+label.check:has(input:disabled) {
+    cursor: not-allowed;
+}
+/* In a form: as tall as a text input and bottom-aligned, so it sits on the inputs' row */
+form label.check {
+    align-self: end;
+    min-block-size: calc(1lh + 1rem + 2px);
+}
+
+input[type="checkbox"] {
+    appearance: none;
+    flex: none;
+    display: inline-grid;
+    place-content: center;
+    inline-size: 1.15rem;
+    block-size: 1.15rem;
+    margin: 0;
+    padding: 0;
+    border: 1.5px solid var(--border-strong);
+    border-radius: 5px;
+    vertical-align: middle;
+    cursor: pointer;
+}
+input[type="checkbox"]::before {
+    content: "";
+    inline-size: 0.7rem;
+    block-size: 0.7rem;
+    background: var(--on-accent);
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+    transform: scale(0);
+    transition: transform var(--t);
+}
+input[type="checkbox"]:hover {
+    border-color: var(--accent);
+}
+input[type="checkbox"]:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+input[type="checkbox"]:checked:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+input[type="checkbox"]:checked::before {
+    transform: scale(1);
+}
+input[type="checkbox"]:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+input[type="checkbox"]:disabled:hover {
+    border-color: var(--border-strong);
+}

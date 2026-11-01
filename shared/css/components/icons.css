@@ -1,0 +1,63 @@
+/* Inline SVG icons, role icons, device dot. */
+
+/* Device type icons */
+.role {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    white-space: nowrap;
+}
+/* Inline SVGs carry only a viewBox, so CSS must size them (1em tracks text size) */
+.role-icon {
+    /*    width: 1em; */
+    height: 1em;
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.role .role-icon + .role-icon {
+    margin-left: -0.1rem;
+}
+th .role-icon {
+    vertical-align: -0.2em;
+}
+
+/* Device list: the dot wears the device's header color and beats like a
+   heartbeat while its websocket link is up; offline it goes dim and still */
+.device-dot {
+    display: inline-block;
+    width: 0.55rem;
+    height: 0.55rem;
+    margin-right: 0.45rem;
+    vertical-align: 0.05rem;
+    border-radius: 50%;
+    background: var(--muted);
+    opacity: 0.55;
+    box-shadow: 0 0 8px currentColor;
+}
+.device-dot.online {
+    opacity: 1;
+    animation: heartbeat 1.4s ease-in-out infinite;
+}
+
+@keyframes heartbeat {
+    0%,
+    100% {
+        transform: scale(0.8);
+        opacity: 0.7;
+    }
+    15% {
+        transform: scale(1.15);
+        opacity: 1;
+    }
+    30% {
+        transform: scale(0.9);
+    }
+    45% {
+        transform: scale(1.05);
+        opacity: 0.95;
+    }
+}

@@ -1,0 +1,190 @@
+/* Forms: fields, inputs, buttons, actions, tables. */
+
+/* Narrow dashboard cells (e.g. the two-column mobile grid): definition
+ * labels move to their own rows and badge text is cropped with an ellipsis
+ * instead of wrapping. Container-scoped, so full pages are unaffected. */
+@container dash-widget (max-width: 420px) {
+    .dash-widget dl {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.15rem 0;
+    }
+    .dash-widget dl dd {
+        margin-top: 2px;
+    }
+    .dash-widget .badge {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+/* Full-page cards get the same treatment at their own narrow widths: in a
+ * stacked (single-column) definition list the value keeps the whole row and
+ * the label sits above it, so long values get the full width. */
+@container card (max-width: 560px) {
+    .card > dl {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.15rem 0;
+    }
+    .card > dl dd {
+        margin-top: 2px;
+    }
+}
+
+form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    /* align-items: end; */
+}
+form.inline {
+    align-items: center;
+}
+label {
+    display: grid;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-weight: 500;
+}
+
+input,
+select,
+button,
+textarea {
+    font: inherit;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--bg) 80%, var(--card-solid));
+    color: var(--text);
+    transition:
+        border-color var(--t),
+        box-shadow var(--t),
+        background var(--t),
+        color var(--t);
+}
+
+/* Color picker: thin padding so the swatch fills the control, same height as text inputs */
+input[type="color"] {
+    padding: 0.2rem;
+    inline-size: 4.5rem;
+    block-size: calc(1lh + 1rem + 2px);
+    cursor: pointer;
+}
+input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+input[type="color"]::-webkit-color-swatch {
+    border: none;
+    border-radius: var(--radius-xs);
+}
+input[type="color"]::-moz-color-swatch {
+    border: none;
+    border-radius: var(--radius-xs);
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+    border-color: var(--border-strong);
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--ring);
+}
+
+button {
+    cursor: pointer;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+    font-weight: 600;
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 30%, transparent);
+    transition:
+        background var(--t),
+        border-color var(--t),
+        transform var(--t),
+        box-shadow var(--t);
+}
+button:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+button:active {
+    transform: translateY(1px);
+}
+
+button.secondary {
+    background: transparent;
+    color: var(--text);
+    border-color: var(--border);
+    box-shadow: none;
+}
+button.secondary:hover {
+    background: color-mix(in srgb, var(--text) 6%, transparent);
+    border-color: var(--border-strong);
+}
+
+button.danger {
+    background: var(--bad);
+    border-color: var(--bad);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--bad) 30%, transparent);
+}
+button.danger:hover {
+    background: color-mix(in srgb, var(--bad) 85%, white);
+    border-color: color-mix(in srgb, var(--bad) 85%, white);
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: progress;
+    box-shadow: none;
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+th,
+td {
+    text-align: left;
+    padding: 0.55rem 0.65rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+th {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+tbody tr {
+    transition: background var(--t);
+}
+tbody tr:hover td {
+    background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+tr.selected td {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.75rem;
+}

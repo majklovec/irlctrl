@@ -1,0 +1,76 @@
+/* Page and card spacing, footer, status text. */
+
+/* Page padding ramps up with the viewport (mobile-first). */
+@media (min-width: 768px) {
+    main {
+        padding: 1.5rem;
+    }
+}
+@media (min-width: 1024px) {
+    main {
+        padding: 2rem;
+    }
+}
+
+.card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    overflow-x: auto;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    /* Size container: nested content (definition lists, …) reacts to the
+     * card's own width via `@container card` instead of the viewport. */
+    container-type: inline-size;
+    container-name: card;
+}
+/* Card padding ramps up with the viewport (mobile-first). */
+@media (min-width: 768px) {
+    .card {
+        padding: 1.5rem;
+    }
+}
+@media (min-width: 1024px) {
+    .card {
+        padding: 1.75rem;
+    }
+}
+
+.card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+.card-head h2 {
+    margin: 0;
+}
+
+.muted {
+    color: var(--muted);
+}
+
+/* Pinned to the bottom-right corner, out of the content flow. */
+.page-footer {
+    position: fixed;
+    right: 0.75rem;
+    bottom: 0.5rem;
+    font-size: 0.75rem;
+    opacity: 0.7;
+    pointer-events: none;
+    z-index: 10;
+}
+.page-footer .app-version {
+    font-variant-numeric: tabular-nums;
+}
+
+.ok {
+    margin: 0.5rem 0 0;
+    color: var(--ok);
+}
+.error {
+    margin: 0.5rem 0 0;
+    color: var(--bad);
+}
