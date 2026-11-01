@@ -13,13 +13,13 @@ import type {
 	OverlayElement,
 	Scene,
 	Variable,
-} from "../../../shared/overlay";
+} from "../../../../shared/overlay";
 import {
 	assetUrl,
 	overlayElementView,
 	sceneElementsView,
 } from "./overlay_render";
-import "../css/overlay.css";
+import "../../css/overlay.css";
 
 interface RuntimeState {
 	scene: Scene | undefined;

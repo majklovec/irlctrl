@@ -11,17 +11,21 @@
  */
 import m from "mithril";
 import type { Vnode } from "mithril";
-import type { OverlayElement } from "../../../shared/overlay";
+import type { OverlayElement } from "../../../../shared/overlay";
+import { overlayElementSchema } from "../../../../shared/overlay_elements";
 import {
 	assetUrl,
 	elementStyle,
 	resolveElement,
 	resolveElementProps,
-} from "../../../shared/ui/overlay/element";
+} from "../../../../shared/ui/overlay/element";
 export { assetUrl, elementStyle, resolveElement, resolveElementProps };
-export type { CSS, ElementContext } from "../../../shared/ui/overlay/element";
-import { elementDef } from "../../../shared/ui/overlay/registry";
-import type { ElementContext } from "../../../shared/ui/overlay/element";
+export type {
+	CSS,
+	ElementContext,
+} from "../../../../shared/ui/overlay/element";
+import { elementDef } from "../../../../shared/ui/overlay/registry";
+import type { ElementContext } from "../../../../shared/ui/overlay/element";
 
 /** Render one element (content + positioning) for editor and runtime.
  * Each element is resolved against its variable bindings ONCE here; both the
@@ -57,7 +61,9 @@ export function sceneElementsView(
 	ctx: ElementContext,
 ): Vnode[] {
 	const groups = new Set(
-		elements.filter((e) => e.type === "group").map((e) => e.id),
+		elements
+			.filter((e) => overlayElementSchema(e.type)?.container)
+			.map((e) => e.id),
 	);
 	return elements
 		.filter((e) => !groups.has(e.id))

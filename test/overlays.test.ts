@@ -224,11 +224,23 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
 
         const cookie = await login();
 
+        // the list page and the per-scene editor page are separate, linkable pages
         const page = await fetch(`${baseUrl}/overlays/`, {
             headers: { cookie },
         });
         expect(page.status).toBe(200);
-        expect((await page.text()).toLowerCase()).toContain("overlays");
+        const listHtml = await page.text();
+        expect(listHtml.toLowerCase()).toContain("overlays");
+        expect(listHtml).toContain("/assets/overlay_list-");
+        const editorPage = await fetch(`${baseUrl}/overlays/edit/some-scene/`, {
+            headers: { cookie },
+        });
+        expect(editorPage.status).toBe(200);
+        expect(await editorPage.text()).toContain("/assets/overlay_update-");
+        expect(
+            (await fetch(`${baseUrl}/overlays/edit/some-scene/`, { redirect: "manual" }))
+                .status,
+        ).toBe(302);
 
         // ── project ──
         const projectRes = await fetch(`${baseUrl}/api/overlays`, {
@@ -477,7 +489,7 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
             expect(runtimePage.status).toBe(200);
             const runtimeHtml = await runtimePage.text();
             // the bundled runtime page ships the overlay stylesheet + script
-            expect(runtimeHtml).toContain("/assets/overlay-");
+            expect(runtimeHtml).toContain("/assets/overlay_view-");
 
             // bad token → same blank page (no error text)
             const badPage = await fetch(

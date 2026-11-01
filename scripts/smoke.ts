@@ -26,8 +26,9 @@ const SERVER_ROUTES: Partial<Record<(typeof PAGES)[number], string>> = {
 	dashboards: "/dashboards/",
 	dashboardview: "/dashboards/view/smoke/",
 	dashboardadd: "/dashboards/add/smoke/",
-	overlays: "/overlays/",
-	overlay: "/overlay/smoke",
+	overlay_list: "/overlays/",
+	overlay_update: "/overlays/edit/smoke/",
+	overlay_view: "/overlay/smoke",
 };
 const SERVER_EXTRA = [
 	"/healthz",

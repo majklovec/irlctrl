@@ -192,4 +192,19 @@ export const textElement: OverlayElementDef = {
 	editForm,
 	validate,
 	handles: "box",
+	// double-click edits the text in place, in the element's own font
+	inlineEdit: {
+		prop: "text",
+		style: (p) => {
+			const props = textProps(p);
+			return {
+				fontFamily: props.fontFamily,
+				fontSize: `${props.fontSize}px`,
+				fontWeight: `${props.fontWeight}`,
+				lineHeight: `${props.lineHeight}`,
+				color: props.color,
+				textAlign: props.textAlign,
+			};
+		},
+	},
 };

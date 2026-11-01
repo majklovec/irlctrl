@@ -121,7 +121,7 @@ export function elementStyle(
 	// ancestor of an `<iframe>` to a composited layer and paints that
 	// layer opaque white — so even an identity `rotate(0deg)` turned
 	// iframe/chat elements into solid white boxes. Omitting `transform`
-	// keeps them transparent. See shared/overlay.tsx + overlay.css note.
+	// keeps them transparent. See overlay_render.tsx + overlay.css note.
 	return {
 		position: "absolute",
 		left: `${t.x}px`,
@@ -258,4 +258,11 @@ export interface OverlayElementDef {
 	 * frame, from the fixed endpoint) so the element can record which
 	 * diagonal it runs along. */
 	onEndpointDrag?(element: OverlayElement, dx: number, dy: number): void;
+	/** Offer in-place editing of one string prop on the canvas (double-click):
+	 * the editor overlays a textarea styled by `style(resolvedProps)` so the
+	 * edit is what-you-see. */
+	readonly inlineEdit?: {
+		prop: string;
+		style(props: Record<string, unknown>): Record<string, string>;
+	};
 }

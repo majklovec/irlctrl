@@ -13,8 +13,9 @@ export const SERVER_PAGES = [
     "dashboards",
     "dashboardview",
     "dashboardadd",
-    "overlays",
-    "overlay",
+    "overlay_list",
+    "overlay_update",
+    "overlay_view",
 ] as const;
 
 export const PAGES = [...CLIENT_PAGES, ...SERVER_PAGES] as const;

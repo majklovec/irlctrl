@@ -1,6 +1,7 @@
 /*
  * OBS overlay editor routes:
- *   GET  /overlays/                the editor page (cookie auth)
+ *   GET  /overlays/                the overlay list page (cookie auth)
+ *   GET  /overlays/edit/:id/       the scene editor page (cookie auth)
  *   GET  /overlay/:slug?token=…    the runtime page (token auth, transparent)
  *   GET  /overlay/variables/:id    revalue one variable (token auth, ?value=…)
  *   WS   /overlay/:slug/ws?token=… the runtime live feed (token auth)
@@ -36,7 +37,7 @@ function runtimeToken(request: Request): string {
 /** The runtime page HTML: served even for a bad token so OBS shows a blank
  * (transparent) page — no error text, no background (handoff §7.3). */
 function runtimePage(frontend: Frontend): Response {
-    const response = frontend.htmlResponse("overlay");
+    const response = frontend.htmlResponse("overlay_view");
     for (const [key, value] of Object.entries(RUNTIME_HEADERS))
         response.headers.set(key, value);
     return response;
@@ -50,7 +51,13 @@ export function overlayRoutes(
     return new Elysia({ name: "control-overlays" })
         .get(
             "/overlays/",
-            authenticatedHandler(auth, () => frontend.htmlResponse("overlays")),
+            authenticatedHandler(auth, () => frontend.htmlResponse("overlay_list")),
+        )
+        .get(
+            "/overlays/edit/*",
+            authenticatedHandler(auth, () =>
+                frontend.htmlResponse("overlay_update"),
+            ),
         )
         .get("/overlay/:slug", () => runtimePage(frontend))
         .get(

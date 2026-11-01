@@ -3,7 +3,7 @@
 The control server ships a visual overlay editor. Scenes you compose there are
 served as transparent runtime pages that OBS loads with a **Browser Source**.
 
-- Editor: `/overlays/` (logged-in users only)
+- Overlay list: `/overlays/`, scene editor: `/overlays/edit/<scene id>/` (logged-in users only)
 - Runtime: `/overlay/<scene-slug>?token=<token>` (no session, token-gated)
 - Schema, limits and normalization: [`shared/overlay.ts`](../shared/overlay.ts)
 - Element plugin contract: [`shared/contracts/overlay_element.ts`](../shared/contracts/overlay_element.ts)
@@ -218,7 +218,7 @@ Element types are module plugins: the core (schema validator, renderer,
 editor, runtime) resolves them through two generated registries and never
 names one. Any module — under `client/modules/` or `server/modules/` — can
 contribute elements; a new type never touches `shared/overlay.ts`,
-`overlay_render.tsx`, `overlays.tsx` or `overlay.tsx`.
+`overlays/overlay_render.tsx`, the editor (`overlays/overlay_update.tsx`, `overlays/editor/*`) or the runtime page (`overlays/overlay_view.tsx`).
 
 1. **Schema** — add (or extend) `<module>/overlay_schema.ts`, default-exporting
    an array of `OverlayElementSchema` ([contract](../shared/contracts/overlay_element.ts)):
