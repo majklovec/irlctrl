@@ -1,3 +1,21 @@
+# [2.1.0](https://github.com/majklovec/irlctrl/compare/v2.0.0...v2.1.0) (2026-11-01)
+
+
+### Bug Fixes
+
+* **handles:** add CSS variable for counter-scaling handles based on zoom ([108f239](https://github.com/majklovec/irlctrl/commit/108f239ccc0948883c5186b5fdfa11abf19bbd90))
+* **handles:** adjust border width for overlay handles ([0957a84](https://github.com/majklovec/irlctrl/commit/0957a847575cf937a954f51f9fca408a548ae4a2))
+* **overlay:** improve CSS inlining for first paint and adjust progress bar layout ([cd86bda](https://github.com/majklovec/irlctrl/commit/cd86bda8e1eb78ed2c85d1e3628de36f71f69834))
+* **setup:** role diagrams ([d6d7d88](https://github.com/majklovec/irlctrl/commit/d6d7d8837d6d15421875dcf47123c63bc96ac6a3))
+
+
+### Features
+
+* enhance alert handling with payload validation and persistence in project variables ([fd055c0](https://github.com/majklovec/irlctrl/commit/fd055c017b68d1cb118e458f3b5b0e85dfa0e3d9))
+* implement alert element with trigger-driven overlays ([c9f07bf](https://github.com/majklovec/irlctrl/commit/c9f07bf4226ac3c6281bc41811616182d25f02d4))
+* introduce dedicated alert trigger endpoint and update variable handling ([d6e3879](https://github.com/majklovec/irlctrl/commit/d6e387939e6b5d8faae2cffb5de5455f3a7005dc))
+* update variable handling in overlays ([f106b42](https://github.com/majklovec/irlctrl/commit/f106b42d55517117c8093144f87c0322568233eb))
+
 # [2.0.0](https://github.com/majklovec/irlctrl/compare/v1.21.0...v2.0.0) (2026-11-01)
 
 
