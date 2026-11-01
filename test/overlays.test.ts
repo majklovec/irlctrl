@@ -402,7 +402,7 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                 ).variables.map((v) => v.value),
             ).toEqual([7]);
 
-            // bad token → 404 (no existence leak), missing value → 400,
+            // bad token → 404 (no existence leak),
             // bad value → 400, unknown id → 404
             expect(
                 (
@@ -414,7 +414,7 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
             expect(
                 (
                     await fetch(
-                        `${baseUrl}/overlay/variables/${varBody.variable.id}?token=${token}`,
+                        `${baseUrl}/overlay/variables/${varBody.variable.id}?token=${token}&value=not-a-number`,
                     )
                 ).status,
             ).toBe(400);
@@ -429,6 +429,106 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                 (
                     await fetch(
                         `${baseUrl}/overlay/variables/nope?token=${token}&value=7`,
+                    )
+                ).status,
+            ).toBe(404);
+
+            // no value → clear: the variable is emptied to its type's
+            // neutral value (number → 0) and the clear is pushed to the feed
+            const clearVarRes = await fetch(
+                `${baseUrl}/overlay/variables/${varBody.variable.id}?token=${token}`,
+            );
+            expect(clearVarRes.status).toBe(200);
+            expect(await clearVarRes.json()).toMatchObject({
+                ok: true,
+                variable: { name: "score", value: 0 },
+            });
+            const clearVarEvent = await nextFrame(
+                editorSocket,
+                (f) =>
+                    f.event === "overlays.variables" &&
+                    (
+                        (f.data as { variables?: { value: number }[] })
+                            .variables ?? []
+                    ).every((v) => v.value === 0),
+            );
+            expect(
+                (
+                    clearVarEvent.data as { variables: { value: number }[] }
+                ).variables.map((v) => v.value),
+            ).toEqual([0]);
+
+            // the runtime feed gets the revalue and the clear (this is what
+            // the runtime page diffs for trigger firing + auto-empty)
+            const clearSocket = await connectSocket(
+                `${baseUrl.replace(/^http/, "ws")}/overlay/${sceneBody.scene.slug}/ws?token=${token}`,
+            );
+            try {
+                const clearSnapshot = await nextFrame(
+                    clearSocket,
+                    (f) => f.event === "overlays.snapshot",
+                );
+                expect(
+                    (
+                        clearSnapshot.data as { variables: { value: number }[] }
+                    ).variables.map((v) => v.value),
+                ).toEqual([0]);
+                expect(
+                    (
+                        await fetch(
+                            `${baseUrl}/overlay/variables/${varBody.variable.id}?token=${token}&value=5`,
+                        )
+                    ).status,
+                ).toBe(200);
+                const clearLive = await nextFrame(
+                    clearSocket,
+                    (f) =>
+                        f.event === "overlays.variables" &&
+                        (
+                            (f.data as { variables?: { value: number }[] })
+                                .variables ?? []
+                        ).some((v) => v.value === 5),
+                );
+                expect(
+                    (
+                        clearLive.data as { variables: { value: number }[] }
+                    ).variables.map((v) => v.value),
+                ).toEqual([5]);
+                expect(
+                    (
+                        await fetch(
+                            `${baseUrl}/overlay/variables/${varBody.variable.id}?token=${token}`,
+                        )
+                    ).status,
+                ).toBe(200);
+                const clearCleared = await nextFrame(
+                    clearSocket,
+                    (f) =>
+                        f.event === "overlays.variables" &&
+                        (
+                            (f.data as { variables?: { value: number }[] })
+                                .variables ?? []
+                        ).every((v) => v.value === 0),
+                );
+                expect(
+                    (
+                        clearCleared.data as { variables: { value: number }[] }
+                    ).variables.map((v) => v.value),
+                ).toEqual([0]);
+            } finally {
+                clearSocket.close();
+            }
+            expect(
+                (
+                    await fetch(
+                        `${baseUrl}/overlay/variables/nope?token=${token}`,
+                    )
+                ).status,
+            ).toBe(404);
+            expect(
+                (
+                    await fetch(
+                        `${baseUrl}/overlay/variables/nope?token=deadbeef`,
                     )
                 ).status,
             ).toBe(404);
@@ -461,26 +561,6 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                 { method: "DELETE", headers: { cookie } },
             );
             expect(delSecondRes.status).toBe(200);
-
-            // ── triggers ──
-            const triggerRes = await fetch(`${baseUrl}/api/overlays/triggers`, {
-                method: "POST",
-                headers: { cookie, "content-type": "application/json" },
-                body: JSON.stringify({
-                    sceneId: sceneBody.scene.id,
-                    eventName: "go",
-                }),
-            });
-            expect(triggerRes.status).toBe(200);
-            const triggerEvent = await nextFrame(
-                editorSocket,
-                (f) =>
-                    f.event === "overlays.trigger" &&
-                    (f.data as { eventName?: string })?.eventName === "go",
-            );
-            expect((triggerEvent.data as { sceneId: string }).sceneId).toBe(
-                sceneBody.scene.id,
-            );
 
             // ── runtime page + WS ──
             const runtimePage = await fetch(

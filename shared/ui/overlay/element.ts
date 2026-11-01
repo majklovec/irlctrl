@@ -24,13 +24,49 @@ import type { Children, Vnode } from "mithril";
 import { t } from "../i18n";
 export type { OverlayElement, OverlayElementType } from "../../overlay";
 
-// ── render context ──────────────────────────────────────────────────────
+/** Runtime trigger state of one active trigger-driven element (alerts).
+ * The payload is the last trigger that fired the element — template tokens
+ * fall back to its keys. */
+export interface TriggerState {
+	startedAt: number;
+	expiresAt: number;
+	payload: Record<string, unknown>;
+}
+
+/** Intro window of a trigger-driven element: the first moments after a
+ * trigger, during which the element's intro animation plays. */
+export const TRIGGER_INTRO_MS = 400;
+/** Outro window: the final moments before expiry, during which the element's
+ * outro animation plays. The runtime page redraws at the window's start. */
+export const TRIGGER_OUTRO_MS = 400;
+
+/** The visual phase of a trigger-driven element at a point in time:
+ * `design` = not triggered (editor), then `in` (intro window), `show`
+ * (main display), `out` (outro window before removal). */
+export type TriggerPhase = "design" | "in" | "show" | "out";
+
+export function triggerPhase(
+	active: TriggerState | undefined,
+	now: number,
+): TriggerPhase {
+	if (!active) return "design";
+	if (now - active.startedAt < TRIGGER_INTRO_MS) return "in";
+	if (now >= active.expiresAt) return "design";
+	if (active.expiresAt - now < TRIGGER_OUTRO_MS) return "out";
+	return "show";
+}
 
 export interface ElementContext {
 	/** asset id -> data: URL */
 	assetUrls: Map<string, string>;
 	/** variable id -> current value (for binding resolution) */
 	variables: Map<string, VariableValue>;
+	/** variable NAME -> current value (for `{token}` template resolution) */
+	variableNames: Map<string, VariableValue>;
+	/** element id -> live trigger state. Present on the runtime page only;
+	 * the editor has none, so trigger-driven elements always render their
+	 * design state there. Absent/missing = the element is not active. */
+	activeTriggers?: Map<string, TriggerState>;
 }
 
 /** A CSS style object (a subset of mithril's CSSObject). */
@@ -265,4 +301,22 @@ export interface OverlayElementDef {
 		prop: string;
 		style(props: Record<string, unknown>): Record<string, string>;
 	};
+	/** Present = the element is trigger-driven: it renders only while a
+	 * runtime trigger has it active (the editor always renders its design
+	 * state). The runtime page calls this for every revalued variable
+	 * whose name matches the element's trigger event; it returns the
+	 * display duration in ms when this instance fires on the event
+	 * (evaluating any variation/condition props),
+	 * `undefined` when the event doesn't claim it. Side effects (audio,
+	 * TTS) belong in here so they fire exactly when the element does.
+	 * The runtime only calls this for a revaluation to a NON-empty value,
+	 * and empties the variable again when the claim expires — the element
+	 * therefore starts from an empty value on every trigger. `ctx` carries
+	 * the live asset URLs and variable values. */
+	onTrigger?(
+		element: OverlayElement,
+		eventName: string,
+		payload: Record<string, unknown>,
+		ctx: ElementContext,
+	): number | undefined;
 }

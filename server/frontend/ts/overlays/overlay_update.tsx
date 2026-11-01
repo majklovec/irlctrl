@@ -5,7 +5,7 @@
  *   center:     zoomable canvas — select / drag / resize / nudge / snap
  *   right rail: the layers list, each row expanding into the element's
  *               inspector (transform, props, bindings)
- *   footers:    variables (live), triggers (fire), runtime URL (copy/rotate)
+ *   footers:    variables (live), runtime URL (copy/rotate)
  *
  * The scene renders through the SHARED overlay render views so the preview is
  * pixel-identical to the OBS runtime; the editor only layers a selection box +
@@ -26,7 +26,6 @@ import { onKey } from "./editor/keyboard";
 import { inspector } from "./editor/layers";
 import { runtimePanel } from "./editor/runtime_panel";
 import { editorTitle, editorToolbar } from "./editor/toolbar";
-import { triggersPanel } from "./editor/triggers";
 import { variablesPanel } from "./editor/variables";
 import {
 	LIST_URL,
@@ -65,7 +64,6 @@ const overlayUpdatePage: m.Component = {
 					<div class="ov-right">{inspector()}</div>
 					<div class="ov-footers">
 						{variablesPanel()}
-						{triggersPanel()}
 						{runtimePanel()}
 					</div>
 				</div>

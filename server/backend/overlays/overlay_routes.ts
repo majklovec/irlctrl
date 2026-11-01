@@ -3,7 +3,8 @@
  *   GET  /overlays/                the overlay list page (cookie auth)
  *   GET  /overlays/edit/:id/       the scene editor page (cookie auth)
  *   GET  /overlay/:slug?token=…    the runtime page (token auth, transparent)
- *   GET  /overlay/variables/:id    revalue one variable (token auth, ?value=…)
+ *   GET  /overlay/variables/:id    revalue one variable (?value=…), clear it
+ *                                  without a value (token auth)
  *   WS   /overlay/:slug/ws?token=… the runtime live feed (token auth)
  *   …    /api/overlays…            the editor REST API (cookie auth)
  *
@@ -63,16 +64,26 @@ export function overlayRoutes(
         .get(
             "/overlay/variables/:id",
             ({ params, request }) => {
-                const value = new URL(request.url).searchParams.get("value");
+                const url = new URL(request.url);
+                // with a value this is the per-variable trigger URL the
+                // editor copies; without one the runtime page clears the
+                // variable (emptying it once its alert has finished)
+                const value = url.searchParams.get("value");
                 let result:
                     | { status: number; body: Record<string, unknown> }
                     | null;
                 try {
-                    result = overlays.setVariableByToken(
-                        runtimeToken(request),
-                        params.id,
-                        value,
-                    );
+                    result =
+                        value === null
+                            ? overlays.clearVariableByToken(
+                                  runtimeToken(request),
+                                  params.id,
+                              )
+                            : overlays.setVariableByToken(
+                                  runtimeToken(request),
+                                  params.id,
+                                  value,
+                              );
                 } catch (err: unknown) {
                     const code = err instanceof ApiError ? err.code : 500;
                     return Response.json(

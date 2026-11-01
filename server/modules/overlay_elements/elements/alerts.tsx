@@ -1,0 +1,817 @@
+/** @jsx m */
+/*
+ * Alert element — a trigger-driven overlay (TODO.md "Alert element").
+ * It fires when a project variable is revalued: the variable's name is the
+ * trigger name (`props.event`), and when one arrives it shows a media +
+ * template-text composition with intro/outro animations, an optional audio
+ * sting and TTS, for `duration` ms, then removes itself.
+ *
+ * Template tokens `{name}` resolve against a project variable of that name
+ * first, then against a key of the trigger payload (the revalued variable's
+ * value arrives as `value`/`amount`); token segments render in the accent
+ * colour.
+ */
+
+import type { Vnode } from "mithril";
+import m from "mithril";
+import { Icon } from "../../../../shared/ui/components/icons";
+import { t } from "../../../../shared/ui/i18n";
+import type {
+	ElementContext,
+	ElementProps,
+	OverlayElement,
+	OverlayElementDef,
+} from "../../../../shared/ui/overlay/element";
+import {
+	numProp,
+	strProp,
+	triggerPhase,
+} from "../../../../shared/ui/overlay/element";
+import { bindField } from "../../../../shared/ui/overlay/fields";
+import {
+	ALERT_INTRO_ANIMATIONS,
+	ALERT_OUTRO_ANIMATIONS,
+	ALERT_TEXT_ANIMATIONS,
+	DEFAULT_ALERT_PROPS,
+} from "../overlay_schema";
+
+interface AlertUiProps {
+	event: string;
+	duration: number;
+	layoutType: "stack" | "row" | "overlay";
+	assetType: "image" | "video";
+	mediaAssetId: string;
+	videoVolume: number;
+	audioAssetId: string;
+	audioVolume: number;
+	titleTemplate: string;
+	messageTemplate: string;
+	fontFamily: string;
+	fontSize: number;
+	fontWeight: number;
+	fontColor: string;
+	accentColor: string;
+	introAnimation: string;
+	outroAnimation: string;
+	textAnimation: string;
+	isVariation: boolean;
+	conditionType: "exact" | "min";
+	conditionValue: number;
+	ttsEnabled: boolean;
+	ttsVoice: string;
+	ttsVolume: number;
+	ttsMinAmount: number;
+}
+
+function alertProps(p: Record<string, unknown>): AlertUiProps {
+	const d = DEFAULT_ALERT_PROPS;
+	const layout = p.layoutType;
+	const asset = p.assetType;
+	const cond = p.conditionType;
+	return {
+		event: strProp(p, "event", d.event),
+		duration: numProp(p, "duration", d.duration),
+		layoutType: layout === "row" || layout === "overlay" ? layout : "stack",
+		assetType: asset === "video" ? "video" : "image",
+		mediaAssetId: strProp(p, "mediaAssetId", d.mediaAssetId),
+		videoVolume: numProp(p, "videoVolume", d.videoVolume),
+		audioAssetId: strProp(p, "audioAssetId", d.audioAssetId),
+		audioVolume: numProp(p, "audioVolume", d.audioVolume),
+		titleTemplate: strProp(p, "titleTemplate", d.titleTemplate),
+		messageTemplate: strProp(p, "messageTemplate", d.messageTemplate),
+		fontFamily: strProp(p, "fontFamily", d.fontFamily),
+		fontSize: numProp(p, "fontSize", d.fontSize),
+		fontWeight: numProp(p, "fontWeight", d.fontWeight),
+		fontColor: strProp(p, "fontColor", d.fontColor),
+		accentColor: strProp(p, "accentColor", d.accentColor),
+		introAnimation: strProp(p, "introAnimation", d.introAnimation),
+		outroAnimation: strProp(p, "outroAnimation", d.outroAnimation),
+		textAnimation: strProp(p, "textAnimation", d.textAnimation),
+		isVariation: p.isVariation === true,
+		conditionType: cond === "exact" ? "exact" : "min",
+		conditionValue: numProp(p, "conditionValue", d.conditionValue),
+		ttsEnabled: p.ttsEnabled === true,
+		ttsVoice: strProp(p, "ttsVoice", d.ttsVoice),
+		ttsVolume: numProp(p, "ttsVolume", d.ttsVolume),
+		ttsMinAmount: numProp(p, "ttsMinAmount", d.ttsMinAmount),
+	};
+}
+
+const clamp01 = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n);
+
+// ── template parser ──────────────────────────────────────────────────────
+
+export interface TemplateSegment {
+	text: string;
+	/** true = a `{token}` segment (renders in the accent colour) */
+	token: boolean;
+}
+
+/** Split a `{token}` template into plain/token segments (token boundaries
+ * kept so the renderer can accent them; adjacent same-kind runs merge). */
+export function parseTemplate(template: string): TemplateSegment[] {
+	const segments: TemplateSegment[] = [];
+	for (const match of template.matchAll(/([^{}]+)|\{([^{}]*)\}/g)) {
+		const text = match[1] ?? match[2];
+		const token = match[1] === undefined;
+		if (!text) continue;
+		const last = segments[segments.length - 1];
+		if (last && last.token === token) last.text += text;
+		else segments.push({ text, token });
+	}
+	return segments;
+}
+
+/** One token's value: a project variable of that name first, then a key of
+ * the trigger payload; a missing value renders as "". */
+export function tokenValue(
+	name: string,
+	ctx: ElementContext,
+	payload: Record<string, unknown>,
+): string {
+	const variable = ctx.variableNames.get(name);
+	if (variable !== undefined) return String(variable);
+	const value = payload[name];
+	if (value === undefined || value === null) return "";
+	return typeof value === "object" ? JSON.stringify(value) : String(value);
+}
+
+function renderTemplate(
+	template: string,
+	ctx: ElementContext,
+	payload: Record<string, unknown>,
+	accentColor: string,
+): m.Children {
+	return parseTemplate(template).map((seg, i) =>
+		seg.token
+			? m(
+					"span",
+					{ key: i, style: { color: accentColor } },
+					tokenValue(seg.text, ctx, payload),
+				)
+			: m("span", { key: i }, seg.text),
+	);
+}
+
+/** The template with tokens resolved to plain text (the TTS line). */
+export function templateText(
+	template: string,
+	ctx: ElementContext,
+	payload: Record<string, unknown>,
+): string {
+	return parseTemplate(template)
+		.map((seg) => (seg.token ? tokenValue(seg.text, ctx, payload) : seg.text))
+		.join("");
+}
+
+/** The `amount` an amount-based rule compares: a variable named `amount`
+ * first, then the payload's `amount`. */
+function amountOf(
+	ctx: ElementContext,
+	payload: Record<string, unknown>,
+): number | undefined {
+	const n = Number(ctx.variableNames.get("amount") ?? payload["amount"]);
+	return Number.isFinite(n) ? n : undefined;
+}
+
+// ── draw ─────────────────────────────────────────────────────────────────
+
+function mediaNode(
+	p: AlertUiProps,
+	ctx: ElementContext,
+	element: OverlayElement,
+): Vnode | null {
+	const url = p.mediaAssetId ? ctx.assetUrls.get(p.mediaAssetId) : undefined;
+	if (!url) return null;
+	if (p.assetType === "video")
+		return m("video.overlay-alert-media", {
+			src: url,
+			playsInline: true,
+			oncreate: (vnode) => {
+				// The runtime page only draws ACTIVE alerts, so node
+				// creation is the moment to start playback; the editor's
+				// design state stays paused and silent.
+				if (ctx.activeTriggers !== undefined) {
+					const video = (vnode as unknown as { dom?: Element })
+						.dom as HTMLVideoElement;
+					video.volume = clamp01(p.videoVolume);
+					void video.play().catch(() => {});
+				}
+			},
+		});
+	return m("img.overlay-alert-media", {
+		src: url,
+		alt: element.name,
+		draggable: false,
+	});
+}
+
+function draw(element: OverlayElement, ctx: ElementContext): Vnode {
+	// `element` is already resolved by the renderer — props carry binding values.
+	const p = alertProps(element.props);
+	const active = ctx.activeTriggers?.get(element.id);
+	const phase = triggerPhase(active, Date.now());
+	const payload = active?.payload ?? {};
+
+	const rootClasses = [
+		"overlay-alert",
+		`overlay-alert-${p.layoutType}`,
+		phase === "in" && p.introAnimation !== "none"
+			? `alert-intro-${p.introAnimation}`
+			: "",
+		phase === "out" && p.outroAnimation !== "none"
+			? `alert-outro-${p.outroAnimation}`
+			: "",
+	]
+		.filter(Boolean)
+		.join(" ");
+
+	const media = mediaNode(p, ctx, element);
+	const text = (
+		<div
+			class={
+				"overlay-alert-text" +
+				(p.textAnimation !== "none" ? ` alert-text-${p.textAnimation}` : "")
+			}
+			style={{
+				fontFamily: p.fontFamily,
+				fontWeight: `${p.fontWeight}`,
+				color: p.fontColor,
+			}}
+		>
+			<div
+				class="overlay-alert-title"
+				style={{ fontSize: `${p.fontSize}px`, lineHeight: 1.2 }}
+			>
+				{renderTemplate(p.titleTemplate, ctx, payload, p.accentColor)}
+			</div>
+			<div
+				class="overlay-alert-message"
+				style={{
+					fontSize: `${Math.max(8, Math.round(p.fontSize * 0.7))}px`,
+					lineHeight: 1.3,
+				}}
+			>
+				{renderTemplate(p.messageTemplate, ctx, payload, p.accentColor)}
+			</div>
+		</div>
+	);
+	// layout is purely CSS (.overlay-alert-{stack,row,overlay}); in `overlay`
+	// the text sits over the media via position:relative/z-index
+	return m("div", { class: rootClasses }, [media, text]);
+}
+
+// ── trigger (runtime) ────────────────────────────────────────────────────
+
+function onTrigger(
+	element: OverlayElement,
+	eventName: string,
+	payload: Record<string, unknown>,
+	ctx: ElementContext,
+): number | undefined {
+	const p = alertProps(element.props);
+	if (eventName !== p.event) return undefined;
+
+	if (p.isVariation) {
+		const amount = amountOf(ctx, payload);
+		if (amount === undefined) return undefined;
+		const passes =
+			p.conditionType === "exact"
+				? amount === p.conditionValue
+				: amount >= p.conditionValue;
+		if (!passes) return undefined;
+	}
+
+	// Audio sting (the video's own track starts with its <video> node).
+	if (p.audioAssetId) {
+		const url = ctx.assetUrls.get(p.audioAssetId);
+		if (url) {
+			const audio = new Audio(url);
+			audio.volume = clamp01(p.audioVolume);
+			void audio.play().catch(() => {});
+		}
+	}
+
+	// TTS (Web Speech): allowed only once the event's amount reaches the
+	// anti-spam threshold; a missing amount counts as 0.
+	if (
+		p.ttsEnabled &&
+		typeof window !== "undefined" &&
+		"speechSynthesis" in window
+	) {
+		const amount = amountOf(ctx, payload) ?? 0;
+		if (amount >= p.ttsMinAmount) {
+			const sentence = [
+				templateText(p.titleTemplate, ctx, payload),
+				templateText(p.messageTemplate, ctx, payload),
+			]
+				.filter(Boolean)
+				.join(" ")
+				.trim();
+			if (sentence) {
+				const utterance = new SpeechSynthesisUtterance(sentence);
+				utterance.volume = clamp01(p.ttsVolume);
+				const voice = window.speechSynthesis
+					.getVoices()
+					.find((v) => v.name === p.ttsVoice || v.voiceURI === p.ttsVoice);
+				if (voice) utterance.voice = voice;
+				window.speechSynthesis.cancel(); // fast triggers: replace, don't queue
+				window.speechSynthesis.speak(utterance);
+			}
+		}
+	}
+
+	return p.duration;
+}
+
+// ── inspector ────────────────────────────────────────────────────────────
+
+function editForm({
+	element: e,
+	mutate,
+	variables,
+	assets,
+	upload,
+}: ElementProps): Vnode {
+	const p = e.props;
+	const sp = { mutate, variables };
+	const str = (key: string, fallback: string) => strProp(p, key, fallback);
+	const num = (key: string, fallback: number) => numProp(p, key, fallback);
+	const set = (key: string) => (ev: Event) =>
+		mutate((el) => {
+			el.props[key] = (ev.target as HTMLInputElement | HTMLSelectElement).value;
+		});
+	const setNum = (key: string) => (ev: Event) =>
+		mutate((el) => {
+			el.props[key] = Number((ev.target as HTMLInputElement).value);
+		});
+	const setBool = (key: string) => (ev: Event) =>
+		mutate((el) => {
+			el.props[key] = (ev.target as HTMLInputElement).checked;
+		});
+
+	const mediaAssets = assets.filter(
+		(a) => a.mime.startsWith("image/") || a.mime.startsWith("video/"),
+	);
+	const audioAssets = assets.filter((a) => a.mime.startsWith("audio/"));
+	const event = str("event", "");
+
+	return (
+		<div
+			oncreate={() => {
+				// speech-synthesis voices load async; redraw when they arrive
+				if (typeof window !== "undefined" && "speechSynthesis" in window)
+					window.speechSynthesis.onvoiceschanged = () => m.redraw();
+			}}
+		>
+			{/* 1. structure & trigger */}
+			{bindField(
+				e,
+				"props.event",
+				t("overlay.alert_event"),
+				<input
+					type="text"
+					list="ov-alert-variables"
+					value={event}
+					placeholder={t("overlay.alert_event_hint")}
+					oninput={set("event")}
+				/>,
+				sp,
+			)}
+			<datalist id="ov-alert-variables">
+				{variables.map((v) => (
+					<option key={v.name} value={v.name} />
+				))}
+			</datalist>
+			<div class="ov-grid2">
+				{bindField(
+					e,
+					"props.duration",
+					t("overlay.alert_duration"),
+					<input
+						type="number"
+						min={500}
+						max={60000}
+						step={100}
+						value={num("duration", 5000)}
+						oninput={setNum("duration")}
+					/>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.layoutType",
+					t("overlay.alert_layout"),
+					<select
+						value={str("layoutType", "stack")}
+						onchange={set("layoutType")}
+					>
+						<option value="stack">stack</option>
+						<option value="row">row</option>
+						<option value="overlay">overlay</option>
+					</select>,
+					sp,
+				)}
+			</div>
+			{/* 2. media */}
+			{bindField(
+				e,
+				"props.assetType",
+				t("overlay.alert_media_type"),
+				<select value={str("assetType", "image")} onchange={set("assetType")}>
+					<option value="image">image</option>
+					<option value="video">video</option>
+				</select>,
+				sp,
+			)}
+			{bindField(
+				e,
+				"props.mediaAssetId",
+				t("overlay.alert_media"),
+				<select value={str("mediaAssetId", "")} onchange={set("mediaAssetId")}>
+					<option value="">—</option>
+					{mediaAssets.map((a) => (
+						<option key={a.id} value={a.id}>
+							{a.filename}
+						</option>
+					))}
+				</select>,
+				sp,
+			)}
+			<span class="ov-field">
+				<span class="ov-upload ov-upload-btn">
+					<input
+						type="file"
+						accept="image/*,video/*"
+						onchange={(ev: Event) => {
+							const input = ev.target as HTMLInputElement;
+							const f = input.files?.[0];
+							input.value = "";
+							if (!f) return;
+							void upload(f).then((id) => {
+								if (id) mutate((el) => (el.props.mediaAssetId = id));
+							});
+						}}
+					/>
+					{t("overlay.alert_upload_media")}
+				</span>
+			</span>
+			{bindField(
+				e,
+				"props.videoVolume",
+				t("overlay.alert_video_volume"),
+				<input
+					type="number"
+					min={0}
+					max={1}
+					step={0.05}
+					value={num("videoVolume", 1)}
+					oninput={setNum("videoVolume")}
+				/>,
+				sp,
+			)}
+			{/* 3. audio sting */}
+			{bindField(
+				e,
+				"props.audioAssetId",
+				t("overlay.alert_audio"),
+				<select value={str("audioAssetId", "")} onchange={set("audioAssetId")}>
+					<option value="">—</option>
+					{audioAssets.map((a) => (
+						<option key={a.id} value={a.id}>
+							{a.filename}
+						</option>
+					))}
+				</select>,
+				sp,
+			)}
+			<span class="ov-field">
+				<span class="ov-upload ov-upload-btn">
+					<input
+						type="file"
+						accept="audio/*"
+						onchange={(ev: Event) => {
+							const input = ev.target as HTMLInputElement;
+							const f = input.files?.[0];
+							input.value = "";
+							if (!f) return;
+							void upload(f).then((id) => {
+								if (id) mutate((el) => (el.props.audioAssetId = id));
+							});
+						}}
+					/>
+					{t("overlay.alert_upload_audio")}
+				</span>
+			</span>
+			{bindField(
+				e,
+				"props.audioVolume",
+				t("overlay.alert_audio_volume"),
+				<input
+					type="number"
+					min={0}
+					max={1}
+					step={0.05}
+					value={num("audioVolume", 1)}
+					oninput={setNum("audioVolume")}
+				/>,
+				sp,
+			)}
+			{/* 4. text */}
+			{bindField(
+				e,
+				"props.titleTemplate",
+				t("overlay.alert_title"),
+				<input
+					type="text"
+					value={str("titleTemplate", "Hello {name}!")}
+					oninput={set("titleTemplate")}
+				/>,
+				sp,
+			)}
+			{bindField(
+				e,
+				"props.messageTemplate",
+				t("overlay.alert_message"),
+				<input
+					type="text"
+					value={str("messageTemplate", "{message}")}
+					oninput={set("messageTemplate")}
+				/>,
+				sp,
+			)}
+			{bindField(
+				e,
+				"props.fontFamily",
+				t("overlay.alert_font_family"),
+				<input
+					type="text"
+					value={str("fontFamily", "system-ui, sans-serif")}
+					oninput={set("fontFamily")}
+				/>,
+				sp,
+			)}
+			<div class="ov-grid2">
+				{bindField(
+					e,
+					"props.fontSize",
+					t("overlay.alert_font_size"),
+					<input
+						type="number"
+						min={8}
+						max={400}
+						value={num("fontSize", 28)}
+						oninput={setNum("fontSize")}
+					/>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.fontWeight",
+					t("overlay.font_weight"),
+					<input
+						type="number"
+						min={100}
+						max={900}
+						step={100}
+						value={num("fontWeight", 700)}
+						oninput={setNum("fontWeight")}
+					/>,
+					sp,
+				)}
+			</div>
+			<div class="ov-grid2">
+				{bindField(
+					e,
+					"props.fontColor",
+					t("overlay.alert_font_color"),
+					<input
+						type="color"
+						value={str("fontColor", "#ffffff")}
+						oninput={set("fontColor")}
+					/>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.accentColor",
+					t("overlay.alert_accent_color"),
+					<input
+						type="color"
+						value={str("accentColor", "#ffd700")}
+						oninput={set("accentColor")}
+					/>,
+					sp,
+				)}
+			</div>
+			{/* 5. animations */}
+			<div class="ov-grid2">
+				{bindField(
+					e,
+					"props.introAnimation",
+					t("overlay.alert_intro_animation"),
+					<select
+						value={str("introAnimation", "slideDown")}
+						onchange={set("introAnimation")}
+					>
+						{ALERT_INTRO_ANIMATIONS.map((name) => (
+							<option key={name} value={name}>
+								{name}
+							</option>
+						))}
+					</select>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.outroAnimation",
+					t("overlay.alert_outro_animation"),
+					<select
+						value={str("outroAnimation", "fadeOut")}
+						onchange={set("outroAnimation")}
+					>
+						{ALERT_OUTRO_ANIMATIONS.map((name) => (
+							<option key={name} value={name}>
+								{name}
+							</option>
+						))}
+					</select>,
+					sp,
+				)}
+			</div>
+			{bindField(
+				e,
+				"props.textAnimation",
+				t("overlay.alert_text_animation"),
+				<select
+					value={str("textAnimation", "none")}
+					onchange={set("textAnimation")}
+				>
+					{ALERT_TEXT_ANIMATIONS.map((name) => (
+						<option key={name} value={name}>
+							{name}
+						</option>
+					))}
+				</select>,
+				sp,
+			)}
+			{/* 6. variation */}
+			{bindField(
+				e,
+				"props.isVariation",
+				t("overlay.alert_variation"),
+				<input
+					type="checkbox"
+					checked={p.isVariation === true}
+					onchange={setBool("isVariation")}
+				/>,
+				sp,
+			)}
+			<div class="ov-grid2">
+				{bindField(
+					e,
+					"props.conditionType",
+					t("overlay.alert_condition"),
+					<select
+						value={str("conditionType", "min")}
+						onchange={set("conditionType")}
+					>
+						<option value="exact">exact</option>
+						<option value="min">min</option>
+					</select>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.conditionValue",
+					t("overlay.alert_condition_value"),
+					<input
+						type="number"
+						min={0}
+						value={num("conditionValue", 0)}
+						oninput={setNum("conditionValue")}
+					/>,
+					sp,
+				)}
+			</div>
+			{/* 7. TTS */}
+			{bindField(
+				e,
+				"props.ttsEnabled",
+				t("overlay.alert_tts"),
+				<input
+					type="checkbox"
+					checked={p.ttsEnabled === true}
+					onchange={setBool("ttsEnabled")}
+				/>,
+				sp,
+			)}
+			<div class="ov-grid2">
+				{bindField(
+					e,
+					"props.ttsVoice",
+					t("overlay.alert_tts_voice"),
+					<select value={str("ttsVoice", "")} onchange={set("ttsVoice")}>
+						<option value="">{t("overlay.alert_tts_default_voice")}</option>
+						{typeof window !== "undefined" && "speechSynthesis" in window
+							? window.speechSynthesis.getVoices().map((v) => (
+									<option key={v.voiceURI} value={v.name}>
+										{v.name} ({v.lang})
+									</option>
+								))
+							: []}
+					</select>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.ttsVolume",
+					t("overlay.alert_tts_volume"),
+					<input
+						type="number"
+						min={0}
+						max={1}
+						step={0.05}
+						value={num("ttsVolume", 1)}
+						oninput={setNum("ttsVolume")}
+					/>,
+					sp,
+				)}
+			</div>
+			{bindField(
+				e,
+				"props.ttsMinAmount",
+				t("overlay.alert_tts_min_amount"),
+				<input
+					type="number"
+					min={0}
+					value={num("ttsMinAmount", 0)}
+					oninput={setNum("ttsMinAmount")}
+				/>,
+				sp,
+			)}
+		</div>
+	);
+}
+
+function validate(e: OverlayElement): string[] {
+	const problems: string[] = [];
+	if (typeof e.props.event !== "string" || e.props.event.length === 0)
+		problems.push("alert has no event");
+	const p = alertProps(e.props);
+	if (
+		typeof e.props.duration === "number" &&
+		(p.duration < 500 || p.duration > 60000)
+	)
+		problems.push("alert duration out of range (500–60000 ms)");
+	if (p.videoVolume < 0 || p.videoVolume > 1)
+		problems.push("video volume must be in 0–1");
+	if (p.audioVolume < 0 || p.audioVolume > 1)
+		problems.push("audio volume must be in 0–1");
+	if (p.conditionValue < 0) problems.push("condition value must be >= 0");
+	if (p.ttsVolume < 0 || p.ttsVolume > 1)
+		problems.push("TTS volume must be in 0–1");
+	if (p.ttsMinAmount < 0) problems.push("TTS minimum amount must be >= 0");
+	return problems;
+}
+
+export const alertsElement: OverlayElementDef = {
+	type: "alert",
+	labelKey: "overlay.add_alert",
+	icon: () => <Icon name="bell" class="role-icon" />,
+	order: 70,
+	defaultProps: { ...DEFAULT_ALERT_PROPS },
+	propKeys: [
+		"event",
+		"duration",
+		"layoutType",
+		"assetType",
+		"mediaAssetId",
+		"videoVolume",
+		"audioAssetId",
+		"audioVolume",
+		"titleTemplate",
+		"messageTemplate",
+		"fontFamily",
+		"fontSize",
+		"fontWeight",
+		"fontColor",
+		"accentColor",
+		"introAnimation",
+		"outroAnimation",
+		"textAnimation",
+		"isVariation",
+		"conditionType",
+		"conditionValue",
+		"ttsEnabled",
+		"ttsVoice",
+		"ttsVolume",
+		"ttsMinAmount",
+	],
+	defaultSize: { width: 420, height: 160 },
+	draw,
+	editForm,
+	validate,
+	handles: "box",
+	onTrigger,
+};

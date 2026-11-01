@@ -161,7 +161,6 @@ Every mutation goes over REST and is fanned out to two WebSocket topics
 | `overlays.project`    | `{project}`                | canvas resize; asset upload/delete (full project, editor-only)     | ✔      | – |
 | `overlays.canvas`     | `{canvas}`                 | canvas resize (runtime gets the slim payload)                      | –      | ✔ |
 | `overlays.assets`     | `{assets}`                 | asset upload/delete                                                | –      | ✔  |
-| `overlays.trigger`    | `{sceneId,eventName,payload}` | `POST /api/overlays/triggers` (forward-compatibility; the v1 runtime page ignores it) | ✔ | ✔ |
 | `overlays.token`      | `{token}`                  | token rotation                                                     | ✔      | –  |
 
 Notes:
@@ -172,9 +171,16 @@ Notes:
 - The runtime page holds its last known state on disconnect and reconnects
   with exponential backoff (1 s → 30 s); a bad token keeps it blank (the
   server closes the WS with 1008).
-- Triggers (`POST /api/overlays/triggers`) let external systems (e.g. the
-  chat, a device pipeline) push a named event into both feeds; v1 delivers
-  without effect, the reaction wiring arrives with a later schema bump.
+- Trigger-based elements (v1: the `Alert` element) key off **variable
+  names**: when any variable is **revalued to a non-empty value** — by the
+  editor, the `/overlay/variables/<id>?token=…&value=…` endpoint, or the API —
+  the runtime page fires every alert whose trigger variable matches that
+  variable's name. Empty values are never triggers, and a frame repeating the
+  last fired value (a re-delivery) doesn't re-fire. Once an alert's duration
+  has run, the runtime page **empties the trigger variable** the same way (the
+  token endpoint without `&value=`), so a burst of equal values — e.g. a
+  follower event redelivered — reads as a single trigger, not a loop of
+  self-clearing alerts.
 
 ## URL binding
 
@@ -182,7 +188,7 @@ Notes:
 | ------------------------------------------ | -------------------------- | ------------------------------------------ |
 | `/overlays/`                               | cookie session             | the editor page                             |
 | `/overlay/<scene-slug>`                    | project token in `?token=` | the transparent runtime page (OBS Browser Source); a bad token renders a blank page |
-| `/overlay/variables/<id>?token=`           | project token              | one variable; without `&value=` it 400s (read via the editor), with `&value=…` it revalues it and returns the new variable |
+| `/overlay/variables/<id>?token=`           | project token              | one variable; with `&value=…` it revalues it, without `&value=` it empties it (the variable's neutral value: 0 / false / `#000000` / ""), returns the new variable in both cases |
 | `/overlay/<scene-slug>/ws?token=`          | project token              | the runtime live feed (WebSocket)           |
 | `/chat/<dashboardId>/<widgetId>?token=`    | per-widget token           | a chat widget's live page                   |
 

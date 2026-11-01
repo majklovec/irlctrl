@@ -17,6 +17,10 @@ const { lineFlipFromDelta } = await import(
 const { resolveElement, resolveElementProps, elementStyle } = await import(
     "../shared/ui/overlay/element"
 );
+const { DEFAULT_ALERT_PROPS } = await import(
+    "../server/modules/overlay_elements/overlay_schema"
+);
+
 import {
     type OverlayElement,
     type OverlayElementType,
@@ -38,7 +42,11 @@ const baseElement = (
     props,
 });
 
-const ctx = () => ({ assetUrls: new Map<string, string>(), variables: new Map() });
+const ctx = () => ({
+    assetUrls: new Map<string, string>(),
+    variables: new Map(),
+    variableNames: new Map(),
+});
 
 const WELL_FORMED: Array<[OverlayElementType, Record<string, unknown>]> = [
     ["text", { text: "hi", fontSize: 48, color: "#ffffff" }],
@@ -49,10 +57,14 @@ const WELL_FORMED: Array<[OverlayElementType, Record<string, unknown>]> = [
     ],
     ["ellipse", { fill: "#3b82f6", stroke: "#000000", strokeWidth: 2 }],
     ["line", { stroke: "#3b82f6", strokeWidth: 4 }],
-    ["progress", { value: 40, fill: "#22c55e", background: "#e5e7eb", radius: 6 }],
+    [
+        "progress",
+        { value: 40, fill: "#22c55e", background: "#e5e7eb", radius: 6 },
+    ],
     ["group", {}],
     ["iframe", { url: "https://example.com" }],
     ["chat", { url: "https://example.com/chat" }],
+    ["alert", { ...DEFAULT_ALERT_PROPS }],
 ];
 
 describe("element registry contract", () => {
@@ -68,7 +80,10 @@ describe("element registry contract", () => {
             expect(elementDef(type)).toBe(def);
             // the browser half seeds new elements from the schema's defaults
             expect(def.defaultProps).toEqual(
-                overlayElementSchemas.get(type)!.defaultProps as Record<string, unknown>,
+                overlayElementSchemas.get(type)!.defaultProps as Record<
+                    string,
+                    unknown
+                >,
             );
         }
     });
@@ -81,6 +96,7 @@ describe("element registry contract", () => {
         expect(elementDef("text")!.handles).toBe("box");
         expect(elementDef("image")!.handles).toBe("box");
         expect(elementDef("group")!.handles).toBe("none");
+        expect(elementDef("alert")!.handles).toBe("box");
     });
 
     test("well-formed elements pass their validate()", () => {
@@ -92,7 +108,9 @@ describe("element registry contract", () => {
 
     test("validators report problems on malformed elements", () => {
         expect(
-            elementDef("line")!.validate(baseElement("line", { strokeWidth: 0 })),
+            elementDef("line")!.validate(
+                baseElement("line", { strokeWidth: 0 }),
+            ),
         ).not.toEqual([]);
         expect(
             elementDef("text")!.validate(baseElement("text", { text: 7 })),
@@ -199,7 +217,9 @@ describe("element registry contract", () => {
         expect(r.transform.width).toBe(el.transform.width);
         expect(r.transform.opacity).toBe(el.transform.opacity);
         // negative opacity is rejected too
-        el.bindings = { "transform.opacity": { kind: "variable", variableId: "vOpNeg" } };
+        el.bindings = {
+            "transform.opacity": { kind: "variable", variableId: "vOpNeg" },
+        };
         expect(resolveElement(el, variables).transform.opacity).toBe(
             el.transform.opacity,
         );
@@ -246,7 +266,14 @@ describe("element registry contract", () => {
 
     test("elementStyle() reflects resolved transform and visibility", () => {
         const el = baseElement("text", { text: "x" });
-        el.transform = { x: 5, y: 10, width: 100, height: 50, rotation: 45, opacity: 0.5 };
+        el.transform = {
+            x: 5,
+            y: 10,
+            width: 100,
+            height: 50,
+            rotation: 45,
+            opacity: 0.5,
+        };
         el.visible = false;
         const style = elementStyle(el) as Record<string, string>;
         expect(style.left).toBe("5px");
@@ -277,7 +304,14 @@ describe("element registry contract", () => {
 
     test("line draw runs along the box diagonal set by props.flip", () => {
         const el = baseElement("line", { flip: false });
-        el.transform = { x: 0, y: 0, width: 100, height: 50, rotation: 0, opacity: 1 };
+        el.transform = {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 50,
+            rotation: 0,
+            opacity: 1,
+        };
         const angleOf = (e: OverlayElement): number => {
             const vnode = elementDef("line")!.draw(e, ctx()) as {
                 attrs?: { style?: Record<string, string> };
@@ -287,10 +321,16 @@ describe("element registry contract", () => {
             return Number(match?.[1]);
         };
         // forward diagonal: top-left → bottom-right (positive slope on screen)
-        expect(angleOf(el)).toBeCloseTo(Math.atan2(50, 100) * (180 / Math.PI), 3);
+        expect(angleOf(el)).toBeCloseTo(
+            Math.atan2(50, 100) * (180 / Math.PI),
+            3,
+        );
         el.props.flip = true;
         // mirrored diagonal: top-right → bottom-left (negative slope)
-        expect(angleOf(el)).toBeCloseTo(-Math.atan2(50, 100) * (180 / Math.PI), 3);
+        expect(angleOf(el)).toBeCloseTo(
+            -Math.atan2(50, 100) * (180 / Math.PI),
+            3,
+        );
     });
 
     test("unknown / legacy types resolve to undefined", () => {

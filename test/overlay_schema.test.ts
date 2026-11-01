@@ -8,6 +8,8 @@ import {
 import {
     defaultProject,
     generateOverlayToken,
+    isAcceptedAssetMime,
+    isMimeKind,
     migrateProjectBlob,
     normalizeProject,
     OVERLAY_SCHEMA_VERSION,
@@ -359,6 +361,61 @@ describe("overlay schema", () => {
         expect(normalizeProject(raw).scenes[0].elements[0].props.assetId).toBe(
             "a1",
         );
+    });
+
+    test("image, video and audio asset mimes are accepted", () => {
+        for (const mime of [
+            "image/png",
+            "video/mp4",
+            "audio/mpeg",
+            "audio/wav",
+            "video/webm",
+        ] as const) {
+            expect(isAcceptedAssetMime(mime)).toBe(true);
+        }
+        for (const mime of [
+            "text/html",
+            "application/json",
+            "pdf",
+            "",
+        ] as const) {
+            expect(isAcceptedAssetMime(mime)).toBe(false);
+        }
+        expect(isMimeKind("video/mp4", "video")).toBe(true);
+        expect(isMimeKind("audio/mpeg", "audio")).toBe(true);
+        expect(isMimeKind("image/png", "video")).toBe(false);
+    });
+
+    test("normalization keeps video/audio mimes, rejects others", () => {
+        const raw = validV1Project();
+        raw.assets = [
+            {
+                id: "vid",
+                hash: "ab",
+                mime: "video/mp4",
+                filename: "x.mp4",
+                dataBase64: "AAAA",
+            },
+            {
+                id: "snd",
+                hash: "cd",
+                mime: "audio/mpeg",
+                filename: "x.mp3",
+                dataBase64: "AAAA",
+            },
+        ];
+        const assets = normalizeProject(raw).assets;
+        expect(assets.find((a) => a.id === "vid")?.mime).toBe("video/mp4");
+        expect(assets.find((a) => a.id === "snd")?.mime).toBe("audio/mpeg");
+
+        raw.assets.push({
+            id: "bad",
+            hash: "ef",
+            mime: "application/x-msdownload",
+            filename: "x.exe",
+            dataBase64: "AAAA",
+        });
+        expect(() => normalizeProject(raw)).toThrow("mime");
     });
 
     test("parent elements must exist, be groups, and be acyclic", () => {

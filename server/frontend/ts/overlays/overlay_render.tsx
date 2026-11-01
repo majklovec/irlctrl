@@ -9,8 +9,9 @@
  * `OverlayElementDef` contributed by a module and is looked up via the
  * registry; no element-specific code lives here.
  */
-import m from "mithril";
+
 import type { Vnode } from "mithril";
+import m from "mithril";
 import type { OverlayElement } from "../../../../shared/overlay";
 import { overlayElementSchema } from "../../../../shared/overlay_elements";
 import {
@@ -19,13 +20,15 @@ import {
 	resolveElement,
 	resolveElementProps,
 } from "../../../../shared/ui/overlay/element";
-export { assetUrl, elementStyle, resolveElement, resolveElementProps };
+
 export type {
 	CSS,
 	ElementContext,
 } from "../../../../shared/ui/overlay/element";
-import { elementDef } from "../../../../shared/ui/overlay/registry";
+export { assetUrl, elementStyle, resolveElement, resolveElementProps };
+
 import type { ElementContext } from "../../../../shared/ui/overlay/element";
+import { elementDef } from "../../../../shared/ui/overlay/registry";
 
 /** Render one element (content + positioning) for editor and runtime.
  * Each element is resolved against its variable bindings ONCE here; both the
@@ -42,7 +45,14 @@ export function overlayElementView(
 		...element,
 		...resolveElement(element, ctx.variables),
 	};
-	const content = def ? def.draw(resolved, ctx) : null;
+	// Trigger-driven elements (def.onTrigger) exist in the DOM only while a
+	// trigger is active. The editor has no live trigger state and always
+	// renders their design state; the runtime hides inactive ones entirely.
+	const shown =
+		!def?.onTrigger ||
+		ctx.activeTriggers === undefined ||
+		ctx.activeTriggers.has(element.id);
+	const content = shown && def ? def.draw(resolved, ctx) : null;
 	return m(
 		".overlay-element",
 		{

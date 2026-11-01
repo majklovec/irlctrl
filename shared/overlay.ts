@@ -249,12 +249,28 @@ const normalizeVariable = (raw: unknown): Variable => {
     };
 };
 
+/** Asset mimes accepted anywhere (store + upload): pictures, short clips
+ * and sound, so alert elements can hold media and audio. */
+export const isMimeKind = (
+    mime: string,
+    kind: "image" | "video" | "audio",
+): boolean => mime.startsWith(`${kind}/`);
+
+export const ACCEPTED_ASSET_MIME_PREFIXES = [
+    "image/",
+    "video/",
+    "audio/",
+] as const;
+
+export const isAcceptedAssetMime = (mime: string): boolean =>
+    ACCEPTED_ASSET_MIME_PREFIXES.some((p) => mime.startsWith(p));
+
 const normalizeAsset = (raw: unknown): Asset => {
     if (!isRecord(raw)) throw new Error("asset must be an object");
     const id = typeof raw.id === "string" && raw.id ? raw.id : "";
     const hash = typeof raw.hash === "string" && raw.hash ? raw.hash : "";
     const mime =
-        typeof raw.mime === "string" && raw.mime.startsWith("image/")
+        typeof raw.mime === "string" && isAcceptedAssetMime(raw.mime)
             ? raw.mime
             : "";
     const filename =
@@ -267,7 +283,9 @@ const normalizeAsset = (raw: unknown): Asset => {
             ? raw.dataBase64
             : "";
     if (!id || !hash || !mime || !filename || !dataBase64)
-        throw new Error("asset needs id, hash, image mime, filename and data");
+        throw new Error(
+            "asset needs id, hash, image/video/audio mime, filename and data",
+        );
     return { id, hash, mime, filename, dataBase64 };
 };
 

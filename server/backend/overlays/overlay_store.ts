@@ -18,6 +18,7 @@ import {
     type Asset,
     defaultProject,
     generateOverlayToken,
+    isAcceptedAssetMime,
     migrateProjectBlob,
     normalizeProject,
     OVERLAY_LIMITS,
@@ -32,6 +33,7 @@ import {
     type Scene,
     type Variable,
 } from "../../../shared/overlay";
+import { overlayElementSchema } from "../../../shared/overlay_elements";
 import { event, type Publish } from "../contracts";
 
 // single ApiError class shared with shared/overlay.ts so `instanceof`
@@ -89,6 +91,18 @@ export interface Overlays {
         variableId: string,
         value: unknown,
     ): { status: number; body: Record<string, unknown> } | null;
+    /**
+    * Token-authenticated clear for the per-variable URL without a value
+    * (`/overlay/variables/:id?token=…`) — the runtime page uses this to
+    * empty a trigger variable once the alert it fired has finished. The
+    * value becomes the type's neutral empty value: number → 0, boolean →
+    * false, color → "#000000", string → "". `null` when the token is
+    * unknown (404, no existence leak); an unknown id throws ApiError(404).
+    */
+    clearVariableByToken(
+       token: string,
+       variableId: string,
+    ): { status: number; body: Record<string, unknown> } | null;
 }
 
 export function createOverlays({
@@ -135,7 +149,9 @@ export function createOverlays({
             token: string;
             updated_at: number;
         }[] = db
-            .prepare("SELECT owner, data, token, updated_at FROM overlay_projects")
+            .prepare(
+                "SELECT owner, data, token, updated_at FROM overlay_projects",
+            )
             .all() as {
             owner: string;
             data: string;
@@ -214,7 +230,11 @@ export function createOverlays({
         if (patch.name !== undefined) scene.name = patch.name;
         if (patch.slug !== undefined) scene.slug = patch.slug;
         if (patch.elements !== undefined) scene.elements = patch.elements;
-        if (project.scenes.some((s) => s.slug === scene.slug && s.id !== scene.id))
+        if (
+            project.scenes.some(
+                (s) => s.slug === scene.slug && s.id !== scene.id,
+            )
+        )
             throw new ApiError(`slug ${scene.slug} is already used`);
         revalidate(project);
     };
@@ -249,10 +269,14 @@ export function createOverlays({
             { status: 405 },
         );
 
-    async function api(req: Request, url: URL, user: string): Promise<Response> {
+    async function api(
+        req: Request,
+        url: URL,
+        user: string,
+    ): Promise<Response> {
         try {
             const m = url.pathname.match(
-                /^\/api\/overlays$|^\/api\/overlays\/(scenes|variables|assets|triggers|token)\/?((?:[\w.-]{1,64})(?:\/elements(?:\/[\w.-]{1,64})?)?)?$/,
+                /^\/api\/overlays$|^\/api\/overlays\/(scenes|variables|assets|token)\/?((?:[\w.-]{1,64})(?:\/elements(?:\/[\w.-]{1,64})?)?)?$/,
             );
             if (!m)
                 return Response.json(
@@ -264,7 +288,6 @@ export function createOverlays({
                     | "scenes"
                     | "variables"
                     | "assets"
-                    | "triggers"
                     | "token"
                     | undefined) ?? null;
             // seg=null → the project itself
@@ -353,20 +376,31 @@ export function createOverlays({
                         throw new ApiError("element is required");
                     const element = parseElementInput(body.element);
                     const scene = mutateScene(user, id, (s) => {
-                        const i = s.elements.findIndex((e) => e.id === element.id);
+                        const i = s.elements.findIndex(
+                            (e) => e.id === element.id,
+                        );
                         if (i >= 0) s.elements[i] = element;
                         else s.elements.push(element);
                     });
                     return Response.json({ ok: true, scene });
                 }
-                if (req.method === "DELETE" && id && seg2 === "elements" && id2) {
+                if (
+                    req.method === "DELETE" &&
+                    id &&
+                    seg2 === "elements" &&
+                    id2
+                ) {
                     const scene = mutateScene(user, id, (s) => {
                         const i = s.elements.findIndex((e) => e.id === id2);
                         if (i < 0) throw new ApiError("Unknown element", 404);
                         // re-parent children of a deleted group
                         s.elements = s.elements
                             .filter((e) => e.id !== id2)
-                            .map((e) => (e.parentId === id2 ? { ...e, parentId: null } : e));
+                            .map((e) =>
+                                e.parentId === id2
+                                    ? { ...e, parentId: null }
+                                    : e,
+                            );
                     });
                     return Response.json({ ok: true, scene });
                 }
@@ -381,9 +415,13 @@ export function createOverlays({
                         value?: unknown;
                     };
                     const store = storeFor(user);
-                    if (store.project.variables.length >= OVERLAY_LIMITS.variablesMax)
+                    if (
+                        store.project.variables.length >=
+                        OVERLAY_LIMITS.variablesMax
+                    )
                         throw new ApiError("Too many variables");
-                    const name = typeof body.name === "string" ? body.name.trim() : "";
+                    const name =
+                        typeof body.name === "string" ? body.name.trim() : "";
                     if (
                         !NAME_RE.test(name) ||
                         store.project.variables.some((v) => v.name === name)
@@ -409,11 +447,16 @@ export function createOverlays({
                             type === "number"
                                 ? 0
                                 : type === "boolean"
-                                    ? false
-                                    : type === "color"
-                                        ? "#ffffff"
-                                        : "";
-                    const variable: Variable = { id: randomUUID(), name, type, value };
+                                  ? false
+                                  : type === "color"
+                                    ? "#ffffff"
+                                    : "";
+                    const variable: Variable = {
+                        id: randomUUID(),
+                        name,
+                        type,
+                        value,
+                    };
                     store.project.variables.push(variable);
                     revalidate(store.project);
                     commit(user, store);
@@ -423,7 +466,10 @@ export function createOverlays({
                     runtime(user, "overlays.variables", {
                         variables: store.project.variables,
                     });
-                    return Response.json({ ok: true, variable }, { status: 201 });
+                    return Response.json(
+                        { ok: true, variable },
+                        { status: 201 },
+                    );
                 }
                 if (req.method === "PUT" && id && !seg2) {
                     const body = (await req.json()) as {
@@ -433,10 +479,15 @@ export function createOverlays({
                     };
                     const store = stores.get(user);
                     if (!store) throw new ApiError("Unknown variable", 404);
-                    const variable = store.project.variables.find((v) => v.id === id);
+                    const variable = store.project.variables.find(
+                        (v) => v.id === id,
+                    );
                     if (!variable) throw new ApiError("Unknown variable", 404);
                     if (body.name !== undefined) {
-                        const name = typeof body.name === "string" ? body.name.trim() : "";
+                        const name =
+                            typeof body.name === "string"
+                                ? body.name.trim()
+                                : "";
                         if (
                             !NAME_RE.test(name) ||
                             store.project.variables.some(
@@ -446,13 +497,21 @@ export function createOverlays({
                             throw new ApiError("Invalid or duplicate name");
                         variable.name = name;
                     }
-                    if (body.type !== undefined && body.type !== variable.type) {
-                        if (!VALID_TYPES.includes(body.type as Variable["type"]))
+                    if (
+                        body.type !== undefined &&
+                        body.type !== variable.type
+                    ) {
+                        if (
+                            !VALID_TYPES.includes(body.type as Variable["type"])
+                        )
                             throw new ApiError("Invalid type");
                         variable.type = body.type as Variable["type"];
                     }
                     if (body.value !== undefined)
-                        variable.value = parseVariableValueInput(body.value, variable);
+                        variable.value = parseVariableValueInput(
+                            body.value,
+                            variable,
+                        );
                     revalidate(store.project);
                     commit(user, store);
                     feed(user, "overlays.variables", {
@@ -502,14 +561,17 @@ export function createOverlays({
                             ? body.filename.slice(0, 255)
                             : "asset";
                     const mime =
-                        typeof body.mime === "string" && body.mime.startsWith("image/")
+                        typeof body.mime === "string" &&
+                        isAcceptedAssetMime(body.mime)
                             ? body.mime
                             : null;
                     const dataBase64 =
-                        typeof body.dataBase64 === "string" ? body.dataBase64 : null;
+                        typeof body.dataBase64 === "string"
+                            ? body.dataBase64
+                            : null;
                     if (!mime || !dataBase64)
                         throw new ApiError(
-                            "Asset needs filename, image mime and base64 data",
+                            "Asset needs filename, an image/video/audio mime and base64 data",
                         );
                     if (dataBase64.length > OVERLAY_LIMITS.assetBase64Max)
                         throw new ApiError("Asset is too large");
@@ -519,9 +581,17 @@ export function createOverlays({
                     const hash = createHash("sha256")
                         .update(Buffer.from(dataBase64, "base64"))
                         .digest("hex");
-                    let asset = store.project.assets.find((a) => a.hash === hash);
+                    let asset = store.project.assets.find(
+                        (a) => a.hash === hash,
+                    );
                     if (!asset) {
-                        asset = { id: randomUUID(), hash, mime, filename, dataBase64 };
+                        asset = {
+                            id: randomUUID(),
+                            hash,
+                            mime,
+                            filename,
+                            dataBase64,
+                        };
                         store.project.assets.push(asset);
                     }
                     commit(user, store);
@@ -540,42 +610,19 @@ export function createOverlays({
                     );
                     if (store.project.assets.length === before)
                         throw new ApiError("Unknown asset", 404);
-                    // image elements referencing it fall back to an empty box
+                    // elements referencing it (their schema's assetProps)
+                    // fall back to an empty box
                     for (const s of store.project.scenes)
                         for (const e of s.elements)
-                            if (e.type === "image" && e.props.assetId === id)
-                                e.props.assetId = "";
+                            for (const key of overlayElementSchema(e.type)
+                                ?.assetProps ?? [])
+                                if (e.props[key] === id) e.props[key] = "";
                     revalidate(store.project);
                     commit(user, store);
                     feed(user, "overlays.project", { project: store.project });
                     runtime(user, "overlays.assets", {
                         assets: store.project.assets,
                     });
-                    return Response.json({ ok: true });
-                }
-                return notAllowed();
-            }
-
-            if (seg === "triggers") {
-                if (req.method === "POST" && !rest) {
-                    const body = (await req.json()) as {
-                        sceneId?: unknown;
-                        eventName?: unknown;
-                        payload?: unknown;
-                    };
-                    const sceneId = typeof body.sceneId === "string" ? body.sceneId : "";
-                    const store = stores.get(user);
-                    if (!store) throw new ApiError("Unknown scene", 404);
-                    const scene = findScene(store.project, sceneId);
-                    const eventName =
-                        typeof body.eventName === "string"
-                            ? body.eventName.trim().slice(0, 100)
-                            : "";
-                    if (!eventName) throw new ApiError("eventName is required");
-                    const payload = isRecord(body.payload) ? body.payload : undefined;
-                    const data = { sceneId: scene.id, eventName, payload };
-                    feed(user, "overlays.trigger", data);
-                    runtime(user, "overlays.trigger", data);
                     return Response.json({ ok: true });
                 }
                 return notAllowed();
@@ -598,7 +645,8 @@ export function createOverlays({
             return Response.json(
                 {
                     ok: false,
-                    error: err instanceof Error ? err.message : "Internal error",
+                    error:
+                        err instanceof Error ? err.message : "Internal error",
                     code,
                 },
                 { status: code },
@@ -612,6 +660,67 @@ export function createOverlays({
         for (const [user, s] of stores)
             if (overlayTokenMatches(s.token, token)) return [user, s];
         return null;
+    }
+
+    function setVariableByToken(
+        token: string,
+        variableId: string,
+        value: unknown,
+    ): { status: number; body: Record<string, unknown> } | null {
+        const hit = runtimeStore(token);
+        if (!hit) return null;
+        const [user, store] = hit;
+        const variable = store.project.variables.find(
+            (v) => v.id === variableId,
+        );
+        if (!variable) throw new ApiError("Unknown variable", 404);
+        if (value === undefined || value === null)
+            throw new ApiError("value query parameter is required", 400);
+        // URL values are strings; map "true"/"false" onto boolean
+        // variables (the parser's !!truthy would turn "false" into true)
+        let raw: unknown = value;
+        if (variable.type === "boolean" && typeof value === "string") {
+            const s = value.trim().toLowerCase();
+            if (s === "true" || s === "1") raw = true;
+            else if (s === "false" || s === "0") raw = false;
+            else
+                throw new ApiError(
+                    `${variable.name} must be true or false`,
+                );
+        }
+        variable.value = parseVariableValueInput(raw, variable);
+        revalidate(store.project);
+        commit(user, store);
+        feed(user, "overlays.variables", {
+            variables: store.project.variables,
+        });
+        runtime(user, "overlays.variables", {
+            variables: store.project.variables,
+        });
+        return { status: 200, body: { ok: true, variable } };
+    }
+
+    function clearVariableByToken(
+        token: string,
+        variableId: string,
+    ): { status: number; body: Record<string, unknown> } | null {
+        const hit = runtimeStore(token);
+        if (!hit) return null;
+        const variable =
+            hit[1].project.variables.find((v) => v.id === variableId);
+        if (!variable) throw new ApiError("Unknown variable", 404);
+        // each neutral literal parses straight to the type's neutral value
+        return setVariableByToken(
+            token,
+            variableId,
+            variable.type === "number"
+                ? "0"
+                : variable.type === "boolean"
+                  ? "false"
+                  : variable.type === "color"
+                    ? "#000000"
+                    : "",
+        );
     }
 
     return {
@@ -631,35 +740,7 @@ export function createOverlays({
                 assets: store.project.assets,
             };
         },
-        setVariableByToken: (token, variableId, value) => {
-            const hit = runtimeStore(token);
-            if (!hit) return null;
-            const [user, store] = hit;
-            const variable = store.project.variables.find(
-                (v) => v.id === variableId,
-            );
-            if (!variable) throw new ApiError("Unknown variable", 404);
-            if (value === undefined || value === null)
-                throw new ApiError("value query parameter is required", 400);
-            // URL values are strings; map "true"/"false" onto boolean
-            // variables (the parser's !!truthy would turn "false" into true)
-            let raw: unknown = value;
-            if (variable.type === "boolean" && typeof value === "string") {
-                const s = value.trim().toLowerCase();
-                if (s === "true" || s === "1") raw = true;
-                else if (s === "false" || s === "0") raw = false;
-                else throw new ApiError(`${variable.name} must be true or false`);
-            }
-            variable.value = parseVariableValueInput(raw, variable);
-            revalidate(store.project);
-            commit(user, store);
-            feed(user, "overlays.variables", {
-                variables: store.project.variables,
-            });
-            runtime(user, "overlays.variables", {
-                variables: store.project.variables,
-            });
-            return { status: 200, body: { ok: true, variable } };
-        },
+        setVariableByToken,
+        clearVariableByToken,
     };
 }

@@ -1,10 +1,7 @@
 import { Button } from "@ui/components/";
 import m from "mithril";
 import type { OverlayElement, Transform } from "../../../../../shared/overlay";
-import {
-	Icon,
-	type IconName,
-} from "../../../../../shared/ui/components/icons";
+import { Icon, type IconName } from "../../../../../shared/ui/components/icons";
 import { t } from "../../../../../shared/ui/i18n";
 import {
 	bindField,
@@ -285,37 +282,7 @@ export function elementProps(e: OverlayElement): m.Vnode {
 						},
 					)}
 				</div>
-				<div class="ov-gridcell">
-					<div class="ov-check">
-						<input
-							id={`ov-visible-${e.id}`}
-							type="checkbox"
-							checked={e.visible}
-							onchange={(ev: Event) =>
-								mutateElementOf(e.id, (el) => {
-									el.visible = (ev.target as HTMLInputElement).checked;
-								})
-							}
-						/>
-						<span>{t("overlay.visible")}</span>
-						{bindToggle(e, "visible", {
-							mutate: (fn) => mutateElementOf(e.id, fn),
-							variables: state.project.variables,
-						})}
-					</div>
-				</div>
 			</div>
-			<label class="ov-check">
-				<input
-					type="checkbox"
-					checked={e.locked}
-					onchange={(ev: Event) =>
-						setElementLocked(e.id, (ev.target as HTMLInputElement).checked)
-					}
-				/>
-				{t("overlay.locked")}
-			</label>
-
 			{def
 				? def.editForm({
 						element: e,

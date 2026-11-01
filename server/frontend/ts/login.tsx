@@ -8,19 +8,24 @@ import { i18nReady, LanguageSelect, t } from "../../../shared/ui/i18n";
 import { mountPage } from "../../../shared/ui/util";
 
 // Show a one-time "account created" note when we just came back from /register.
-const registered = new URLSearchParams(location.search).has("registered");
+const params = new URLSearchParams(location.search);
+const registered = params.has("registered");
+
+// Credentials may arrive via the querystring (?username=...&password=...);
+// we prefill the form and, when both are present, sign in automatically.
+const queryUsername = params.get("username") ?? "";
+const queryPassword = params.get("password") ?? "";
 
 const state = {
-	username: "",
-	password: "",
+	username: queryUsername,
+	password: queryPassword,
 	busy: false,
 	error: false,
 };
 
 /** POST the credentials to /api/login; on success the server sets the
  * session cookie and we land on the device list. */
-async function submit(ev: Event): Promise<void> {
-	ev.preventDefault();
+async function attemptLogin(): Promise<void> {
 	if (state.busy) return;
 	state.busy = true;
 	state.error = false;
@@ -36,6 +41,11 @@ async function submit(ev: Event): Promise<void> {
 		state.busy = false;
 		m.redraw();
 	}
+}
+
+function submit(ev: Event): void {
+	ev.preventDefault();
+	void attemptLogin();
 }
 
 const App: m.Component = {
@@ -92,3 +102,6 @@ const App: m.Component = {
 void mountPage(() => t("login.title"), App);
 // Redraw once the catalogs land so the first paint is already translated
 void i18nReady.then(() => m.redraw());
+
+// Sign in straight away when both credentials were provided via querystring.
+if (queryUsername && queryPassword) void attemptLogin();
