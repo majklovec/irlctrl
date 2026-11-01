@@ -28,25 +28,25 @@ export function dashboardRoutes(
         .get(
             "/dashboards/",
             authenticatedHandler(auth, () =>
-                frontend.htmlResponse("dashboards"),
+                frontend.htmlResponse("dashboard_list"),
             ),
         )
         .get(
             "/dashboards/view/*",
             authenticatedHandler(auth, () =>
-                frontend.htmlResponse("dashboardview"),
+                frontend.htmlResponse("dashboard_view"),
             ),
         )
         .get(
             "/dashboards/edit/*",
             authenticatedHandler(auth, () =>
-                frontend.htmlResponse("dashboardview"),
+                frontend.htmlResponse("dashboard_update"),
             ),
         )
         .get(
             "/dashboards/add/*",
             authenticatedHandler(auth, () =>
-                frontend.htmlResponse("dashboardadd"),
+                frontend.htmlResponse("dashboard_add"),
             ),
         )
         .get(

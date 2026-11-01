@@ -75,7 +75,7 @@ export async function createControlServer(options: ControlServerOptions) {
         .use(accountRoutes(auth, frontend))
         .use(dashboardRoutes(auth, dashboards, devices, frontend))
         .use(overlayRoutes(auth, overlays, frontend))
-        .use(deviceListRoutes(auth, devices))
+        .use(deviceListRoutes(auth, devices, frontend))
         .use(deviceConnectionRoutes(devices))
         .use(deviceViewerRoutes(auth, devices))
         .use(devicePageRoutes(auth, devices, frontend))

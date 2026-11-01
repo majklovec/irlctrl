@@ -12,6 +12,8 @@ export class ApiError extends Error {
 		readonly status: number,
 		/** The server's own error code, when its body carried one. */
 		readonly code?: number,
+		/** The parsed response body (e.g. a 409's `current` copy); null when it was not JSON. */
+		readonly body: unknown = null,
 	) {
 		super(message);
 		this.name = "ApiError";
@@ -51,6 +53,7 @@ export async function apiJson<T>(path: string, init: ApiInit = {}): Promise<T> {
 			body?.error ?? `HTTP ${res.status}`,
 			res.status,
 			body?.code,
+			body,
 		);
 	return body;
 }

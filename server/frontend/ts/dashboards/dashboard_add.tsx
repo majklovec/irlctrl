@@ -7,14 +7,25 @@
  * free grid slot and the page returns to the (live) dashboard view. A 409
  * conflict reloads the server copy; the widget is not added twice. */
 import m from "mithril";
-import { DEFAULT_COLOR } from "../../../shared/validate";
+import { ApiError, apiJson, apiTry } from "../../../../shared/ui/api_client";
+import { dashboardViewUrl } from "./dashboard_urls";
+import { DEFAULT_COLOR } from "../../../../shared/validate";
 import type {
 	ServerDashboard,
 	ServerDashboardWidget,
 	WidgetType,
-} from "../../../shared/contracts/wire";
-import { configFieldName, visibleWidgetConfigFields } from "../../../shared/contracts/wire";
-import { Button, Field, Input, Page, ServerNav } from "../../../shared/ui/components/ui";
+} from "../../../../shared/contracts/wire";
+import {
+	configFieldName,
+	visibleWidgetConfigFields,
+} from "../../../../shared/contracts/wire";
+import {
+	Button,
+	Field,
+	Input,
+	Page,
+	ServerNav,
+} from "../../../../shared/ui/components/ui";
 import {
 	devices,
 	independentTypes,
@@ -23,10 +34,10 @@ import {
 	typeLabel,
 	widgetSize,
 	widgetTypesFor,
-} from "./dashboard";
-import { t } from "../../../shared/ui/i18n";
-import { widgetModule } from "../../../shared/ui/module_registry";
-import { mountPage, setHeaderColor, uuid } from "../../../shared/ui/util";
+} from "./dashboard_widgets";
+import { t } from "../../../../shared/ui/i18n";
+import { widgetModule } from "../../../../shared/ui/module_registry";
+import { mountPage, setHeaderColor, uuid } from "../../../../shared/ui/util";
 import { configSelectField } from "./widget_config_select";
 
 const ADD_PATH_RE = /\/dashboards\/add\/([^/]+)\/?$/;
@@ -180,34 +191,28 @@ async function submit(): Promise<void> {
 	};
 	state.saveState = "saving";
 	m.redraw();
-	const res = await fetch(`/api/dashboards/${encodeURIComponent(dash.id)}`, {
-		method: "PUT",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({
-			name: dash.name,
-			color: dash.color,
-			widgets: [...dash.widgets, widget],
-			version: dash.version,
-		}),
-	}).catch(() => null);
-	if (res?.status === 409) {
-		const conflict = (await res.json().catch(() => null)) as {
-			current?: ServerDashboard;
-		} | null;
-		if (conflict?.current) state.dash = conflict.current; // rebase; the widget was not added
+	try {
+		await apiJson(`/api/dashboards/${encodeURIComponent(dash.id)}`, {
+			method: "PUT",
+			body: {
+				name: dash.name,
+				color: dash.color,
+				widgets: [...dash.widgets, widget],
+				version: dash.version,
+			},
+		});
+		state.saveState = "saved";
+		m.redraw();
+		location.href = dashboardViewUrl(dash.id);
+	} catch (err) {
+		// a 409 carries the other client's copy: rebase; the widget was not added
+		if (err instanceof ApiError && err.status === 409) {
+			const conflict = err.body as { current?: ServerDashboard } | null;
+			if (conflict?.current) state.dash = conflict.current;
+		}
 		state.saveState = "error";
 		m.redraw();
-		return;
 	}
-	// Validation failures come back as HTTP 200 with `ok: false` — do not treat
-	// them as a successful save.
-	const body = res?.ok
-		? ((await res.json().catch(() => null)) as { ok?: boolean } | null)
-		: null;
-	const saved = !!res?.ok && body?.ok !== false;
-	state.saveState = saved ? "saved" : "error";
-	m.redraw();
-	if (saved) location.href = `/dashboards/view/${encodeURIComponent(dash.id)}/`;
 }
 
 // ---------------------------------------------------------------------- view
@@ -363,14 +368,10 @@ const App: m.Component = {
 
 void (async () => {
 	const id = ADD_PATH_RE.exec(location.pathname)?.[1] ?? "";
-	const res = await fetch(`/api/dashboards/${encodeURIComponent(id)}`, {
-		cache: "no-store",
-	}).catch(() => null);
-	const body = (res?.ok ? await res.json().catch(() => null) : null) as {
-		ok?: boolean;
-		dashboard?: ServerDashboard;
-	} | null;
-	if (body?.ok && body.dashboard) {
+	const body = await apiTry<{ dashboard: ServerDashboard }>(
+		`/api/dashboards/${encodeURIComponent(id)}`,
+	);
+	if (body?.dashboard) {
 		state.dash = body.dashboard;
 		setHeaderColor(state.dash.color ?? DEFAULT_COLOR);
 	} else state.notFound = true;

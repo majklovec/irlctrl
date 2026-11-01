@@ -1,16 +1,21 @@
 /* Control server device list — a Mithril view fed by the server's live device
  * list (devices.snapshot / devices.changed over the shared feed websocket). */
 import m from "mithril";
-import type { DeviceSummary } from "../../../shared/contracts/wire";
-import { RoleTag } from "../../../shared/ui/components/role_tag";
-import { Badge, Card, Page, ServerNav } from "../../../shared/ui/components/ui";
-import { i18nReady, t } from "../../../shared/ui/i18n";
+import type { DeviceSummary } from "../../../../shared/contracts/wire";
+import { RoleTag } from "../../../../shared/ui/components/role_tag";
+import {
+	Badge,
+	Card,
+	Page,
+	ServerNav,
+} from "../../../../shared/ui/components/ui";
+import { i18nReady, t } from "../../../../shared/ui/i18n";
 import {
 	deviceSummaryColumnDefinitions,
 	deviceSummaryColumnsFor,
-} from "../../../shared/ui/module_registry";
-import { serverLive } from "./services/serverws";
-import { mountPage, since } from "../../../shared/ui/util";
+} from "../../../../shared/ui/module_registry";
+import { serverLive } from "../services/serverws";
+import { mountPage, since } from "../../../../shared/ui/util";
 
 const state = {
 	connected: false,

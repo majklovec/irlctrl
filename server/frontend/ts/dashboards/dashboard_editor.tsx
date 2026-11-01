@@ -1,17 +1,27 @@
-/* Dashboard page: the merged inline grid editor. Serves both
- * `/dashboards/view/<id>/` (starts read-only) and `/dashboards/edit/<id>/`
- * (starts in edit mode). One GridStack grid renders the live widgets; in edit
- * mode the dashboard name is editable and widgets can be dragged/resized,
- * hidden, removed, renamed and re-configured; new widgets are added on the dedicated page
- * `/dashboards/add/<id>/` (server/frontend/ts/dashboardadd.tsx). Layout + name changes
- * autosave (debounced) with optimistic concurrency: a 409 reloads the server
- * copy and toasts the conflict. Broadcast `dashboards.changed` events rebase
- * the dashboard from the server. */
+/* The dashboard grid page, shared by the two entity pages:
+ *   dashboard_view.tsx    /dashboards/view/<id>/  read-only
+ *   dashboard_update.tsx  /dashboards/edit/<id>/  editing
+ * One GridStack grid renders the live widgets; the update page makes the
+ * dashboard name and colour editable and lets widgets be dragged/resized,
+ * hidden, removed, renamed and re-configured; new widgets are added on the
+ * dedicated page `/dashboards/add/<id>/` (dashboard_add.tsx). "Edit" / "Done"
+ * navigate between the two URLs. Layout + name changes autosave (debounced)
+ * with optimistic concurrency: a 409 reloads the server copy and toasts the
+ * conflict. Broadcast `dashboards.changed` events rebase the dashboard from
+ * the server. */
 import m from "mithril";
-import { DEFAULT_COLOR } from "../../../shared/validate";
-import type { ServerDashboard, ServerDashboardWidget } from "../../../shared/contracts/wire";
-import { Icon } from "../../../shared/ui/components/icons";
-import { Page, ServerNav, TitleWithBack } from "../../../shared/ui/components/ui";
+import { ApiError, apiJson, apiTry } from "../../../../shared/ui/api_client";
+import { DEFAULT_COLOR } from "../../../../shared/validate";
+import type {
+	ServerDashboard,
+	ServerDashboardWidget,
+} from "../../../../shared/contracts/wire";
+import { Icon } from "../../../../shared/ui/components/icons";
+import {
+	Page,
+	ServerNav,
+	TitleWithBack,
+} from "../../../../shared/ui/components/ui";
 import {
 	ensureDashboardsWs,
 	refreshDevices,
@@ -19,13 +29,21 @@ import {
 	setWidgetConfigSaver,
 	syncConnectionsFor,
 	type WidgetActions,
-} from "./dashboard";
-import { GridDashboard } from "./dashboardgrid";
-import { t } from "../../../shared/ui/i18n";
-import { mountPage, setHeaderColor } from "../../../shared/ui/util";
+} from "./dashboard_widgets";
+import { GridDashboard } from "./dashboard_grid";
+import {
+	DASHBOARD_LIST_URL,
+	dashboardAddUrl,
+	dashboardUpdateUrl,
+	dashboardViewUrl,
+} from "./dashboard_urls";
+import { t } from "../../../../shared/ui/i18n";
+import { mountPage, setHeaderColor } from "../../../../shared/ui/util";
 
 const SAVE_DEBOUNCE_MS = 500;
-const PATH_RE = /\/dashboards\/(view|edit)\/([^/]+)\/?$/;
+const PATH_RE = /\/dashboards\/(?:view|edit)\/([^/]+)\/?$/;
+
+export type DashboardPageMode = "view" | "update";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -35,7 +53,6 @@ const state = {
 	editMode: false,
 	saveState: "idle" as SaveState,
 	saving: false,
-	dashMenu: false,
 	toast: undefined as string | undefined,
 };
 
@@ -93,35 +110,19 @@ async function doSave(): Promise<void> {
 	state.saveState = "saving";
 	m.redraw();
 	try {
-		const res = await fetch(`/api/dashboards/${encodeURIComponent(dash.id)}`, {
-			method: "PUT",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				name: dash.name,
-				color: dash.color,
-				widgets: dash.widgets,
-				version: dash.version,
-			}),
-		});
-		if (res.status === 409) {
-			const conflict = (await res.json().catch(() => null)) as {
-				current?: ServerDashboard;
-			} | null;
-			await resync(conflict?.current);
-			toastMsg(t("dash.conflict"), true);
-			return;
-		}
-		if (!res.ok) throw new Error(`HTTP ${res.status}`);
-		const body = (await res.json().catch(() => null)) as {
-			ok?: boolean;
-			dashboard?: ServerDashboard;
-			error?: string;
-		} | null;
-		// Validation failures come back as HTTP 200 with `ok: false` — surface them
-		// so the user is not left believing a change was saved.
-		if (body && body.ok === false)
-			throw new Error(body.error ?? "Save rejected");
-		const fresh = body?.dashboard;
+		const body = await apiJson<{ dashboard?: ServerDashboard }>(
+			`/api/dashboards/${encodeURIComponent(dash.id)}`,
+			{
+				method: "PUT",
+				body: {
+					name: dash.name,
+					color: dash.color,
+					widgets: dash.widgets,
+					version: dash.version,
+				},
+			},
+		);
+		const fresh = body.dashboard;
 		if (fresh) {
 			// Adopt the bumped version so the next save targets the latest revision;
 			// keep our local widget objects (live bodies reference them).
@@ -134,12 +135,18 @@ async function doSave(): Promise<void> {
 		if (toastTimer !== null) window.clearTimeout(toastTimer);
 		toastTimer = window.setTimeout(() => (state.saveState = "idle"), 2_000);
 	} catch (err) {
+		if (err instanceof ApiError && err.status === 409) {
+			// another client saved first: rebase onto its copy
+			const conflict = err.body as { current?: ServerDashboard } | null;
+			await resync(conflict?.current);
+			toastMsg(t("dash.conflict"), true);
+			return;
+		}
 		state.saveState = "error";
-		// Show the server's reason (e.g. a widget bound to a removed device)
+		// Show the server's reason (e.g. a widget bound to a removed device);
+		// validation failures come back as `ok: false` with that reason.
 		const detail =
-			err instanceof Error && err.message && err.message !== "Save rejected"
-				? ` (${err.message})`
-				: "";
+			err instanceof Error && err.message ? ` (${err.message})` : "";
 		toastMsg(t("dash.save_error") + detail);
 	} finally {
 		state.saving = false;
@@ -152,18 +159,12 @@ async function resync(prefer?: ServerDashboard): Promise<void> {
 	const id = state.dash?.id;
 	if (!id) return;
 	let fresh = prefer;
-	if (!fresh) {
-		const res = await fetch(`/api/dashboards/${encodeURIComponent(id)}`, {
-			cache: "no-store",
-		}).catch(() => null);
+	if (!fresh)
 		fresh = (
-			res?.ok
-				? ((await res.json().catch(() => null)) as {
-						dashboard?: ServerDashboard;
-					})
-				: null
+			await apiTry<{ dashboard?: ServerDashboard }>(
+				`/api/dashboards/${encodeURIComponent(id)}`,
+			)
 		)?.dashboard;
-	}
 	if (fresh) {
 		state.dash = {
 			...state.dash!,
@@ -214,11 +215,6 @@ const actions: WidgetActions = { remove: removeWidget, hide: hideWidget };
 
 // ------------------------------------------------------------- dashboard ops
 
-function setEdit(on: boolean): void {
-	state.editMode = on;
-	m.redraw();
-}
-
 function onNameInput(value: string): void {
 	const dash = state.dash;
 	if (!dash) return;
@@ -233,45 +229,6 @@ function onColorInput(value: string): void {
 	dash.color = value;
 	setHeaderColor(value);
 	scheduleSave();
-}
-
-async function _newDashboard(): Promise<void> {
-	state.dashMenu = false;
-	const res = await fetch("/api/dashboards", {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ name: t("dash.default_name") }),
-	}).catch(() => null);
-	const body = res?.ok
-		? ((await res.json().catch(() => null)) as {
-				dashboard?: ServerDashboard;
-			})
-		: null;
-	if (body?.dashboard)
-		location.href = `/dashboards/edit/${encodeURIComponent(body.dashboard.id)}/`;
-	else toastMsg(t("dash.save_error"));
-}
-
-function _renameDashboard(): void {
-	const dash = state.dash;
-	if (!dash) return;
-	state.dashMenu = false;
-	const name = window.prompt(t("dash.rename"), dash.name);
-	if (!name?.trim()) return;
-	dash.name = name.trim();
-	scheduleSave();
-}
-
-async function _deleteDashboard(): Promise<void> {
-	const dash = state.dash;
-	if (!dash) return;
-	if (!window.confirm(t("dash.delete_confirm", { name: dash.name }))) return;
-	state.dashMenu = false;
-	const res = await fetch(`/api/dashboards/${encodeURIComponent(dash.id)}`, {
-		method: "DELETE",
-	}).catch(() => null);
-	if (res?.ok) location.href = "/dashboards/";
-	else toastMsg(t("dash.delete_fail"));
 }
 
 function onDashboardsChanged(
@@ -307,7 +264,7 @@ const App: m.Component = {
 		return (
 			<Page
 				title={
-					<TitleWithBack href="/dashboards/" backLabel={t("dash.back")}>
+					<TitleWithBack href={DASHBOARD_LIST_URL} backLabel={t("dash.back")}>
 						{dash ? (
 							state.editMode ? (
 								<input
@@ -342,14 +299,17 @@ const App: m.Component = {
 									}
 								/>
 							) : null}
-							<button
+							<a
 								class="dash-edittoggle"
-								type="button"
+								href={
+									state.editMode
+										? dashboardViewUrl(dash.id)
+										: dashboardUpdateUrl(dash.id)
+								}
 								aria-pressed={state.editMode}
-								onclick={() => setEdit(!state.editMode)}
 							>
 								{t(state.editMode ? "dash.done" : "dash.edit")}
-							</button>
+							</a>
 						</>
 					) : undefined
 				}
@@ -410,7 +370,7 @@ const App: m.Component = {
 									class="dash-add"
 									type="button"
 									onclick={() => {
-										location.href = `/dashboards/add/${encodeURIComponent(dash.id)}/`;
+										location.href = dashboardAddUrl(dash.id);
 									}}
 								>{`+ ${t("dash.add_widget")}`}</button>
 							</div>
@@ -436,30 +396,27 @@ const App: m.Component = {
 
 // -------------------------------------------------------------------- startup
 
-void (async () => {
-	const match = PATH_RE.exec(location.pathname);
-	state.editMode = match?.[1] === "edit";
-	const id = match?.[2] ?? "";
-	const res = await fetch(`/api/dashboards/${encodeURIComponent(id)}`, {
-		cache: "no-store",
-	}).catch(() => null);
-	const body = (res?.ok ? await res.json().catch(() => null) : null) as {
-		ok?: boolean;
-		dashboard?: ServerDashboard;
-	} | null;
-	if (body?.ok && body.dashboard) {
-		state.dash = body.dashboard;
-		setHeaderColor(state.dash.color ?? DEFAULT_COLOR);
-	} else state.notFound = true;
-	setWidgetConfigSaver(() => scheduleSave());
-	setDashboardChangedSink(onDashboardsChanged);
-	await refreshDevices();
-	syncConnectionsFor(state.dash);
-	// One-time startup sync: devices.changed then keeps the devices and the
-	// widget connections in step, so no polling timer is needed.
-	ensureDashboardsWs();
-	m.redraw();
-})();
-
-document.addEventListener("fullscreenchange", () => m.redraw());
-void mountPage(() => t("dash.title"), App);
+/** Mount the page in the given mode; the dashboard id comes from the URL. */
+export function mountDashboardPage(mode: DashboardPageMode): void {
+	state.editMode = mode === "update";
+	void (async () => {
+		const id = PATH_RE.exec(location.pathname)?.[1] ?? "";
+		const body = await apiTry<{ dashboard: ServerDashboard }>(
+			`/api/dashboards/${encodeURIComponent(id)}`,
+		);
+		if (body?.dashboard) {
+			state.dash = body.dashboard;
+			setHeaderColor(state.dash.color ?? DEFAULT_COLOR);
+		} else state.notFound = true;
+		setWidgetConfigSaver(() => scheduleSave());
+		setDashboardChangedSink(onDashboardsChanged);
+		await refreshDevices();
+		syncConnectionsFor(state.dash);
+		// One-time startup sync: devices.changed then keeps the devices and the
+		// widget connections in step, so no polling timer is needed.
+		ensureDashboardsWs();
+		m.redraw();
+	})();
+	document.addEventListener("fullscreenchange", () => m.redraw());
+	void mountPage(() => t("dash.title"), App);
+}

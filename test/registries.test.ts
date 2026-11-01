@@ -275,10 +275,10 @@ describe("module registries", () => {
     test("core frontend pages compose module contributions without feature branches", () => {
         const readPage = (side: "client" | "server", name: string) =>
             readFileSync(join(appDir, side, "frontend", "ts", name), "utf8");
-        const app = readPage("client", "app.tsx");
-        const dashboard = readPage("server", "dashboard.tsx");
+        const app = readPage("client", "device_page.tsx");
+        const dashboard = readPage("server", "dashboards/dashboard_widgets.tsx");
         const setup = readPage("client", "setup.tsx");
-        const devices = readPage("server", "devices.tsx");
+        const devices = readPage("server", "devices/device_list.tsx");
 
         expect(app).not.toMatch(
             /moduleCard\(["'](encoder|relay|obs)/,

@@ -9,10 +9,6 @@ type Frontend = Awaited<ReturnType<typeof createFrontend>>;
 export function accountRoutes(auth: Auth, frontend: Frontend) {
     return new Elysia({ name: "control-account" })
         .get(
-            "/",
-            authenticatedHandler(auth, () => frontend.htmlResponse("devices")),
-        )
-        .get(
             "/profile",
             authenticatedHandler(auth, () => frontend.htmlResponse("profile")),
         )

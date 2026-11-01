@@ -21,11 +21,12 @@ const CLIENT_ENTRY = "client/backend/client.ts";
 
 /** Control-server routes per page (login/register redirect when no-auth). */
 const SERVER_ROUTES: Partial<Record<(typeof PAGES)[number], string>> = {
-	devices: "/",
+	device_list: "/",
 	profile: "/profile/",
-	dashboards: "/dashboards/",
-	dashboardview: "/dashboards/view/smoke/",
-	dashboardadd: "/dashboards/add/smoke/",
+	dashboard_list: "/dashboards/",
+	dashboard_add: "/dashboards/add/smoke/",
+	dashboard_view: "/dashboards/view/smoke/",
+	dashboard_update: "/dashboards/edit/smoke/",
 	overlay_list: "/overlays/",
 	overlay_update: "/overlays/edit/smoke/",
 	overlay_view: "/overlay/smoke",

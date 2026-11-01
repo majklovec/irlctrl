@@ -32,10 +32,11 @@ function close(ok: boolean): void {
 	p?.resolve(ok);
 }
 
+/** Focus the confirming button once the modal is in the DOM. */
+const focusOk = ({ dom }: m.VnodeDOM) =>
+	(dom.querySelector("button[data-ok]") as HTMLButtonElement | null)?.focus();
+
 const Dialog: m.Component = {
-	oncreate: ({ dom }) => {
-		(dom.querySelector("button[data-ok]") as HTMLButtonElement | null)?.focus();
-	},
 	view: () =>
 		pending && (
 			<div
@@ -48,7 +49,7 @@ const Dialog: m.Component = {
 					if (e.key === "Enter") close(true);
 				}}
 			>
-				<div class="modal" role="dialog" aria-modal="true">
+				<div class="modal" role="dialog" aria-modal="true" oncreate={focusOk}>
 					{pending.title ? <h2 class="modal-title">{pending.title}</h2> : null}
 					<p class="modal-body">{pending.message}</p>
 					<div class="actions modal-actions">

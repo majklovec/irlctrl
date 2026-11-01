@@ -3,7 +3,7 @@
  * pushed live over the shared feed websocket, and live widget data flows over the
  * control server's per-device viewer websockets (d/<id>/ws). */
 import m from "mithril";
-import { apiTry } from "../../../shared/ui/api_client";
+import { apiTry } from "../../../../shared/ui/api_client";
 import type {
 	DeviceInfo,
 	DeviceSummary,
@@ -12,16 +12,22 @@ import type {
 	ServerDashboardWidget,
 	Status,
 	WidgetType,
-} from "../../../shared/contracts/wire";
-import { configFieldName, visibleWidgetConfigFields } from "../../../shared/contracts/wire";
-import { Badge, Button } from "../../../shared/ui/components/ui";
-import { createCardHost, type DeviceCard } from "../../../shared/ui/device/store";
-import { t } from "../../../shared/ui/i18n";
+} from "../../../../shared/contracts/wire";
+import {
+	configFieldName,
+	visibleWidgetConfigFields,
+} from "../../../../shared/contracts/wire";
+import { Badge, Button } from "../../../../shared/ui/components/ui";
+import {
+	createCardHost,
+	type DeviceCard,
+} from "../../../../shared/ui/device/store";
+import { t } from "../../../../shared/ui/i18n";
 import type {
 	DeviceDashboardContext,
 	DeviceLink,
 	FleetDashboardContext,
-} from "../../../shared/contracts/frontend_module";
+} from "../../../../shared/contracts/frontend_module";
 import {
 	destroyDeviceWidget,
 	deviceWidgetForType,
@@ -34,9 +40,9 @@ import {
 	widgetConfigFieldsForType,
 	widgetModuleForType,
 	widgetModuleTypes,
-} from "../../../shared/ui/module_registry";
-import { RpcClient, socketUrl } from "../../../shared/ui/services/rpc";
-import { serverLive } from "./services/serverws";
+} from "../../../../shared/ui/module_registry";
+import { RpcClient, socketUrl } from "../../../../shared/ui/services/rpc";
+import { serverLive } from "../services/serverws";
 import { configSelectField } from "./widget_config_select";
 
 /** Device-independent widget types — offered once, with no device of their

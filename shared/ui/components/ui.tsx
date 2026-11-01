@@ -124,7 +124,7 @@ const ServerNavComponent: m.Component<{
 	view: ({ attrs: { active } }) => (
 		<span>
 			<a
-				href="/"
+				href="/devices/"
 				class={active === "devices" ? "nav-link active" : "nav-link"}
 				aria-current={active === "devices" ? "page" : undefined}
 			>
