@@ -1,3 +1,12 @@
+# [2.3.0](https://github.com/majklovec/irlctrl/compare/v2.2.0...v2.3.0) (2026-11-01)
+
+
+### Features
+
+* add fitZoom function to adjust canvas zoom to fit viewport and update overlayUpdatePage to call fitZoom on load ([e8dd84e](https://github.com/majklovec/irlctrl/commit/e8dd84edd62fb338fe9b134c3540cad4f41fce86))
+* add variables modal and toolbar icon for variable management ([7faa38c](https://github.com/majklovec/irlctrl/commit/7faa38c3378adda18e5674d0789edfdbf3d540e2))
+* enhance variable binding UI with new selection and usage indicators ([58fa5df](https://github.com/majklovec/irlctrl/commit/58fa5dfdce978ca5aafe2cd2100ae8e4b5065ef8))
+
 # [2.2.0](https://github.com/majklovec/irlctrl/compare/v2.1.0...v2.2.0) (2026-11-01)
 
 
