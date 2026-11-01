@@ -304,16 +304,21 @@ export interface OverlayElementDef {
 	/** Present = the element is trigger-driven: it renders only while a
 	 * runtime trigger has it active (the editor always renders its design
 	 * state). The runtime page calls this for every alert event
-	 * (`GET /overlay/alert/<name>` → `overlays.alert` frame) whose name
-	 * matches the element's trigger event; it returns the display duration
-	 * in ms when this instance fires on the event (evaluating any
-	 * variation/condition props), `undefined` when the event doesn't claim
-	 * it. Side effects (audio, TTS) belong in here so they play when the
-	 * event arrives. Consecutive claims on the same element queue FIFO:
-	 * the element's visual display starts when the previous claim
-	 * expires. `ctx` carries the live asset URLs and variable values;
-	 * values set by the trigger endpoint persist — the runtime never
-	 * empties them. */
+	 * (`GET /overlay/alert/<name>` → `overlays.alert` frame) at the
+	 * moment the alert goes on air — immediately when the element is
+	 * free, at the previous claim's expiry when it is queued; it returns
+	 * the display duration in ms when this instance fires on the event
+	 * (evaluating any variation/condition props), `undefined` when the
+	 * event doesn't claim it (a queued claim that fails its condition
+	 * is dropped and the queue continues). The trigger's
+	 * `<name>=<value>` pairs ride in `payload` and are already written
+	 * into the project variables (and `ctx`) by the runtime page before
+	 * this runs — a queued alert's values only land at its play time, so
+	 * they never clobber the on-air ones early; the written values
+	 * persist (the runtime page sends them over the `overlays.applyAlert`
+	 * uplink) and are never emptied. Side effects (audio, TTS) belong in
+	 * here so they play when the alert goes on air, not when the trigger
+	 * arrives. `ctx` carries the live asset URLs and variable values. */
 	onTrigger?(
 		element: OverlayElement,
 		eventName: string,

@@ -4,8 +4,10 @@
  * It fires for a named event: `GET /overlay/alert/<name>` shows this alert
  * while `<name>` equals `props.event`, rendering a media + template-text
  * composition with intro/outro animations, an optional audio sting and TTS,
- * for `duration` ms. Consecutive triggers on the same element queue FIFO.
- * Values set by the trigger endpoint persist (the runtime never clears
+ * for `duration` ms. Consecutive triggers on the same element queue FIFO;
+ * the trigger's `<name>=<value>` pairs are written to the project
+ * variables when this alert plays (queued alerts hold their values until
+ * their turn), and the written values persist (the runtime never clears
  * them).
  *
  * Template tokens `{name}` resolve against a project variable of that name

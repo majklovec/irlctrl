@@ -908,8 +908,10 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
 
             // ── GET /overlay/alert/<name>: the dedicated trigger endpoint ──
             // an alert element listens for a named event; the endpoint fires
-            // it by name and optional ?<name>=<value> pairs set project
-            // variables (which persist — the endpoint never clears them)
+            // it by name and optional ?<name>=<value> pairs ride with the
+            // alert — they are written to the project variables when the
+            // alert plays (the runtime uplinks `overlays.applyAlert`), so
+            // a queued alert's values never clobber the on-air ones early
             const alertUpsertRes = await fetch(
                 `${baseUrl}/api/overlays/scenes/${sceneBody.scene.id}/elements`,
                 {
@@ -949,24 +951,54 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                 );
 
                 // values ride along as query pairs, the trigger is the
-                // URL's <name>
+                // URL's <name>; the response no longer carries (revalued)
+                // variables — they persist only when the alert plays
                 const alertRes = await fetch(
                     `${baseUrl}/overlay/alert/test.alert?token=${token}&score=4&live=true`,
                 );
                 expect(alertRes.status).toBe(200);
-                expect(await alertRes.json()).toMatchObject({
+                expect(await alertRes.json()).toEqual({
                     ok: true,
                     name: "test.alert",
-                    variables: [
-                        { name: "score", value: 4 },
-                        { name: "lives", value: 0 },
-                        { name: "live", value: true },
-                    ],
                 });
 
-                // both frames land on the runtime socket: the revalued
-                // variables first (so templates/`amount` render live),
-                // then the alert event (the name the elements match on)
+                // the alert event lands on the runtime socket with the
+                // validated + type-coerced payload (string query values
+                // → 4 / true); no `overlays.variables` frame accompanies
+                // it — nothing is written to the project yet
+                const alertEvent = await nextFrame(
+                    alertSocket,
+                    (f) =>
+                        f.event === "overlays.alert" &&
+                        (f.data as { name?: string }).name === "test.alert",
+                );
+                expect(alertEvent.data).toMatchObject({
+                    name: "test.alert",
+                    payload: { score: 4, live: true },
+                });
+
+                // the project variables are untouched at trigger time:
+                // the runtime page applies them when it plays the alert
+                const beforePlay = (await (
+                    await fetch(`${baseUrl}/api/overlays`, { headers: { cookie } })
+                ).json()) as {
+                    project: { variables: { name: string; value: unknown }[] };
+                };
+                expect(
+                    Object.fromEntries(
+                        beforePlay.project.variables.map((v) => [v.name, v.value]),
+                    ),
+                ).toMatchObject({ score: 0, lives: 0, live: false });
+
+                // the runtime page's uplink: the alert went on air, so its
+                // values land in the project (one commit + one frame)
+                alertSocket.send(
+                    JSON.stringify({
+                        type: "event",
+                        event: "overlays.applyAlert",
+                        data: { values: { score: 4, live: true } },
+                    }),
+                );
                 await nextFrame(
                     alertSocket,
                     (f) =>
@@ -984,26 +1016,14 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                             } as Record<string, unknown>)[v.name] === v.value,
                         ),
                 );
-                const alertEvent = await nextFrame(
-                    alertSocket,
-                    (f) =>
-                        f.event === "overlays.alert" &&
-                        (f.data as { name?: string }).name === "test.alert",
-                );
-                expect(alertEvent.data).toMatchObject({
-                    name: "test.alert",
-                    payload: { score: "4", live: "true" },
-                });
-
-                // the values persisted (the new model never clears them)
-                const afterAlert = (await (
+                const afterPlay = (await (
                     await fetch(`${baseUrl}/api/overlays`, { headers: { cookie } })
                 ).json()) as {
                     project: { variables: { name: string; value: unknown }[] };
                 };
                 expect(
                     Object.fromEntries(
-                        afterAlert.project.variables.map((v) => [v.name, v.value]),
+                        afterPlay.project.variables.map((v) => [v.name, v.value]),
                     ),
                 ).toMatchObject({ score: 4, lives: 0, live: true });
 

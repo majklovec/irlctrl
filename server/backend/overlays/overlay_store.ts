@@ -101,16 +101,29 @@ export interface Overlays {
      * `overlays.alert` frame (`{name, payload}`) on the runtime topic;
      * the runtime page shows every alert element whose `event` prop
      * equals `name`, queuing consecutive triggers per element. Any query
-     * values are applied to same-named project variables first (they
-     * persist — the new trigger model never empties them). `null` when
-     * the token is unknown; `name` is not validated against project
-     * state (it just needs to match an element on the client).
+     * values are validated and type-coerced (variables-endpoint rules)
+     * and ride along in `payload` — the runtime page writes them into
+     * the project variables (the `overlays.applyAlert` WS uplink →
+     * `applyAlertValues`) only when that alert goes on air, so a
+     * queued alert's values never clobber the on-air
+     * ones early (and the written values persist — the new trigger
+     * model never empties them). `null` when the token is unknown;
+     * `name` is not validated against project state (it just needs to
+     * match an element on the client).
      */
     triggerAlertByToken(
         token: string,
         name: string,
         values: Record<string, unknown>,
     ): { status: number; body: Record<string, unknown> } | null;
+    /**
+     * The runtime page's `overlays.applyAlert` WS uplink: writes an
+     * on-air alert's payload values into the project variables (one
+     * commit + one `overlays.variables` frame). Only reachable from a
+     * runtime WS whose open already passed the token+scene check, so
+     * failures are not masked; `false` on unknown user/store.
+     */
+    applyAlertValues(user: string, values: Record<string, unknown>): boolean;
 }
 
 export function createOverlays({
@@ -702,15 +715,18 @@ export function createOverlays({
         return null;
     }
 
-    /** Apply a token-endpoint value batch to the project variables in
-     * place: unknown names 404, null/"" empties to the type's neutral
-     * value, booleans map "true"/"false"/"0"/"1". Throws ApiError on any
-     * problem before any value is applied. Shared by the variables and
-     * alert trigger endpoints. */
-    function applyTokenValues(
+    /** Validate + type-coerce a value batch against the project
+     * variables WITHOUT mutating: unknown names 404, null/"" → the
+     * type's neutral value, booleans map "true"/"false"/"0"/"1", numbers
+     * parse (the variables-endpoint rules). Returns the resolved
+     * `{name: coercedValue}` pairs. Shared by the variables endpoint
+     * (which then applies the result) and the alert trigger endpoint
+     * (which ships the result with the alert frame). */
+    function resolveTokenValues(
         store: Store,
         values: Record<string, unknown>,
-    ): void {
+    ): Record<string, unknown> {
+        const resolved: Record<string, unknown> = {};
         // names are unique per project, so the token endpoint keys on
         // names (ids are internal, names are what triggers match on)
         for (const name of Object.keys(values)) {
@@ -721,7 +737,7 @@ export function createOverlays({
             const raw = values[name];
             // null/"" clears: the type's neutral empty value
             if (raw === null || raw === undefined || raw === "") {
-                variable.value =
+                resolved[name] =
                     variable.type === "number"
                         ? 0
                         : variable.type === "boolean"
@@ -744,7 +760,27 @@ export function createOverlays({
                         `${variable.name} must be true or false`,
                     );
             }
-            variable.value = parseVariableValueInput(value, variable);
+            resolved[name] = parseVariableValueInput(value, variable);
+        }
+        return resolved;
+    }
+
+    /** Apply a token-endpoint value batch to the project variables in
+     * place (validate+coerce via `resolveTokenValues` first, so a bad
+     * value throws before any value is applied). Shared by the
+     * variables and alert-apply endpoints. */
+    function applyTokenValues(
+        store: Store,
+        values: Record<string, unknown>,
+    ): void {
+        const resolved = resolveTokenValues(store, values);
+        for (const [name, value] of Object.entries(resolved)) {
+            const variable = store.project.variables.find(
+                (v) => v.name === name,
+            );
+            // resolveTokenValues just validated every name and coerced
+            // each value to the variable's type — the find can't fail
+            if (variable) variable.value = value as Variable["value"];
         }
     }
 
@@ -784,13 +820,16 @@ export function createOverlays({
 
     /** Trigger an alert through its event name (the `<name>` in
      * `GET /overlay/alert/<name>`): the event is pushed to the runtime
-     * topic as an `overlays.alert` frame. Any query values are applied
-     * to same-named project variables first (one commit + one
-     * `overlays.variables` frame, so templates/`amount` render live
-     * values — and they persist, the new trigger model never empties
-     * them). `null` when the token is unknown (the route 404s, same
-     * no-leak contract as the variables endpoint); unknown variable
-     * names and bad values throw ApiError(404/400). */
+     * topic as an `overlays.alert` frame. Any query values are
+     * validated + type-coerced (the variables-endpoint rules) and
+     * shipped in the frame's `payload` — the runtime page applies them
+     * to same-named project variables (via the `overlays.apply-alert`
+     * WS uplink → `applyAlertValues`) only when that alert goes on air,
+     * so a queued alert's values never clobber the on-air ones early
+     * (and they persist once written — the new trigger model never
+     * empties them). `null` when the token is unknown (the route 404s,
+     * same no-leak contract as the variables endpoint); unknown
+     * variable names and bad values throw ApiError(404/400). */
     function triggerAlertByToken(
         token: string,
         name: string,
@@ -799,27 +838,49 @@ export function createOverlays({
         const hit = runtimeStore(token);
         if (!hit) return null;
         const [user, store] = hit;
-        applyTokenValues(store, values);
-        if (Object.keys(values).length > 0) {
-            try {
-                revalidate(store.project);
-            } catch {
-                // no-leak contract, same as setVariablesByToken
-                throw new ApiError("Not found", 404);
-            }
-            commit(user, store);
-            feed(user, "overlays.variables", {
-                variables: store.project.variables,
-            });
-            runtime(user, "overlays.variables", {
-                variables: store.project.variables,
-            });
-        }
-        runtime(user, "overlays.alert", { name, payload: values });
+        // validate + coerce without touching the project: the values
+        // travel with the alert and land when the alert plays
+        const payload = resolveTokenValues(store, values);
+        runtime(user, "overlays.alert", { name, payload });
         return {
             status: 200,
-            body: { ok: true, name, variables: store.project.variables },
+            body: { ok: true, name },
         };
+    }
+
+    /** The runtime page's `overlays.apply-alert` WS uplink: writes an
+     * on-air alert's payload values into the project variables (one
+     * commit + one `overlays.variables` frame to feed and runtime).
+     * Only reachable from a runtime WS whose `open` already passed the
+     * token+scene check, so failures surface (no no-leak masking).
+     * Returns `false` on unknown user/store; unknown variable names
+     * still throw (they can't have come from a validated trigger
+     * frame in the first place). */
+    function applyAlertValues(
+        user: string,
+        values: Record<string, unknown>,
+    ): boolean {
+        const store = stores.get(user);
+        if (!store || Object.keys(values).length === 0) return false;
+        applyTokenValues(store, values);
+        try {
+            revalidate(store.project);
+        } catch {
+            // scene binding lost against the variable set — surface it
+            // (the runtime WS is an authenticated internal client)
+            throw new ApiError(
+                "scene validation failed after applying alert values",
+                500,
+            );
+        }
+        commit(user, store);
+        feed(user, "overlays.variables", {
+            variables: store.project.variables,
+        });
+        runtime(user, "overlays.variables", {
+            variables: store.project.variables,
+        });
+        return true;
     }
 
     return {
@@ -841,5 +902,6 @@ export function createOverlays({
         },
         setVariablesByToken,
         triggerAlertByToken,
+        applyAlertValues,
     };
 }

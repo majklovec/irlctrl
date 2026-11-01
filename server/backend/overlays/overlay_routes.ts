@@ -9,8 +9,13 @@
  *                                  {<name>: value|null} (token auth)
  *   GET  /overlay/alert/:name?…    trigger an alert whose element event
  *                                  matches <name>; optional ?<name>=<value>
- *                                  pairs set project variables (token auth)
- *   WS   /overlay/:slug/ws?token=… the runtime live feed (token auth)
+ *                                  pairs ride with the alert and land in
+ *                                  project variables when the alert plays
+ *                                  (token auth)
+ *   WS   /overlay/:slug/ws?token=… the runtime live feed (token auth);
+ *                                  also accepts the runtime page's
+ *                                  `overlays.applyAlert` uplink (it writes
+ *                                  an on-air alert's values to variables)
  *   …    /api/overlays…            the editor REST API (cookie auth)
  *
  * The runtime page is what OBS loads as a Browser Source: no session, only
@@ -19,6 +24,7 @@
 import { Elysia } from "elysia";
 import type { createFrontend } from "../../../shared/frontend";
 import { upgradeRequired } from "../../../shared/http";
+import { socketMessage } from "../../../shared/socket_message";
 import type { createAuth } from "../auth/auth";
 import { authenticatedHandler } from "../auth/authenticated";
 import { event } from "../contracts";
@@ -190,6 +196,8 @@ export function overlayRoutes(
                     slug,
                 );
                 if (!feed) return ws.close(1008, "Invalid overlay token");
+                // the message handler reuses the already-validated owner
+                (ws.data as { user?: string }).user = feed.user;
                 // snapshot first, then the live topic (the server publishes
                 // topic messages to this socket from the next tick on)
                 ws.subscribe(overlayRuntimeTopic(feed.user));
@@ -201,6 +209,42 @@ export function overlayRoutes(
                         assets: feed.assets,
                     }),
                 );
+            },
+            message(ws, message) {
+                // uplink from the runtime page: an alert went on air and
+                // its values must land in the project variables
+                const user = (ws.data as { user?: string }).user;
+                if (!user) return;
+                // Elysia pre-parses JSON text frames; socketMessage
+                // restores the raw string
+                let frame: { event?: string; data?: unknown };
+                try {
+                    frame = JSON.parse(
+                        `${socketMessage(message)}`,
+                    ) as { event?: string; data?: unknown };
+                } catch {
+                    return;
+                }
+                if (frame.event !== "overlays.applyAlert") return;
+                const values = (frame.data as { values?: unknown } | null)
+                    ?.values;
+                if (
+                    typeof values !== "object" ||
+                    values === null ||
+                    Array.isArray(values)
+                )
+                    return;
+                try {
+                    overlays.applyAlertValues(
+                        user,
+                        values as Record<string, unknown>,
+                    );
+                } catch {
+                    // the values came from this page's own validated
+                    // trigger payload; an apply failure means the project
+                    // changed underneath — the alert already played, there
+                    // is nothing safe to surface over a fire-and-forget WS
+                }
             },
         });
 }

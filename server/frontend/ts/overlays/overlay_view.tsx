@@ -7,13 +7,18 @@
  * - on disconnect: hold last-known state, reconnect with exponential backoff
  * - an `overlays.alert` frame shows every alert element whose event matches
  *   the frame's name; an element already showing an alert queues the new
- *   one FIFO and starts it when the current one expires (variables set by
- *   the trigger endpoint persist — they are never cleared here)
+ *   one FIFO and starts it when the current one expires
+ * - a trigger's `?<name>=<value>` pairs ride in the frame's payload and
+ *   are written into the project variables only when that alert goes on
+ *   air (never while it waits in the queue), then persisted via the
+ *   `overlays.applyAlert` WS uplink — so a queued alert's values never
+ *   clobber the on-air ones early, and the written values persist
  */
 import m from "mithril";
 import type {
 	Asset,
 	Canvas,
+	OverlayElement,
 	Scene,
 	Variable,
 	VariableValue,
@@ -68,11 +73,21 @@ const triggerTimers = new Map<
 	[ReturnType<typeof setTimeout>, ReturnType<typeof setTimeout>]
 >();
 
+/** an alert claim: the element that wants it, when it was claimed, and
+ * the values that must go on air with it */
+interface PendingAlert {
+	element: OverlayElement;
+	eventName: string;
+	payload: Record<string, unknown>;
+}
+
 /** element id -> FIFO of pending alerts (the element is showing an earlier
- * one); drained when the element's current trigger expires */
+ * one); drained when the element's current trigger expires. Values are
+ * applied only when the alert plays, so queued alerts never clobber the
+ * on-air values early */
 const alertQueues = new Map<
 	string,
-	{ eventName: string; payload: Record<string, unknown> }[]
+	PendingAlert[]
 >();
 
 let ws: WebSocket | undefined;
@@ -155,33 +170,8 @@ function runtimeCtx(): ElementContext {
 	};
 }
 
-/** Show a claimed trigger: active until its duration runs out, with the
- * outro window fading it. When an alert was queued for this element (it
- * was already showing one), the next one starts right at expiry. */
-function scheduleTriggerLifecycle(elementId: string, duration: number): void {
-	const [outroId, removeId] = triggerTimers.get(elementId) ?? [0, 0];
-	clearTimeout(outroId);
-	clearTimeout(removeId);
-	const timers: [ReturnType<typeof setTimeout>, ReturnType<typeof setTimeout>] =
-		[
-			setTimeout(() => m.redraw(), duration - TRIGGER_OUTRO_MS),
-			setTimeout(() => {
-				state.activeTriggers.delete(elementId);
-				triggerTimers.delete(elementId);
-				const queue = alertQueues.get(elementId);
-				if (queue && queue.length > 0) {
-					const [next, ...rest] = queue;
-					if (rest.length > 0)
-						alertQueues.set(elementId, rest);
-					else alertQueues.delete(elementId);
-					activateTrigger(elementId, next.payload, next.duration);
-				}
-				m.redraw();
-			}, duration),
-		];
-	triggerTimers.set(elementId, timers);
-}
-
+/** Mark a playing trigger: active until its duration runs out, with the
+ * outro window fading it. */
 function activateTrigger(
 	elementId: string,
 	payload: Record<string, unknown>,
@@ -196,33 +186,99 @@ function activateTrigger(
 	scheduleTriggerLifecycle(elementId, duration);
 }
 
+/** Show a claimed trigger: apply its values to the project variables
+ * first (they were validated by the trigger endpoint, so the names exist
+ * here), then let the element decide (event match + variation condition
+ * + side effects) with the live values in place. Returns `false` when the
+ * element declines the claim. */
+function playAlert(
+	element: OverlayElement,
+	eventName: string,
+	payload: Record<string, unknown>,
+): boolean {
+	for (const [name, value] of Object.entries(payload)) {
+		const variable = state.variables.find((v) => v.name === name);
+		if (variable)
+			variable.value = value as VariableValue;
+	}
+	const duration =
+		elementDef(element.type)?.onTrigger(
+			element,
+			eventName,
+			payload,
+			runtimeCtx(),
+		);
+	if (duration === undefined || !Number.isFinite(duration) || duration <= 0)
+		return false;
+	activateTrigger(element.id, payload, duration);
+	// persist the on-air values (best-effort: the alert plays even if the
+	// socket is momentarily down)
+	if (Object.keys(payload).length > 0 && ws?.readyState === WebSocket.OPEN)
+		ws.send(
+			JSON.stringify({
+				type: "event",
+				event: "overlays.applyAlert",
+				data: { values: payload },
+			}),
+		);
+	return true;
+}
+
+/** Run the per-element trigger lifecycle: outro window, then removal —
+ * and the FIFO drain of queued claims for this element (a claim whose
+ * condition fails at play time is dropped and the queue continues). */
+function scheduleTriggerLifecycle(elementId: string, duration: number): void {
+	const [outroId, removeId] = triggerTimers.get(elementId) ?? [0, 0];
+	clearTimeout(outroId);
+	clearTimeout(removeId);
+	const timers: [ReturnType<typeof setTimeout>, ReturnType<typeof setTimeout>] =
+		[
+			setTimeout(() => m.redraw(), duration - TRIGGER_OUTRO_MS),
+			setTimeout(() => {
+				state.activeTriggers.delete(elementId);
+				triggerTimers.delete(elementId);
+				const queue = alertQueues.get(elementId);
+				if (queue && queue.length > 0) {
+					while (queue.length > 0) {
+						const [next, ...rest] = queue;
+						if (rest.length > 0)
+							alertQueues.set(elementId, rest);
+						else alertQueues.delete(elementId);
+						if (
+							playAlert(next.element, next.eventName, next.payload)
+						)
+							break;
+					}
+				}
+				m.redraw();
+			}, duration),
+		];
+	triggerTimers.set(elementId, timers);
+}
+
 /** Route an `overlays.alert` frame to every trigger-driven element in the
- * scene. An element claims the trigger (returns a duration) only when its
- * configured event name matches — and, for variation alerts, when the
- * amount condition holds. Claims on an element that is still showing an
- * earlier alert are queued FIFO and start at that alert's expiry (the
- * values the trigger endpoint set persist; nothing is cleared here). */
+ * scene. A claim plays immediately (values applied, `onTrigger` evaluated
+ * with the live values) when the element is free, and is queued FIFO with
+ * its values when the element is still showing an earlier alert — the
+ * queued values only land at play time, and the written values persist
+ * via the `overlays.applyAlert` uplink (nothing is cleared here). */
 function handleTrigger(
 	eventName: string,
 	payload: Record<string, unknown>,
 ): void {
 	const scene = state.scene;
 	if (!scene || !eventName) return;
-	const ctx = runtimeCtx();
 	for (const element of scene.elements) {
-		const def = elementDef(element.type);
-		if (!def?.onTrigger) continue;
-		const duration = def.onTrigger(element, eventName, payload, ctx);
-		if (duration === undefined || !Number.isFinite(duration) || duration <= 0)
-			continue;
+		if (!elementDef(element.type)?.onTrigger) continue;
 		if (state.activeTriggers.has(element.id)) {
-			// the element is showing an earlier alert: queue this claim
+			// the element is showing an earlier alert: queue the claim
+			// with its values; they apply at play time
 			const queue = alertQueues.get(element.id) ?? [];
-			queue.push({ payload, duration });
+			queue.push({ element, eventName, payload });
 			alertQueues.set(element.id, queue);
 			continue;
 		}
-		activateTrigger(element.id, payload, duration);
+		playAlert(element, eventName, payload);
 	}
 }
 

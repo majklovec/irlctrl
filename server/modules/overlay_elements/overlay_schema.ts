@@ -207,7 +207,9 @@ export const groupSchema: OverlayElementSchema = {
 /** Alert element: fires for the named event `props.event` (published by
  * `GET /overlay/alert/<name>`), shows media + token text for `duration` ms,
  * then fades out (TODO.md "Alert element"). Consecutive triggers on the
- * same element queue FIFO. */
+ * same element queue FIFO; the trigger's `<name>=<value>` pairs ride with
+ * the alert and are written to the project variables when the alert
+ * plays (a queued alert's values never clobber the on-air ones early). */
 export const ALERT_INTRO_ANIMATIONS = [
     "none",
     "fadeIn",

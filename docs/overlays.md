@@ -167,7 +167,8 @@ Every mutation goes over REST and is fanned out to two WebSocket topics
 | `overlays.project`    | `{project}`                | canvas resize; asset upload/delete (full project, editor-only)     | ✔      | – |
 | `overlays.canvas`     | `{canvas}`                 | canvas resize (runtime gets the slim payload)                      | –      | ✔ |
 | `overlays.assets`     | `{assets}`                 | asset upload/delete                                                | –      | ✔  |
-| `overlays.alert`      | `{name, payload}`          | `GET /overlay/alert/<name>` was called (the trigger event)         | –      | ✔  |
+| `overlays.alert`      | `{name, payload}`          | `GET /overlay/alert/<name>` was called (the trigger event; `payload` carries the trigger's validated `<name>=<value>` pairs) | – | ✔  |
+| `overlays.applyAlert` | `{values}`                 | uplink: the runtime page goes on air with an alert and writes its values to the project variables (`overlays.variables` frame is the ack) | – | uplink |
 | `overlays.token`      | `{token}`                  | token rotation                                                     | ✔      | –  |
 
 Notes:
@@ -184,14 +185,18 @@ Notes:
   *Event* prop equals `<name>`. Consecutive triggers on the same element
   **queue FIFO** — a second trigger while the first is on air starts right
   when the first expires (different elements fire independently). Any
-  `?<name>=<value>` pairs set project variables in the same call (typed
-  like the variables endpoint, 404/400 on unknown/bad values) — and they
-  **persist**: the runtime page never clears them (variation `amount`
-  thresholds read the variable, so templates and TTS see the trigger's
-  values while the alert is on air). A bare trigger without values
-  (`/overlay/alert/follow?token=…`) is valid; `<name>` does not need to be
-  a variable, it just needs to match an element's *Event* prop on the
-  runtime page.
+  `?<name>=<value>` pairs are validated in the same call (typed like the
+  variables endpoint, 404/400 on unknown/bad values) and ride in the
+  frame's `payload`; the runtime page writes them to the project variables
+  **when the alert goes on air** — so a queued alert's values never
+  clobber the on-air ones early — and persists them with the
+  `overlays.applyAlert` WS uplink (the `overlays.variables` frame that
+  follows is the ack). The written values persist: the runtime page never
+  clears them (variation `amount` thresholds read the variable, so
+  templates and TTS see the trigger's values while the alert is on air).
+  A bare trigger without values (`/overlay/alert/follow?token=…`) is
+  valid; `<name>` does not need to be a variable, it just needs to match
+  an element's *Event* prop on the runtime page.
 
 ## URL binding
 
@@ -201,8 +206,8 @@ Notes:
 | `/overlay/<scene-slug>`                    | project token in `?token=` | the transparent runtime page (OBS Browser Source); a bad token renders a blank page |
 | `/overlay/variables?token=&<name>=<value>…`| project token              | revalue variables from the querystring (several `<name>=<value>` pairs per fetch; an empty value empties the variable to its neutral value: 0 / false / `#000000` / ""), returns the new variable list |
 | `POST /overlay/variables?token=`           | project token              | revalue variables from a JSON body `{<name>: value\|null}` (`null`/`""` empties), returns the new variable list |
-| `/overlay/alert/<name>?token=…[&<name>=<value>…]` | project token      | trigger every alert element whose *Event* prop equals `<name>` (queues FIFO per element); optional `<name>=<value>` pairs set project variables (persist), returns `{"ok":true,"name":…,"variables":[…]}` |
-| `/overlay/<scene-slug>/ws?token=`          | project token              | the runtime live feed (WebSocket)           |
+| `/overlay/alert/<name>?token=…[&<name>=<value>…]` | project token      | trigger every alert element whose *Event* prop equals `<name>` (queues FIFO per element); optional `<name>=<value>` pairs ride with the alert and are written to project variables when the alert plays (persist), returns `{"ok":true,"name":…}` |
+| `/overlay/<scene-slug>/ws?token=`          | project token              | the runtime live feed (WebSocket; also the page's `overlays.applyAlert` uplink) |
 | `/chat/<dashboardId>/<widgetId>?token=`    | per-widget token           | a chat widget's live page                   |
 
 **Project token** — one per user (per overlay project), 64 hex chars, the
