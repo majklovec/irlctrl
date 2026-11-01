@@ -14,21 +14,14 @@ import {
 	Page,
 	Select,
 } from "@ui/components/";
+import { languageOptions, setLanguage, t } from "@ui/i18n";
+import { roleIcon, setupStepsForRole } from "@ui/module_registry";
+import { RpcClient, socketUrl } from "@ui/services/rpc";
+import { HOSTNAME_PATTERN, mountPage, setHeaderColor } from "@ui/util";
 import m from "mithril";
 import roleDiagrams from "../../../generated/role_diagrams";
 import type { ModuleSetupStep } from "../../../shared/contracts/frontend_module";
 import type { Role, SetupInfo } from "../../../shared/contracts/wire";
-import { languageOptions, setLanguage, t } from "../../../shared/ui/i18n";
-import {
-	roleIcon,
-	setupStepsForRole,
-} from "../../../shared/ui/module_registry";
-import { RpcClient, socketUrl } from "../../../shared/ui/services/rpc";
-import {
-	HOSTNAME_PATTERN,
-	mountPage,
-	setHeaderColor,
-} from "../../../shared/ui/util";
 import { errorMessage } from "../../../shared/util";
 import { DEFAULT_COLOR, HOSTNAME_RE } from "../../../shared/validate";
 

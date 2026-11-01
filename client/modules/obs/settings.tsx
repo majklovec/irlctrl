@@ -1,8 +1,8 @@
 // biome-ignore lint/correctness/noUnusedImports: the JSX factory (tsconfig jsxFactory "m")
 
 import { Actions, Break, Button, Field, Form, Input } from "@ui/components/";
+import { t } from "@ui/i18n";
 import m from "mithril";
-import { t } from "../../../shared/ui/i18n";
 import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
 import type { ObsModuleView } from "./types";
 

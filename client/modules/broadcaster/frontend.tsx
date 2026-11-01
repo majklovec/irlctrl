@@ -3,12 +3,12 @@
  * profile are edited on the Settings page (this card shows them). */
 
 import { Actions, Badge, Button, Card, DefinitionList } from "@ui/components/";
+import { OutlineIcon } from "@ui/components/icons";
+import { card, type DeviceCard } from "@ui/device/store";
+import { t } from "@ui/i18n";
 import m from "mithril";
 import type { FrontendModule } from "../../../shared/contracts/frontend_module";
 import type { DeviceSummary } from "../../../shared/contracts/wire";
-import { OutlineIcon } from "../../../shared/ui/components/icons";
-import { card, type DeviceCard } from "../../../shared/ui/device/store";
-import { t } from "../../../shared/ui/i18n";
 import log from "./log";
 import { SRTLA_CUSTOM_SERVICE, srtlaService } from "./services";
 import "./styles.css";

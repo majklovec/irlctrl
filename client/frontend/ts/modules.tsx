@@ -12,6 +12,8 @@
  */
 
 import { Card } from "@ui/components/";
+import { t } from "@ui/i18n";
+import type { RpcClient } from "@ui/services/rpc";
 import m from "mithril";
 import SETTINGS_MANIFEST from "../../../generated/modules.settings";
 import type {
@@ -20,8 +22,6 @@ import type {
 } from "../../../shared/contracts/frontend_module";
 import type { ModulesView, Settings } from "../../../shared/contracts/wire";
 import { registerLogWording } from "../../../shared/log_messages";
-import { t } from "../../../shared/ui/i18n";
-import type { RpcClient } from "../../../shared/ui/services/rpc";
 import { errorMessage } from "../../../shared/util";
 
 export type {

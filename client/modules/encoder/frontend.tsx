@@ -18,6 +18,11 @@ import {
 	Options,
 	Select,
 } from "@ui/components/";
+import { Icon, OutlineIcon } from "@ui/components/icons";
+import { card, type DeviceCard } from "@ui/device/store";
+import { t } from "@ui/i18n";
+import type { MithrilJSXComponent } from "@ui/jsx";
+import { formatBitrate, inRange, optionalNumber, since } from "@ui/util";
 import m from "mithril";
 import type {
 	DeviceDashboardWidget,
@@ -30,16 +35,6 @@ import type {
 	SetupInfo,
 	Status,
 } from "../../../shared/contracts/wire";
-import { Icon, OutlineIcon } from "../../../shared/ui/components/icons";
-import { card, type DeviceCard } from "../../../shared/ui/device/store";
-import { t } from "../../../shared/ui/i18n";
-import type { MithrilJSXComponent } from "../../../shared/ui/jsx";
-import {
-	formatBitrate,
-	inRange,
-	optionalNumber,
-	since,
-} from "../../../shared/ui/util";
 import log from "./log";
 import type {
 	CeraBalancer,

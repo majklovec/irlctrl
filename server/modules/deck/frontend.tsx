@@ -6,6 +6,8 @@
  * catalogues of every device. */
 import "./styles.css";
 import { Badge } from "@ui/components/";
+import { confirmDialog } from "@ui/components/confirm";
+import { t } from "@ui/i18n";
 import m from "mithril";
 import type {
 	DashboardWidgetModule,
@@ -14,8 +16,6 @@ import type {
 	FleetDashboardWidget,
 } from "../../../shared/contracts/frontend_module";
 import type { DeviceSummary } from "../../../shared/contracts/wire";
-import { confirmDialog } from "../../../shared/ui/components/confirm";
-import { t } from "../../../shared/ui/i18n";
 import { ButtonsGrid, type GridItem } from "./grids";
 import {
 	type ButtonConfig,

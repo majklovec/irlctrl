@@ -2,12 +2,12 @@
  * first account bootstraps as admin; everyone after needs an invite, which the
  * /api/register/status probe (plus a ?invite= link) drives showing the field. */
 
+import { ApiError, apiJson } from "@ui/api_client";
 import { Card, Field, Footer, Input } from "@ui/components/";
+import { i18nReady, LanguageSelect, t } from "@ui/i18n";
+import { mountPage } from "@ui/util";
 import m from "mithril";
 import logoUrl from "../../../shared/assets/img/logo-irlctrl.png";
-import { ApiError, apiJson } from "../../../shared/ui/api_client";
-import { i18nReady, LanguageSelect, t } from "../../../shared/ui/i18n";
-import { mountPage } from "../../../shared/ui/util";
 
 /** Server /api/register error strings → i18n keys (unknowns pass through). */
 function mapError(message: string): string {

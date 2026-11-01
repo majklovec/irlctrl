@@ -1,7 +1,7 @@
 import { Button, Card } from "@ui/components/";
+import { Icon } from "@ui/components/icons";
+import { t } from "@ui/i18n";
 import m from "mithril";
-import { Icon } from "../../../../../shared/ui/components/icons";
-import { t } from "../../../../../shared/ui/i18n";
 import {
 	copyVariableUrl,
 	createVariable,

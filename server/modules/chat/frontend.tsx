@@ -4,6 +4,7 @@
 // frames it cares about; the core only forwards frames through onFrame().
 
 import { Badge } from "@ui/components/";
+import { currentLanguage, t } from "@ui/i18n";
 import m from "mithril";
 import type {
 	ChannelWidgetModule,
@@ -11,7 +12,6 @@ import type {
 	WidgetContext,
 } from "../../../shared/contracts/frontend_module";
 import type { ServerDashboardWidget } from "../../../shared/contracts/wire";
-import { currentLanguage, t } from "../../../shared/ui/i18n";
 import {
 	bannedMessagesFromConfig,
 	CHAT_CONFIG_FIELDS,

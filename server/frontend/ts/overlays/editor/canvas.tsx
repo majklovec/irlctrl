@@ -1,10 +1,10 @@
+import { elementDef } from "@ui/overlay/registry";
 import m from "mithril";
 import type {
 	OverlayElement,
 	Scene,
 	Transform,
 } from "../../../../../shared/overlay";
-import { elementDef } from "../../../../../shared/ui/overlay/registry";
 import {
 	elementStyle,
 	resolveElement,

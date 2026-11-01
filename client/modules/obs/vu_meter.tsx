@@ -2,8 +2,9 @@
  * one bar per channel (green / yellow / red zones, dimmed behind the level),
  * a peak-hold tick and dB labels underneath. The component owns its canvas and
  * its animation loop; the parent only mutates `levels` as meter events arrive. */
+
+import type { MithrilJSXComponent } from "@ui/jsx";
 import m from "mithril";
-import type { MithrilJSXComponent } from "../../../shared/ui/jsx";
 
 /** Linear (0..1) magnitude and peak of one channel, as delivered by InputVolumeMeters. */
 export interface VuChannel {

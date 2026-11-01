@@ -18,10 +18,10 @@ import {
 	Page,
 	TitleWithBack,
 } from "@ui/components/";
+import { t } from "@ui/i18n";
+import { RpcClient, socketUrl } from "@ui/services/rpc";
+import { mountPage, setHeaderColor } from "@ui/util";
 import m from "mithril";
-import { t } from "../../../shared/ui/i18n";
-import { RpcClient, socketUrl } from "../../../shared/ui/services/rpc";
-import { mountPage, setHeaderColor } from "../../../shared/ui/util";
 import { errorMessage } from "../../../shared/util";
 import "./pipeline_editor.css";
 

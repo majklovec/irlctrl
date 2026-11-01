@@ -1,5 +1,5 @@
+import type { MithrilJSXComponent } from "@ui/jsx";
 import m from "mithril";
-import type { MithrilJSXComponent } from "../../../shared/ui/jsx";
 import type { StatsSample } from "./types";
 
 const W_FALLBACK = 260;

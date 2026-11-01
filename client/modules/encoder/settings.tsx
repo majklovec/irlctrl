@@ -26,10 +26,10 @@ import {
 	IconLink,
 	Input,
 } from "@ui/components/";
+import { confirmDialog } from "@ui/components/confirm";
+import { Icon } from "@ui/components/icons";
+import { t } from "@ui/i18n";
 import m from "mithril";
-import { confirmDialog } from "../../../shared/ui/components/confirm";
-import { Icon } from "../../../shared/ui/components/icons";
-import { t } from "../../../shared/ui/i18n";
 import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
 import "./styles.css";
 import type { EncoderSettings, Pipeline } from "./types";

@@ -1,8 +1,8 @@
 import { IconButton, Toolbar } from "@ui/components/";
+import { Icon } from "@ui/components/icons";
+import { t } from "@ui/i18n";
+import { addableElements } from "@ui/overlay/registry";
 import m from "mithril";
-import { Icon } from "../../../../../shared/ui/components/icons";
-import { t } from "../../../../../shared/ui/i18n";
-import { addableElements } from "../../../../../shared/ui/overlay/registry";
 import {
 	addElement,
 	clamp,

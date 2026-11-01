@@ -19,15 +19,11 @@ import {
 	Select,
 	TitleWithBack,
 } from "@ui/components/";
+import { t } from "@ui/i18n";
+import { RpcClient, socketUrl } from "@ui/services/rpc";
+import { HOSTNAME_PATTERN, mountPage, setHeaderColor } from "@ui/util";
 import m from "mithril";
 import type { ModulesView, Settings } from "../../../shared/contracts/wire";
-import { t } from "../../../shared/ui/i18n";
-import { RpcClient, socketUrl } from "../../../shared/ui/services/rpc";
-import {
-	HOSTNAME_PATTERN,
-	mountPage,
-	setHeaderColor,
-} from "../../../shared/ui/util";
 import { errorMessage } from "../../../shared/util";
 import { DEFAULT_COLOR } from "../../../shared/validate";
 import {

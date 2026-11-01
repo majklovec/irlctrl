@@ -2,14 +2,14 @@
  * role-specific function, and the event log. The WebSocket client mutates state and redraws. */
 
 import { Badge, IconLink, Page, TitleWithBack } from "@ui/components/";
+import { Icon } from "@ui/components/icons";
+import { RoleTag } from "@ui/components/role_tag";
+import { LogCard } from "@ui/device/log";
+import { act, connectDevice, st } from "@ui/device/store";
+import { t } from "@ui/i18n";
+import { moduleCards } from "@ui/module_registry";
+import { mountPage } from "@ui/util";
 import m from "mithril";
-import { Icon } from "../../../shared/ui/components/icons";
-import { RoleTag } from "../../../shared/ui/components/role_tag";
-import { LogCard } from "../../../shared/ui/device/log";
-import { act, connectDevice, st } from "../../../shared/ui/device/store";
-import { t } from "../../../shared/ui/i18n";
-import { moduleCards } from "../../../shared/ui/module_registry";
-import { mountPage } from "../../../shared/ui/util";
 
 // The store's websocket is lazy (surfaces like the dashboard import the store
 // without a device to talk to): open it on the device page.

@@ -22,22 +22,17 @@ import {
 	Options,
 	Select,
 } from "@ui/components/";
+import { confirmDialog } from "@ui/components/confirm";
+import { Icon, OutlineIcon } from "@ui/components/icons";
+import { card, type DeviceCard } from "@ui/device/store";
+import { t } from "@ui/i18n";
+import { formatBitrate, formatSpeed, inRange, since } from "@ui/util";
 import m from "mithril";
 import type {
 	DeviceDashboardWidget,
 	FrontendModule,
 } from "../../../shared/contracts/frontend_module";
 import type { DeviceSummary, SetupInfo } from "../../../shared/contracts/wire";
-import { confirmDialog } from "../../../shared/ui/components/confirm";
-import { Icon, OutlineIcon } from "../../../shared/ui/components/icons";
-import { card, type DeviceCard } from "../../../shared/ui/device/store";
-import { t } from "../../../shared/ui/i18n";
-import {
-	formatBitrate,
-	formatSpeed,
-	inRange,
-	since,
-} from "../../../shared/ui/util";
 import log from "./log";
 import { defaultRouteRowIndex } from "./route_view";
 import type {

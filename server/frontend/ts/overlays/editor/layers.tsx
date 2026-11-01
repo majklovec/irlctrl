@@ -1,14 +1,10 @@
 import { Button } from "@ui/components/";
+import { Icon, type IconName } from "@ui/components/icons";
+import { t } from "@ui/i18n";
+import { bindField, lbl } from "@ui/overlay/fields";
+import { elementDef } from "@ui/overlay/registry";
 import m from "mithril";
 import type { OverlayElement, Transform } from "../../../../../shared/overlay";
-import { Icon, type IconName } from "../../../../../shared/ui/components/icons";
-import { t } from "../../../../../shared/ui/i18n";
-import {
-	bindField,
-	bindToggle,
-	lbl,
-} from "../../../../../shared/ui/overlay/fields";
-import { elementDef } from "../../../../../shared/ui/overlay/registry";
 import {
 	deleteElement,
 	mutateElementOf,

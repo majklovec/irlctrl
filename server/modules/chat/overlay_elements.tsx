@@ -5,20 +5,21 @@
  * inspector offers the user's chat modules as one-click targets — the list is
  * fetched here, on demand, so the editor core knows nothing about chat.
  */
-import m from "mithril";
-import { apiTry } from "../../../shared/ui/api_client";
-import type { Vnode } from "mithril";
-import { Icon } from "../../../shared/ui/components/icons";
-import { t } from "../../../shared/ui/i18n";
-import { FRONTS } from "../../../shared/ui/module_registry";
+
+import { apiTry } from "@ui/api_client";
+import { Icon } from "@ui/components/icons";
+import { t } from "@ui/i18n";
+import { FRONTS } from "@ui/module_registry";
 import type {
 	ElementContext,
 	ElementProps,
 	OverlayElement,
 	OverlayElementDef,
-} from "../../../shared/ui/overlay/element";
-import { drawIframe, strProp } from "../../../shared/ui/overlay/element";
-import { bindField } from "../../../shared/ui/overlay/fields";
+} from "@ui/overlay/element";
+import { drawIframe, strProp } from "@ui/overlay/element";
+import { bindField } from "@ui/overlay/fields";
+import type { Vnode } from "mithril";
+import m from "mithril";
 import { DEFAULT_CHAT_PROPS } from "./overlay_schema";
 
 /** A chat module (a dashboard widget of type "chat") the picker can offer. */

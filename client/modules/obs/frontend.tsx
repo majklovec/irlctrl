@@ -24,6 +24,11 @@ import {
 	Options,
 	Select,
 } from "@ui/components/";
+import { OutlineIcon } from "@ui/components/icons";
+import { card, type DeviceCard } from "@ui/device/store";
+import { t } from "@ui/i18n";
+import type { MithrilJSXComponent } from "@ui/jsx";
+import { since, uuid } from "@ui/util";
 import m from "mithril";
 import type {
 	DeviceDashboardContext,
@@ -32,11 +37,6 @@ import type {
 	ModuleSetupStep,
 } from "../../../shared/contracts/frontend_module";
 import type { Role, SetupInfo } from "../../../shared/contracts/wire";
-import { OutlineIcon } from "../../../shared/ui/components/icons";
-import { card, type DeviceCard } from "../../../shared/ui/device/store";
-import { t } from "../../../shared/ui/i18n";
-import type { MithrilJSXComponent } from "../../../shared/ui/jsx";
-import { since, uuid } from "../../../shared/ui/util";
 import type { ObsModuleView, ObsStatus, SwitcherStatus } from "./types";
 import { VUMeter, type VuLevels } from "./vu_meter";
 

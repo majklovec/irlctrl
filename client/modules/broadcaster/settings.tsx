@@ -9,11 +9,11 @@ import {
 	Options,
 	Select,
 } from "@ui/components/";
+import { Icon } from "@ui/components/icons";
+import { t } from "@ui/i18n";
+import type { MithrilJSXComponent } from "@ui/jsx";
 import m from "mithril";
 import type { ModuleSliceView } from "../../../shared/contracts/wire";
-import { Icon } from "../../../shared/ui/components/icons";
-import { t } from "../../../shared/ui/i18n";
-import type { MithrilJSXComponent } from "../../../shared/ui/jsx";
 import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
 import {
 	SRTLA_CUSTOM_SERVICE,

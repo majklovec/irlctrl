@@ -1,6 +1,7 @@
 // Stats dashboard widget for YouTube, Twitch, and Kick channel references.
 
 import { Badge } from "@ui/components/";
+import { t } from "@ui/i18n";
 // biome-ignore lint/style/useImportType: used in JSX
 import m from "mithril";
 import type {
@@ -8,7 +9,6 @@ import type {
 	WidgetContext,
 } from "../../../shared/contracts/frontend_module";
 import type { ServerDashboardWidget } from "../../../shared/contracts/wire";
-import { t } from "../../../shared/ui/i18n";
 import {
 	parseStatsSpec,
 	STATS_EDITOR_FIELDS,

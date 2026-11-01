@@ -5,9 +5,10 @@
  * dashboard (one grid per page) several grids can be alive at once (a widget's
  * live body plus the editor canvas), so managers are keyed by their host
  * element. */
+
+import type { MithrilJSXComponent } from "@ui/jsx";
 import { GridStack, type GridStackWidget } from "gridstack";
 import m from "mithril";
-import type { MithrilJSXComponent } from "../../../shared/ui/jsx";
 
 /** A positioned button: its slot in the internal 12-column grid, in cells. */
 export interface GridItem {
