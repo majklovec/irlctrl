@@ -608,7 +608,9 @@ identically here and on the runtime page */
    name + type chip + value + usage + actions, height-capped and
    scrollable so big projects don't push it off-screen */
 .ov-vars-modal {
-    width: min(46rem, 100%);
+    width: min(46rem, 100%) !important;
+    max-height: min(80vh, 600px);
+    overflow-y: auto;
 }
 .ov-newvar {
     display: flex;

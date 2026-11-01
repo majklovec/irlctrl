@@ -29,6 +29,7 @@ import { runtimeDialog } from "./editor/runtime_dialog";
 import { editorTitle, editorToolbar } from "./editor/toolbar";
 import { variablesDialog } from "./editor/variables";
 import {
+	fitZoom,
 	LIST_URL,
 	load,
 	scene,
@@ -41,6 +42,8 @@ const overlayUpdatePage: m.Component = {
 		void load(sceneIdFromLocation()).then(() => {
 			// the URL names a scene that no longer exists → back to the list
 			if (state.loaded && !scene()) location.replace(LIST_URL);
+			// default zoom: fit the whole canvas into the viewport
+			else requestAnimationFrame(fitZoom);
 		});
 		window.addEventListener("keydown", onKey, true);
 	},
