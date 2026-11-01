@@ -437,99 +437,107 @@ function editForm({
 				</select>,
 				sp,
 			)}
-			{bindField(
-				e,
-				"props.mediaAssetId",
-				t("overlay.alert_media"),
-				<select value={str("mediaAssetId", "")} onchange={set("mediaAssetId")}>
-					<option value="">—</option>
-					{mediaAssets.map((a) => (
-						<option key={a.id} value={a.id}>
-							{a.filename}
-						</option>
-					))}
-				</select>,
-				sp,
-			)}
-			<span class="ov-field">
-				<span class="ov-upload ov-upload-btn">
+			<div class="ov-grid4">
+				<div class="ov-field ov-span3">
+					<span class="ov-lbl">{t("overlay.alert_media")}</span>
+					<div class="ov-field-row">
+						<div class="ov-field-ctl">
+							<select
+								value={str("mediaAssetId", "")}
+								onchange={set("mediaAssetId")}
+							>
+								<option value="">—</option>
+								{mediaAssets.map((a) => (
+									<option key={a.id} value={a.id}>
+										{a.filename}
+									</option>
+								))}
+							</select>
+						</div>
+						<span class="ov-upload ov-upload-btn ov-upload-btn-sm">
+							<input
+								type="file"
+								accept="image/*,video/*"
+								onchange={(ev: Event) => {
+									const input = ev.target as HTMLInputElement;
+									const f = input.files?.[0];
+									input.value = "";
+									if (!f) return;
+									void upload(f).then((id) => {
+										if (id) mutate((el) => (el.props.mediaAssetId = id));
+									});
+								}}
+							/>
+							{t("overlay.alert_upload_media")}
+						</span>
+					</div>
+				</div>
+				{bindField(
+					e,
+					"props.videoVolume",
+					t("overlay.alert_video_volume"),
 					<input
-						type="file"
-						accept="image/*,video/*"
-						onchange={(ev: Event) => {
-							const input = ev.target as HTMLInputElement;
-							const f = input.files?.[0];
-							input.value = "";
-							if (!f) return;
-							void upload(f).then((id) => {
-								if (id) mutate((el) => (el.props.mediaAssetId = id));
-							});
-						}}
-					/>
-					{t("overlay.alert_upload_media")}
-				</span>
-			</span>
-			{bindField(
-				e,
-				"props.videoVolume",
-				t("overlay.alert_video_volume"),
-				<input
-					type="number"
-					min={0}
-					max={1}
-					step={0.05}
-					value={num("videoVolume", 1)}
-					oninput={setNum("videoVolume")}
-				/>,
-				sp,
-			)}
+						type="number"
+						min={0}
+						max={1}
+						step={0.05}
+						value={num("videoVolume", 1)}
+						oninput={setNum("videoVolume")}
+					/>,
+					sp,
+				)}
+			</div>
 			{/* 3. audio sting */}
-			{bindField(
-				e,
-				"props.audioAssetId",
-				t("overlay.alert_audio"),
-				<select value={str("audioAssetId", "")} onchange={set("audioAssetId")}>
-					<option value="">—</option>
-					{audioAssets.map((a) => (
-						<option key={a.id} value={a.id}>
-							{a.filename}
-						</option>
-					))}
-				</select>,
-				sp,
-			)}
-			<span class="ov-field">
-				<span class="ov-upload ov-upload-btn">
+			<div class="ov-grid4">
+				<div class="ov-field ov-span3">
+					<span class="ov-lbl">{t("overlay.alert_audio")}</span>
+					<div class="ov-field-row">
+						<div class="ov-field-ctl">
+							<select
+								value={str("audioAssetId", "")}
+								onchange={set("audioAssetId")}
+							>
+								<option value="">—</option>
+								{audioAssets.map((a) => (
+									<option key={a.id} value={a.id}>
+										{a.filename}
+									</option>
+								))}
+							</select>
+						</div>
+						<span class="ov-upload ov-upload-btn ov-upload-btn-sm">
+							<input
+								type="file"
+								accept="audio/*"
+								onchange={(ev: Event) => {
+									const input = ev.target as HTMLInputElement;
+									const f = input.files?.[0];
+									input.value = "";
+									if (!f) return;
+									void upload(f).then((id) => {
+										if (id) mutate((el) => (el.props.audioAssetId = id));
+									});
+								}}
+							/>
+							{t("overlay.alert_upload_audio")}
+						</span>
+					</div>
+				</div>
+				{bindField(
+					e,
+					"props.audioVolume",
+					t("overlay.alert_audio_volume"),
 					<input
-						type="file"
-						accept="audio/*"
-						onchange={(ev: Event) => {
-							const input = ev.target as HTMLInputElement;
-							const f = input.files?.[0];
-							input.value = "";
-							if (!f) return;
-							void upload(f).then((id) => {
-								if (id) mutate((el) => (el.props.audioAssetId = id));
-							});
-						}}
-					/>
-					{t("overlay.alert_upload_audio")}
-				</span>
-			</span>
-			{bindField(
-				e,
-				"props.audioVolume",
-				t("overlay.alert_audio_volume"),
-				<input
-					type="number"
-					min={0}
-					max={1}
-					step={0.05}
-					value={num("audioVolume", 1)}
-					oninput={setNum("audioVolume")}
-				/>,
-				sp,
-			)}
+						type="number"
+						min={0}
+						max={1}
+						step={0.05}
+						value={num("audioVolume", 1)}
+						oninput={setNum("audioVolume")}
+					/>,
+					sp,
+				)}
+			</div>
 			{/* 4. text */}
 			{bindField(
 				e,
@@ -669,18 +677,19 @@ function editForm({
 				sp,
 			)}
 			{/* 6. variation */}
-			{bindField(
-				e,
-				"props.isVariation",
-				t("overlay.alert_variation"),
-				<input
-					type="checkbox"
-					checked={p.isVariation === true}
-					onchange={setBool("isVariation")}
-				/>,
-				sp,
-			)}
-			<div class="ov-grid2">
+			<div class="ov-grid3">
+				{bindField(
+					e,
+					"props.isVariation",
+					t("overlay.alert_variation"),
+					<input
+						type="checkbox"
+						checked={p.isVariation === true}
+						onchange={setBool("isVariation")}
+					/>,
+					sp,
+				)}
+
 				{bindField(
 					e,
 					"props.conditionType",
@@ -708,18 +717,18 @@ function editForm({
 				)}
 			</div>
 			{/* 7. TTS */}
-			{bindField(
-				e,
-				"props.ttsEnabled",
-				t("overlay.alert_tts"),
-				<input
-					type="checkbox"
-					checked={p.ttsEnabled === true}
-					onchange={setBool("ttsEnabled")}
-				/>,
-				sp,
-			)}
-			<div class="ov-grid2">
+			<div class="ov-grid3">
+				{bindField(
+					e,
+					"props.ttsEnabled",
+					t("overlay.alert_tts"),
+					<input
+						type="checkbox"
+						checked={p.ttsEnabled === true}
+						onchange={setBool("ttsEnabled")}
+					/>,
+					sp,
+				)}
 				{bindField(
 					e,
 					"props.ttsVoice",

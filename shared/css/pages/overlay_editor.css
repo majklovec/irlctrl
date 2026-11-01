@@ -511,7 +511,7 @@ identically here and on the runtime page */
     font-size: 13px;
     color: var(--muted);
 }
-.ov-field input,
+.ov-field input:not([type="checkbox"]),
 .ov-field select {
     width: 100%;
 }
@@ -520,8 +520,8 @@ identically here and on the runtime page */
 .ov-inspect select {
     padding: 0.1rem;
 }
-.ov-field input[type="checkbox"] {
-    width: auto;
+.ov-inspect select {
+    width: 100% !important;
 }
 .ov-field input[type="color"] {
     padding: 2px;
@@ -543,6 +543,14 @@ identically here and on the runtime page */
 }
 .ov-grid4 {
     grid-template-columns: repeat(4, 1fr);
+}
+/* a cell spanning the first N columns of a grid row (e.g. asset select +
+   inline upload button, volume in the last column) */
+.ov-span2 {
+    grid-column: span 2;
+}
+.ov-span3 {
+    grid-column: span 3;
 }
 .ov-gridcell {
     min-width: 0;
@@ -679,11 +687,8 @@ identically here and on the runtime page */
     display: inline-flex;
     align-items: center;
 }
-.ov-var-val input {
+.ov-var-val input:not([type="checkbox"]) {
     width: 340px;
-}
-.ov-var-val input[type="checkbox"] {
-    width: auto;
 }
 .ov-var-val input[type="color"] {
     width: 36px;
@@ -790,6 +795,13 @@ instead of truncating */
 }
 .ov-upload-btn:hover {
     background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+/* compact variant: sits inline right next to a select in a field row */
+.ov-upload-btn-sm {
+    padding: 1px 8px;
+    font-size: 11px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 .ov-copied {
     color: var(--ok);

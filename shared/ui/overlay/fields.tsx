@@ -9,11 +9,12 @@
  * chain again detaches. (Element *content* lives in the per-element
  * modules; nothing here is specific to a single element type.)
  */
-import m from "mithril";
+
 import type { Vnode, VnodeDOM } from "mithril";
+import m from "mithril";
 import type { Variable } from "../../overlay";
-import { t } from "../i18n";
 import { Icon } from "../components/icons";
+import { t } from "../i18n";
 import type { ElementProps, OverlayElement } from "./element";
 
 /** element id + path of fields whose picker is open. Module scope on
@@ -33,7 +34,8 @@ function isBindable(control: Vnode): boolean {
 	const dom = control as VnodeDOM;
 	if (typeof dom.tag !== "string") return true;
 	if (dom.tag === "select") return false;
-	if (dom.tag === "input") return (dom.attrs as { type?: string } | null)?.type !== "checkbox";
+	if (dom.tag === "input")
+		return (dom.attrs as { type?: string } | null)?.type !== "checkbox";
 	return true;
 }
 
@@ -63,8 +65,7 @@ export function bindField(
 	const key = e.id + ":" + path;
 	const binding = e.bindings[path];
 	const bound =
-		binding !== undefined &&
-		variables.some((v) => v.id === binding.variableId);
+		binding !== undefined && variables.some((v) => v.id === binding.variableId);
 	const open = !bound && pickOpen.has(key);
 	const active = bound || open;
 
@@ -97,9 +98,7 @@ export function bindField(
 			class="ov-var-sel"
 			value={bound ? (binding?.variableId ?? "") : ""}
 			aria-label={t("overlay.bind_variable")}
-			onchange={(ev: Event) =>
-				setPick((ev.target as HTMLSelectElement).value)
-			}
+			onchange={(ev: Event) => setPick((ev.target as HTMLSelectElement).value)}
 		>
 			{variables.length === 0 ? (
 				<option value="" disabled>
@@ -128,8 +127,12 @@ export function bindField(
 				<button
 					class={active ? "ov-bind-chk on" : "ov-bind-chk"}
 					type="button"
-					title={bound ? t("overlay.unbind_variable") : t("overlay.bind_variable")}
-					aria-label={bound ? t("overlay.unbind_variable") : t("overlay.bind_variable")}
+					title={
+						bound ? t("overlay.unbind_variable") : t("overlay.bind_variable")
+					}
+					aria-label={
+						bound ? t("overlay.unbind_variable") : t("overlay.bind_variable")
+					}
 					aria-pressed={bound}
 					onclick={toggle}
 				>
