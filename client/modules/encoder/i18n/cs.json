@@ -101,5 +101,5 @@
     "act.encoder.stream_stop": "Zastavit stream",
     "role.encoder": "enkodér",
     "setup.role.encoder": "Enkodér",
-    "setup.role.encoder_tag": "Zachycuje GStreamer pipeline a posílá ho přes SRT"
+    "setup.role.encoder_tag": "Zachycuje video a posílá ho přes SRT"
 }

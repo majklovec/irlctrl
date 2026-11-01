@@ -101,5 +101,5 @@
     "act.encoder.stream_stop": "Stop stream",
     "role.encoder": "encoder",
     "setup.role.encoder": "Encoder",
-    "setup.role.encoder_tag": "Captures a GStreamer pipeline and sends it over SRT"
+    "setup.role.encoder_tag": "Captures video and sends it over SRT"
 }

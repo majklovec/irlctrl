@@ -64,5 +64,6 @@
     "act.obs.stream_stop": "Zastavit vysílání",
     "act.obs.record_start": "Spustit nahrávání",
     "act.obs.record_stop": "Zastavit nahrávání",
-    "role.obs": "obs"
+    "role.obs": "obs",
+    "setup.role.obs_tag": "Ovládá OBS Studio"
 }

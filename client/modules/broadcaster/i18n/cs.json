@@ -24,5 +24,6 @@
     "set.broadcaster": "RTMP výstupy",
     "set.broadcaster_desc": "Služba, URL a klíč pro každý cíl, do kterého se stream publikuje — všechny používají stejný ffmpeg profil. Klíče streamu jsou pouze pro zápis. Po uložení se stream restartuje.",
     "set.broadcaster_profile": "Výstupní profil",
-    "role.broadcaster": "broadcaster"
+    "role.broadcaster": "broadcaster",
+    "setup.role.broadcaster_tag": "Vysílá do zvolených platforem"
 }

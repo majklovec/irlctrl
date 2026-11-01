@@ -13,7 +13,7 @@
 /* The role cards (step 1) line up on wide screens instead of stacking. */
 @media (min-width: 768px) {
     #setup-form fieldset[data-step="role"] {
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 .wiz-heading {

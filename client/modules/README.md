@@ -75,6 +75,10 @@ A module ships:
     registration. The registry validates role IDs, picks the declared
     default, and sends setup-selectable metadata to the frontend so the role
     selector has one source of truth.
+-   optional `role_<id>.svg` — the role's architecture diagram. The manifest
+    generator exposes it as a URL asset via `generated/role_diagrams.ts` and
+    the device setup wizard shows it in the role's card, so the diagram ships
+    with the module that owns the role.
 -   optional `log.ts` — the module's log wording, imported by both sides.
 -   optional `i18n/<lang>.json` — the module's translations (one file per
     supported language, same keys in each). They are merged over the core

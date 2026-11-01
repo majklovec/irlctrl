@@ -17,7 +17,6 @@
  */
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { registerLogWording } from "./log_messages";
 import type {
     BackendModule,
     ChannelHub,
@@ -28,7 +27,12 @@ import type {
     WidgetConfigContext,
 } from "./contracts/backend_module";
 import type { Role, RoleDefinition } from "./contracts/roles";
-import type { ServerDashboard, Status, WidgetConfigField } from "./contracts/wire";
+import type {
+    ServerDashboard,
+    Status,
+    WidgetConfigField,
+} from "./contracts/wire";
+import { registerLogWording } from "./log_messages";
 import { appPath, MODULE_ROOTS } from "./paths";
 import { isCompiledBinary } from "./util";
 
@@ -133,7 +137,8 @@ function validate(mod: unknown, file: string): asserts mod is BackendModule {
                     ((r as RoleDefinition).default !== undefined &&
                         typeof (r as RoleDefinition).default !== "boolean") ||
                     ((r as RoleDefinition).setupSelectable !== undefined &&
-                        typeof (r as RoleDefinition).setupSelectable !== "boolean"),
+                        typeof (r as RoleDefinition).setupSelectable !==
+                            "boolean"),
             )
         )
             throw new Error(
@@ -230,22 +235,22 @@ async function discover(): Promise<Map<string, BackendModule>> {
         return found;
     }
     for (const root of MODULE_ROOTS)
-    for (const entry of readdirSync(appPath(root)).sort()) {
-        const backendPath = join(appPath(root), entry, "backend.ts");
-        if (!existsSync(backendPath)) continue;
-        const file = `${root}/${entry}/backend.ts`;
-        let ns: { default?: unknown };
-        try {
-            ns = (await import(backendPath)) as { default?: unknown };
-        } catch (err) {
-            throw new Error(
-                `failed to load module backend ${file}: ${err instanceof Error ? err.message : String(err)}`,
-            );
+        for (const entry of readdirSync(appPath(root)).sort()) {
+            const backendPath = join(appPath(root), entry, "backend.ts");
+            if (!existsSync(backendPath)) continue;
+            const file = `${root}/${entry}/backend.ts`;
+            let ns: { default?: unknown };
+            try {
+                ns = (await import(backendPath)) as { default?: unknown };
+            } catch (err) {
+                throw new Error(
+                    `failed to load module backend ${file}: ${err instanceof Error ? err.message : String(err)}`,
+                );
+            }
+            if (ns.default === undefined)
+                throw new Error(`module backend ${file} has no default export`);
+            add(acceptRegistration(ns.default, file));
         }
-        if (ns.default === undefined)
-            throw new Error(`module backend ${file} has no default export`);
-        add(acceptRegistration(ns.default, file));
-    }
     return found;
 }
 
@@ -266,7 +271,9 @@ for (const definition of ROLE_DEFINITIONS) {
     roleIds.add(definition.id);
 }
 if (ROLE_DEFINITIONS.filter((definition) => definition.default).length !== 1)
-    throw new Error("module role definitions must declare exactly one default role");
+    throw new Error(
+        "module role definitions must declare exactly one default role",
+    );
 
 /** Module-contributed roles, sorted for stable setup/settings presentation. */
 export const roleDefinitions = (): readonly RoleDefinition[] =>

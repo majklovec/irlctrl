@@ -15,6 +15,7 @@ import {
 	Select,
 } from "@ui/components/";
 import m from "mithril";
+import roleDiagrams from "../../../generated/role_diagrams";
 import type { ModuleSetupStep } from "../../../shared/contracts/frontend_module";
 import type { Role, SetupInfo } from "../../../shared/contracts/wire";
 import { languageOptions, setLanguage, t } from "../../../shared/ui/i18n";
@@ -88,6 +89,11 @@ const f = {
 	autostart: false,
 };
 
+// The per-role architecture diagram each module ships (role_<role>.svg),
+// keyed by role id via the generated manifest; the wizard shows it in the
+// role card of the role it illustrates.
+const ROLE_DIAGRAMS = roleDiagrams;
+
 const stepFrame = (
 	id: string,
 	heading: string,
@@ -114,6 +120,9 @@ const roleCard = (value: Role, name: string, tagline?: string): m.Vnode => (
 		{roleIcon(value) ?? null}
 		<span class="role-name">{name}</span>
 		{tagline ? <span class="role-tagline">{tagline}</span> : null}
+		{ROLE_DIAGRAMS[value] ? (
+			<img src={ROLE_DIAGRAMS[value]} alt={name} loading="lazy" />
+		) : null}
 	</label>
 );
 

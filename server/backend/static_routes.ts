@@ -1,7 +1,7 @@
 /*
- * Static assets for the control server: `/img/*` (shared/assets/img: role
- * diagrams, brand logo, favicon) through @elysia/static, and `/i18n/*` from
- * the in-memory merged catalogs (core + every module's; see shared/i18n.ts).
+ * Static assets for the control server: `/img/*` (shared/assets/img: brand
+ * logo, favicon) through @elysia/static, and `/i18n/*` from the in-memory
+ * merged catalogs (core + every module's; see shared/i18n.ts).
  *
  * @elysia/static reads files from a directory on disk; a compiled binary is a
  * flat file and cannot, so the image routes are only mounted unbundled (the
@@ -12,7 +12,7 @@ import staticPlugin from "@elysia/static";
 import { Elysia } from "elysia";
 import { i18nResponse } from "../../shared/http";
 import { catalog } from "../../shared/i18n";
-import { appPath, ASSETS_DIR } from "../../shared/paths";
+import { ASSETS_DIR, appPath } from "../../shared/paths";
 import { isCompiledBinary } from "../../shared/util";
 
 // These assets are tiny and path-stable, so revalidate on every request to

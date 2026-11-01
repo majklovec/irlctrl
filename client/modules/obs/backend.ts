@@ -10,13 +10,13 @@
 import { randomUUID } from "node:crypto";
 import { appendFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { ModuleCore } from "../../backend/module_core";
 import type {
     BackendModule,
     DashboardAction,
     ModuleSlice,
     Params,
 } from "../../../shared/contracts/backend_module";
+import type { Status } from "../../../shared/contracts/wire";
 import {
     DEFAULT_EVENT_SUBSCRIPTIONS,
     EventSubscription,
@@ -31,7 +31,7 @@ import {
     optionalStringList,
     requireString,
 } from "../../../shared/params";
-import type { Status } from "../../../shared/contracts/wire";
+import type { ModuleCore } from "../../backend/module_core";
 import { type AudioSource, AudioSourceTracker } from "./audio_sources";
 import { SceneTracker } from "./scenes";
 import { collectSrtSample, type SrtBaseline } from "./srt_metrics";
@@ -139,8 +139,7 @@ let obsClient: ObsClient | null = null;
 
 /** The live client, or a 409 asking the operator to enable the module. */
 const requiredClient = (): ObsClient => {
-    if (!obsClient)
-        throw new ApiError("The obs module is not running", 409);
+    if (!obsClient) throw new ApiError("The obs module is not running", 409);
     return obsClient;
 };
 
@@ -597,7 +596,13 @@ const registration: BackendModule<ModuleCore> = {
     title: "OBS",
     legacyConfigKeys: ["obs-controller"],
     roleDefinitions: [
-        { id: "obs", titleKey: "role.obs", order: 40, setupSelectable: true },
+        {
+            id: "obs",
+            titleKey: "role.obs",
+            taglineKey: "setup.role.obs_tag",
+            order: 40,
+            setupSelectable: true,
+        },
     ],
     enabledByDefaultRoles: ["obs"],
     requireEnabled: true,
@@ -661,7 +666,7 @@ const registration: BackendModule<ModuleCore> = {
                     ? params.obsPassword
                     : typeof existing.obsPassword === "string"
                       ? existing.obsPassword
-                      : (process.env.OBS_PASSWORD ?? "");
+                      : process.env.OBS_PASSWORD ?? "";
             modules[MODULE_ID] = {
                 ...existing,
                 enabled: true,

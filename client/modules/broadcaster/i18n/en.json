@@ -24,5 +24,6 @@
     "set.broadcaster": "RTMP outputs",
     "set.broadcaster_desc": "Stream service, URL and key for each destination the stream is published to — all use the same ffmpeg profile. Stream keys are write-only. The stream restarts after saving.",
     "set.broadcaster_profile": "Output profile",
-    "role.broadcaster": "broadcaster"
+    "role.broadcaster": "broadcaster",
+    "setup.role.broadcaster_tag": "Broadcasts to RTMP destinations"
 }

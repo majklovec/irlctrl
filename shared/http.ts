@@ -65,8 +65,8 @@ const IMG_CONTENT_TYPES: Record<string, string> = {
 };
 
 /**
- * Content type of a `/img/` asset by extension (role diagrams are SVG, the brand
- * logo is PNG, the tab favicon is ICO); null for any other path.
+ * Content type of a `/img/` asset by extension (SVG diagrams, the brand logo
+ * is PNG, the tab favicon is ICO); null for any other path.
  */
 function imgContentType(path: string): string | null {
     const m = IMG_PATH_RE.exec(path);
