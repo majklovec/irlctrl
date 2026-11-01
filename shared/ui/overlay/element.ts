@@ -1,10 +1,15 @@
 /*
- * Overlay element contract + shared (non-element-specific) helpers.
+ * Overlay element contract (browser half) + shared, non-element-specific
+ * render helpers.
  *
- * Every concrete element lives in its own module (text.tsx, image.tsx,
- * rectangle.tsx, …), implements `OverlayElementDef` and is registered in
- * registry.ts. Core files (overlay_render.tsx, overlays.tsx, overlay.tsx)
- * only talk to the registry — they contain no element-specific code.
+ * A module contributes elements by default-exporting `OverlayElementDef[]`
+ * from `<module>/overlay_elements.tsx`; scripts/gen_modules.ts collects them
+ * into generated/overlay_elements.ts and ./registry.ts indexes them. The
+ * editor and the runtime page only talk to the registry — they contain no
+ * element-specific code. The environment-free half (type, default props,
+ * validation) is the `OverlayElementSchema` in
+ * shared/contracts/overlay_element.ts, contributed from
+ * `<module>/overlay_schema.ts`.
  */
 import m from "mithril";
 import type {
@@ -14,10 +19,10 @@ import type {
 	Transform,
 	Variable,
 	VariableValue,
-} from "../../../../shared/overlay";
-import type { Children } from "mithril";
-import { t } from "../../../../shared/ui/i18n";
-export type { OverlayElement, OverlayElementType } from "../../../../shared/overlay";
+} from "../../overlay";
+import type { Children, Vnode } from "mithril";
+import { t } from "../i18n";
+export type { OverlayElement, OverlayElementType } from "../../overlay";
 
 // ── render context ──────────────────────────────────────────────────────
 
@@ -200,26 +205,12 @@ export function drawIframe(element: OverlayElement): Children {
 
 // ── the element contract ────────────────────────────────────────────────
 
-/** A chat module (a dashboard widget of type "chat") that the chat
- * element's inspector can offer as a one-click target. The overlay URL is
- * built from dashboardId + widgetId + token — no cookies, so OBS can render
- * it in an external browser source. */
-export interface ChatWidgetRef {
-	dashboardId: string;
-	widgetId: string;
-	/** Dashboard name (label grouping) — display only. */
-	dashboardName: string;
-	/** Widget name — the label shown in the picker. */
-	name: string;
-	/** Per-widget auth token; required to load the live chat page. */
-	token: string;
-}
-
 /** What the inspector's per-element edit form receives.
  * `mutate` runs a mutation on the row's element (the core persists it and
  * takes an undo snapshot); `assets`/`variables` back the binding selects;
- * `upload` is the project's asset uploader (used by the image element);
- * `chatWidgets` backs the chat element's module picker. */
+ * `upload` is the project's asset uploader (used by the image element).
+ * An element that needs more (e.g. a list fetched from the server) loads it
+ * itself inside its form. */
 export interface ElementProps {
 	element: OverlayElement;
 	mutate: (fn: (e: OverlayElement) => void) => void;
@@ -227,8 +218,6 @@ export interface ElementProps {
 	variables: Variable[];
 	/** Upload a file as a new project asset; resolves to its id (or null). */
 	upload: (file: File) => Promise<string | null>;
-	/** The user's chat modules, for the iframe element's picker. */
-	chatWidgets: ChatWidgetRef[];
 }
 
 /** Which editing affordance an element shows when selected on the canvas.
@@ -237,6 +226,8 @@ export interface ElementProps {
 export type HandleMode = "box" | "endpoints" | "none";
 
 /** The contract every overlay element fulfils:
+ *   - `labelKey` / `icon` / `order`: its entry in the editor's "add" toolbar
+ *     (no toolbar entry when `labelKey` is omitted, e.g. a structural type)
  *   - `defaultProps` / `defaultSize`: what a freshly created element looks like
  *   - `draw`:        renders the element (content only; core wraps + positions)
  *   - `editForm`:    publishes the element's inspector form
@@ -244,6 +235,12 @@ export type HandleMode = "box" | "endpoints" | "none";
  *   - `handles`:     drives the canvas selection handles (box / endpoints / none) */
 export interface OverlayElementDef {
 	readonly type: OverlayElementType;
+	/** i18n key of the "add <element>" action; omit to keep the type out of the toolbar. */
+	readonly labelKey?: string;
+	/** Toolbar icon (a vnode factory, so the module brings its own pictogram). */
+	readonly icon?: () => Vnode;
+	/** Toolbar position; lower first (defaults to 100). */
+	readonly order?: number;
 	readonly defaultProps: Record<string, unknown>;
 	/** Prop names that exist on the type; the inspector offers a binding
 	 * toggle on each field the `editForm` wraps in `bindField` — bound as
@@ -257,4 +254,8 @@ export interface OverlayElementDef {
 	editForm(props: ElementProps): Children;
 	validate(element: OverlayElement): string[];
 	readonly handles: HandleMode;
+	/** For `handles: "endpoints"`: the editor reports the drag delta (box
+	 * frame, from the fixed endpoint) so the element can record which
+	 * diagonal it runs along. */
+	onEndpointDrag?(element: OverlayElement, dx: number, dy: number): void;
 }

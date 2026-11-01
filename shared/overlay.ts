@@ -9,6 +9,11 @@
  * Round-trip rule: unknown fields on every object are preserved so newer
  * server/clients can read projects written by older ones.
  */
+import type {
+    OverlayElementSchema,
+    PropReaders,
+} from "./contracts/overlay_element";
+import { overlayElementSchema } from "./overlay_elements";
 import { ApiError } from "./params";
 
 export const OVERLAY_SCHEMA_VERSION = 1;
@@ -52,18 +57,9 @@ export interface Transform {
  * schema bump + sandbox; the type keeps the discriminator for that. */
 export type Binding = { kind: "variable"; variableId: string };
 
-/** Every supported element type. `shape` was split into the three distinct
- * types rectangle / ellipse / line. */
-export type OverlayElementType =
-    | "text"
-    | "image"
-    | "rectangle"
-    | "ellipse"
-    | "line"
-    | "progress"
-    | "group"
-    | "iframe"
-    | "chat";
+/** An element type id. The set of valid types is whatever the modules
+ * contribute (`shared/overlay_elements.ts`); the core never names one. */
+export type OverlayElementType = string;
 
 export type ElementBase = {
     id: string;
@@ -305,222 +301,38 @@ const normalizeTransform = (raw: unknown): Transform => {
     };
 };
 
-export const DEFAULT_TEXT_PROPS: Required<TextProps> = {
-    text: "Text",
-    fontSize: 48,
-    fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-    color: "#ffffff",
-    weight: 400,
-    lineHeight: 1.2,
-    align: "left",
-};
-
-export interface TextProps {
-    text: string;
-    fontSize: number;
-    fontFamily: string;
-    color: string;
-    weight: number;
-    lineHeight: number;
-    align: "left" | "center" | "right";
-}
-
-/** Rectangle / ellipse / line are distinct element types now; each carries
- * its own (slimmer) prop set instead of one `shape` discriminator. */
-export const DEFAULT_RECTANGLE_PROPS: Required<RectangleProps> = {
-    fill: "#3b82f6",
-    stroke: "#000000",
-    strokeWidth: 0,
-    radius: 0,
-};
-
-export interface RectangleProps {
-    fill: string;
-    stroke: string;
-    strokeWidth: number;
-    /** corner radius in px (0 = square corners) */
-    radius: number;
-}
-
-export const DEFAULT_ELLIPSE_PROPS: Required<EllipseProps> = {
-    fill: "#3b82f6",
-    stroke: "#000000",
-    strokeWidth: 0,
-};
-
-export interface EllipseProps {
-    fill: string;
-    stroke: string;
-    strokeWidth: number;
-}
-
-export const DEFAULT_PROGRESS_PROPS: Required<ProgressProps> = {
-    value: 25,
-    fill: "#22c55e",
-    background: "#e5e7eb",
-    radius: 6,
-};
-
-export interface ProgressProps {
-    /** progress percentage, 0–100 */
-    value: number;
-    /** color of the filled portion */
-    fill: string;
-    /** color of the empty track behind the fill */
-    background: string;
-    /** corner radius in px (0 = square corners) */
-    radius: number;
-}
-
-export const DEFAULT_LINE_PROPS: Required<LineProps> = {
-    stroke: "#3b82f6",
-    strokeWidth: 4,
-    flip: false,
-};
-
-export interface LineProps {
-    /** the line's color */
-    stroke: string;
-    /** the line's thickness in px */
-    strokeWidth: number;
-    /**
-     * Which box diagonal the line runs along. The box is stored in
-     * min/abs form (negative deltas are impossible in CSS), so this flag
-     * disambiguates: false = top-left → bottom-right, true = top-right →
-     * bottom-left.
-     */
-    flip: boolean;
-}
-
-export const DEFAULT_IFRAME_PROPS: Required<IframeProps> = {
-    url: "",
-};
-
-export interface IframeProps {
-    /**
-     * The page to embed. Any absolute URL; `""` renders a placeholder box.
-     */
-    url: string;
-};
-
-export const DEFAULT_CHAT_PROPS: Required<ChatProps> = {
-    url: "",
-};
-
-export interface ChatProps {
-    /**
-     * The chat module's live overlay URL
-     * (`/chat/<dashboardId>/<widgetId>?token=…`), set by the inspector's
-     * module picker; no free-form URL (a generic page goes in an iframe
-     * element). `""` renders a placeholder box.
-     */
-    url: string;
-};
-
 const COLOR_HEX = /^#[0-9a-f]{6}$/i;
 
+/**
+ * Coerce an element's props through its schema. Unknown keys are always
+ * preserved (forward compatibility); the schema returns safe values for the
+ * keys it knows.
+ */
 const normalizeProps = (
-    type: OverlayElementType,
+    schema: OverlayElementSchema,
     raw: unknown,
 ): Record<string, unknown> => {
-    // unknown keys are always preserved (forward compatibility)
     const props: Record<string, unknown> = { ...(isRecord(raw) ? raw : {}) };
-    const num = (
-        k: string,
-        fallback: number,
-        min: number,
-        max: number,
-    ): number => {
-        const v = Number(props[k]);
-        return Number.isFinite(v) && v >= min && v <= max ? v : fallback;
+    const read: PropReaders = {
+        num: (k, fallback, min, max) => {
+            const v = Number(props[k]);
+            return Number.isFinite(v) && v >= min && v <= max ? v : fallback;
+        },
+        hex: (k, fallback) =>
+            typeof props[k] === "string" && COLOR_HEX.test(props[k])
+                ? (props[k] as string).toLowerCase()
+                : fallback,
+        str: (k, fallback, max) =>
+            typeof props[k] === "string"
+                ? max === undefined
+                    ? (props[k] as string)
+                    : (props[k] as string).slice(0, max)
+                : fallback,
+        oneOf: (k, allowed, fallback) =>
+            allowed.includes(props[k] as never) ? (props[k] as never) : fallback,
+        bool: (k) => props[k] === true,
     };
-    const hex = (k: string, fallback: string): string =>
-        typeof props[k] === "string" && COLOR_HEX.test(props[k])
-            ? (props[k] as string).toLowerCase()
-            : fallback;
-    switch (type) {
-        case "text": {
-            const d = DEFAULT_TEXT_PROPS;
-            const out: Record<string, unknown> = {};
-            for (const k of Object.keys(props)) out[k] = props[k];
-            out.text =
-                typeof props.text === "string" ? props.text.slice(0, 10000) : d.text;
-            out.fontSize = num("fontSize", d.fontSize, 1, 2000);
-            out.fontFamily =
-                typeof props.fontFamily === "string"
-                    ? props.fontFamily.slice(0, 300)
-                    : d.fontFamily;
-            out.color = hex("color", d.color);
-            out.weight = num("weight", d.weight, 100, 900);
-            out.lineHeight = num("lineHeight", d.lineHeight, 0.1, 10);
-            out.align =
-                props.align === "center" || props.align === "right"
-                    ? (props.align as string)
-                    : d.align;
-            return out;
-        }
-        case "rectangle": {
-            const d = DEFAULT_RECTANGLE_PROPS;
-            const out: Record<string, unknown> = {};
-            for (const k of Object.keys(props)) out[k] = props[k];
-            out.fill = hex("fill", d.fill);
-            out.stroke = hex("stroke", d.stroke);
-            out.strokeWidth = num("strokeWidth", d.strokeWidth, 0, 500);
-            out.radius = num("radius", d.radius, 0, 10000);
-            return out;
-        }
-        case "ellipse": {
-            const d = DEFAULT_ELLIPSE_PROPS;
-            const out: Record<string, unknown> = {};
-            for (const k of Object.keys(props)) out[k] = props[k];
-            out.fill = hex("fill", d.fill);
-            out.stroke = hex("stroke", d.stroke);
-            out.strokeWidth = num("strokeWidth", d.strokeWidth, 0, 500);
-            return out;
-        }
-        case "progress": {
-            const d = DEFAULT_PROGRESS_PROPS;
-            const out: Record<string, unknown> = {};
-            for (const k of Object.keys(props)) out[k] = props[k];
-            out.value = num("value", d.value, 0, 100);
-            out.fill = hex("fill", d.fill);
-            out.background = hex("background", d.background);
-            out.radius = num("radius", d.radius, 0, 10000);
-            return out;
-        }
-        case "line": {
-            const d = DEFAULT_LINE_PROPS;
-            const out: Record<string, unknown> = {};
-            for (const k of Object.keys(props)) out[k] = props[k];
-            out.stroke = hex("stroke", d.stroke);
-            out.strokeWidth = num("strokeWidth", d.strokeWidth, 1, 500);
-            out.flip = props.flip === true;
-            return out;
-        }
-        case "image":
-            // `assetId` is checked against the project's asset list in
-            // `normalizeScene`; a missing asset renders as an empty box.
-            return {
-                assetId: typeof props.assetId === "string" ? props.assetId : "",
-                ...spreadRest(props, ["assetId"]),
-            };
-        case "iframe":
-            // A bare string (no scheme or path checks — the browser decides what
-            // a URL is worth loading); a missing value falls back to "".
-            return {
-                url: typeof props.url === "string" ? props.url : "",
-                ...spreadRest(props, ["url"]),
-            };
-        case "chat":
-            // The picker always writes the chat overlay URL (`?token=…`),
-            // which already contains percent-safe characters as-is.
-            return {
-                url: typeof props.url === "string" ? props.url : "",
-                ...spreadRest(props, ["url"]),
-            };
-        case "group":
-            return props;
-    }
+    return { ...props, ...schema.normalizeProps(props, read) };
 };
 
 const normalizeBinding = (raw: unknown): Binding => {
@@ -541,20 +353,9 @@ const normalizeElement = (raw: unknown): OverlayElement => {
         typeof raw.name === "string" && raw.name
             ? raw.name.slice(0, OVERLAY_LIMITS.nameMax)
             : "";
-    const type = raw.type as OverlayElementType;
-    if (
-        !id ||
-        !name ||
-        (type !== "text" &&
-            type !== "image" &&
-            type !== "rectangle" &&
-            type !== "ellipse" &&
-            type !== "line" &&
-            type !== "progress" &&
-            type !== "iframe" &&
-            type !== "chat" &&
-            type !== "group")
-    )
+    const type = typeof raw.type === "string" ? raw.type : "";
+    const schema = overlayElementSchema(type);
+    if (!id || !name || !schema)
         throw new Error("element needs id, name and a valid type");
     const transform = normalizeTransform(raw.transform);
     const visible = raw.visible !== false;
@@ -565,7 +366,7 @@ const normalizeElement = (raw: unknown): OverlayElement => {
     const bindings: Record<string, Binding> = {};
     for (const [k, v] of Object.entries(bindingsRaw))
         bindings[k] = normalizeBinding(v);
-    const props = normalizeProps(type, raw.props);
+    const props = normalizeProps(schema, raw.props);
     return {
         id,
         name,
@@ -632,7 +433,7 @@ const normalizeScene = (raw: unknown): Scene => {
         if (el?.parentId) {
             const parent = byId.get(el.parentId);
             if (!parent) throw new Error(`element ${el.name} has missing parent`);
-            if (parent.type !== "group")
+            if (!overlayElementSchema(parent.type)?.container)
                 throw new Error(`element ${el.name} has a non-group parent`);
             const pd = walk(parent.id);
             if (pd === -1) throw new Error("cyclic element parents");
@@ -739,8 +540,8 @@ export function normalizeProject(raw: Record<string, unknown>): OverlayProject {
                     throw new Error(
                         `scene ${s.name}: binding to unknown variable ${b.variableId}`,
                     );
-            if (e.type === "image") {
-                const aid = e.props.assetId;
+            for (const key of overlayElementSchema(e.type)?.assetProps ?? []) {
+                const aid = e.props[key];
                 if (typeof aid === "string" && aid && !assetIds.has(aid))
                     throw new Error(
                         `scene ${s.name}: element ${e.name} references a missing asset`,

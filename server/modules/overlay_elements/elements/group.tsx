@@ -5,7 +5,7 @@ import type {
 	ElementProps,
 	OverlayElement,
 	OverlayElementDef,
-} from "./core";
+} from "../../../../shared/ui/overlay/element";
 
 // A group is a container: it renders no content of its own (children are the
 // elements that set `parentId` to it) and shows no resize handles — it is

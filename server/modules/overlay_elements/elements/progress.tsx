@@ -1,16 +1,17 @@
 /** @jsx m */
 import m from "mithril";
+import { Icon } from "../../../../shared/ui/components/icons";
 import type { Vnode } from "mithril";
-import { DEFAULT_PROGRESS_PROPS } from "../../../../shared/overlay";
+import { DEFAULT_PROGRESS_PROPS } from "../overlay_schema";
 import { t } from "../../../../shared/ui/i18n";
 import type {
 	ElementContext,
 	ElementProps,
 	OverlayElement,
 	OverlayElementDef,
-} from "./core";
-import { strProp, numProp } from "./core";
-import { bindField } from "./fields";
+} from "../../../../shared/ui/overlay/element";
+import { strProp, numProp } from "../../../../shared/ui/overlay/element";
+import { bindField } from "../../../../shared/ui/overlay/fields";
 
 /** Clamp the (possibly bound) value into 0–100 so a bad variable can't widen
  * the fill past the track. */
@@ -141,6 +142,9 @@ function validate(e: OverlayElement): string[] {
 
 export const progressElement: OverlayElementDef = {
 	type: "progress",
+	labelKey: "overlay.add_progress",
+	icon: () => <Icon name="progress" class="role-icon" />,
+	order: 50,
 	defaultProps: { ...DEFAULT_PROGRESS_PROPS },
 	propKeys: ["value", "fill", "background", "radius"],
 	defaultSize: { width: 320, height: 40 },

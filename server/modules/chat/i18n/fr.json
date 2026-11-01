@@ -32,5 +32,8 @@
     "dash.widget_ignoredUsernames": "Utilisateurs ignorés (séparés par des virgules)",
     "chat.tts.on": "Lit le chat à voix haute",
     "chat.tts.off": "TTS désactivé",
-    "chat.tts.waiting": "En attente d'une voix tchèque…"
+    "chat.tts.waiting": "En attente d'une voix tchèque…",
+    "overlay.add_chat": "Chat",
+    "overlay.chat_module": "Module de chat",
+    "overlay.chat_no_module": "Aucun module de chat"
 }

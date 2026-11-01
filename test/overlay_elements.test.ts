@@ -9,13 +9,13 @@ import { describe, expect, test } from "bun:test";
 };
 
 const { elementRegistry, elementDef } = await import(
-    "../server/frontend/ts/overlay_elements/registry"
+    "../shared/ui/overlay/registry"
 );
 const { lineFlipFromDelta } = await import(
-    "../server/frontend/ts/overlay_elements/line"
+    "../server/modules/overlay_elements/elements/line"
 );
 const { resolveElement, resolveElementProps, elementStyle } = await import(
-    "../server/frontend/ts/overlay_elements/core"
+    "../shared/ui/overlay/element"
 );
 import {
     type OverlayElement,
@@ -56,20 +56,20 @@ const WELL_FORMED: Array<[OverlayElementType, Record<string, unknown>]> = [
 ];
 
 describe("element registry contract", () => {
-    test("every schema type is registered exactly once and self-consistent", () => {
-        expect(Object.keys(elementRegistry).sort()).toEqual([
-            "chat",
-            "ellipse",
-            "group",
-            "iframe",
-            "image",
-            "line",
-            "progress",
-            "rectangle",
-            "text",
-        ]);
-        for (const def of Object.values(elementRegistry)) {
-            expect(elementRegistry[def.type]).toBe(def);
+    test("the browser registry and the schema registry cover the same module-contributed types", async () => {
+        const { overlayElementSchemas } = await import(
+            "../shared/overlay_elements"
+        );
+        const defTypes = [...elementRegistry.keys()].sort();
+        expect(defTypes).toEqual([...overlayElementSchemas.keys()].sort());
+        expect(defTypes.length).toBeGreaterThanOrEqual(8);
+        for (const [type, def] of elementRegistry) {
+            expect(def.type).toBe(type);
+            expect(elementDef(type)).toBe(def);
+            // the browser half seeds new elements from the schema's defaults
+            expect(def.defaultProps).toEqual(
+                overlayElementSchemas.get(type)!.defaultProps as Record<string, unknown>,
+            );
         }
     });
 

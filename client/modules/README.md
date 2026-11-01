@@ -29,8 +29,9 @@ cases.
 │   ├── frontend/             # control-server web UI pages
 │   └── modules/              # widget modules (run on the server / in the dashboard)
 │       ├── stats/            # channel widget modules
-│       ├── chat/
-│       └── deck/             # fleet dashboard widget (virtual StreamDeck across devices)
+│       ├── chat/             # … also contributes the chat overlay element
+│       ├── deck/             # fleet dashboard widget (virtual StreamDeck across devices)
+│       └── overlay_elements/ # the built-in OBS overlay elements (plugins only, no backend)
 ├── shared/                   # helpers, contracts, the UI kit (shared/ui), CSS, assets
 └── generated/                # gitignored generated manifests / embedded assets
     ├── frontend-assets.ts
@@ -83,6 +84,11 @@ A module ships:
 -   optional `pages/*.html` — module-owned page entry points, bundled with the
     shared frontend assets and served at the paths the backend declares in
     `pages`.
+-   optional `overlay_schema.ts` + `overlay_elements.tsx` — overlay element
+    plugins for the OBS overlay editor (the environment-free schema and the
+    browser half); see [docs/overlays.md](../../docs/overlays.md#adding-a-new-element-type).
+    A directory may contribute only these (no `backend.ts`), like
+    `server/modules/overlay_elements/`.
 -   any number of private helpers (`switcher_engine.ts`, `routing.ts`, …).
 
 Modules may import the dependency-free helpers in `shared/` (`args`, `params`,

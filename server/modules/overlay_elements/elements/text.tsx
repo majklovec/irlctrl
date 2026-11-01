@@ -1,16 +1,17 @@
 /** @jsx m */
 import m from "mithril";
+import { Icon } from "../../../../shared/ui/components/icons";
 import type { Vnode } from "mithril";
-import { DEFAULT_TEXT_PROPS } from "../../../../shared/overlay";
+import { DEFAULT_TEXT_PROPS } from "../overlay_schema";
 import { t } from "../../../../shared/ui/i18n";
 import type {
 	ElementContext,
 	ElementProps,
 	OverlayElement,
 	OverlayElementDef,
-} from "./core";
-import { strProp, numProp } from "./core";
-import { bindField } from "./fields";
+} from "../../../../shared/ui/overlay/element";
+import { strProp, numProp } from "../../../../shared/ui/overlay/element";
+import { bindField } from "../../../../shared/ui/overlay/fields";
 
 interface TextProps {
 	text: string;
@@ -173,6 +174,9 @@ function validate(e: OverlayElement): string[] {
 
 export const textElement: OverlayElementDef = {
 	type: "text",
+	labelKey: "overlay.add_text",
+	icon: () => <Icon name="text" class="role-icon" />,
+	order: 10,
 	defaultProps: { ...DEFAULT_TEXT_PROPS },
 	propKeys: [
 		"text",

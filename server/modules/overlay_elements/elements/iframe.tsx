@@ -1,16 +1,17 @@
 /** @jsx m */
 import m from "mithril";
+import { Icon } from "../../../../shared/ui/components/icons";
 import type { Vnode } from "mithril";
-import { DEFAULT_IFRAME_PROPS } from "../../../../shared/overlay";
+import { DEFAULT_IFRAME_PROPS } from "../overlay_schema";
 import { t } from "../../../../shared/ui/i18n";
 import type {
 	ElementContext,
 	ElementProps,
 	OverlayElement,
 	OverlayElementDef,
-} from "./core";
-import { drawIframe } from "./core";
-import { bindField } from "./fields";
+} from "../../../../shared/ui/overlay/element";
+import { drawIframe } from "../../../../shared/ui/overlay/element";
+import { bindField } from "../../../../shared/ui/overlay/fields";
 
 function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 	// `element` is already resolved by the renderer — drawIframe reads props.url.
@@ -49,6 +50,9 @@ function validate(e: OverlayElement): string[] {
 
 export const iframeElement: OverlayElementDef = {
 	type: "iframe",
+	labelKey: "overlay.add_iframe",
+	icon: () => <Icon name="iframe" class="role-icon" />,
+	order: 80,
 	defaultProps: { ...DEFAULT_IFRAME_PROPS },
 	propKeys: ["url"],
 	defaultSize: { width: 360, height: 480 },

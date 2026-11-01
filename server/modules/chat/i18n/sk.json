@@ -32,5 +32,8 @@
     "dash.widget_ignoredUsernames": "Ignorovaní používatelia (čiarkou)",
     "chat.tts.on": "Číta chat nahlas",
     "chat.tts.off": "TTS vypnuté",
-    "chat.tts.waiting": "Čaká sa na český hlas…"
+    "chat.tts.waiting": "Čaká sa na český hlas…",
+    "overlay.add_chat": "Chat",
+    "overlay.chat_module": "Chatovací modul",
+    "overlay.chat_no_module": "Žiadny chatovací modul"
 }

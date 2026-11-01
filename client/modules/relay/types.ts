@@ -72,7 +72,7 @@ export interface SrtlaState {
 export type SrtlaMode = "classic" | "enhanced";
 export const SRTLA_MODES: readonly SrtlaMode[] = ["classic", "enhanced"];
 
-/** Scheduler options (`state.relayOptions`, the `srtla.setOption` params). */
+/** Scheduler options (`state.relayOptions`, the `relay.options` params). */
 export interface SrtlaOptions {
     mode?: SrtlaMode;
     quality?: boolean;
@@ -147,7 +147,7 @@ export type RelayStatus = Status & {
     monitor: { running: boolean; reloadMode: string };
 };
 
-/** The device-list row with the srtla module's summary fields (status `summary` + live stats patches). */
+/** The device-list row with the relay module's summary fields (status `summary` + live stats patches). */
 export type RelayDeviceSummary = DeviceSummary & {
     relay?: SrtlaState;
     /** Live srtla_send total, bytes/s across all links. */
@@ -156,7 +156,7 @@ export type RelayDeviceSummary = DeviceSummary & {
     totalLinks?: number;
 };
 
-/** The persisted `srtla` config section: receiver target plus scheduler options. */
+/** The persisted `relay` config section: receiver target plus scheduler options. */
 export interface RelayConfig {
     listenPort: string;
     mode: SrtlaMode;

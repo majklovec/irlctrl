@@ -1,16 +1,17 @@
 /** @jsx m */
 import m from "mithril";
+import { Icon } from "../../../../shared/ui/components/icons";
 import type { Vnode } from "mithril";
-import { DEFAULT_RECTANGLE_PROPS } from "../../../../shared/overlay";
+import { DEFAULT_RECTANGLE_PROPS } from "../overlay_schema";
 import { t } from "../../../../shared/ui/i18n";
 import type {
 	ElementContext,
 	ElementProps,
 	OverlayElement,
 	OverlayElementDef,
-} from "./core";
-import { strProp, numProp } from "./core";
-import { bindField } from "./fields";
+} from "../../../../shared/ui/overlay/element";
+import { strProp, numProp } from "../../../../shared/ui/overlay/element";
+import { bindField } from "../../../../shared/ui/overlay/fields";
 
 function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	// `element` is already resolved by the renderer — props carry binding values.
@@ -98,6 +99,9 @@ function validate(e: OverlayElement): string[] {
 
 export const rectangleElement: OverlayElementDef = {
 	type: "rectangle",
+	labelKey: "overlay.add_rectangle",
+	icon: () => <Icon name="rectangle" class="role-icon" />,
+	order: 20,
 	defaultProps: { ...DEFAULT_RECTANGLE_PROPS },
 	propKeys: ["fill", "stroke", "strokeWidth", "radius"],
 	defaultSize: { width: 240, height: 160 },

@@ -6,7 +6,12 @@ served as transparent runtime pages that OBS loads with a **Browser Source**.
 - Editor: `/overlays/` (logged-in users only)
 - Runtime: `/overlay/<scene-slug>?token=<token>` (no session, token-gated)
 - Schema, limits and normalization: [`shared/overlay.ts`](../shared/overlay.ts)
-- Element modules: [`server/frontend/ts/overlay_elements/`](../server/frontend/ts/overlay_elements/)
+- Element plugin contract: [`shared/contracts/overlay_element.ts`](../shared/contracts/overlay_element.ts)
+  (schema half) and [`shared/ui/overlay/element.ts`](../shared/ui/overlay/element.ts)
+  (browser half)
+- Built-in elements: [`server/modules/overlay_elements/`](../server/modules/overlay_elements/);
+  the chat element lives in the chat module
+  ([`server/modules/chat/overlay_elements.tsx`](../server/modules/chat/overlay_elements.tsx))
 - Server: [`server/backend/overlays.ts`](../server/backend/overlays.ts)
 
 ## OBS setup
@@ -125,10 +130,10 @@ while no variables exist, so a bound-but-unresolvable state can never be
 created. Transform fields and visibility live in the core inspector; the
 element-specific props get their toggles where the element's `editForm`
 renders its fields (via `bindField` in
-[overlay_elements/fields.tsx](../server/frontend/ts/overlay_elements/fields.tsx)).
+[shared/ui/overlay/fields.tsx](../shared/ui/overlay/fields.tsx)).
 
 Resolution happens once per element at render time in
-`resolveElement` ([`overlay_elements/core.ts`](../server/frontend/ts/overlay_elements/core.ts))
+`resolveElement` ([`shared/ui/overlay/element.ts`](../shared/ui/overlay/element.ts))
 — editor canvas and runtime page share the exact same code path, so a bound
 element looks identical in both. Unknown paths are ignored, so stale
 bindings on element-type changes never break rendering. Deleting a variable
@@ -209,25 +214,36 @@ immediately.
 
 ## Adding a new element type
 
-The core (renderer, editor, runtime) only talks to the element registry, so a
-new type never touches `overlay_render.tsx`, `overlays.tsx` or `overlay.tsx`:
+Element types are module plugins: the core (schema validator, renderer,
+editor, runtime) resolves them through two generated registries and never
+names one. Any module — under `client/modules/` or `server/modules/` — can
+contribute elements; a new type never touches `shared/overlay.ts`,
+`overlay_render.tsx`, `overlays.tsx` or `overlay.tsx`.
 
-1. Add the type to `OverlayElementType` in
-   [`shared/overlay.ts`](../shared/overlay.ts) plus a `DEFAULT_*_PROPS` shape
-   and a `normalizeProps` case (the REST routes and the registry are the only
-   other places a new type shows up). Unknown prop keys are preserved on
-   round-trip — keep that true for forward compatibility.
-2. Create `server/frontend/ts/overlay_elements/<type>.tsx` implementing
-   `OverlayElementDef` (`defaultProps`, `defaultSize`, `draw`, `editForm`,
-   `validate`, `handles`, `propKeys`) and register it in
-   [`registry.ts`](../server/frontend/ts/overlay_elements/registry.ts). `draw`
-   receives the **resolved** element (bindings already applied) — read
+1. **Schema** — add (or extend) `<module>/overlay_schema.ts`, default-exporting
+   an array of `OverlayElementSchema` ([contract](../shared/contracts/overlay_element.ts)):
+   `type`, `defaultProps`, `normalizeProps(props, read)` (coerce the known
+   props with the `read.num/hex/str/oneOf/bool` helpers; unknown keys are
+   preserved by the core for forward compatibility), optional `container`
+   (may parent other elements) and `assetProps` (props holding a project
+   asset id, validated against the project's assets). This file must stay
+   environment-free — it runs on the control server too.
+2. **Browser half** — add (or extend) `<module>/overlay_elements.tsx`,
+   default-exporting an array of `OverlayElementDef`
+   ([contract](../shared/ui/overlay/element.ts)): `type` (same id),
+   `labelKey` / `icon` / `order` for the editor's add-toolbar, `defaultProps`
+   (reuse the schema's), `defaultSize`, `draw`, `editForm`, `validate`,
+   `handles`, `propKeys`, and `onEndpointDrag` for `handles: "endpoints"`.
+   `draw` receives the **resolved** element (bindings already applied) — read
    `element.props` / `element.transform` directly, never resolve again.
-   `propKeys` documents which prop names exist on the type; binding toggles
-   come for free on every field the `editForm` wraps in `bindField`
-   (transform fields and `visible` are toggled in the core inspector).
-3. Add the `overlay.*` i18n keys to `i18n/en.json` (mirror them into the
-   other locale catalogs).
+   Binding toggles come for free on every field the `editForm` wraps in
+   `bindField` (transform fields and `visible` are toggled in the core
+   inspector). A form that needs server data (e.g. the chat element's module
+   list) fetches it itself.
+3. Put the element's i18n keys in `<module>/i18n/<lang>.json` (every
+   language in `shared/languages.ts`). `bun run gen:modules` (also run by
+   `predev` / `pretest`) regenerates `generated/overlay_schemas.ts` and
+   `generated/overlay_elements.ts`.
 4. Bump `OVERLAY_SCHEMA_VERSION` **only** if the change breaks existing
    stored projects, and add a migration step to `MIGRATIONS` in
    `shared/overlay.ts`.

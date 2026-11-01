@@ -4,7 +4,7 @@
  * namespace automatically, so plain tag names render as SVG children. */
 
 import m from "mithril";
-import type { Role } from "../types";
+import type { Role } from "../../contracts/roles";
 import { t } from "../i18n";
 import type { MithrilJSXComponent } from "../jsx";
 

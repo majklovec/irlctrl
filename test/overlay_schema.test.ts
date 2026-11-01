@@ -4,6 +4,8 @@ import {
     DEFAULT_PROGRESS_PROPS,
     DEFAULT_RECTANGLE_PROPS,
     DEFAULT_TEXT_PROPS,
+} from "../server/modules/overlay_elements/overlay_schema";
+import {
     defaultProject,
     generateOverlayToken,
     migrateProjectBlob,

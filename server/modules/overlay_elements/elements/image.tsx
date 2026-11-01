@@ -1,5 +1,6 @@
 /** @jsx m */
 import m from "mithril";
+import { Icon } from "../../../../shared/ui/components/icons";
 import type { Vnode } from "mithril";
 import { t } from "../../../../shared/ui/i18n";
 import type {
@@ -7,9 +8,9 @@ import type {
 	ElementProps,
 	OverlayElement,
 	OverlayElementDef,
-} from "./core";
-import { strProp } from "./core";
-import { bindField } from "./fields";
+} from "../../../../shared/ui/overlay/element";
+import { strProp } from "../../../../shared/ui/overlay/element";
+import { bindField } from "../../../../shared/ui/overlay/fields";
 
 function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	const assetId = strProp(element.props, "assetId", "");
@@ -94,6 +95,9 @@ function validate(e: OverlayElement): string[] {
 
 export const imageElement: OverlayElementDef = {
 	type: "image",
+	labelKey: "overlay.add_image",
+	icon: () => <Icon name="image" class="role-icon" />,
+	order: 60,
 	defaultProps: { assetId: "" },
 	propKeys: ["assetId"],
 	defaultSize: { width: 240, height: 160 },

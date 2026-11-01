@@ -32,5 +32,8 @@
     "dash.widget_ignoredUsernames": "Ignored usernames (comma-separated)",
     "chat.tts.on": "Reading chat aloud",
     "chat.tts.off": "TTS off",
-    "chat.tts.waiting": "Waiting for a Czech voice…"
+    "chat.tts.waiting": "Waiting for a Czech voice…",
+    "overlay.add_chat": "Chat",
+    "overlay.chat_module": "Chat module",
+    "overlay.chat_no_module": "No chat module"
 }

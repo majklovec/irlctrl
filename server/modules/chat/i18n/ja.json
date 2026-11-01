@@ -32,5 +32,8 @@
     "dash.widget_ignoredUsernames": "無視するユーザー (カンマ区切り)",
     "chat.tts.on": "チャットを読み上げ中",
     "chat.tts.off": "TTS オフ",
-    "chat.tts.waiting": "チェコ語の音声中…"
+    "chat.tts.waiting": "チェコ語の音声中…",
+    "overlay.add_chat": "チャット",
+    "overlay.chat_module": "チャットモジュール",
+    "overlay.chat_no_module": "チャットモジュールなし"
 }

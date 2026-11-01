@@ -6,7 +6,7 @@
  *
  * This file is intentionally thin — it knows HOW to wrap and position an
  * element, not WHAT one is. Every concrete element implements
- * `OverlayElementDef` in `./overlay_elements/` and is looked up via the
+ * `OverlayElementDef` contributed by a module and is looked up via the
  * registry; no element-specific code lives here.
  */
 import m from "mithril";
@@ -17,11 +17,11 @@ import {
 	elementStyle,
 	resolveElement,
 	resolveElementProps,
-} from "./overlay_elements/core";
+} from "../../../shared/ui/overlay/element";
 export { assetUrl, elementStyle, resolveElement, resolveElementProps };
-export type { CSS, ElementContext } from "./overlay_elements/core";
-import { elementDef } from "./overlay_elements/registry";
-import type { ElementContext } from "./overlay_elements/core";
+export type { CSS, ElementContext } from "../../../shared/ui/overlay/element";
+import { elementDef } from "../../../shared/ui/overlay/registry";
+import type { ElementContext } from "../../../shared/ui/overlay/element";
 
 /** Render one element (content + positioning) for editor and runtime.
  * Each element is resolved against its variable bindings ONCE here; both the

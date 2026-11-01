@@ -9,9 +9,9 @@
  */
 import m from "mithril";
 import type { Vnode } from "mithril";
-import type { Variable } from "../../../../shared/overlay";
-import { t } from "../../../../shared/ui/i18n";
-import type { ElementProps, OverlayElement } from "./core";
+import type { Variable } from "../../overlay";
+import { t } from "../i18n";
+import type { ElementProps, OverlayElement } from "./element";
 
 export function lbl(label: string): Vnode {
 	return <span class="ov-lbl">{label}</span>;

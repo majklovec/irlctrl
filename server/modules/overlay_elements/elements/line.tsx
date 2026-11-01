@@ -1,16 +1,17 @@
 /** @jsx m */
 import m from "mithril";
+import { Icon } from "../../../../shared/ui/components/icons";
 import type { Vnode } from "mithril";
-import { DEFAULT_LINE_PROPS } from "../../../../shared/overlay";
+import { DEFAULT_LINE_PROPS } from "../overlay_schema";
 import { t } from "../../../../shared/ui/i18n";
 import type {
 	ElementContext,
 	ElementProps,
 	OverlayElement,
 	OverlayElementDef,
-} from "./core";
-import { strProp, numProp } from "./core";
-import { bindField } from "./fields";
+} from "../../../../shared/ui/overlay/element";
+import { strProp, numProp } from "../../../../shared/ui/overlay/element";
+import { bindField } from "../../../../shared/ui/overlay/fields";
 
 /**
  * Which box diagonal a drag delta runs along. The box is stored in min/abs
@@ -108,6 +109,9 @@ function validate(e: OverlayElement): string[] {
 
 export const lineElement: OverlayElementDef = {
 	type: "line",
+	labelKey: "overlay.add_line",
+	icon: () => <Icon name="line" class="role-icon" />,
+	order: 40,
 	defaultProps: { ...DEFAULT_LINE_PROPS },
 	propKeys: ["stroke", "strokeWidth", "flip"],
 	defaultSize: { width: 240, height: 160 },
@@ -117,4 +121,7 @@ export const lineElement: OverlayElementDef = {
 	// endpoints, not a box: a line is structurally two endpoints, so the
 	// rectangle's 8-handle box editing can never be presented for it
 	handles: "endpoints",
+	onEndpointDrag: (e, dx, dy) => {
+		e.props.flip = lineFlipFromDelta(dx, dy);
+	},
 };

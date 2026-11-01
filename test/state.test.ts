@@ -13,6 +13,7 @@ const OBS = "obs";
 /** The switcher fields as they live on the obs module slice (plus the obs
  * url, to prove the non-switcher obs fields survive the backfill). */
 type ObsSwitcherFields = SwitcherConfig & {
+    enabled?: boolean;
     switcherEnabled?: boolean;
     obsUrl?: string;
 };

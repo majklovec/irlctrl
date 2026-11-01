@@ -32,10 +32,11 @@ import type {
 import { Icon } from "../../../shared/ui/components/icons";
 import { Button, Card, Page, ServerNav } from "../../../shared/ui/components/ui";
 import { t } from "../../../shared/ui/i18n";
-import type { ChatWidgetRef } from "./overlay_elements/core";
-import { bindField, bindToggle, lbl } from "./overlay_elements/fields";
-import { lineFlipFromDelta } from "./overlay_elements/line";
-import { elementDef } from "./overlay_elements/registry";
+import { bindField, bindToggle, lbl } from "../../../shared/ui/overlay/fields";
+import {
+	addableElements,
+	elementDef,
+} from "../../../shared/ui/overlay/registry";
 import {
 	assetUrl,
 	type ElementContext,
@@ -99,8 +100,6 @@ const state = {
 	expandedElementId: null as string | null,
 	/** Text element being inline-edited on the canvas. */
 	editingElementId: null as string | null,
-	/** The user's chat modules (type "chat" widgets), for the chat picker. */
-	chatWidgets: [] as ChatWidgetRef[],
 };
 
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
@@ -177,38 +176,6 @@ async function load(): Promise<void> {
 		state.future = [];
 	}
 	state.loaded = true;
-	m.redraw();
-}
-
-/** Fetch the user's chat modules (dashboard widgets of type "chat") so the
- * chat element's inspector can offer them as one-click targets. */
-async function loadChatModules(): Promise<void> {
-	const body = await api<{
-		dashboards: Array<{
-			id: string;
-			name: string;
-			widgets: Array<{
-				id: string;
-				type: string;
-				name: string;
-				config?: Record<string, string>;
-			}>;
-		}>;
-	}>("/api/dashboards");
-	const widgets: ChatWidgetRef[] = [];
-	for (const d of body?.dashboards ?? []) {
-		for (const w of d.widgets ?? []) {
-			if (w.type !== "chat") continue;
-			widgets.push({
-				dashboardId: d.id,
-				widgetId: w.id,
-				dashboardName: d.name,
-				name: w.name,
-				token: w.config?.token ?? "",
-			});
-		}
-	}
-	state.chatWidgets = widgets;
 	m.redraw();
 }
 
@@ -352,17 +319,7 @@ function setElementLocked(elementId: string, locked: boolean): void {
 /** Types the user can create from the canvas toolbar. Each type's default
  * props and size come from its `OverlayElementDef` — the core never
  * hardcodes element-specific defaults. */
-function addElement(
-	type:
-		| "text"
-		| "rectangle"
-		| "ellipse"
-		| "line"
-		| "progress"
-		| "image"
-		| "iframe"
-		| "chat",
-): void {
+function addElement(type: string): void {
 	const s = scene();
 	if (!s) return;
 	const def = elementDef(type);
@@ -764,7 +721,7 @@ function onDrag(ev: MouseEvent): void {
 	// along (true = top-right → bottom-left, the "backward" diagonal).
 	const width = Math.abs(ux);
 	const height = Math.abs(uy);
-	if (e.type === "line") e.props.flip = lineFlipFromDelta(ux, uy);
+	elementDef(e.type)?.onEndpointDrag?.(e, ux, uy);
 	// new world center: fixed endpoint + rotated half-diagonal
 	const cx = fwx + (ux * cos - uy * sin) / 2;
 	const cy = fwy + (ux * sin + uy * cos) / 2;
@@ -905,7 +862,7 @@ function canvasArea(): m.Vnode {
 						height: C.height + "px",
 						// Zoom via the CSS `zoom` property, NOT `transform: scale()`.
 						// A transform promotes the canvas (and any <iframe> inside it,
-						// e.g. the chat element) to a GPU-composited layer, which on
+						// e.g. an embedded page) to a GPU-composited layer, which on
 						// real-GPU Chromium/CEF paints an opaque white backing behind the
 						// iframe — a solid white box. `zoom` scales layout without creating
 						// a composited layer, so iframe elements stay transparent. The
@@ -1348,7 +1305,6 @@ function elementProps(e: OverlayElement): m.Vnode {
 						assets: state.project.assets,
 						variables: state.project.variables,
 						upload: (f: File) => uploadAsset(f).then((a) => a?.id ?? null),
-						chatWidgets: state.chatWidgets,
 					})
 				: null}
 
@@ -1536,16 +1492,6 @@ function runtimePanel(): m.Vnode {
 
 /** Icon submenu below the main nav: undo/redo + one icon per element type. */
 function editorToolbar(): m.Vnode {
-	const adds = [
-		["text", "overlay.add_text"],
-		["rectangle", "overlay.add_rectangle"],
-		["ellipse", "overlay.add_ellipse"],
-		["line", "overlay.add_line"],
-		["progress", "overlay.add_progress"],
-		["image", "overlay.add_image"],
-		["chat", "overlay.add_chat"],
-		["iframe", "overlay.add_iframe"],
-	] as const;
 	return (
 		<div class="ov-toolrow" role="toolbar">
 			<Button
@@ -1565,14 +1511,14 @@ function editorToolbar(): m.Vnode {
 				onclick={redo}
 			/>
 			<span class="ov-toolsep" aria-hidden="true" />
-			{adds.map(([type, key]) => (
+			{addableElements().map((def) => (
 				<Button
-					key={type}
-					label={<Icon name={type} class="role-icon" />}
+					key={def.type}
+					label={def.icon?.() ?? def.type}
 					class="icon-link"
-					title={t(key)}
-					aria-label={t(key)}
-					onclick={() => addElement(type)}
+					title={t(def.labelKey ?? def.type)}
+					aria-label={t(def.labelKey ?? def.type)}
+					onclick={() => addElement(def.type)}
 				/>
 			))}
 		</div>
@@ -1770,7 +1716,6 @@ function editorTitle(): m.Vnode {
 const overlaysPage: m.Component = {
 	oncreate() {
 		void load();
-		void loadChatModules();
 		window.addEventListener("keydown", onKey, true);
 	},
 	onremove() {

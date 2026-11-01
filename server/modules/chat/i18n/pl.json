@@ -32,5 +32,8 @@
     "dash.widget_ignoredUsernames": "Ignorowani użytkownicy (po przecinku)",
     "chat.tts.on": "Czyta czat na głos",
     "chat.tts.off": "TTS wyłączone",
-    "chat.tts.waiting": "Oczekiwanie na czeski głos…"
+    "chat.tts.waiting": "Oczekiwanie na czeski głos…",
+    "overlay.add_chat": "Czat",
+    "overlay.chat_module": "Moduł czatu",
+    "overlay.chat_no_module": "Brak modułu czatu"
 }

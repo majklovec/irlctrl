@@ -4,7 +4,7 @@
 import m from "mithril";
 import { type LogEvent, label, methodLog } from "../../log_messages";
 import { errorMessage } from "../../util";
-import type { DeviceInfo, ModulesView, Status } from "../types";
+import type { DeviceInfo, ModulesView, Status } from "../../contracts/wire";
 import type { Level } from "../components/icons";
 import { t } from "../i18n";
 import { type Params, RpcClient, RpcError, socketUrl } from "../services/rpc";

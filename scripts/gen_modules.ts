@@ -13,6 +13,10 @@
 //   generated/modules.settings.ts — one import per <root>/<id>/settings.tsx;
 //   the settings framework (client/frontend/ts/modules.tsx) registers each module's
 //   settings card from this manifest.
+//   generated/overlay_schemas.ts  — one import per <root>/<id>/overlay_schema.ts
+//   (overlay element schemas, used by the scene validator on both sides).
+//   generated/overlay_elements.ts — one import per <root>/<id>/overlay_elements.tsx
+//   (the browser half of the overlay elements: rendering + inspector).
 //   generated/modules.backend.ts  — one import per <root>/<id>/backend.ts;
 //   used by the compiled binaries (bun build --compile), where the runtime
 //   directory scan in shared/registry.ts cannot reach disk (import.meta.url
@@ -170,6 +174,24 @@ await Promise.all([
         variable: "s",
         purpose:
             "one static import per <root>/<id>/settings.tsx; the settings framework registers each module's settings card from this manifest",
+    }),
+    buildManifest({
+        outFile: fileURLToPath(
+            new URL("../generated/overlay_schemas.ts", import.meta.url),
+        ),
+        file: "overlay_schema.ts",
+        variable: "o",
+        purpose:
+            "one static import per <root>/<id>/overlay_schema.ts; the overlay scene validator resolves element types through these",
+    }),
+    buildManifest({
+        outFile: fileURLToPath(
+            new URL("../generated/overlay_elements.ts", import.meta.url),
+        ),
+        file: "overlay_elements.tsx",
+        variable: "e",
+        purpose:
+            "one static import per <root>/<id>/overlay_elements.tsx; the overlay editor and runtime render elements through these",
     }),
     buildManifest({
         outFile: fileURLToPath(
