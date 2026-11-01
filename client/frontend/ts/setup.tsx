@@ -13,7 +13,7 @@ import {
 	Input,
 	Page,
 	Select,
-} from "@ui/components";
+} from "@ui/components/";
 import m from "mithril";
 import type { ModuleSetupStep } from "../../../shared/contracts/frontend_module";
 import type { Role, SetupInfo } from "../../../shared/contracts/wire";

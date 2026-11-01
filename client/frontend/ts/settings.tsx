@@ -18,7 +18,7 @@ import {
 	Page,
 	Select,
 	TitleWithBack,
-} from "@ui/components";
+} from "@ui/components/";
 import m from "mithril";
 import type { ModulesView, Settings } from "../../../shared/contracts/wire";
 import { t } from "../../../shared/ui/i18n";

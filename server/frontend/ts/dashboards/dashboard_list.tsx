@@ -3,6 +3,7 @@
  * dashboards.changed); the initial fetch only loads the page before the socket
  * opens. */
 
+import { apiJson, apiTry } from "@ui/api_client";
 import {
 	Button,
 	Card,
@@ -15,14 +16,13 @@ import {
 	ServerNav,
 	Table,
 	Toolbar,
-} from "@ui/components";
+} from "@ui/components/";
+import { confirmDialog } from "@ui/components/confirm";
+import { Icon } from "@ui/components/icons";
+import { t } from "@ui/i18n";
+import { mountPage } from "@ui/util";
 import m from "mithril";
 import type { ServerDashboard } from "../../../../shared/contracts/wire";
-import { apiJson, apiTry } from "../../../../shared/ui/api_client";
-import { confirmDialog } from "../../../../shared/ui/components/confirm";
-import { Icon } from "../../../../shared/ui/components/icons";
-import { t } from "../../../../shared/ui/i18n";
-import { mountPage } from "../../../../shared/ui/util";
 import { serverLive } from "../services/serverws";
 import { dashboardUpdateUrl, dashboardViewUrl } from "./dashboard_urls";
 

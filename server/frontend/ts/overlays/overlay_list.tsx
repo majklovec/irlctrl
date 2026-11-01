@@ -9,7 +9,7 @@ import {
 	ServerNav,
 	Table,
 	Toolbar,
-} from "@ui/components";
+} from "@ui/components/";
 import m from "mithril";
 import { confirmDialog } from "../../../../shared/ui/components/confirm";
 import { Icon } from "../../../../shared/ui/components/icons";
@@ -75,7 +75,7 @@ function renameInput(sceneId: string): m.Vnode {
 	);
 }
 
-/** Dashboards-style list of overlays; click a row to open its editor. */
+/** Dashboards-style list of overlays; click a scene name to open its editor. */
 export function overlayList(): m.Vnode {
 	const scenes = state.project.scenes;
 	return (
@@ -90,12 +90,14 @@ export function overlayList(): m.Vnode {
 						]}
 					>
 						{scenes.map((s) => (
-							<tr key={s.id} onclick={() => location.assign(editorUrl(s.id))}>
+							<tr key={s.id}>
 								<td class="dash-name">
 									{state.renamingSceneId === s.id ? (
 										renameInput(s.id)
 									) : (
-										<span class="dash-row-link">{s.name}</span>
+										<a class="dash-row-link" href={editorUrl(s.id)}>
+											{s.name}
+										</a>
 									)}
 								</td>
 								<td class="muted">/overlay/{s.slug}</td>
@@ -105,13 +107,11 @@ export function overlayList(): m.Vnode {
 										href={editorUrl(s.id)}
 										label={t("overlay.open")}
 										icon={<Icon name="view" class="role-icon" />}
-										onclick={(ev: Event) => ev.stopPropagation()}
 									/>
 									<IconButton
 										label={t("overlay.rename_scene")}
 										icon={<Icon name="edit" class="role-icon" />}
-										onclick={(ev: Event) => {
-											ev.stopPropagation();
+										onclick={() => {
 											state.renamingSceneId = s.id;
 											state.renameValue = s.name;
 											m.redraw();
@@ -121,8 +121,7 @@ export function overlayList(): m.Vnode {
 										danger
 										label={t("overlay.delete_scene")}
 										icon={<Icon name="delete" class="role-icon" />}
-										onclick={async (ev: Event) => {
-											ev.stopPropagation();
+										onclick={async () => {
 											if (
 												await confirmDialog(t("overlay.confirm_delete_scene"), {
 													danger: true,

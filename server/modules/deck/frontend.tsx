@@ -5,7 +5,7 @@
  * that device's RPC. The config editor (pencil) composes the layout from the
  * catalogues of every device. */
 import "./styles.css";
-import { Badge } from "@ui/components";
+import { Badge } from "@ui/components/";
 import m from "mithril";
 import type {
 	DashboardWidgetModule,

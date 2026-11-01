@@ -8,7 +8,7 @@ import {
 	Input,
 	Options,
 	Select,
-} from "@ui/components";
+} from "@ui/components/";
 import m from "mithril";
 import type { ModuleSliceView } from "../../../shared/contracts/wire";
 import { Icon } from "../../../shared/ui/components/icons";

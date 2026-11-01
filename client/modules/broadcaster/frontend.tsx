@@ -2,7 +2,7 @@
  * device and the start / stop actions. The RTMP destination and ffmpeg output
  * profile are edited on the Settings page (this card shows them). */
 
-import { Actions, Badge, Button, Card, DefinitionList } from "@ui/components";
+import { Actions, Badge, Button, Card, DefinitionList } from "@ui/components/";
 import m from "mithril";
 import type { FrontendModule } from "../../../shared/contracts/frontend_module";
 import type { DeviceSummary } from "../../../shared/contracts/wire";

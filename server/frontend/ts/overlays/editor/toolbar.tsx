@@ -1,4 +1,4 @@
-import { IconButton, Toolbar } from "@ui/components";
+import { IconButton, Toolbar } from "@ui/components/";
 import m from "mithril";
 import { Icon } from "../../../../../shared/ui/components/icons";
 import { t } from "../../../../../shared/ui/i18n";

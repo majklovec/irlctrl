@@ -17,7 +17,7 @@ import {
 	numberAttrs,
 	Options,
 	Select,
-} from "@ui/components";
+} from "@ui/components/";
 import m from "mithril";
 import type {
 	DeviceDashboardWidget,

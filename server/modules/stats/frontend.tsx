@@ -1,6 +1,6 @@
 // Stats dashboard widget for YouTube, Twitch, and Kick channel references.
 
-import { Badge } from "@ui/components";
+import { Badge } from "@ui/components/";
 // biome-ignore lint/style/useImportType: used in JSX
 import m from "mithril";
 import type {

@@ -11,7 +11,7 @@
  * line, and the Card shell.
  */
 
-import { Card } from "@ui/components";
+import { Card } from "@ui/components/";
 import m from "mithril";
 import SETTINGS_MANIFEST from "../../../generated/modules.settings";
 import type {

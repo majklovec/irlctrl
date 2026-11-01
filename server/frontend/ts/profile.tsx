@@ -12,7 +12,7 @@ import {
 	Input,
 	Page,
 	ServerNav,
-} from "@ui/components";
+} from "@ui/components/";
 import m from "mithril";
 import { apiJson } from "../../../shared/ui/api_client";
 import { Icon } from "../../../shared/ui/components/icons";

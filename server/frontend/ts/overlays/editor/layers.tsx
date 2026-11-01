@@ -1,4 +1,4 @@
-import { Button } from "@ui/components";
+import { Button } from "@ui/components/";
 import m from "mithril";
 import type { OverlayElement, Transform } from "../../../../../shared/overlay";
 import { Icon } from "../../../../../shared/ui/components/icons";

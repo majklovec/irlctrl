@@ -1,7 +1,7 @@
 /* Device page — a Mithril view over the device store (device/store.ts): header, one card per
  * role-specific function, and the event log. The WebSocket client mutates state and redraws. */
 
-import { Badge, IconLink, Page, TitleWithBack } from "@ui/components";
+import { Badge, IconLink, Page, TitleWithBack } from "@ui/components/";
 import m from "mithril";
 import { Icon } from "../../../shared/ui/components/icons";
 import { RoleTag } from "../../../shared/ui/components/role_tag";

@@ -2,7 +2,7 @@
  * first account bootstraps as admin; everyone after needs an invite, which the
  * /api/register/status probe (plus a ?invite= link) drives showing the field. */
 
-import { Card, Field, Footer, Input } from "@ui/components";
+import { Card, Field, Footer, Input } from "@ui/components/";
 import m from "mithril";
 import logoUrl from "../../../shared/assets/img/logo-irlctrl.png";
 import { ApiError, apiJson } from "../../../shared/ui/api_client";

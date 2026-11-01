@@ -3,7 +3,7 @@
 // Self-contained: owns its per-channel live map, fed by dashboard websocket
 // frames it cares about; the core only forwards frames through onFrame().
 
-import { Badge } from "@ui/components";
+import { Badge } from "@ui/components/";
 import m from "mithril";
 import type {
 	ChannelWidgetModule,

@@ -3,7 +3,7 @@
  * pushed live over the shared feed websocket, and live widget data flows over the
  * control server's per-device viewer websockets (d/<id>/ws). */
 
-import { Badge, Button } from "@ui/components";
+import { Badge, Button } from "@ui/components/";
 import m from "mithril";
 import type {
 	DeviceDashboardContext,

@@ -17,7 +17,7 @@ import {
 	Input,
 	Page,
 	TitleWithBack,
-} from "@ui/components";
+} from "@ui/components/";
 import m from "mithril";
 import { t } from "../../../shared/ui/i18n";
 import { RpcClient, socketUrl } from "../../../shared/ui/services/rpc";

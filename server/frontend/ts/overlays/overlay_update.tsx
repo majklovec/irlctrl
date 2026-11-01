@@ -17,7 +17,7 @@
  * canvas editor).
  */
 
-import { Page, ServerNav } from "@ui/components";
+import { Page, ServerNav } from "@ui/components/";
 import m from "mithril";
 import { t } from "../../../../shared/ui/i18n";
 import { mountPage } from "../../../../shared/ui/util";

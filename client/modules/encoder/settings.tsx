@@ -25,7 +25,7 @@ import {
 	IconButton,
 	IconLink,
 	Input,
-} from "@ui/components";
+} from "@ui/components/";
 import m from "mithril";
 import { confirmDialog } from "../../../shared/ui/components/confirm";
 import { Icon } from "../../../shared/ui/components/icons";

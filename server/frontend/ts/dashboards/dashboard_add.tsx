@@ -7,7 +7,7 @@
  * free grid slot and the page returns to the (live) dashboard view. A 409
  * conflict reloads the server copy; the widget is not added twice. */
 
-import { Button, Field, Input, Page, ServerNav } from "@ui/components";
+import { Button, Field, Input, Page, ServerNav } from "@ui/components/";
 import m from "mithril";
 import type {
 	ServerDashboard,

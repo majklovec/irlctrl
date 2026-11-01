@@ -11,13 +11,14 @@
  * the server. */
 
 import {
+	Button,
 	IconButton,
 	Page,
 	ServerNav,
 	TitleWithBack,
 	Toast,
 	useToast,
-} from "@ui/components";
+} from "@ui/components/";
 import m from "mithril";
 import type {
 	ServerDashboard,
@@ -295,17 +296,16 @@ const App: m.Component = {
 									}
 								/>
 							) : null}
-							<a
-								class="dash-edittoggle"
-								href={
-									state.editMode
-										? dashboardViewUrl(dash.id)
-										: dashboardUpdateUrl(dash.id)
-								}
+							<Button
+								class="dash-edittoggle secondary"
 								aria-pressed={state.editMode}
-							>
-								{t(state.editMode ? "dash.done" : "dash.edit")}
-							</a>
+								label={t(state.editMode ? "dash.done" : "dash.edit")}
+								onclick={() => {
+									location.href = state.editMode
+										? dashboardViewUrl(dash.id)
+										: dashboardUpdateUrl(dash.id);
+								}}
+							/>
 						</>
 					) : undefined
 				}

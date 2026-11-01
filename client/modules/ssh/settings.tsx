@@ -16,7 +16,7 @@
  * generated manifest (generated/modules.settings.ts) — no per-module imports.
  */
 
-import { Actions, Button, Field, Input } from "@ui/components";
+import { Actions, Button, Field, Input } from "@ui/components/";
 import m from "mithril";
 import { confirmDialog } from "../../../shared/ui/components/confirm";
 import { t } from "../../../shared/ui/i18n";
