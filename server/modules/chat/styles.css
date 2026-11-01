@@ -16,6 +16,7 @@
 .dash-widget-body.chat-overlay-live .chat-feed {
     overflow: hidden;
     white-space: normal;
+    font-size: 24px;
 }
 
 /* Card-head status: one platform icon per channel, green when online, red
