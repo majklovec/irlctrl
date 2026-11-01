@@ -3,7 +3,12 @@
 import m from "mithril";
 import { Icon } from "../../../shared/ui/components/icons";
 import { RoleTag } from "../../../shared/ui/components/role_tag";
-import { Badge, Page, TitleWithBack } from "../../../shared/ui/components/ui";
+import {
+	Badge,
+	IconLink,
+	Page,
+	TitleWithBack,
+} from "../../../shared/ui/components/ui";
 import { LogCard } from "../../../shared/ui/device/log";
 import { act, connectDevice, st } from "../../../shared/ui/device/store";
 import { t } from "../../../shared/ui/i18n";
@@ -49,16 +54,17 @@ function headerRight(): m.Children[] {
 			/>
 			{` ${t("ui.autostart")}`}
 		</label>,
-		status && <span class="badge"><RoleTag role={status.role} /></span>,
+		status && (
+			<span class="badge">
+				<RoleTag role={status.role} />
+			</span>
+		),
 		connBadge(),
-		<a
-			class="icon-link"
+		<IconLink
 			href="settings/"
-			title={t("set.title")}
-			aria-label={t("set.title")}
-		>
-			<Icon name="gear" class="role-icon" />
-		</a>,
+			label={t("set.title")}
+			icon={<Icon name="gear" class="role-icon" />}
+		/>,
 	];
 }
 

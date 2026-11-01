@@ -10,6 +10,7 @@ import {
 	Field,
 	FieldGroup,
 	Form,
+	IconButton,
 	Input,
 	Page,
 	ServerNav,
@@ -83,7 +84,9 @@ async function load(): Promise<void> {
 /** GET /api/invitations → the admin's invitation history (newest first). */
 async function loadInvitations(): Promise<void> {
 	try {
-		const body = await apiJson<{ invitations: Invitation[] }>("/api/invitations");
+		const body = await apiJson<{ invitations: Invitation[] }>(
+			"/api/invitations",
+		);
 		state.invitations = body.invitations;
 		render();
 	} catch {
@@ -266,11 +269,10 @@ const App: m.Component = {
 							<span class="muted">
 								{new Date(tk.createdAt).toLocaleString()}
 							</span>
-							<Button
-								class="icon-link dash-delete"
-								label={<Icon name="delete" class="role-icon" />}
-								title={t("profile.tokens.remove")}
-								aria-label={t("profile.tokens.remove")}
+							<IconButton
+								danger
+								label={t("profile.tokens.remove")}
+								icon={<Icon name="delete" class="role-icon" />}
 								disabled={state.removing}
 								onclick={() => removeToken(tk.id)}
 							/>

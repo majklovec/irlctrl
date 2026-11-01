@@ -12,17 +12,18 @@ import {
 	Break,
 	Button,
 	Card,
-	Checkbox,
 	CheckField,
-	type Child,
+	Checkbox,
 	DefinitionList,
 	Field,
 	FieldGroup,
 	Form,
+	IconButton,
 	Input,
-	numberAttrs,
 	Options,
 	Select,
+	numberAttrs,
+	type Child,
 } from "../../../shared/ui/components/ui";
 import { card, type DeviceCard } from "../../../shared/ui/device/store";
 import { t } from "../../../shared/ui/i18n";
@@ -224,10 +225,7 @@ const relaySummaryColumns = [
 		id: "relay",
 		order: 40,
 		available: (device: DeviceSummary) => device.role !== "encoder",
-		header: () => [
-			relayIcon(),
-			` ${t("setup.step.relay")}`,
-		],
+		header: () => [relayIcon(), ` ${t("setup.step.relay")}`],
 		cell: (device: DeviceSummary) => {
 			const { relay } = device as RelayDeviceSummary;
 			if (!relay) return "—";
@@ -619,9 +617,7 @@ function interfacesCard(host: DeviceCard, status: RelayStatus): m.Vnode {
 				<td class="is-iface">
 					{i.iface}
 					{isDefaultRoute ? (
-						<span class="default-route-label">
-							{t("dev.default_route")}
-						</span>
+						<span class="default-route-label">{t("dev.default_route")}</span>
 					) : null}
 					{i.speed ? (
 						<small class="muted">{` · ${formatSpeed(i.speed)}`}</small>
@@ -647,11 +643,9 @@ function interfacesCard(host: DeviceCard, status: RelayStatus): m.Vnode {
 						kind="warn"
 					/>
 				),
-				<Button
-					label={<Icon name="sync" class="role-icon" />}
-					class="icon-link"
-					title={t("ui.reconfigure")}
-					aria-label={t("ui.reconfigure")}
+				<IconButton
+					label={t("ui.reconfigure")}
+					icon={<Icon name="sync" class="role-icon" />}
 					disabled={host.busy.has("reconfigure")}
 					onclick={() => void host.act("reconfigure", "reconfigure")}
 				/>,

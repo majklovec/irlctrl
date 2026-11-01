@@ -24,6 +24,8 @@ import {
 	Card,
 	Field,
 	Form,
+	IconButton,
+	IconLink,
 	Input,
 } from "../../../shared/ui/components/ui";
 import { t } from "../../../shared/ui/i18n";
@@ -177,9 +179,12 @@ async function deletePipeline(
 	pipeline: Pipeline,
 ): Promise<void> {
 	if (
-		!(await confirmDialog(t("set.pipeline_delete_confirm", { id: pipeline.id }), {
-			danger: true,
-		}))
+		!(await confirmDialog(
+			t("set.pipeline_delete_confirm", { id: pipeline.id }),
+			{
+				danger: true,
+			},
+		))
 	)
 		return;
 	const response = await ctx.run(() =>
@@ -250,19 +255,15 @@ export const def: ModuleDef = {
 											<div class="pipeline-item">
 												<code title={pipeline.id}>{pipeline.name}</code>
 												<div class="dash-row-actions">
-													<a
+													<IconLink
 														href={pipelineEditUrl(pipeline.id)}
-														class="icon-link"
-														title={t("set.pipeline_edit")}
-														aria-label={t("set.pipeline_edit")}
-													>
-														<Icon name="edit" class="role-icon" />
-													</a>
-													<Button
-														label={<Icon name="delete" class="role-icon" />}
-														class="icon-link dash-delete"
-														title={t("set.pipeline_delete")}
-														aria-label={t("set.pipeline_delete")}
+														label={t("set.pipeline_edit")}
+														icon={<Icon name="edit" class="role-icon" />}
+													/>
+													<IconButton
+														danger
+														label={t("set.pipeline_delete")}
+														icon={<Icon name="delete" class="role-icon" />}
 														disabled={ctx.busy}
 														onclick={() => void deletePipeline(ctx, pipeline)}
 													/>
@@ -283,19 +284,16 @@ export const def: ModuleDef = {
 									count: state.counts[repository] ?? 0,
 								})}
 							/>
-							<Button
-								label={<Icon name="sync" class="role-icon" />}
-								class="icon-link"
-								title={t("set.repo_update")}
-								aria-label={t("set.repo_update")}
+							<IconButton
+								label={t("set.repo_update")}
+								icon={<Icon name="sync" class="role-icon" />}
 								disabled={ctx.busy}
 								onclick={() => void updateRepository(ctx, repository)}
 							/>
-							<Button
-								label={<Icon name="delete" class="role-icon" />}
-								class="icon-link dash-delete"
-								title={t("ui.remove")}
-								aria-label={t("ui.remove")}
+							<IconButton
+								danger
+								label={t("ui.remove")}
+								icon={<Icon name="delete" class="role-icon" />}
 								disabled={ctx.busy}
 								onclick={() => void removeRepository(ctx, repository)}
 							/>

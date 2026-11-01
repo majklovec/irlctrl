@@ -7,7 +7,8 @@
  */
 import m from "mithril";
 import { t } from "../i18n";
-import { Button } from "./ui";
+import { Button } from "./button";
+import { Modal } from "./modal";
 
 export interface ConfirmOptions {
 	/** Label of the confirming button (default: the "OK" wording). */
@@ -39,34 +40,29 @@ const focusOk = ({ dom }: m.VnodeDOM) =>
 const Dialog: m.Component = {
 	view: () =>
 		pending && (
-			<div
-				class="modal-backdrop"
-				onclick={(e: MouseEvent) => {
-					if (e.target === e.currentTarget) close(false);
-				}}
+			<Modal
+				title={pending.title}
+				onClose={() => close(false)}
 				onkeydown={(e: KeyboardEvent) => {
-					if (e.key === "Escape") close(false);
 					if (e.key === "Enter") close(true);
 				}}
+				oncreate={focusOk}
 			>
-				<div class="modal" role="dialog" aria-modal="true" oncreate={focusOk}>
-					{pending.title ? <h2 class="modal-title">{pending.title}</h2> : null}
-					<p class="modal-body">{pending.message}</p>
-					<div class="actions modal-actions">
-						<Button
-							label={t("ui.cancel")}
-							class="secondary"
-							onclick={() => close(false)}
-						/>
-						<Button
-							label={pending.okLabel ?? t("ui.ok")}
-							class={pending.danger ? "danger" : undefined}
-							data-ok="1"
-							onclick={() => close(true)}
-						/>
-					</div>
+				<p class="modal-body">{pending.message}</p>
+				<div class="actions modal-actions">
+					<Button
+						label={t("ui.cancel")}
+						class="secondary"
+						onclick={() => close(false)}
+					/>
+					<Button
+						label={pending.okLabel ?? t("ui.ok")}
+						class={pending.danger ? "danger" : undefined}
+						data-ok="1"
+						onclick={() => close(true)}
+					/>
 				</div>
-			</div>
+			</Modal>
 		),
 };
 

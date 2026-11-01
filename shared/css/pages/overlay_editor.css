@@ -551,6 +551,11 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
     border-bottom: 1px solid var(--border);
     background: var(--header-bg);
 }
+/* The editor's icon strip is a `Toolbar` inside the subbar: tight, no margins. */
+.page-subbar .dash-toolbar {
+    gap: 4px;
+    margin: 0;
+}
 .page-subbar .icon-link {
     width: 2.25rem;
     height: 2.25rem;

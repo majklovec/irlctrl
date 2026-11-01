@@ -1,6 +1,10 @@
 import m from "mithril";
 import { Icon } from "../../../../../shared/ui/components/icons";
-import { Button } from "../../../../../shared/ui/components/ui";
+import {
+	Button,
+	IconButton,
+	Toolbar,
+} from "../../../../../shared/ui/components/ui";
 import { t } from "../../../../../shared/ui/i18n";
 import { addableElements } from "../../../../../shared/ui/overlay/registry";
 import {
@@ -16,35 +20,31 @@ import {
 /** Icon submenu below the main nav: undo/redo + one icon per element type. */
 export function editorToolbar(): m.Vnode {
 	return (
-		<div class="ov-toolrow" role="toolbar">
-			<Button
-				label={<Icon name="undo" class="role-icon" />}
-				class="icon-link"
+		<Toolbar class="ov-toolrow">
+			<IconButton
+				label={t("overlay.undo")}
 				title={`${t("overlay.undo")} (Ctrl+Z)`}
-				aria-label={t("overlay.undo")}
+				icon={<Icon name="undo" class="role-icon" />}
 				disabled={!state.past.length}
 				onclick={undo}
 			/>
-			<Button
-				label={<Icon name="redo" class="role-icon" />}
-				class="icon-link"
+			<IconButton
+				label={t("overlay.redo")}
 				title={`${t("overlay.redo")} (Ctrl+Shift+Z)`}
-				aria-label={t("overlay.redo")}
+				icon={<Icon name="redo" class="role-icon" />}
 				disabled={!state.future.length}
 				onclick={redo}
 			/>
 			<span class="ov-toolsep" aria-hidden="true" />
 			{addableElements().map((def) => (
-				<Button
+				<IconButton
 					key={def.type}
-					label={def.icon?.() ?? def.type}
-					class="icon-link"
-					title={t(def.labelKey ?? def.type)}
-					aria-label={t(def.labelKey ?? def.type)}
+					label={t(def.labelKey ?? def.type)}
+					icon={def.icon?.() ?? def.type}
 					onclick={() => addElement(def.type)}
 				/>
 			))}
-		</div>
+		</Toolbar>
 	);
 }
 

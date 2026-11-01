@@ -160,6 +160,10 @@ device entry (per module; send `{}` to clear them).
 
 ## The frontend contract
 
+Cards, settings pages and widgets render with the shared UI kit —
+[`shared/ui/README.md`](../../shared/ui/README.md) lists the components and
+the rules (tokens, one API client, no raw `window.confirm`).
+
 `FrontendModule` (device card): `kind: "device-card"`, `id`, `title`, `order`,
 `available(status)`, `component(status)`, `defaultSize` / `minSize`, plus the
 contributions the core pages compose — `dashboardWidgets`, `setupSteps`,

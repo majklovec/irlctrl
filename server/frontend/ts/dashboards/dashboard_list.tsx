@@ -11,9 +11,15 @@ import { Icon } from "../../../../shared/ui/components/icons";
 import {
 	Button,
 	Card,
+	EmptyState,
+	IconButton,
+	IconLink,
 	Input,
 	Page,
+	RowActions,
 	ServerNav,
+	Table,
+	Toolbar,
 } from "../../../../shared/ui/components/ui";
 import { t } from "../../../../shared/ui/i18n";
 import { serverLive } from "../services/serverws";
@@ -83,69 +89,51 @@ async function deleteDashboard(d: ServerDashboard): Promise<void> {
 
 function list(): m.Vnode {
 	return (
-		<table class="dash-table">
-			<thead>
-				<tr>
-					<th>{t("dash.name")}</th>
-					<th>{t("dash.widgets")}</th>
-					<th />
+		<Table
+			columns={[
+				{ key: "name", header: t("dash.name") },
+				{ key: "widgets", header: t("dash.widgets") },
+			]}
+		>
+			{state.dashboards.map((d) => (
+				<tr key={d.id}>
+					<td class="dash-name">
+						<a class="dash-row-link" href={dashboardViewUrl(d.id)}>
+							<span
+								class="dash-dot"
+								style={d.color ? `background:${d.color};color:${d.color}` : ""}
+							/>
+							{d.name}
+						</a>
+					</td>
+					<td class="muted">{`${d.widgets.length} ${d.widgets.length === 1 ? t("dash.widget") : t("dash.widgets").toLowerCase()}`}</td>
+					<RowActions>
+						<IconLink
+							href={dashboardViewUrl(d.id)}
+							label={t("dash.view")}
+							icon={<Icon name="view" class="role-icon" />}
+						/>
+						<IconLink
+							href={dashboardUpdateUrl(d.id)}
+							label={t("dash.edit")}
+							icon={<Icon name="edit" class="role-icon" />}
+						/>
+						<IconButton
+							danger
+							label={t("dash.delete")}
+							icon={<Icon name="delete" class="role-icon" />}
+							onclick={() => void deleteDashboard(d)}
+						/>
+					</RowActions>
 				</tr>
-			</thead>
-			<tbody>
-				{state.dashboards.map((d) => (
-					<tr key={d.id}>
-						<td class="dash-name">
-							<a class="dash-row-link" href={dashboardViewUrl(d.id)}>
-								<span
-									class="dash-dot"
-									style={
-										d.color ? `background:${d.color};color:${d.color}` : ""
-									}
-								/>
-								{d.name}
-							</a>
-						</td>
-						<td class="muted">{`${d.widgets.length} ${d.widgets.length === 1 ? t("dash.widget") : t("dash.widgets").toLowerCase()}`}</td>
-						<td class="actions-cell">
-							<div class="dash-row-actions">
-								{[
-									<a
-										class="icon-link"
-										href={dashboardViewUrl(d.id)}
-										title={t("dash.view")}
-										aria-label={t("dash.view")}
-									>
-										<Icon name="view" class="role-icon" />
-									</a>,
-									<a
-										class="icon-link"
-										href={dashboardUpdateUrl(d.id)}
-										title={t("dash.edit")}
-										aria-label={t("dash.edit")}
-									>
-										<Icon name="edit" class="role-icon" />
-									</a>,
-									<Button
-										label={<Icon name="delete" class="role-icon" />}
-										class="icon-link dash-delete"
-										title={t("dash.delete")}
-										aria-label={t("dash.delete")}
-										onclick={() => void deleteDashboard(d)}
-									/>,
-								]}
-							</div>
-						</td>
-					</tr>
-				))}
-			</tbody>
-		</table>
+			))}
+		</Table>
 	);
 }
 
 function createToolbar(): m.Vnode {
 	return (
-		<div class="dash-toolbar">
-			<span class="dash-empty-text">{t("dash.create_new")}</span>
+		<Toolbar label={t("dash.create_new")}>
 			<Input
 				target={state}
 				prop="newName"
@@ -156,7 +144,7 @@ function createToolbar(): m.Vnode {
 				onclick={createDashboard}
 				disabled={state.saving || !state.newName.trim()}
 			/>
-		</div>
+		</Toolbar>
 	);
 }
 
@@ -166,10 +154,7 @@ function dashboardsCard(): m.Vnode {
 			{state.dashboards.length ? (
 				[list(), createToolbar()]
 			) : (
-				<div class="dash-empty">
-					<p class="muted">{t("dash.empty")}</p>
-					{createToolbar()}
-				</div>
+				<EmptyState message={t("dash.empty")}>{createToolbar()}</EmptyState>
 			)}
 		</Card>
 	);

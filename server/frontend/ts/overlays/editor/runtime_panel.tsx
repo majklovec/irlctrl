@@ -1,6 +1,10 @@
 import m from "mithril";
 import { Icon } from "../../../../../shared/ui/components/icons";
-import { Button, Card } from "../../../../../shared/ui/components/ui";
+import {
+	Button,
+	Card,
+	IconButton,
+} from "../../../../../shared/ui/components/ui";
 import { t } from "../../../../../shared/ui/i18n";
 import {
 	copyRuntimeUrl,
@@ -18,19 +22,16 @@ export function runtimePanel(): m.Vnode {
 			class="ov-bottom"
 			headActions={
 				<>
-					<Button
-						label={<Icon name="sync" class="role-icon" />}
-						class="icon-link"
-						title={t("overlay.rotate")}
-						aria-label={t("overlay.rotate")}
+					<IconButton
+						label={t("overlay.rotate")}
+						icon={<Icon name="sync" class="role-icon" />}
 						onclick={() => void rotateToken()}
 					/>
 					{s ? (
-						<Button
-							label={<Icon name="copy" class="role-icon" />}
-							class={state.copied ? "icon-link ov-copied" : "icon-link"}
-							title={state.copied ? t("overlay.copied") : t("overlay.copy")}
-							aria-label={t("overlay.copy")}
+						<IconButton
+							class={state.copied ? "ov-copied" : undefined}
+							label={state.copied ? t("overlay.copied") : t("overlay.copy")}
+							icon={<Icon name="copy" class="role-icon" />}
 							onclick={() => void copyRuntimeUrl(s)}
 						/>
 					) : null}

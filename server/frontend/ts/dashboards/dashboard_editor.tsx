@@ -18,9 +18,12 @@ import type {
 } from "../../../../shared/contracts/wire";
 import { Icon } from "../../../../shared/ui/components/icons";
 import {
+	IconButton,
 	Page,
 	ServerNav,
 	TitleWithBack,
+	Toast,
+	useToast,
 } from "../../../../shared/ui/components/ui";
 import {
 	ensureDashboardsWs,
@@ -53,21 +56,13 @@ const state = {
 	editMode: false,
 	saveState: "idle" as SaveState,
 	saving: false,
-	toast: undefined as string | undefined,
 };
 
 let saveTimer: number | null = null;
-let toastTimer: number | null = null;
+let savedTimer: number | null = null;
+const toast = useToast();
 
 // -------------------------------------------------------------------- helpers
-
-function toastMsg(msg: string, sticky = false): void {
-	state.toast = msg;
-	m.redraw();
-	if (toastTimer !== null) window.clearTimeout(toastTimer);
-	if (!sticky)
-		toastTimer = window.setTimeout(() => (state.toast = undefined), 4_000);
-}
 
 function colsOf(dash: ServerDashboard | undefined): number {
 	return dash?.columns ?? 12;
@@ -82,7 +77,7 @@ async function toggleFullscreen(): Promise<void> {
 			await main.requestFullscreen();
 		}
 	} catch (err) {
-		toastMsg(
+		toast.show(
 			t("dash.fullscreen_error", {
 				error: err instanceof Error ? err.message : String(err),
 			}),
@@ -132,14 +127,14 @@ async function doSave(): Promise<void> {
 			dash.columns = fresh.columns;
 		}
 		state.saveState = "saved";
-		if (toastTimer !== null) window.clearTimeout(toastTimer);
-		toastTimer = window.setTimeout(() => (state.saveState = "idle"), 2_000);
+		if (savedTimer !== null) window.clearTimeout(savedTimer);
+		savedTimer = window.setTimeout(() => (state.saveState = "idle"), 2_000);
 	} catch (err) {
 		if (err instanceof ApiError && err.status === 409) {
 			// another client saved first: rebase onto its copy
 			const conflict = err.body as { current?: ServerDashboard } | null;
 			await resync(conflict?.current);
-			toastMsg(t("dash.conflict"), true);
+			toast.show(t("dash.conflict"), true);
 			return;
 		}
 		state.saveState = "error";
@@ -147,7 +142,7 @@ async function doSave(): Promise<void> {
 		// validation failures come back as `ok: false` with that reason.
 		const detail =
 			err instanceof Error && err.message ? ` (${err.message})` : "";
-		toastMsg(t("dash.save_error") + detail);
+		toast.show(t("dash.save_error") + detail);
 	} finally {
 		state.saving = false;
 		m.redraw();
@@ -331,39 +326,34 @@ const App: m.Component = {
 														: "dash.save_error",
 											)}
 								</span>,
-								<button
-									class="icon-link dash-fullscreen"
-									type="button"
-									title={t(
+								<IconButton
+									class="dash-fullscreen"
+									label={t(
 										document.fullscreenElement
 											? "dash.exit_fullscreen"
 											: "dash.fullscreen",
 									)}
-									aria-label={t(
-										document.fullscreenElement
-											? "dash.exit_fullscreen"
-											: "dash.fullscreen",
-									)}
+									icon={
+										<Icon
+											name={
+												document.fullscreenElement
+													? "exit-fullscreen"
+													: "fullscreen"
+											}
+											class="role-icon"
+										/>
+									}
 									aria-pressed={!!document.fullscreenElement}
 									disabled={!document.fullscreenEnabled}
 									onclick={() => void toggleFullscreen()}
-								>
-									<Icon
-										name={
-											document.fullscreenElement
-												? "exit-fullscreen"
-												: "fullscreen"
-										}
-										class="role-icon"
-									/>
-								</button>,
+								/>,
 							]
 						: null,
 				]}
 			>
 				{dash ? (
 					[
-						state.toast ? <div class="dash-toast">{state.toast}</div> : null,
+						<Toast message={toast.message} />,
 						state.editMode ? (
 							<div class="dash-add-bar">
 								<button
