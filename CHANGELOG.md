@@ -1,3 +1,10 @@
+# [2.5.0](https://github.com/majklovec/irlctrl/compare/v2.4.0...v2.5.0) (2026-11-01)
+
+
+### Features
+
+* enhance chat overlay with customizable text properties and new TTS voices page ([deaf211](https://github.com/majklovec/irlctrl/commit/deaf211f7df792d90be5bc3967625a46deddafc4))
+
 # [2.4.0](https://github.com/majklovec/irlctrl/compare/v2.3.0...v2.4.0) (2026-11-01)
 
 
