@@ -1,4 +1,8 @@
-/* OBS Browser Source runtime page: fully transparent, no chrome. */
+/* OBS Browser Source runtime page: fully transparent, no chrome.
+   NOTE: the html/body/#app rules below are ALSO inlined in
+   pages/overlay_view.html — OBS's CEF does not reliably repaint when this
+   external stylesheet arrives after the first paint, so the inlined copy is
+   authoritative for the first frame. Keep the two in sync. */
 html,
 body,
 #app {

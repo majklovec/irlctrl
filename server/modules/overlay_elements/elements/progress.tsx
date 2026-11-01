@@ -27,26 +27,35 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	const fill = strProp(p, "fill", DEFAULT_PROGRESS_PROPS.fill);
 	const background = strProp(p, "background", DEFAULT_PROGRESS_PROPS.background);
 	const radius = numProp(p, "radius", DEFAULT_PROGRESS_PROPS.radius);
+	// The fill is laid out with absolute positioning, NOT flexbox. OBS's
+	// embedded Chromium (CEF) can collapse a flex container whose height
+	// comes from a percentage chain and never repaint it, which made the bar
+	// invisible in the stream while it rendered fine in a regular browser.
+	// Positioning against the explicit-px wrapper sizes identically everywhere;
+	// the track's overflow clips the fill to the rounded corners.
 	return m(
 		".overlay-progress",
 		{
 			style: {
+				position: "relative",
 				width: "100%",
 				height: "100%",
 				background,
 				borderRadius: `${radius}px`,
 				boxSizing: "border-box",
-				display: "flex",
+				overflow: "hidden",
 			},
 		},
 		[
 			m(".overlay-progress-fill", {
 				key: "fill",
 				style: {
+					position: "absolute",
+					left: 0,
+					top: 0,
 					width: `${value}%`,
 					height: "100%",
 					background: fill,
-					borderRadius: `${radius}px`,
 					transition: "width 120ms linear",
 				},
 			}),
