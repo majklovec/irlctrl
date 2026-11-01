@@ -150,7 +150,7 @@ const overlayListPage: m.Component = {
 		void load();
 	},
 	view: () => (
-		<Page title={t("overlay.title")} nav={<ServerNav active="overlays" />}>
+		<Page nav={<ServerNav active="overlays" />}>
 			{state.loaded ? (
 				overlayList()
 			) : (
