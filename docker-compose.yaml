@@ -126,6 +126,44 @@ services:
             server:
                 condition: service_healthy
 
+    # Encoder and relay in one container: encoder → local srtla_send → bonded
+    # uplinks. One Start/Stop drives both parts.
+    combined:
+        build:
+            context: .
+            dockerfile: Dockerfile.device
+        image: majkl/irlctrl-device:latest
+        container_name: irlctrl-combined
+        restart: unless-stopped
+        cap_add:
+            - NET_ADMIN
+        ports:
+            - "8089:8085"
+        command:
+            - "--host"
+            - "0.0.0.0"
+            - "--port"
+            - "8085"
+            - "--role"
+            - "combined"
+            - "--pipelines"
+            - "/app/pipeline"
+            - "--config"
+            - "/config/config.json"
+            - "--ceracoder-conf"
+            - "/config/ceracoder.conf"
+        volumes:
+            - ./config/combined:/config
+            - ./pipeline:/app/pipeline
+        environment:
+            - CONTROL_SERVER_URL=${CONTROL_SERVER_URL}
+            - CONTROL_SERVER_TOKEN=${CONTROL_SERVER_TOKEN}
+            - ENCODER_BIN=/app/ceracoder
+            - SRTLA_SEND_BIN=/app/srtla_send
+        depends_on:
+            server:
+                condition: service_healthy
+
     # One device client hosts the broadcaster module, receiving SRTLA on UDP
     # 5001 and forwarding it through ffmpeg to the configured RTMP outputs.
     broadcaster:
