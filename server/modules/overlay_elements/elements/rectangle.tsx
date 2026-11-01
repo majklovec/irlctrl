@@ -20,14 +20,12 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	const fill = strProp(p, "fill", DEFAULT_RECTANGLE_PROPS.fill);
 	const stroke = strProp(p, "stroke", DEFAULT_RECTANGLE_PROPS.stroke);
 	const strokeWidth = numProp(p, "strokeWidth", 0);
-	// NOTE: the renderer always drew rectangles with square corners
-	// (borderRadius 0); `radius` is persisted (schema) but not painted, so we
-	// preserve that exact behavior here.
+	const radius = numProp(p, "radius", DEFAULT_RECTANGLE_PROPS.radius);
 	return m(".overlay-shape", {
 		style: {
 			background: fill,
 			border: strokeWidth > 0 ? `${strokeWidth}px solid ${stroke}` : undefined,
-			borderRadius: "0",
+			borderRadius: `${radius}px`,
 		},
 	});
 }
@@ -69,23 +67,41 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 					sp,
 				)}
 			</div>
-			{bindField(
-				e,
-				"props.strokeWidth",
-				t("overlay.stroke_width"),
-				<input
-					type="number"
-					value={numProp(p, "strokeWidth", 0)}
-					oninput={(ev: Event) =>
-						mutate((el) => {
-							el.props.strokeWidth = Number(
-								(ev.target as HTMLInputElement).value,
-							);
-						})
-					}
-				/>,
-				sp,
-			)}
+			<div class="ov-grid2">
+				{bindField(
+					e,
+					"props.strokeWidth",
+					t("overlay.stroke_width"),
+					<input
+						type="number"
+						value={numProp(p, "strokeWidth", 0)}
+						oninput={(ev: Event) =>
+							mutate((el) => {
+								el.props.strokeWidth = Number(
+									(ev.target as HTMLInputElement).value,
+								);
+							})
+						}
+					/>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.radius",
+					t("overlay.radius"),
+					<input
+						type="number"
+						min={0}
+						value={numProp(p, "radius", DEFAULT_RECTANGLE_PROPS.radius)}
+						oninput={(ev: Event) =>
+							mutate((el) => {
+								el.props.radius = Number((ev.target as HTMLInputElement).value);
+							})
+						}
+					/>,
+					sp,
+				)}
+			</div>
 		</>
 	);
 }
@@ -94,6 +110,8 @@ function validate(e: OverlayElement): string[] {
 	const problems: string[] = [];
 	const w = numProp(e.props, "strokeWidth", 0);
 	if (w < 0 || w > 500) problems.push("stroke width out of range (0–500)");
+	const r = numProp(e.props, "radius", DEFAULT_RECTANGLE_PROPS.radius);
+	if (r < 0 || r > 10000) problems.push("radius out of range (0–10000)");
 	return problems;
 }
 

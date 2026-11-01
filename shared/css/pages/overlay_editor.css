@@ -609,6 +609,7 @@ identically here and on the runtime page */
     border-color: var(--bad) !important;
     color: var(--bad) !important;
     background: none !important;
+    box-shadow: none !important;
 }
 .ov-danger-btn:hover {
     background: color-mix(in srgb, var(--bad) 14%, transparent) !important;
