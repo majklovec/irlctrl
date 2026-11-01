@@ -12,6 +12,9 @@
  *      backend code at runtime — `import type` is erased and allowed.
  *   4. the client and server sides only meet through shared/ (and the
  *      generated manifests); listed exceptions are the deliberate doors.
+ *   5. a module reaches the core only through shared/ at runtime — the
+ *      contracts, the UI kit, the helpers; core process files are imported
+ *      as types at most (`ModuleCore`, the settings-page `ModuleDef`).
  *
  * Specifiers are resolved relative to the importing file, so the checks are
  * about *where* a dependency lives, not how the path is spelled.
@@ -42,6 +45,8 @@ interface Layout {
 	generatedDir: string;
 	/** Process sides that must stay isolated from each other. */
 	sides: Side[];
+	/** The only directory a module may import from outside itself at runtime. */
+	moduleApi: string;
 }
 
 const LAYOUT: Layout = {
@@ -56,6 +61,7 @@ const LAYOUT: Layout = {
 	browserRoots: ["client/frontend", "server/frontend", "shared/ui"],
 	backendRoots: ["client/backend", "server/backend"],
 	generatedDir: "generated",
+	moduleApi: "shared",
 	sides: [
 		{ name: "client", dirs: ["client"] },
 		{ name: "server", dirs: ["server"] },
@@ -177,6 +183,20 @@ describe("architectural boundaries", () => {
 		expect(generated.length).toBeGreaterThan(0);
 		for (const file of generated)
 			expect(readFileSync(file, "utf8")).toMatch(/AUTO-GENERATED/);
+	});
+
+	test("a module reaches the core only through shared/ at runtime", () => {
+		const offenders: string[] = [];
+		for (const file of sourcesUnder(LAYOUT.moduleRoots)) {
+			const own = moduleOf(file) as string;
+			for (const imp of importsOf(file)) {
+				if (imp.typeOnly) continue;
+				if (moduleOf(imp.target) === own) continue;
+				if (isUnder(imp.target, LAYOUT.moduleApi)) continue;
+				offenders.push(describeOffender(file, imp));
+			}
+		}
+		expect(offenders).toEqual([]);
 	});
 
 	test("client and server sides only meet through shared/", () => {
