@@ -46,15 +46,6 @@
     border: 1px solid var(--border);
 
     overflow: hidden;
-    background:
-        linear-gradient(45deg, var(--canvas-check) 25%, transparent 25%) 0 0 /
-            24px 24px,
-        linear-gradient(-45deg, var(--canvas-check) 25%, transparent 25%) 0 12px /
-            24px 24px,
-        linear-gradient(45deg, transparent 75%, var(--canvas-check) 75%) 12px -12px /
-            24px 24px,
-        linear-gradient(-45deg, transparent 75%, var(--canvas-check) 75%) 12px 0 /
-            24px 24px var(--canvas-bg);
 }
 .ov-canvas-scroll {
     flex: 1;
@@ -65,6 +56,15 @@
     box-shadow:
         0 0 0 1px var(--border-strong),
         var(--shadow-lg);
+    background:
+        linear-gradient(45deg, var(--canvas-check) 25%, transparent 25%) 0 0 /
+            24px 24px,
+        linear-gradient(-45deg, var(--canvas-check) 25%, transparent 25%) 0 12px /
+            24px 24px,
+        linear-gradient(45deg, transparent 75%, var(--canvas-check) 75%) 12px -12px /
+            24px 24px,
+        linear-gradient(-45deg, transparent 75%, var(--canvas-check) 75%) 12px 0 /
+            24px 24px var(--canvas-bg);
 }
 .ov-selection {
     position: absolute;

@@ -58,7 +58,7 @@ z-order, index 0 renders at the back. Every element shares the same base shape
 | `line`       | `stroke`, `strokeWidth` (1–500), `flip` (box diagonal: false = TL→BR, true = TR→BL)         | two endpoint handles |
 | `group`      | none — a pure container; children are the elements whose `parentId` points at it            | none |
 | `iframe`     | `url` — any absolute URL; `""` renders a dashed placeholder box                             | box |
-| `chat`       | `url` — set by the module picker only, points at a chat widget's live page (see [URL binding](#url-binding)) | box |
+| `chat`       | `url` — set by the module picker only, points at a chat widget's live page (see [URL binding](#url-binding)); `fontSize` (1–2000, 48), `fontFamily`, `color`, `fontWeight` (100–900), `lineHeight` (0.1–10) style the feed text | box |
 
 Every element attribute — props, `transform` fields and `visible` — can be
 bound to a variable (see [Binding](#binding) below).

@@ -16,7 +16,7 @@ import type {
 	OverlayElement,
 	OverlayElementDef,
 } from "@ui/overlay/element";
-import { drawIframe, strProp } from "@ui/overlay/element";
+import { drawIframe, numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
@@ -98,10 +98,38 @@ function overlayPreview(url: string): Vnode | undefined {
 	return undefined;
 }
 
+/** The element's feed text style. The live preview's `.chat-feed` sets its own
+ * font rules, so these ride down as CSS custom properties (see
+ * `styles.css`) rather than relying on plain inheritance. */
+function chatTextProps(p: Record<string, unknown>) {
+	return {
+		fontSize: numProp(p, "fontSize", 48),
+		fontFamily: strProp(p, "fontFamily", "Inter, system-ui, sans-serif"),
+		color: strProp(p, "color", "#ffffff"),
+		fontWeight: numProp(p, "fontWeight", 600),
+		lineHeight: numProp(p, "lineHeight", 1.2),
+	};
+}
+
 function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 	const url = strProp(element.props, "url", "");
 	const preview = overlayPreview(url);
-	return preview ?? (drawIframe(element) as Vnode);
+	const t = chatTextProps(element.props);
+	return m(
+		".chat-element",
+		{
+			style: {
+				width: "100%",
+				height: "100%",
+				"--ov-chat-font-size": `${t.fontSize}px`,
+				"--ov-chat-font-family": t.fontFamily,
+				"--ov-chat-color": t.color,
+				"--ov-chat-font-weight": `${t.fontWeight}`,
+				"--ov-chat-line-height": `${t.lineHeight}`,
+			},
+		},
+		[preview ?? (drawIframe(element) as Vnode)],
+	);
 }
 
 /** The module picker: a closure component so it can trigger the fetch on
@@ -110,33 +138,130 @@ const ChatPicker: m.ClosureComponent<ElementProps> = () => {
 	void loadWidgets();
 	return {
 		view: ({ attrs: { element: e, mutate, variables } }) => {
-			const current = String(e.props.url ?? "");
+			const p = e.props;
+			const sp = { mutate, variables };
+			const current = String(p.url ?? "");
 			const matched = widgets.find((w) => chatUrl(w) === current);
-			return bindField(
-				e,
-				"props.url",
-				t("overlay.chat_module"),
-				<select
-					value={matched ? matched.widgetId : ""}
-					onchange={(ev: Event) => {
-						const id = (ev.target as HTMLSelectElement).value;
-						const w = widgets.find((c) => c.widgetId === id);
-						if (w) mutate((el) => (el.props.url = chatUrl(w)));
-					}}
-				>
-					{[
-						// one flat keyed list: mithril rejects a keyed vnode next to a fragment
-						<option key="" value="">
-							{t("overlay.chat_no_module")}
-						</option>,
-						...widgets.map((w) => (
-							<option key={w.widgetId} value={w.widgetId}>
-								{w.name}
-							</option>
-						)),
-					]}
-				</select>,
-				{ mutate, variables },
+			return (
+				<>
+					{bindField(
+						e,
+						"props.url",
+						t("overlay.chat_module"),
+						<select
+							value={matched ? matched.widgetId : ""}
+							onchange={(ev: Event) => {
+								const id = (ev.target as HTMLSelectElement).value;
+								const w = widgets.find((c) => c.widgetId === id);
+								if (w) mutate((el) => (el.props.url = chatUrl(w)));
+							}}
+						>
+							{[
+								// one flat keyed list: mithril rejects a keyed vnode next to a fragment
+								<option key="" value="">
+									{t("overlay.chat_no_module")}
+								</option>,
+								...widgets.map((w) => (
+									<option key={w.widgetId} value={w.widgetId}>
+										{w.name}
+									</option>
+								)),
+							]}
+						</select>,
+						sp,
+					)}
+					<div class="ov-grid2">
+						{bindField(
+							e,
+							"props.fontSize",
+							t("overlay.font_size"),
+							<input
+								type="number"
+								value={Number(p.fontSize ?? 48)}
+								oninput={(ev: Event) =>
+									mutate((el) => {
+										el.props.fontSize = Number(
+											(ev.target as HTMLInputElement).value,
+										);
+									})
+								}
+							/>,
+							sp,
+						)}
+						{bindField(
+							e,
+							"props.color",
+							t("overlay.color"),
+							<input
+								type="color"
+								value={String(p.color ?? "#ffffff")}
+								oninput={(ev: Event) =>
+									mutate((el) => {
+										el.props.color = (ev.target as HTMLInputElement)
+											.value;
+									})
+								}
+							/>,
+							sp,
+						)}
+					</div>
+					<div class="ov-grid2">
+						{bindField(
+							e,
+							"props.fontWeight",
+							t("overlay.font_weight"),
+							<select
+								value={String(p.fontWeight ?? 600)}
+								onchange={(ev: Event) =>
+									mutate((el) => {
+										el.props.fontWeight = Number(
+											(ev.target as HTMLSelectElement).value,
+										);
+									})
+								}
+							>
+								<option value="400">400</option>
+								<option value="600">600</option>
+								<option value="700">700</option>
+								<option value="900">900</option>
+							</select>,
+							sp,
+						)}
+						{bindField(
+							e,
+							"props.lineHeight",
+							t("overlay.line_height"),
+							<input
+								type="number"
+								value={Number(p.lineHeight ?? 1.2)}
+								oninput={(ev: Event) =>
+									mutate((el) => {
+										el.props.lineHeight = Number(
+											(ev.target as HTMLInputElement).value,
+										);
+									})
+								}
+							/>,
+							sp,
+						)}
+					</div>
+					{bindField(
+						e,
+						"props.fontFamily",
+						t("overlay.font_family"),
+						<input
+							type="text"
+							value={String(p.fontFamily ?? "Inter, system-ui, sans-serif")}
+							oninput={(ev: Event) =>
+								mutate((el) => {
+									el.props.fontFamily = (ev.target as HTMLInputElement)
+										.value;
+								})
+							}
+						/>,
+						sp,
+					)}
+				</>
 			);
 		},
 	};
@@ -149,6 +274,9 @@ function editForm(props: ElementProps): Vnode {
 function validate(e: OverlayElement): string[] {
 	const problems: string[] = [];
 	if (typeof e.props.url !== "string") problems.push("url is not a string");
+	const size = numProp(e.props, "fontSize", 48);
+	if (!(size >= 1 && size <= 2000))
+		problems.push("font size out of range (1–2000)");
 	return problems;
 }
 
@@ -158,7 +286,14 @@ export const chatElement: OverlayElementDef = {
 	icon: () => <Icon name="chat" class="role-icon" />,
 	order: 70,
 	defaultProps: { ...DEFAULT_CHAT_PROPS },
-	propKeys: ["url"],
+	propKeys: [
+		"url",
+		"fontSize",
+		"fontFamily",
+		"color",
+		"fontWeight",
+		"lineHeight",
+	],
 	defaultSize: { width: 360, height: 480 },
 	draw,
 	editForm,

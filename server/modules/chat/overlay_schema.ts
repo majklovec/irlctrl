@@ -12,9 +12,26 @@ export interface ChatProps {
      * element). `""` renders a placeholder box.
      */
     url: string;
+    /** Feed text size in px. */
+    fontSize: number;
+    /** Feed text font stack. */
+    fontFamily: string;
+    /** Feed text colour (`#rrggbb`). */
+    color: string;
+    /** Feed text weight. */
+    fontWeight: number;
+    /** Feed text line-height (unitless). */
+    lineHeight: number;
 }
 
-export const DEFAULT_CHAT_PROPS: Required<ChatProps> = { url: "" };
+export const DEFAULT_CHAT_PROPS: Required<ChatProps> = {
+    url: "",
+    fontSize: 48,
+    fontFamily: "Inter, system-ui, sans-serif",
+    color: "#ffffff",
+    fontWeight: 600,
+    lineHeight: 1.2,
+};
 
 export const chatSchema: OverlayElementSchema = {
     type: "chat",
@@ -22,7 +39,15 @@ export const chatSchema: OverlayElementSchema = {
     // The picker always writes the chat overlay URL (`?token=…`), which
     // already contains percent-safe characters as-is.
     normalizeProps(_props, read) {
-        return { url: read.str("url", "") };
+        const d = DEFAULT_CHAT_PROPS;
+        return {
+            url: read.str("url", ""),
+            fontSize: read.num("fontSize", d.fontSize, 1, 2000),
+            fontFamily: read.str("fontFamily", d.fontFamily, 300),
+            color: read.hex("color", d.color),
+            fontWeight: read.num("fontWeight", d.fontWeight, 100, 900),
+            lineHeight: read.num("lineHeight", d.lineHeight, 0.1, 10),
+        };
     },
 };
 

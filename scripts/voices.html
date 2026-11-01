@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="cs">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dostupné TTS Hlasy</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --border: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+
+        .test-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary);
+        }
+
+        .btn-test {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-test:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .voice-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .voice-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: #fff;
+        }
+
+        .voice-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .voice-name {
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .voice-lang {
+            font-size: 12px;
+            color: var(--text-muted);
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            width: fit-content;
+        }
+
+        .btn-listen {
+            background: transparent;
+            border: 1px solid var(--border);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-listen:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: #eff6ff;
+        }
+
+        /* Styl pro posuvník */
+        .voice-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .voice-list::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>Dostupné TTS hlasy</h1>
+        <p class="subtitle" id="count-label">Načítání hlasů z vašeho systému...</p>
+
+        <div class="test-box">
+            <input type="text" id="text-to-speak" value="Ahoj, toto je ukázka textu pro testování hlasu.">
+        </div>
+
+        <ul class="voice-list" id="voices-container">
+            <!-- Hlasy budou vloženy dynamicky pomocí JavaScriptu -->
+        </ul>
+    </div>
+
+    <script>
+        const synth = window.speechSynthesis;
+        const voicesContainer = document.getElementById('voices-container');
+        const countLabel = document.getElementById('count-label');
+        const textInput = document.getElementById('text-to-speak');
+
+        let voices = [];
+
+        function populateVoiceList() {
+            // Získání dostupných hlasů z API prohlížeče
+            voices = synth.getVoices();
+
+            // Vyčištění kontejneru
+            voicesContainer.innerHTML = '';
+
+            if (voices.length === 0) {
+                countLabel.textContent = "Nebyly nalezeny žádné systémové hlasy.";
+                return;
+            }
+
+            countLabel.textContent = `Nalezeno ${voices.length} dostupných hlasů ve vašem prohlížeči:`;
+
+            // Vykreslení každého hlasu do seznamu
+            voices.forEach((voice, index) => {
+                const li = document.createElement('li');
+                li.className = 'voice-item';
+
+                li.innerHTML = `
+                <div class="voice-info">
+                    <span class="voice-name">${voice.name} ${voice.default ? '<b>(Výchozí)</b>' : ''}</span>
+                    <span class="voice-lang">${voice.lang} — ${voice.localService ? 'Lokální' : 'Vzdálený'}</span>
+                </div>
+                <button class="btn-listen" data-index="${index}">Přehrát</button>
+            `;
+
+                voicesContainer.appendChild(li);
+            });
+
+            // Přidání event listenerů na tlačítka "Přehrát"
+            document.querySelectorAll('.btn-listen').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const voiceIndex = e.target.getAttribute('data-index');
+                    speak(voiceIndex);
+                });
+            });
+        }
+
+        function speak(index) {
+            // Pokud již mluví, zastavit
+            if (synth.speaking) {
+                synth.cancel();
+            }
+
+            if (textInput.value !== '') {
+                const utterThis = new SpeechSynthesisUtterance(textInput.value);
+
+                // Nastavení vybraného hlasu
+                utterThis.voice = voices[index];
+
+                // Spuštění řeči
+                synth.speak(utterThis);
+            }
+        }
+
+        // Chrome a další prohlížeče načítají hlasy asynchronně přes událost
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = populateVoiceList;
+        }
+
+        // Inicializace pro prohlížeče, které načtou hlasy hned (např. Safari)
+        populateVoiceList();
+    </script>
+
+</body>
+
+</html>
