@@ -24,15 +24,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy only what is needed to run the server. The server runs unbundled
-# (`bun backend/server/server.ts`): modules are discovered by a runtime scan
-# of modules/ and dynamically imported, and
-# the web UI is bundled at startup via scripts/gen-modules.ts + Bun.build.
+# (`bun server/backend/server.ts`): modules are discovered by a runtime scan
+# of client/modules + server/modules and dynamically imported (the server
+# validates dashboards against the device modules too), and the web UI is
+# bundled at startup via scripts/gen-modules.ts + Bun.build.
 COPY --from=builder /app/package.json /app/bun.lock ./
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/backend/client ./backend/client
-COPY --from=builder /app/backend/server ./backend/server
-COPY --from=builder /app/modules ./modules
-COPY --from=builder /app/frontend ./frontend
+COPY --from=builder /app/client ./client
+COPY --from=builder /app/server ./server
 COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/i18n ./i18n
 COPY --from=builder /app/scripts ./scripts
@@ -48,5 +47,5 @@ RUN mkdir -p /app/generated && chown 1000:1000 /app/generated
 EXPOSE 8090
 
 # Default entrypoint — override with `command` in docker-compose
-ENTRYPOINT ["bun", "backend/server/server.ts"]
+ENTRYPOINT ["bun", "server/backend/server.ts"]
 CMD ["--host", "0.0.0.0", "--port", "8090"]

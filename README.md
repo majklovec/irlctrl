@@ -49,16 +49,16 @@ combined ─────────SRTLA (bonded)─────────▶
 
 ```sh
 # Relay: local web UI + API on :8085, watches interfaces, reloads srtla_send
-sudo bun backend/client/client.ts --host 0.0.0.0
+sudo bun client/backend/client.ts --host 0.0.0.0
 
 # Encoder: pick a pipeline and the relay's SRT port in the UI
-bun backend/client/client.ts --role encoder --pipelines /usr/share/belacoder/pipelines
+bun client/backend/client.ts --role encoder --pipelines /usr/share/belacoder/pipelines
 
 # Combined
-sudo bun backend/client/client.ts --role combined --pipelines /usr/share/belacoder/pipelines
+sudo bun client/backend/client.ts --role combined --pipelines /usr/share/belacoder/pipelines
 
 # Relay: also start srtla_send immediately on startup
-sudo bun backend/client/client.ts --start-srtla 6000 rec.example.com 5000
+sudo bun client/backend/client.ts --start-srtla 6000 rec.example.com 5000
 ```
 
 Open `http://<device>:8085/`. The UI shows only what applies to the role.
@@ -69,7 +69,7 @@ For a local checkout with the bundled binaries, override their paths explicitly:
 sudo CONTROL_SERVER_TOKEN=token \
   ENCODER_BIN=./belacoder \
   SRTLA_SEND_BIN=./srtla_send \
-  bun backend/client/client.ts --port 8085 \
+  bun client/backend/client.ts --port 8085 \
   --remote ws://127.0.0.1:8090/device \
   --role combined --pipelines ./pipeline
 ```
@@ -121,7 +121,7 @@ Tick **Autostart** in the UI (or call `autostart.set`) to resume the last stream
 
 ## Control server
 
-`backend/server/server.ts` lists all devices and serves the same web UI for each one at `/d/<id>/`, relaying commands to the device over its outbound connection — so devices behind NAT or on mobile networks can be managed. It also hosts per-user **dashboards**: gridstack grids composed of widgets from any device owned by that user, with dedicated add / edit / view pages. Widgets come in three kinds — **device widgets** (bound to one device: live status cards for `relay`, `encoder`, `combined`, `obs`, or `broadcaster`, depending on the device's role and enabled modules), **channel widgets** (device-independent modules, one hub per kind serves all widgets of that kind) and **fleet widgets** (offered once, driving any of your devices: the `buttons` virtual StreamDeck). Dashboards are persisted to the SQLite database (`dashboards` table of `--db`), and a shared live feed (`/dashboards/ws`) streams widget data to every open view.
+`server/backend/server.ts` lists all devices and serves the same web UI for each one at `/d/<id>/`, relaying commands to the device over its outbound connection — so devices behind NAT or on mobile networks can be managed. It also hosts per-user **dashboards**: gridstack grids composed of widgets from any device owned by that user, with dedicated add / edit / view pages. Widgets come in three kinds — **device widgets** (bound to one device: live status cards for `relay`, `encoder`, `combined`, `obs`, or `broadcaster`, depending on the device's role and enabled modules), **channel widgets** (device-independent modules, one hub per kind serves all widgets of that kind) and **fleet widgets** (offered once, driving any of your devices: the `buttons` virtual StreamDeck). Dashboards are persisted to the SQLite database (`dashboards` table of `--db`), and a shared live feed (`/dashboards/ws`) streams widget data to every open view.
 
 ### Authentication
 
@@ -135,10 +135,10 @@ The server replaces HTTP Basic auth with per-user profiles stored in a local **S
 
 ```sh
 # control server — the first account is created at /register
-bun backend/server/server.ts --port 8090
+bun server/backend/server.ts --port 8090
 
 # on each device — that device's owner token
-CONTROL_SERVER_TOKEN=tok-alice-1 bun backend/client/client.ts --role encoder --remote wss://ctl.example.com/device
+CONTROL_SERVER_TOKEN=tok-alice-1 bun client/backend/client.ts --role encoder --remote wss://ctl.example.com/device
 
 # in a browser
 open http://ctl.example.com/  # redirects to /login; enter the username + password
@@ -155,7 +155,7 @@ open http://ctl.example.com/  # redirects to /login; enter the username + passwo
 
 ### Install as an app (PWA)
 
-The control-server UI is an installable web app: every page links a web app manifest (`frontend/pwa/manifest.webmanifest`, bundled with the pages) and registers a service worker served at the origin root (`/sw.js`, scope `/`, from `frontend/pwa/` via [`shared/pwa.ts`](shared/pwa.ts) — embedded in the compiled binary). On a phone open the server over **HTTPS**, sign in, then _Add to Home Screen_ (iOS Safari: Share → Add to Home Screen; Android Chrome: menu → Install app / Add to Home screen). Desktop Chrome/Edge show an install icon in the address bar.
+The control-server UI is an installable web app: every page links a web app manifest (`shared/assets/pwa/manifest.webmanifest`, bundled with the pages) and registers a service worker served at the origin root (`/sw.js`, scope `/`, from `shared/assets/pwa/` via [`shared/pwa.ts`](shared/pwa.ts) — embedded in the compiled binary). On a phone open the server over **HTTPS**, sign in, then _Add to Home Screen_ (iOS Safari: Share → Add to Home Screen; Android Chrome: menu → Install app / Add to Home screen). Desktop Chrome/Edge show an install icon in the address bar.
 
 The service worker caches only the app shell: the hashed `/assets/*` bundles and the icons cache-first, page navigations network-first with the last good copy as an offline fallback. It never touches `/api/*`, `/i18n/*`, the device connection (`/device`) or any websocket (`…/ws`), so live data, RPC and dashboards behave exactly as before. Service workers need a secure context — plain `http://` (other than `localhost`) just skips the registration.
 
@@ -189,7 +189,7 @@ The control server is the same with `server` in place of `client` (no `root` nee
 -   `build.sh [config]` — clones the Armbian build framework, links the bundled `userpatches/`, and compiles the image (default config `orangepi5-plus`)
 -   `build-all.sh` — builds both variants: the SD-card image and the **eMMC auto-install** image (`orangepi5-plus-emmc`), which copies itself to eMMC on first boot via a one-shot `irlctrl-emmc-install.service`
 
-The image ships with the whole streaming chain — GStreamer (incl. `gstreamer1.0-rockchip1`), CERALIVE's SRT, [ceracoder](https://github.com/CERALIVE/ceracoder) (built from source), [srtla_send](https://github.com/irlserver/srtla_send) (prebuilt arm64 .deb), and udev rules for belaUI audio — so `backend/client/client.ts --role combined` runs out of the box.
+The image ships with the whole streaming chain — GStreamer (incl. `gstreamer1.0-rockchip1`), CERALIVE's SRT, [ceracoder](https://github.com/CERALIVE/ceracoder) (built from source), [srtla_send](https://github.com/irlserver/srtla_send) (prebuilt arm64 .deb), and udev rules for belaUI audio — so `client/backend/client.ts --role combined` runs out of the box.
 
 ### Docker
 
@@ -199,13 +199,13 @@ The image ships with the whole streaming chain — GStreamer (incl. `gstreamer1.
 docker compose up -d --build
 ```
 
--   **server** — `backend/server/server.ts`, the control server (`Dockerfile`, image `majkl/irlctrl-control`), UI on `:8090`.
--   **obs-client** — the standard `backend/client/client.ts --role obs` process with the `obs-controller` module enabled; connects to host OBS at `ws://host.docker.internal:4455`.
--   **relay** — `backend/client/client.ts --role relay`, bonds SRT out via `srtla_send` (`Dockerfile.device`, image `majkl/irlctrl-device`).
--   **encoder** — `backend/client/client.ts --role encoder`, runs `ceracoder`/GStreamer and sends SRT to the relay; same device image, different role + `ENCODER_BIN`.
--   **broadcaster** — `backend/client/client.ts --role broadcaster` runs the `modules/broadcaster` receiver and publisher with ffmpeg; configure destinations in the device settings and expose SRTLA UDP port `5001`.
+-   **server** — `server/backend/server.ts`, the control server (`Dockerfile`, image `majkl/irlctrl-control`), UI on `:8090`.
+-   **obs-client** — the standard `client/backend/client.ts --role obs` process with the `obs-controller` module enabled; connects to host OBS at `ws://host.docker.internal:4455`.
+-   **relay** — `client/backend/client.ts --role relay`, bonds SRT out via `srtla_send` (`Dockerfile.device`, image `majkl/irlctrl-device`).
+-   **encoder** — `client/backend/client.ts --role encoder`, runs `ceracoder`/GStreamer and sends SRT to the relay; same device image, different role + `ENCODER_BIN`.
+-   **broadcaster** — `client/backend/client.ts --role broadcaster` runs the `client/modules/broadcaster` receiver and publisher with ffmpeg; configure destinations in the device settings and expose SRTLA UDP port `5001`.
 
-The shared device image bundles `backend/client/client.ts`, the native streaming binaries, ffmpeg, GStreamer, and the role modules. The **relay** grants the `NET_ADMIN` capability (`cap_add`) because at startup it builds per-uplink policy routing (`ip rule add` + route tables) and watches interfaces with `ip monitor`; without it the relay logs `ip rule add … Operation not permitted` and exits. The encoder and OBS role do not need the capability. On the default bridge network the relay's routing changes act on the container's own network namespace, not the host; for real bonded uplinks on the host's raw interfaces, run the relay with `network_mode: host`.
+The shared device image bundles `client/backend/client.ts`, the native streaming binaries, ffmpeg, GStreamer, and the role modules. The **relay** grants the `NET_ADMIN` capability (`cap_add`) because at startup it builds per-uplink policy routing (`ip rule add` + route tables) and watches interfaces with `ip monitor`; without it the relay logs `ip rule add … Operation not permitted` and exits. The encoder and OBS role do not need the capability. On the default bridge network the relay's routing changes act on the container's own network namespace, not the host; for real bonded uplinks on the host's raw interfaces, run the relay with `network_mode: host`.
 
 ## API
 
@@ -214,19 +214,21 @@ The local `/ws` endpoint and the control server speak the same JSON protocol:
 -   response — `{ "type": "response", "id", "ok", … }`
 -   push — `{ "type": "event", "event": "status" | "log" | "srtla.stats", "data": … }`
 
-The method list lives at the top of [`backend/client/methods.ts`](backend/client/methods.ts). Methods that do not apply to the device's role are rejected with code 409.
+The method list lives at the top of [`client/backend/methods.ts`](client/backend/methods.ts). Methods that do not apply to the device's role are rejected with code 409.
 
 The cog in the device header opens a settings page. It uses `settings.get` / `settings.update` for the persistent device UUID, hostname, role, control-server URL, remote token, header color, and UI language. The UUID is the device's fixed identity on the control server — auto-assigned once, saved in the config file, and never changed (it survives hostname changes). Saving settings re-dials the control server, so the device re-registers with its new URL, token, hostname, and role without a service restart. Stream settings (pipeline, bitrate, audio, targets, scheduler) are saved automatically whenever they change.
 
 ## Modules
 
-Every capability is a **self-contained module** under [`modules/`](modules/README.md) — a backend registration, a frontend card, local types, and styles. The core (`backend/` + `frontend/` + `shared/`) contains no module-specific code: it discovers, routes, and renders everything through the registration contract, the registries and the capability bus. The boundary is enforced by [`test/registries.test.ts`](test/registries.test.ts).
+Every capability is a **self-contained module** under [`client/modules/`](client/modules/README.md) (device modules) or `server/modules/` (dashboard widget modules) — a backend registration, a frontend card, local types, and styles. The core (`client/`, `server/` and `shared/` outside the module roots) contains no module-specific code: it discovers, routes, and renders everything through the registration contract, the registries and the capability bus. The boundary is enforced by [`test/registries.test.ts`](test/registries.test.ts).
 
-The browser application lives in `frontend/`; service entrypoints are
-separated under `backend/client/` and `backend/server/`.
-Module directories stay together under `modules/<id>/` so each module's backend
-and frontend implementation remain co-located. Cross-layer wire types live in
-`shared/`.
+The repository is split by process: `client/` is the device (its backend, its
+web UI under `client/frontend/` and the device modules under `client/modules/`),
+`server/` is the control server (backend, web UI, widget modules), and `shared/`
+holds the dependency-free helpers, the contracts and the UI kit (`shared/ui/`,
+`shared/css/`, `shared/assets/`) both sides and every module use. Module
+directories stay together (`<root>/<id>/`) so each module's backend and
+frontend implementation remain co-located.
 
 **Device modules** — run on the device, each shown as a card in the web UI:
 
@@ -235,7 +237,7 @@ and frontend implementation remain co-located. Cross-layer wire types live in
 | `encoder`        | Runs and supervises the encoder process for encoder/combined devices: pipeline discovery (ids are paths under `--pipelines`, e.g. `rk3588/h265_hdmi_1440p25`), start/stop with automatic restart, and live bitrate changes. Supports **belacoder** (bitrate via a min/max file, re-read on SIGHUP) and **ceracoder** (INI config with balancer tuning).                                                 |
 | `srtla`          | Owns relay/combined SRTLA: `srtla_send` lifecycle, scheduler options, source routing, uplink selection and ModemManager (`mmcli`) integration, including modem state and enable/disable/reset/connect/disconnect actions.                                                                                                                                                                                     |
 | `ssh`            | Manages the box's sshd (start/stop) and the SSH login account password.                                                                                                                                                                                                                                                                                                                                 |
-| `obs-controller` | Owns the [obs-websocket](https://github.com/obsproject/obs-websocket) (v5) connection to a paired OBS Studio instance and forwards its events into the device event stream. Also runs the **low-bitrate switcher**: a pure state machine ([`switcher-engine.ts`](modules/obs-controller/switcher-engine.ts)) that watches SRT/OBS metrics and switches OBS between `normal` / `low` / `offline` scenes. |
+| `obs-controller` | Owns the [obs-websocket](https://github.com/obsproject/obs-websocket) (v5) connection to a paired OBS Studio instance and forwards its events into the device event stream. Also runs the **low-bitrate switcher**: a pure state machine ([`switcher-engine.ts`](client/modules/obs-controller/switcher-engine.ts)) that watches SRT/OBS metrics and switches OBS between `normal` / `low` / `offline` scenes. |
 | `broadcaster`    | Owns the `srtla_rec` + ffmpeg stream lifecycle, output destinations, keepalive telemetry, and non-destructive profile seeding for the `broadcaster` role.                                                                                                                                                                                                                                      |
 
 **Channel widgets** — dashboard-only, run on the control server (device-independent); one hub per module serves all widgets of its kind:
@@ -243,7 +245,7 @@ and frontend implementation remain co-located. Cross-layer wire types live in
 | Widget  | Source                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `stats` | Configure YouTube (channel ID or handle), Twitch, and Kick channels independently. Polls each configured source every 30 s and charts each viewer count plus their combined total (1 h window).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `chat`  | One widget, one merged feed: config has a channel per platform (`youtube`, `twitch`, `tiktok`, `kick`) and every filled channel is joined, its messages merged into the single view. Per-platform transports live in `modules/chat/providers/`: Kick joins the public chat Pusher room (no auth), Twitch one IRC-over-websocket connection per channel (anonymous `justinfan` nick, IRCv3 tags), YouTube polls the live-chat endpoint per creator handle (~1 s cadence) via [`youtube-chat-next`](https://www.npmjs.com/package/youtube-chat-next), TikTok one [`tiktok-live-connector`](https://www.npmjs.com/package/tiktok-live-connector) websocket (reconnect loop owned by the module). |
+| `chat`  | One widget, one merged feed: config has a channel per platform (`youtube`, `twitch`, `tiktok`, `kick`) and every filled channel is joined, its messages merged into the single view. Per-platform transports live in `server/modules/chat/providers/`: Kick joins the public chat Pusher room (no auth), Twitch one IRC-over-websocket connection per channel (anonymous `justinfan` nick, IRCv3 tags), YouTube polls the live-chat endpoint per creator handle (~1 s cadence) via [`youtube-chat-next`](https://www.npmjs.com/package/youtube-chat-next), TikTok one [`tiktok-live-connector`](https://www.npmjs.com/package/tiktok-live-connector) websocket (reconnect loop owned by the module). |
 
 Chat widgets keep rolling message history so reconnects don't re-send, and a `seen` set that dedupes message ids across reconnects.
 
@@ -263,24 +265,24 @@ chat, not to the dashboard or devices. Clearing the token disables the overlay;
 changing it revokes old URLs on their next refresh. Leave the token empty to keep
 existing session-only behavior.
 
-**Buttons widget** (`modules/buttons/`) — a **virtual StreamDeck**, offered once per dashboard (under _Independent_): a grid of buttons where each button fires one RPC method of one module on one of your devices (`encoder.stop`, a bitrate preset, `srtla.reload`, an OBS `StartStream`, …) — one widget can mix buttons from any number of devices. Modules declare the actions they offer with `dashboardActions` on their backend registration — a fixed list, or a `status => …` factory for actions that depend on live device state (e.g. one mute button per OBS audio source); the control server resolves them against the device's freshest status and merges the enabled modules' actions into each device's cached status (`status.actions`), and the widget's settings (pencil icon in edit mode) compose the layout from the catalogues of all your devices — with per-button label / icon overrides and a JSON params override (e.g. `pipeline`, `host`, `port` for `encoder.start`). Actions marked `confirm` ask before firing; buttons whose device went away or whose module was disabled are shown as unavailable. See [modules/README.md → Dashboard actions](modules/README.md#dashboard-actions) for declaring actions in a module.
+**Buttons widget** (`server/modules/deck/`) — a **virtual StreamDeck**, offered once per dashboard (under _Independent_): a grid of buttons where each button fires one RPC method of one module on one of your devices (`encoder.stop`, a bitrate preset, `srtla.reload`, an OBS `StartStream`, …) — one widget can mix buttons from any number of devices. Modules declare the actions they offer with `dashboardActions` on their backend registration — a fixed list, or a `status => …` factory for actions that depend on live device state (e.g. one mute button per OBS audio source); the control server resolves them against the device's freshest status and merges the enabled modules' actions into each device's cached status (`status.actions`), and the widget's settings (pencil icon in edit mode) compose the layout from the catalogues of all your devices — with per-button label / icon overrides and a JSON params override (e.g. `pipeline`, `host`, `port` for `encoder.start`). Actions marked `confirm` ask before firing; buttons whose device went away or whose module was disabled are shown as unavailable. See [client/modules/README.md → Dashboard actions](client/modules/README.md#dashboard-actions) for declaring actions in a module.
 
 ### How the module system works
 
-Each `modules/<id>/` is a plugin the core discovers by directory; it ships:
+Each `client/modules/<id>/` or `server/modules/<id>/` is a plugin the core discovers by directory; it ships:
 -   `backend.ts` — the backend registration (runs in Bun on the host; no DOM). It parses its own CLI arguments, owns its config sections, validates and answers its own RPC methods, and contributes status / settings / setup / log wording / pages / widgets through the hooks of the contract in [`shared/module-contract.ts`](shared/module-contract.ts).
--   `frontend.tsx` — the frontend registration (mithril components; no backend imports): the device card, dashboard widgets, setup steps, device-list columns and event handlers (contract in [`frontend/ts/module-contracts.ts`](frontend/ts/module-contracts.ts)).
+-   `frontend.tsx` — the frontend registration (mithril components; no backend imports): the device card, dashboard widgets, setup steps, device-list columns and event handlers (contract in [`shared/ui/module-contracts.ts`](shared/ui/module-contracts.ts)).
 -   `types.ts` (its own wire types), `styles.css`, `i18n/<lang>.json` (its own translations), optional `settings.tsx` (settings-page card), `log.ts` (log wording shared by both sides), `pages/*.html` (module-owned pages), and any private helpers.
 
-**Discovery** — the backend is a runtime `readdirSync` scan of `modules/*/` in [`shared/registry.ts`](shared/registry.ts) (compiled binaries use the generated manifest): add a directory and it appears. The browser bundle cannot glob at runtime, so `scripts/gen-modules.ts` writes the gitignored `generated/modules.*.ts` manifests from the same scan (wired into `predev`).
+**Discovery** — the backend is a runtime `readdirSync` scan of both module roots in [`shared/registry.ts`](shared/registry.ts) (compiled binaries use the generated manifest): add a directory and it appears. The browser bundle cannot glob at runtime, so `scripts/gen-modules.ts` writes the gitignored `generated/modules.*.ts` manifests from the same scan (wired into `predev`).
 
-**Core ↔ module** — the core knows only the contract. The device lifecycle ([`backend/client/modules.ts`](backend/client/modules.ts)) starts the modules that serve the current role (`roles`), routes every non-core RPC method to its owner's `dispatch` (rejecting it with 409 outside the module's roles, or while a `requireEnabled` module is disabled), deep-merges the modules' `status()` fragments into the `status` payload, seeds and backfills their settings slices from `configDefaults`, runs their `setup()` validators in the first-run wizard and their `resume()` on autostart. Modules receive one process-services bag ([`backend/client/module-core.ts`](backend/client/module-core.ts): state, saveState, logEvent, run, Supervisor, …) and talk to each other only over the **capability bus** by name (`stream.srtla`) — never by import. Module pushes go through `ctx.emit(event, data, { throttle, retain, summary })`; the control server stores retained frames and merges `summary` fields into its device list without knowing the event.
+**Core ↔ module** — the core knows only the contract. The device lifecycle ([`client/backend/modules.ts`](client/backend/modules.ts)) starts the modules that serve the current role (`roles`), routes every non-core RPC method to its owner's `dispatch` (rejecting it with 409 outside the module's roles, or while a `requireEnabled` module is disabled), deep-merges the modules' `status()` fragments into the `status` payload, seeds and backfills their settings slices from `configDefaults`, runs their `setup()` validators in the first-run wizard and their `resume()` on autostart. Modules receive one process-services bag ([`client/backend/module-core.ts`](client/backend/module-core.ts): state, saveState, logEvent, run, Supervisor, …) and talk to each other only over the **capability bus** by name (`stream.srtla`) — never by import. Module pushes go through `ctx.emit(event, data, { throttle, retain, summary })`; the control server stores retained frames and merges `summary` fields into its device list without knowing the event.
 
 **Persistence** — `config.json` holds the core settings plus each module's own sections (`state.data.<section>`, e.g. `encoder` and `srtla`) in the current format.
 
 **Ordering** — `resolveOrder` topologically sorts modules by their `dependencies` (cycle-safe, id-sorted when no edges); start/stop/status/resume all iterate that order, never a hand-maintained list.
 
-**Adding a module** — `mkdir modules/<id>` with `backend.ts` + `frontend.tsx` (+ `types.ts`, `styles.css`), declare `roles`, `methods`, hooks and capabilities as needed. No core edits — the scan and `predev` pick it up. Method and event names are frozen: renaming one is a breaking API change.
+**Adding a module** — `mkdir client/modules/<id>` (or `server/modules/<id>` for a dashboard widget) with `backend.ts` + `frontend.tsx` (+ `types.ts`, `styles.css`), declare `roles`, `methods`, hooks and capabilities as needed. No core edits — the scan and `predev` pick it up. Method and event names are frozen: renaming one is a breaking API change.
 
 ## Development
 
@@ -298,21 +300,21 @@ bun run build:client     # → dist/client
 bun run build:server     # → dist/server
 ```
 
-Modules are discovered by a runtime scan of `modules/`; generated manifests in `generated/` are produced by `scripts/gen-modules.ts` (wired into `predev`/`pretest`/`prebuild:*`). The UI is localized via JSON catalogs (12 languages): the core strings in `i18n/` and each module's own in `modules/<id>/i18n/`, merged and served to the browser on demand as `/i18n/<lang>.json` (compiled binaries inline them through the generated `generated/i18n.ts`). The language is chosen in the first-run wizard and can be switched at any time from the header select; the device persists the choice in its config file.
+Modules are discovered by a runtime scan of `client/modules/` and `server/modules/`; generated manifests in `generated/` are produced by `scripts/gen-modules.ts` (wired into `predev`/`pretest`/`prebuild:*`). The UI is localized via JSON catalogs (12 languages): the core strings in `i18n/` and each module's own in `modules/<id>/i18n/`, merged and served to the browser on demand as `/i18n/<lang>.json` (compiled binaries inline them through the generated `generated/i18n.ts`). The language is chosen in the first-run wizard and can be switched at any time from the header select; the device persists the choice in its config file.
 
-The control-server build hook bundles the browser pages and embeds their generated assets in the standalone server binary; source-mode startup continues to bundle the UI from `frontend/`.
+The control-server build hook bundles the browser pages and embeds their generated assets in the standalone server binary; source-mode startup continues to bundle the UI from `client/frontend/`, `server/frontend/` and the module pages.
 
 ### Control-server code
 
-[`backend/server/server.ts`](./backend/server/server.ts) remains the CLI entrypoint. Its implementation lives in
-[`backend/server/`](./backend/server/):
--   [`db.ts`](./backend/server/db.ts) opens the SQLite database and runs the migrations; [`migrations/`](./backend/server/migrations/) holds the numbered `.sql` files that build the schema (each applied once, tracked in the `schema_migrations` table) — to change the schema, add a new migration file there.
--   [`auth.ts`](./backend/server/auth.ts) owns passwords, sessions, profiles, device tokens and invitations.
--   [`devices.ts`](./backend/server/devices.ts) owns the device registry, request forwarding, cached telemetry/logs and device-list broadcasts.
--   [`dashboards.ts`](./backend/server/dashboards.ts) owns dashboard validation, persistence, API responses and widget-hub synchronization.
+[`server/backend/server.ts`](./server/backend/server.ts) remains the CLI entrypoint. Its implementation lives in
+[`server/backend/`](./server/backend/):
+-   [`db.ts`](./server/backend/db.ts) opens the SQLite database and runs the migrations; [`migrations/`](./server/backend/migrations/) holds the numbered `.sql` files that build the schema (each applied once, tracked in the `schema_migrations` table) — to change the schema, add a new migration file there.
+-   [`auth.ts`](./server/backend/auth.ts) owns passwords, sessions, profiles, device tokens and invitations.
+-   [`devices.ts`](./server/backend/devices.ts) owns the device registry, request forwarding, cached telemetry/logs and device-list broadcasts.
+-   [`dashboards.ts`](./server/backend/dashboards.ts) owns dashboard validation, persistence, API responses and widget-hub synchronization.
 -   [`shared/frontend.ts`](./shared/frontend.ts) bundles the UI at startup in source mode; compiled builds serve matching pages and embedded assets generated by [`gen-control-server-assets.ts`](./scripts/gen-control-server-assets.ts).
--   [`control-server.ts`](./backend/server/control-server.ts) composes the domains, HTTP routes, WebSocket handlers and maintenance timers.
--   [`contracts.ts`](./backend/server/contracts.ts) holds shared socket data, topics and event framing.
+-   [`control-server.ts`](./server/backend/control-server.ts) composes the domains, HTTP routes, WebSocket handlers and maintenance timers.
+-   [`contracts.ts`](./server/backend/contracts.ts) holds shared socket data, topics and event framing.
 
 The domains receive their dependencies explicitly: authentication resolves device
 tokens, the registry supplies device ownership checks to dashboards, and the

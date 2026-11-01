@@ -69,8 +69,8 @@ combined ─────────SRTLA (bonded)─────────▶
 
 | Část                | Vstupní bod                        | Co to je                                                                                                                                                                                                                                                        |
 | ------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Klient zařízení** | `backend/client/client.ts`         | Běží ve všech rolích zařízení. Zpřístupňuje místní webové rozhraní a API na portu **8085**, spouští příslušné moduly a případně se připojuje k ovládacímu serveru. |
-| **Ovládací server** | `backend/server/server.ts`         | Centrální server pro správu na portu **8090**: spravuje uživatelské účty, seznam zařízení a dashboardy jednotlivých uživatelů. Se zařízeními komunikuje přes jejich _odchozí_ spojení WebSocket, takže lze spravovat i zařízení za NAT nebo v mobilních sítích. |
+| **Klient zařízení** | `client/backend/client.ts`         | Běží ve všech rolích zařízení. Zpřístupňuje místní webové rozhraní a API na portu **8085**, spouští příslušné moduly a případně se připojuje k ovládacímu serveru. |
+| **Ovládací server** | `server/backend/server.ts`         | Centrální server pro správu na portu **8090**: spravuje uživatelské účty, seznam zařízení a dashboardy jednotlivých uživatelů. Se zařízeními komunikuje přes jejich _odchozí_ spojení WebSocket, takže lze spravovat i zařízení za NAT nebo v mobilních sítích. |
 
 ---
 
@@ -121,7 +121,7 @@ Pro lokální checkout s přibalovanými binárkami explicitně přepište jejic
 
 ```sh
 # ovládací server — první účet se vytvoří na /register
-bun backend/server/server.ts --port 8090
+bun server/backend/server.ts --port 8090
 ```
 
 Poté v prohlížeči otevřete `http://<server>:8090/` — přesměruje na `/login`.
@@ -142,23 +142,23 @@ Poté na [profilové stránce](#113-profil--heslo-tokeny-pozvánky) vytvořte **
 
 ```sh
 # Relay: místní webové rozhraní a API na :8085, sleduje rozhraní a znovu načítá srtla_send
-sudo bun backend/client/client.ts --host 0.0.0.0
+sudo bun client/backend/client.ts --host 0.0.0.0
 
 # Encoder: v rozhraní vyberte pipeline a SRT port relay
-bun backend/client/client.ts --role encoder --pipelines /usr/share/belacoder/pipelines
+bun client/backend/client.ts --role encoder --pipelines /usr/share/belacoder/pipelines
 
 # Combined
-sudo bun backend/client/client.ts --role combined --pipelines /usr/share/belacoder/pipelines
+sudo bun client/backend/client.ts --role combined --pipelines /usr/share/belacoder/pipelines
 
 # Relay: ihned při startu spustit i srtla_send
-sudo bun backend/client/client.ts --start-srtla 6000 rec.example.com 5000
+sudo bun client/backend/client.ts --start-srtla 6000 rec.example.com 5000
 ```
 
 Otevřete `http://<device>:8085/`. **Čistě nové zařízení (ještě bez konfiguračního souboru) se otevře v průvodci nastavením** — projděte ho v [sekci 5](#5-průvodce-prvním-spuštěním). Připojení zařízení k ovládacímu serveru:
 
 ```sh
 # na každém zařízení — token majitele tohoto zařízení
-CONTROL_SERVER_TOKEN=tok-alice-1 bun backend/client/client.ts --role encoder --remote wss://ctl.example.com/device
+CONTROL_SERVER_TOKEN=tok-alice-1 bun client/backend/client.ts --role encoder --remote wss://ctl.example.com/device
 ```
 
 > [!NOTE]
@@ -199,7 +199,7 @@ docker compose up -d --build
 - **obs-client** — `client.ts --role obs`, modul `obs-controller` se připojuje k OBS na hostiteli (`ws://host.docker.internal:4455`).
 - **relay** — `client.ts --role relay`, bonduje SRT ven přes `srtla_send` (`Dockerfile.device`, image `majkl/irlctrl-device`).
 - **encoder** — `client.ts --role encoder`, běží `ceracoder`/GStreamer a posílá SRT do relay; stejný device image, jiná role + `ENCODER_BIN`.
-- **broadcaster** — `client.ts --role broadcaster` spouští přijímač a publikační modul `modules/broadcaster`; cíle RTMP se konfigurují v nastavení zařízení a SRTLA přijímač naslouchá na UDP portu `5001`.
+- **broadcaster** — `client.ts --role broadcaster` spouští přijímač a publikační modul `client/modules/broadcaster`; cíle RTMP se konfigurují v nastavení zařízení a SRTLA přijímač naslouchá na UDP portu `5001`.
 
 Všechny role zařízení používají `Dockerfile.device`, který obsahuje běhové prostředí modulů a potřebné streamovací nástroje. Kontejner **relay** potřebuje oprávnění `NET_ADMIN`, protože při startu nastavuje směrování podle jednotlivých uplinků (`ip rule add` a tabulky tras) a sleduje rozhraní pomocí `ip monitor`. Bez tohoto oprávnění vypíše `ip rule add … Operation not permitted` a skončí. Encoder ani OBS je nepotřebují. Ve výchozí síti bridge se změny směrování relayu projeví pouze v síťovém prostoru kontejneru. Má-li relay používat skutečná síťová rozhraní hostitele pro agregaci připojení, spusťte jej s `network_mode: host`.
 
@@ -491,7 +491,7 @@ Stavová tabulka zobrazuje stav přepínače pro každé spojení: **State** (`n
 
 ## 11. Obsluha ovládacího serveru
 
-Spusťte server příkazem `bun backend/server/server.ts --port 8090`, přihlaste se a můžete spravovat připojená zařízení.
+Spusťte server příkazem `bun server/backend/server.ts --port 8090`, přihlaste se a můžete spravovat připojená zařízení.
 
 ### 11.1 Seznam zařízení
 
@@ -569,7 +569,7 @@ Widget zařízení, na kterém je modul vypnutý, zobrazuje _Module disabled on 
 
 ## 12. Reference příkazové řádky
 
-### 12.1 Klient zařízení (`backend/client/client.ts`)
+### 12.1 Klient zařízení (`client/backend/client.ts`)
 
 Každá volba má ekvivalent v podobě proměnné prostředí. Řešení: **CLI flag > proměnná prostředí > konfigurační soubor > výchozí hodnota**.
 
@@ -596,7 +596,7 @@ Každá volba má ekvivalent v podobě proměnné prostředí. Řešení: **CLI 
 | `--remote-stats-interval` | `CONTROL_SERVER_STATS_INTERVAL`     | `2`                              | Interval odesílání statistik spojení `srtla_send` v sekundách.                                                                                                                              |
 | `--dry-run`               | `DRY_RUN`                           | —                                | Vypíše příkazy `ip` a akce s procesy, ale neprovede je (bezpečné testování).                                                                                                                |
 
-### 12.2 Ovládací server (`backend/server/server.ts`)
+### 12.2 Ovládací server (`server/backend/server.ts`)
 
 | Volba              | Proměnná   | Výchozí        | Co dělá                                                                                                                                                 |
 | ------------------ | ---------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -606,7 +606,7 @@ Každá volba má ekvivalent v podobě proměnné prostředí. Řešení: **CLI 
 
 ### 12.3 Nastavení specifická pro moduly
 
-Připojení k OBS spravuje modul `obs-controller`; hodnoty lze zadat přes `OBS_URL` / `OBS_PASSWORD` nebo na stránce nastavení zařízení. RTMP výstupy, profily ffmpeg a nastavení SRTLA přijímače vlastní `modules/broadcaster`. Pro tyto role neexistuje samostatný vstupní bod klienta.
+Připojení k OBS spravuje modul `obs-controller`; hodnoty lze zadat přes `OBS_URL` / `OBS_PASSWORD` nebo na stránce nastavení zařízení. RTMP výstupy, profily ffmpeg a nastavení SRTLA přijímače vlastní `client/modules/broadcaster`. Pro tyto role neexistuje samostatný vstupní bod klienta.
 
 ---
 
@@ -634,4 +634,4 @@ Protokol zaznamenává například změny konfigurace, `Bitrate set to min X / m
 
 ---
 
-_Další informace: [README](../README.md) popisuje architekturu a vývoj, [modules/README.md](../modules/README.md) systém modulů a katalogy překladů pro 12 podporovaných jazyků najdete v adresáři `i18n/`._
+_Další informace: [README](../README.md) popisuje architekturu a vývoj, [client/modules/README.md](../modules/README.md) systém modulů a katalogy překladů pro 12 podporovaných jazyků najdete v adresáři `i18n/`._

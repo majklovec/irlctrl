@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { defaultModules, ensureModuleSlices } from "../backend/client/modules";
-import { fromConfig, state } from "../backend/client/state";
-import type { SwitcherConfig } from "../modules/obs-controller/types";
+import { defaultModules, ensureModuleSlices } from "../client/backend/modules";
+import { fromConfig, state } from "../client/backend/state";
+import type { SwitcherConfig } from "../client/modules/obs-controller/types";
 
 /**
  * The switcher rides on the OBS module slice; the module's `configDefaults`

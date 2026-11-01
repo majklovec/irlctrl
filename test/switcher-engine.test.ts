@@ -4,11 +4,11 @@ import {
     type ObsSnapshot,
     type SwitcherDeps,
     SwitcherEngine,
-} from "../modules/obs-controller/switcher-engine";
+} from "../client/modules/obs-controller/switcher-engine";
 import type {
     SwitcherConfig,
     SwitcherMetrics,
-} from "../modules/obs-controller/types";
+} from "../client/modules/obs-controller/types";
 
 interface DepsOpts {
     obs?: ObsSnapshot | null;

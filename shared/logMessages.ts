@@ -7,7 +7,7 @@
  * the current UI language. Display-time section localization uses label().
  *
  * Stays dependency-free (the web UI imports it): the runtime installs its
- * translator with setLogTranslator (Bun → shared/i18n, browser → frontend/ts/i18n).
+ * translator with setLogTranslator (Bun → shared/i18n, browser → shared/ui/i18n).
  */
 
 /** Translator injected by whichever runtime uses the log wording (see above). */

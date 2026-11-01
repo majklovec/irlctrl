@@ -17,7 +17,7 @@
  * about *where* a dependency lives, not how the path is spelled.
  */
 import { describe, expect, test } from "bun:test";
-import { readdirSync, readFileSync } from "node:fs";
+import { type Dirent, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 const ROOT = resolve(import.meta.dir, "..");
@@ -45,18 +45,27 @@ interface Layout {
 }
 
 const LAYOUT: Layout = {
-	moduleRoots: ["modules"],
-	coreRoots: ["backend", "frontend/ts", "shared"],
-	browserRoots: ["frontend/ts"],
-	backendRoots: ["backend"],
+	moduleRoots: ["client/modules", "server/modules"],
+	coreRoots: [
+		"client/backend",
+		"client/frontend",
+		"server/backend",
+		"server/frontend",
+		"shared",
+	],
+	browserRoots: ["client/frontend", "server/frontend", "shared/ui"],
+	backendRoots: ["client/backend", "server/backend"],
 	generatedDir: "generated",
-	sides: [],
+	sides: [
+		{ name: "client", dirs: ["client"] },
+		{ name: "server", dirs: ["server"] },
+	],
 };
 
 const SOURCE_RE = /\.(ts|tsx)$/;
 
 function walk(dir: string): string[] {
-	let entries: ReturnType<typeof readdirSync<{ withFileTypes: true }>>;
+	let entries: Dirent[];
 	try {
 		entries = readdirSync(dir, { withFileTypes: true });
 	} catch {
@@ -79,7 +88,7 @@ const isUnder = (file: string, dir: string): boolean => {
 	return rel !== "" && !rel.startsWith("..") && !rel.startsWith(sep);
 };
 
-/** `modules/encoder` for a file inside a module root, else undefined. */
+/** `client/modules/encoder` for a file inside a module root, else undefined. */
 function moduleOf(file: string): string | undefined {
 	for (const root of LAYOUT.moduleRoots) {
 		if (!isUnder(file, root)) continue;

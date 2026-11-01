@@ -10,9 +10,7 @@ const outputFile = fileURLToPath(
 await mkdir(new URL("../generated/", import.meta.url), { recursive: true });
 
 await Bun.$`bun scripts/gen-modules.ts`.quiet();
-const pagesToBuild = frontendPageEntries(
-    new URL("../frontend/", import.meta.url),
-);
+const pagesToBuild = frontendPageEntries();
 
 const result = await Bun.build({
     entrypoints: pagesToBuild.map((entry) => entry.path),

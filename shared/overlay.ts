@@ -2,8 +2,8 @@
  * OBS overlay editor: shared project schema, validation and migrations.
  *
  * The control server persists one `Project` per user as a JSON blob
- * (see backend/server/overlays.ts). The runtime page renders a scene from the
- * same types (frontend/ts/overlay-render.tsx). Validation is hand-rolled
+ * (see server/backend/overlays.ts). The runtime page renders a scene from the
+ * same types (server/frontend/ts/overlay-render.tsx). Validation is hand-rolled
  * `ApiError` style like the rest of the server (no Zod in this repo).
  *
  * Round-trip rule: unknown fields on every object are preserved so newer

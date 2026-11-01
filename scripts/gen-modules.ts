@@ -5,18 +5,21 @@
 // Each file lists paths only — it never imports a module — so a broken module
 // cannot break the generator:
 //
-//   generated/modules.frontend.ts — one import per modules/<id>/frontend.tsx;
+// Modules live under the roots listed in shared/paths.ts (MODULE_ROOTS:
+// client/modules and server/modules); every manifest spans all of them.
+//
+//   generated/modules.frontend.ts — one import per <root>/<id>/frontend.tsx;
 //   the browser bundle statically resolves every import (no runtime Glob).
-//   generated/modules.settings.ts — one import per modules/<id>/settings.tsx;
-//   the settings framework (frontend/ts/modules.tsx) registers each module's
+//   generated/modules.settings.ts — one import per <root>/<id>/settings.tsx;
+//   the settings framework (client/frontend/ts/modules.tsx) registers each module's
 //   settings card from this manifest.
-//   generated/modules.backend.ts  — one import per modules/<id>/backend.ts;
+//   generated/modules.backend.ts  — one import per <root>/<id>/backend.ts;
 //   used by the compiled binaries (bun build --compile), where the runtime
 //   directory scan in shared/registry.ts cannot reach disk (import.meta.url
 //   lives in Bun's virtual /$bunfs mount).
 //   generated/version.ts — the package.json version for the UI footer.
 //   generated/i18n.ts — every catalog (i18n/<lang>.json plus each
-//   modules/<id>/i18n/<lang>.json) inlined per language, for the compiled
+//   <root>/<id>/i18n/<lang>.json) inlined per language, for the compiled
 //   binaries (shared/i18n.ts merges them; unbundled runs scan the disk).
 //
 // Runs in Bun (not the browser) and is re-invoked by server.ts before it
@@ -27,25 +30,28 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { CORE_I18N_DIR, MODULE_ROOTS } from "../shared/paths";
 
-// scripts/ lives next to modules/ — the app dir is the scan base so the
-// relative patterns below resolve the same way regardless of the CWD.
+// The app dir is the scan base so the relative patterns below resolve the
+// same way regardless of the CWD.
 const baseDir = fileURLToPath(new URL("..", import.meta.url));
 const generatedDir = fileURLToPath(new URL("../generated/", import.meta.url));
 await mkdir(generatedDir, { recursive: true });
 
 interface ManifestSpec {
     outFile: string; // fileURLToPath'ed output path
-    pattern: string; // e.g. modules/*/frontend.tsx
+    file: string; // the per-module file to collect, e.g. frontend.tsx
     variable: string; // import base name, e.g. m / b
-    importSuffix: string; // e.g. frontend / backend
     purpose: string; // header line describing the manifest
 }
 
 async function buildManifest(spec: ManifestSpec): Promise<void> {
     const matches: string[] = [];
-    for await (const p of new Bun.Glob(spec.pattern).scan({ cwd: baseDir }))
-        matches.push(p);
+    for (const root of MODULE_ROOTS)
+        for await (const p of new Bun.Glob(`${root}/*/${spec.file}`).scan({
+            cwd: baseDir,
+        }))
+            matches.push(p.split(sep).join("/"));
     matches.sort();
 
     const lines = [
@@ -56,12 +62,9 @@ async function buildManifest(spec: ManifestSpec): Promise<void> {
     ];
 
     matches.forEach((path, i) => {
-        // Generated files live outside modules/, so imports step back into it.
-        const parts = path.split(sep);
-        const moduleId = parts[parts.length - 2];
-        lines.push(
-            `import ${spec.variable}${i} from "../modules/${moduleId}/${spec.importSuffix}";`,
-        );
+        // Generated files live in generated/, so imports step back to the app dir.
+        const specifier = path.replace(/\.(tsx?|js)$/, "");
+        lines.push(`import ${spec.variable}${i} from "../${specifier}";`);
     });
 
     lines.push("");
@@ -74,7 +77,7 @@ async function buildManifest(spec: ManifestSpec): Promise<void> {
 
     await writeIfChanged(spec.outFile, lines.join("\n"));
     console.log(
-        `[gen-modules] ${spec.outFile.split(sep).pop()} → ${matches.length} ${spec.importSuffix} module(s)`,
+        `[gen-modules] ${spec.outFile.split(sep).pop()} → ${matches.length} ${spec.file} module(s)`,
     );
 }
 
@@ -94,7 +97,10 @@ async function buildI18nManifest(): Promise<void> {
     const files: string[] = [];
     // Glob yields OS separators; normalise so the language key and the
     // import specifiers come out identical on Windows.
-    for (const pattern of ["i18n/*.json", "modules/*/i18n/*.json"])
+    for (const pattern of [
+        `${CORE_I18N_DIR}/*.json`,
+        ...MODULE_ROOTS.map((root) => `${root}/*/i18n/*.json`),
+    ])
         for await (const p of new Bun.Glob(pattern).scan({ cwd: baseDir }))
             files.push(p.split(sep).join("/"));
     files.sort();
@@ -151,30 +157,27 @@ await Promise.all([
         outFile: fileURLToPath(
             new URL("../generated/modules.frontend.ts", import.meta.url),
         ),
-        pattern: "modules/*/frontend.tsx",
+        file: "frontend.tsx",
         variable: "m",
-        importSuffix: "frontend",
         purpose:
-            "one static import per modules/<id>/frontend.tsx; the browser bundle never uses Glob",
+            "one static import per <root>/<id>/frontend.tsx; the browser bundle never uses Glob",
     }),
     buildManifest({
         outFile: fileURLToPath(
             new URL("../generated/modules.settings.ts", import.meta.url),
         ),
-        pattern: "modules/*/settings.tsx",
+        file: "settings.tsx",
         variable: "s",
-        importSuffix: "settings",
         purpose:
-            "one static import per modules/<id>/settings.tsx; the settings framework registers each module's settings card from this manifest",
+            "one static import per <root>/<id>/settings.tsx; the settings framework registers each module's settings card from this manifest",
     }),
     buildManifest({
         outFile: fileURLToPath(
             new URL("../generated/modules.backend.ts", import.meta.url),
         ),
-        pattern: "modules/*/backend.ts",
+        file: "backend.ts",
         variable: "b",
-        importSuffix: "backend",
         purpose:
-            "one static import per modules/<id>/backend.ts for the compiled binaries (bun build --compile), where the runtime scan cannot reach disk",
+            "one static import per <root>/<id>/backend.ts for the compiled binaries (bun build --compile), where the runtime scan cannot reach disk",
     }),
 ]);

@@ -1,6 +1,7 @@
 /*
- * HTTP helpers shared by the device API (backend/client/api.ts) and the control server (backend/server/server.ts).
+ * HTTP helpers shared by the device API (client/backend/api.ts) and the control server (server/backend/server.ts).
  */
+import { appPath, ASSETS_DIR } from "./paths";
 
 export const text = (
     body: string,
@@ -72,11 +73,9 @@ function imgContentType(path: string): string | null {
     return m ? IMG_CONTENT_TYPES[m[1]] : null;
 }
 
-/** The browser tab icon (`/favicon.ico`), served from frontend/img; 404 if missing. */
+/** The browser tab icon (`/favicon.ico`), served from the shared assets; 404 if missing. */
 export async function faviconResponse(): Promise<Response> {
-    const file = Bun.file(
-        new URL("../frontend/img/favicon.ico", import.meta.url),
-    );
+    const file = Bun.file(appPath(`${ASSETS_DIR}/img/favicon.ico`));
     return (await file.exists())
         ? new Response(file, {
               headers: {
@@ -87,11 +86,11 @@ export async function faviconResponse(): Promise<Response> {
         : notFound();
 }
 
-/** Static images from frontend/ (`/img/<name>.svg|png`); null for other paths. */
+/** Static images from the shared assets (`/img/<name>.svg|png`); null for other paths. */
 export async function imageResponse(path: string): Promise<Response | null> {
     const contentType = imgContentType(path);
     if (!contentType) return null;
-    const file = Bun.file(new URL(`../frontend${path}`, import.meta.url));
+    const file = Bun.file(appPath(`${ASSETS_DIR}${path}`));
     return (await file.exists())
         ? new Response(file, {
               headers: {

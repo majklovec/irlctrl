@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import type { ModuleCore } from "../backend/client/module-core";
+import type { ModuleCore } from "../client/backend/module-core";
 import type { ModuleStartContext } from "../shared/module-contract";
-import broadcaster from "../modules/broadcaster/backend";
+import broadcaster from "../client/modules/broadcaster/backend";
 import {
 	configuredOutputs,
 	effectiveOutputUrl,
 	outputMetadata,
-} from "../modules/broadcaster/persistence";
+} from "../client/modules/broadcaster/persistence";
 
 describe("broadcaster persistence", () => {
 	test("masks keys and retains a blank key at its submitted row", () => {
@@ -36,7 +36,7 @@ describe("broadcaster persistence", () => {
 
 describe("broadcaster module lifecycle", () => {
 	test("starts and stops through module methods with public status only", async () => {
-		const profilesDir = `${import.meta.dir}/../modules/broadcaster/defaults/profiles`;
+		const profilesDir = `${import.meta.dir}/../client/modules/broadcaster/defaults/profiles`;
 		const coreState: {
 			settings: {
 				role: string;

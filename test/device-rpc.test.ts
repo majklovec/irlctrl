@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
-import * as eventlog from "../backend/client/eventlog";
-import { handleRequest } from "../backend/client/methods";
+import * as eventlog from "../client/backend/eventlog";
+import { handleRequest } from "../client/backend/methods";
 import {
     ALL_MODULES,
     defaultModules,
     moduleById,
-} from "../backend/client/modules";
-import { state } from "../backend/client/state";
-import { parseBitrates, parseEncoderConfig } from "../modules/encoder/params";
+} from "../client/backend/modules";
+import { state } from "../client/backend/state";
+import { parseBitrates, parseEncoderConfig } from "../client/modules/encoder/params";
 import type { Params } from "../shared/params";
 
 const OBS = "obs-controller";

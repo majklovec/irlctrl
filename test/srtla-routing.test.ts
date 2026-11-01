@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import type { ModuleCore } from "../backend/client/module-core";
-import { bindRouting, defaultRouteDetails } from "../modules/srtla/routing";
-import { defaultRouteRowIndex } from "../modules/srtla/route-view";
+import type { ModuleCore } from "../client/backend/module-core";
+import { bindRouting, defaultRouteDetails } from "../client/modules/srtla/routing";
+import { defaultRouteRowIndex } from "../client/modules/srtla/route-view";
 
 describe("SRTLA default-route details", () => {
     test("reports the source address selected for the default route", async () => {

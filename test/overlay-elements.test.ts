@@ -9,13 +9,13 @@ import { describe, expect, test } from "bun:test";
 };
 
 const { elementRegistry, elementDef } = await import(
-    "../frontend/ts/overlay-elements/registry"
+    "../server/frontend/ts/overlay-elements/registry"
 );
 const { lineFlipFromDelta } = await import(
-    "../frontend/ts/overlay-elements/line"
+    "../server/frontend/ts/overlay-elements/line"
 );
 const { resolveElement, resolveElementProps, elementStyle } = await import(
-    "../frontend/ts/overlay-elements/core"
+    "../server/frontend/ts/overlay-elements/core"
 );
 import {
     type OverlayElement,

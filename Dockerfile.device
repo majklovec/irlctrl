@@ -1,7 +1,7 @@
-# Device image — runs `backend/client/client.ts` in any registered role.
+# Device image — runs `client/backend/client.ts` in any registered role.
 #
 # Unlike the control image (Dockerfile), this bundles the device runtime:
-#   - backend/client/ + shared/ + modules/ (the module-driven device client),
+#   - client/ + shared/ (the module-driven device client and its modules),
 #   - the native streaming binaries (srtla_send, srtla_rec, ceracoder, belacoder),
 #   - the GStreamer pipeline definitions (pipeline/),
 #   - GStreamer itself, since ceracoder/belacoder drive the encode pipeline,
@@ -98,13 +98,13 @@ RUN ln -s /usr/local/lib/libsrt.so.1.5.7 /usr/lib/x86_64-linux-gnu/libsrt.so.1 \
 WORKDIR /app
 
 # Copy only what is needed to run the device. The client runs unbundled
-# (`bun backend/client/client.ts`): modules are discovered by a runtime scan of modules/ and
-# dynamically imported, and the web UI is bundled at startup on the fly.
+# (`bun client/backend/client.ts`): modules are discovered by a runtime scan of
+# client/modules + server/modules and dynamically imported, and the web UI is
+# bundled at startup on the fly.
 COPY --from=builder /app/package.json /app/bun.lock ./
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/backend/client ./backend/client
-COPY --from=builder /app/modules ./modules
-COPY --from=builder /app/frontend ./frontend
+COPY --from=builder /app/client ./client
+COPY --from=builder /app/server ./server
 COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/i18n ./i18n
 COPY --from=builder /app/scripts ./scripts
@@ -126,5 +126,5 @@ RUN chmod +x ./srtla_send ./ceracoder ./belacoder
 EXPOSE 8085
 
 # Default entrypoint — override `command` in docker-compose to set the role.
-ENTRYPOINT ["bun", "backend/client/client.ts"]
+ENTRYPOINT ["bun", "client/backend/client.ts"]
 CMD ["--host", "0.0.0.0", "--port", "8085", "--role", "relay", "--pipelines", "/app/pipeline"]

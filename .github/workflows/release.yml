@@ -106,7 +106,7 @@ jobs:
               run: |
                   bun build --compile --minify --sourcemap \
                     --target=${{ matrix.target }} \
-                    ./backend/client/client.ts \
+                    ./client/backend/client.ts \
                     --outfile client-prof${{ matrix.ext }}
 
             - name: Record bytecode profiles (native only)
@@ -120,7 +120,7 @@ jobs:
               run: |
                   ARGS="--compile --minify --sourcemap --format=esm --bytecode \
                     --target=${{ matrix.target }} \
-                    ./backend/client/client.ts \
+                    ./client/backend/client.ts \
                     --outfile ${{ matrix.artifact }}${{ matrix.ext }}"
                   if [ -f client.order ]; then
                     ARGS="$ARGS --bytecode-order=client.order"

@@ -38,7 +38,7 @@ async function startServer(): Promise<void> {
     serverProcess = Bun.spawn(
         [
             process.execPath,
-            "backend/server/server.ts",
+            "server/backend/server.ts",
             "--host",
             "127.0.0.1",
             "--port",

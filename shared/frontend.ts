@@ -1,8 +1,8 @@
 import { Buffer } from "node:buffer";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { PAGES } from "./frontend-pages";
+import { CLIENT_PAGES, SERVER_PAGES } from "./frontend-pages";
+import { appPath, MODULE_ROOTS, PAGE_DIRS } from "./paths";
 import { isCompiledBinary } from "./util";
 
 export interface FrontendPageEntry {
@@ -10,42 +10,51 @@ export interface FrontendPageEntry {
     path: string;
 }
 
-export function frontendPageEntries(
-    frontendDirectory: URL,
-): FrontendPageEntry[] {
-    const entries: FrontendPageEntry[] = PAGES.map((name) => ({
-        name,
-        path: fileURLToPath(new URL(`${name}.html`, frontendDirectory)),
-    }));
-    const modulesDirectory = fileURLToPath(
-        new URL("../modules/", import.meta.url),
-    );
+/**
+ * Every page to bundle: both sides' pages (shared/paths PAGE_DIRS) and the
+ * module-owned pages (`<module>/pages/*.html`) of every module root. Names
+ * must be unique across all of them — they are the keys of `htmlResponse`.
+ */
+export function frontendPageEntries(): FrontendPageEntry[] {
+    const entries: FrontendPageEntry[] = [
+        ...CLIENT_PAGES.map((name) => ({
+            name,
+            path: appPath(`${PAGE_DIRS.client}/${name}.html`),
+        })),
+        ...SERVER_PAGES.map((name) => ({
+            name,
+            path: appPath(`${PAGE_DIRS.server}/${name}.html`),
+        })),
+    ];
 
-    for (const module of readdirSync(modulesDirectory, {
-        withFileTypes: true,
-    }).sort((left, right) => left.name.localeCompare(right.name))) {
-        if (!module.isDirectory()) continue;
-        const pagesDirectory = join(modulesDirectory, module.name, "pages");
-        let pages;
-        try {
-            pages = readdirSync(pagesDirectory, {
-                withFileTypes: true,
-            }).sort((left, right) => left.name.localeCompare(right.name));
-        } catch (error) {
-            if (
-                error instanceof Error &&
-                "code" in error &&
-                error.code === "ENOENT"
-            )
-                continue;
-            throw error;
-        }
-        for (const page of pages) {
-            if (!page.isFile() || !page.name.endsWith(".html")) continue;
-            entries.push({
-                name: page.name.slice(0, -".html".length),
-                path: join(pagesDirectory, page.name),
-            });
+    for (const root of MODULE_ROOTS) {
+        const modulesDirectory = appPath(root);
+        for (const module of readdirSync(modulesDirectory, {
+            withFileTypes: true,
+        }).sort((left, right) => left.name.localeCompare(right.name))) {
+            if (!module.isDirectory()) continue;
+            const pagesDirectory = join(modulesDirectory, module.name, "pages");
+            let pages;
+            try {
+                pages = readdirSync(pagesDirectory, {
+                    withFileTypes: true,
+                }).sort((left, right) => left.name.localeCompare(right.name));
+            } catch (error) {
+                if (
+                    error instanceof Error &&
+                    "code" in error &&
+                    error.code === "ENOENT"
+                )
+                    continue;
+                throw error;
+            }
+            for (const page of pages) {
+                if (!page.isFile() || !page.name.endsWith(".html")) continue;
+                entries.push({
+                    name: page.name.slice(0, -".html".length),
+                    path: join(pagesDirectory, page.name),
+                });
+            }
         }
     }
 
@@ -58,7 +67,7 @@ export function frontendPageEntries(
     return entries;
 }
 
-export async function createFrontend(frontendDirectory: URL) {
+export async function createFrontend() {
     const pages: Record<string, string> = {};
     const assets = new Map<string, Blob>();
 
@@ -77,7 +86,7 @@ export async function createFrontend(frontendDirectory: URL) {
         }
     } else {
         await Bun.$`bun scripts/gen-modules.ts`.quiet();
-        const entries = frontendPageEntries(frontendDirectory);
+        const entries = frontendPageEntries();
         const result = await Bun.build({
             entrypoints: entries.map((entry) => entry.path),
             target: "browser",

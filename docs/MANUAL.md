@@ -69,8 +69,8 @@ combined ─────────SRTLA (bonded)─────────▶
 
 | Part               | Entry point                        | What it is                                                                                                                                                                                                  |
 | ------------------ | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Device client**  | `backend/client/client.ts`         | Runs every device role. Serves the local web UI + API on port **8085**, starts role modules, and (optionally) dials the control server. |
-| **Control server** | `backend/server/server.ts`         | Central management server on port **8090**: user accounts, device list, per-user dashboards. Reaches devices over their _outbound_ WebSocket, so devices behind NAT / mobile networks are fully manageable. |
+| **Device client**  | `client/backend/client.ts`         | Runs every device role. Serves the local web UI + API on port **8085**, starts role modules, and (optionally) dials the control server. |
+| **Control server** | `server/backend/server.ts`         | Central management server on port **8090**: user accounts, device list, per-user dashboards. Reaches devices over their _outbound_ WebSocket, so devices behind NAT / mobile networks are fully manageable. |
 
 ---
 
@@ -121,7 +121,7 @@ For a local checkout with the bundled binaries, override their paths explicitly 
 
 ```sh
 # control server — the first account is created at /register
-bun backend/server/server.ts --port 8090
+bun server/backend/server.ts --port 8090
 ```
 
 Then open `http://<server>:8090/` in a browser — it redirects to `/login`.
@@ -142,23 +142,23 @@ After that, create **device tokens** on the [profile page](#114-profile-password
 
 ```sh
 # Relay: local web UI + API on :8085, watches interfaces, reloads srtla_send
-sudo bun backend/client/client.ts --host 0.0.0.0
+sudo bun client/backend/client.ts --host 0.0.0.0
 
 # Encoder: pick a pipeline and the relay's SRT port in the UI
-bun backend/client/client.ts --role encoder --pipelines /usr/share/belacoder/pipelines
+bun client/backend/client.ts --role encoder --pipelines /usr/share/belacoder/pipelines
 
 # Combined
-sudo bun backend/client/client.ts --role combined --pipelines /usr/share/belacoder/pipelines
+sudo bun client/backend/client.ts --role combined --pipelines /usr/share/belacoder/pipelines
 
 # Relay: also start srtla_send immediately on startup
-sudo bun backend/client/client.ts --start-srtla 6000 rec.example.com 5000
+sudo bun client/backend/client.ts --start-srtla 6000 rec.example.com 5000
 ```
 
 Open `http://<device>:8085/`. **A fresh device (no config file yet) opens on the setup wizard** — walk through it in [section 5](#5-first-run-setup-wizard). Connecting the device to the control server:
 
 ```sh
 # on each device — that device's owner token
-CONTROL_SERVER_TOKEN=tok-alice-1 bun backend/client/client.ts --role encoder --remote wss://ctl.example.com/device
+CONTROL_SERVER_TOKEN=tok-alice-1 bun client/backend/client.ts --role encoder --remote wss://ctl.example.com/device
 ```
 
 > [!NOTE]
@@ -199,7 +199,7 @@ docker compose up -d --build
 - **obs-client** — `client.ts --role obs`, using the `obs-controller` module to connect to host OBS (`ws://host.docker.internal:4455`).
 - **relay** — `client.ts --role relay`, bonds SRT out via `srtla_send` (`Dockerfile.device`, image `majkl/irlctrl-device`).
 - **encoder** — `client.ts --role encoder`, runs `ceracoder`/GStreamer and sends SRT to the relay; same device image, different role + `ENCODER_BIN`.
-- **broadcaster** — `client.ts --role broadcaster`, runs the `modules/broadcaster` receiver/publisher; configure RTMP destinations in device settings and expose its SRTLA receiver on UDP `5001`.
+- **broadcaster** — `client.ts --role broadcaster`, runs the `client/modules/broadcaster` receiver/publisher; configure RTMP destinations in device settings and expose its SRTLA receiver on UDP `5001`.
 
 All device roles use `Dockerfile.device`, which includes the module runtime and required streaming tools. The **relay** container grants the `NET_ADMIN` capability because at startup it builds per-uplink policy routing (`ip rule add` + route tables) and watches interfaces with `ip monitor`; without it the relay logs `ip rule add … Operation not permitted` and exits. The encoder and OBS role do not need the capability. On the default bridge network the relay's routing changes act on the container's own namespace; for real bonded uplinks on the host's raw interfaces run the relay with `network_mode: host`.
 
@@ -493,7 +493,7 @@ The status table tracks the engine per link: **State** (`normal` / `low bitrate`
 
 ## 11. Control server operation
 
-Start it (`bun backend/server/server.ts --port 8090`), sign in, and manage the fleet.
+Start it (`bun server/backend/server.ts --port 8090`), sign in, and manage the fleet.
 
 ### 11.1 Device list
 
@@ -571,7 +571,7 @@ A widget for a device whose module is off shows _Module disabled on device_; a w
 
 ## 12. Command-line reference
 
-### 12.1 Device client (`backend/client/client.ts`)
+### 12.1 Device client (`client/backend/client.ts`)
 
 Every flag has an environment-variable counterpart. Resolution order: **CLI flag > env var > config file > default**.
 
@@ -598,7 +598,7 @@ Every flag has an environment-variable counterpart. Resolution order: **CLI flag
 | `--remote-stats-interval` | `CONTROL_SERVER_STATS_INTERVAL` | `2`                              | `srtla_send` link-stats push interval in seconds.                                                                                                     |
 | `--dry-run`               | `DRY_RUN`                       | —                                | Print `ip`/process actions instead of running them (safe testing).                                                                                    |
 
-### 12.2 Control server (`backend/server/server.ts`)
+### 12.2 Control server (`server/backend/server.ts`)
 
 | Option             | Env        | Default        | What it does                                                                                                                  |
 | ------------------ | ---------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -608,7 +608,7 @@ Every flag has an environment-variable counterpart. Resolution order: **CLI flag
 
 ### 12.3 Module-specific settings
 
-OBS connection fields are owned by `obs-controller` and can be supplied through `OBS_URL` / `OBS_PASSWORD` or the device setup and settings pages. Broadcaster outputs, ffmpeg profiles, and SRTLA receiver settings are owned by `modules/broadcaster`; there is no separate client entrypoint or transport.
+OBS connection fields are owned by `obs-controller` and can be supplied through `OBS_URL` / `OBS_PASSWORD` or the device setup and settings pages. Broadcaster outputs, ffmpeg profiles, and SRTLA receiver settings are owned by `client/modules/broadcaster`; there is no separate client entrypoint or transport.
 
 ---
 
@@ -636,4 +636,4 @@ Configuration changes, `Bitrate set to min X / max Y kbps`, `Bond toggle` (`eth0
 
 ---
 
-_See also: [README](../README.md) for architecture and development, [modules/README.md](../modules/README.md) for the module system, and the i18n catalogs in `i18n/` for the 12 supported languages._
+_See also: [README](../README.md) for architecture and development, [client/modules/README.md](../modules/README.md) for the module system, and the i18n catalogs in `i18n/` for the 12 supported languages._

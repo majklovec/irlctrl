@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { runInNewContext } from "node:vm";
-import { chatOverlayRoutes } from "../modules/chat/overlay-server";
-import type { ChatSnapshot } from "../modules/chat/types";
+import { chatOverlayRoutes } from "../server/modules/chat/overlay-server";
+import type { ChatSnapshot } from "../server/modules/chat/types";
 import type { ServerDashboard } from "../shared/types";
 
 function fixture() {
@@ -72,7 +72,7 @@ describe("token-authenticated chat overlay", () => {
             respondWith(): void;
         };
         let onFetch: ((event: Navigation) => void) | undefined;
-        runInNewContext(await Bun.file(new URL("../frontend/pwa/sw.js", import.meta.url)).text(), {
+        runInNewContext(await Bun.file(new URL("../shared/assets/pwa/sw.js", import.meta.url)).text(), {
             self: {
                 location: { origin: "http://localhost" },
                 addEventListener(name: string, handler: (event: Navigation) => void) {

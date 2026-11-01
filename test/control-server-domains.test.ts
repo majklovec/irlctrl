@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { createAuth } from "../backend/server/auth";
-import { createDashboards } from "../backend/server/dashboards";
+import { createAuth } from "../server/backend/auth";
+import { createDashboards } from "../server/backend/dashboards";
 import { destroyWidgetHub } from "../shared/registry";
 
 function request(path: string, body?: unknown, cookie?: string): Request {

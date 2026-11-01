@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { AudioSourceTracker } from "../modules/obs-controller/audio-sources";
-import { SceneTracker } from "../modules/obs-controller/scenes";
+import { AudioSourceTracker } from "../client/modules/obs-controller/audio-sources";
+import { SceneTracker } from "../client/modules/obs-controller/scenes";
 import {
     OBS_DISCONNECTED_EVENT,
     type ObsClient,

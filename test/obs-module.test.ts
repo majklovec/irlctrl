@@ -3,9 +3,9 @@ import {
     defaultModules,
     methodAllowed,
     safeModules,
-} from "../backend/client/modules";
-import { state } from "../backend/client/state";
-import obsModule from "../modules/obs-controller/backend";
+} from "../client/backend/modules";
+import { state } from "../client/backend/state";
+import obsModule from "../client/modules/obs-controller/backend";
 
 const OBS = "obs-controller";
 

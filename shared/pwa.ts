@@ -1,6 +1,6 @@
 /*
- * PWA routes shared by the control server (backend/server) and the device API
- * (backend/client): the service worker and the home-screen icons. The service
+ * PWA routes shared by the control server (server/backend) and the device API
+ * (client/backend): the service worker and the home-screen icons. The service
  * worker must answer at the origin root (`/sw.js`, scope `/`) to control the
  * whole UI, and the manifest names the icons by fixed path, so these are
  * explicit routes rather than part of the hashed `/assets/*` bundle (the
@@ -12,9 +12,9 @@
  * resolve into Bun's virtual file system — either way `Bun.file()` serves them.
  */
 import { Elysia } from "elysia";
-import icon192 from "../frontend/pwa/icons/icon-192.png" with { type: "file" };
-import icon512 from "../frontend/pwa/icons/icon-512.png" with { type: "file" };
-import serviceWorker from "../frontend/pwa/sw.js" with { type: "file" };
+import icon192 from "./assets/pwa/icons/icon-192.png" with { type: "file" };
+import icon512 from "./assets/pwa/icons/icon-512.png" with { type: "file" };
+import serviceWorker from "./assets/pwa/sw.js" with { type: "file" };
 import { notFound } from "./http";
 
 const ICONS: Record<string, string> = {

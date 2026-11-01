@@ -3,11 +3,11 @@ import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import type m from "mithril";
 
-let chat: typeof import("../modules/chat/frontend");
+let chat: typeof import("../server/modules/chat/frontend");
 
 beforeAll(async () => {
     const result = await Bun.build({
-        entrypoints: [new URL("../modules/chat/frontend.tsx", import.meta.url).pathname],
+        entrypoints: [new URL("../server/modules/chat/frontend.tsx", import.meta.url).pathname],
         target: "browser",
         format: "cjs",
         external: ["mithril"],
@@ -15,7 +15,7 @@ beforeAll(async () => {
         plugins: [{
             name: "chat-browser-shell",
             setup(build) {
-                build.onLoad({ filter: /frontend\/ts\/(?:i18n|components\/ui)\.tsx$/ }, () => ({
+                build.onLoad({ filter: /shared\/ui\/(?:i18n|components\/ui)\.tsx$/ }, () => ({
                     contents: "export const currentLanguage = () => 'en'; export const t = (key) => key; export const Badge = {};",
                     loader: "js",
                 }));

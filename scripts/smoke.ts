@@ -16,8 +16,8 @@ import { fileURLToPath } from "node:url";
 import { PAGES } from "../shared/frontend-pages";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
-const SERVER_ENTRY = "backend/server/server.ts";
-const CLIENT_ENTRY = "backend/client/client.ts";
+const SERVER_ENTRY = "server/backend/server.ts";
+const CLIENT_ENTRY = "client/backend/client.ts";
 
 /** Control-server routes per page (login/register redirect when no-auth). */
 const SERVER_ROUTES: Partial<Record<(typeof PAGES)[number], string>> = {

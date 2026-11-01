@@ -2,20 +2,21 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync } from "node:fs";
 import { catalog, i18nReady, translate } from "../shared/i18n";
 import { LANGUAGES } from "../shared/languages";
+import { MODULE_ROOTS } from "../shared/paths";
 
 const root = new URL("../", import.meta.url);
 
-/** Every catalog directory: the core `i18n/` plus each `modules/<id>/i18n/`. */
+/** Every catalog directory: the core `i18n/` plus each `<root>/<id>/i18n/`. */
 function catalogDirs(): { name: string; dir: URL }[] {
     const dirs = [{ name: "core", dir: new URL("i18n/", root) }];
-    const modulesDir = new URL("modules/", root);
-    for (const entry of readdirSync(modulesDir, { withFileTypes: true }).sort(
-        (a, b) => a.name.localeCompare(b.name),
-    )) {
-        const dir = new URL(`modules/${entry.name}/i18n/`, root);
-        if (entry.isDirectory() && existsSync(dir))
-            dirs.push({ name: entry.name, dir });
-    }
+    for (const moduleRoot of MODULE_ROOTS)
+        for (const entry of readdirSync(new URL(`${moduleRoot}/`, root), {
+            withFileTypes: true,
+        }).sort((a, b) => a.name.localeCompare(b.name))) {
+            const dir = new URL(`${moduleRoot}/${entry.name}/i18n/`, root);
+            if (entry.isDirectory() && existsSync(dir))
+                dirs.push({ name: entry.name, dir });
+        }
     return dirs;
 }
 

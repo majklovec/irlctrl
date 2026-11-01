@@ -10,14 +10,14 @@
 // first time it is requested and cached.
 //
 // The catalogs are resolved in two ways:
-//   * unbundled (bun backend/server/server.ts, dev, tests): read from disk —
+//   * unbundled (bun server/backend/server.ts, dev, tests): read from disk —
 //     the core file plus a scan of modules/*/i18n/;
 //   * compiled binaries (bun build --compile): the build-time manifest
 //     generated/i18n.ts (scripts/gen-modules.ts) inlines every catalog, as a
 //     flat binary cannot scan a directory.
 //
 // The browser loads the same merged catalogs on demand from /i18n/<lang>.json
-// (see frontend/ts/i18n.tsx) using the i18next-http-backend plugin over HTTP.
+// (see shared/ui/i18n.tsx) using the i18next-http-backend plugin over HTTP.
 // This core deliberately does not: the plugin routes only http(s) URLs through
 // fetch, and it has nothing to fetch from before the HTTP server starts —
 // including the synchronous `--help` path.
@@ -26,7 +26,6 @@
 // values. Missing keys fall back to English, then to the raw key.
 
 import { existsSync, readdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import i18next, { type TOptions } from "i18next";
 import {
     asLanguage,
@@ -35,6 +34,7 @@ import {
     type Language,
 } from "./languages";
 import { setLogTranslator } from "./logMessages";
+import { appPath, CORE_I18N_DIR, MODULE_ROOTS } from "./paths";
 import { isCompiledBinary } from "./util";
 
 export type { Language } from "./languages";
@@ -48,19 +48,17 @@ export {
 
 const i18n = i18next.createInstance();
 
-const MODULES_DIR = fileURLToPath(new URL("../modules/", import.meta.url));
 
 type Catalog = Record<string, string>;
 
 /** The core catalog file plus every module's catalog for `lng` (unbundled). */
 function catalogFiles(lng: Language): string[] {
-    const files = [
-        fileURLToPath(new URL(`../i18n/${lng}.json`, import.meta.url)),
-    ];
-    for (const entry of readdirSync(MODULES_DIR).sort()) {
-        const file = `${MODULES_DIR}${entry}/i18n/${lng}.json`;
-        if (existsSync(file)) files.push(file);
-    }
+    const files = [appPath(`${CORE_I18N_DIR}/${lng}.json`)];
+    for (const root of MODULE_ROOTS)
+        for (const entry of readdirSync(appPath(root)).sort()) {
+            const file = appPath(`${root}/${entry}/i18n/${lng}.json`);
+            if (existsSync(file)) files.push(file);
+        }
     return files;
 }
 
@@ -170,7 +168,7 @@ export function t(key: string, options?: TOptions): string {
 setLogTranslator(t);
 
 /**
- * The catalog for a language, for the device API (backend/client/api.ts) and the control
+ * The catalog for a language, for the device API (client/backend/api.ts) and the control
  * server (server.ts) to serve as /i18n/<lang>.json. Loads on demand and
  * caches. null for unknown codes.
  */

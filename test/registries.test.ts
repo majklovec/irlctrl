@@ -5,8 +5,9 @@ import {
     defaultModules,
     ensureModuleSlices,
     safeModules,
-} from "../backend/client/modules";
-import { state } from "../backend/client/state";
+} from "../client/backend/modules";
+import { state } from "../client/backend/state";
+import { MODULE_ROOTS } from "../shared/paths";
 import {
     ALL_MODULES,
     allModules,
@@ -34,13 +35,25 @@ const WIDGET_IDS = ["stats", "chat"];
 /**
  * The frontend registry cannot be imported outside the browser graph (it
  * mounts the device store at module init), so its discovery is checked from
- * the files: every modules/<id>/frontend.tsx must default-export at least one
+ * the files: every <root>/<id>/frontend.tsx must default-export at least one
  * registration whose `id` matches its directory, and whose `kind` splits the
  * set into device cards (matching the backend registry) and widgets. A module
  * can register several (e.g. a device-card plus a dashboard widget) by
  * default-exporting an array of them — the registry flattens it.
  */
-const modulesDir = join(import.meta.dir, "..", "modules");
+const appDir = join(import.meta.dir, "..");
+/** Every module directory across the module roots (client/modules, server/modules). */
+const moduleDirs = (): { id: string; path: string }[] =>
+    MODULE_ROOTS.flatMap((root) =>
+        readdirSync(join(appDir, root), { withFileTypes: true })
+            .filter((dir) => dir.isDirectory())
+            .map((dir) => ({ id: dir.name, path: join(appDir, root, dir.name) })),
+    );
+const moduleDir = (id: string): string => {
+    const found = moduleDirs().find((dir) => dir.id === id);
+    if (!found) throw new Error(`no module directory for ${id}`);
+    return found.path;
+};
 
 /** The id/kind of the object a `const` declares (empty when it is not one). */
 function regOf(src: string, name: string): { id?: string; kind?: string } {
@@ -60,9 +73,8 @@ function scanFrontends(): {
         dir: string;
         registrations: { id: string; kind: string }[];
     }[] = [];
-    for (const dir of readdirSync(modulesDir, { withFileTypes: true })) {
-        if (!dir.isDirectory()) continue;
-        const file = join(modulesDir, dir.name, "frontend.tsx");
+    for (const dir of moduleDirs()) {
+        const file = join(dir.path, "frontend.tsx");
         let src: string;
         try {
             src = readFileSync(file, "utf8");
@@ -93,7 +105,7 @@ function scanFrontends(): {
             registrations.length,
             `${dir}/frontend.tsx default-exports no registration` as string,
         ).toBeGreaterThan(0);
-        out.push({ dir: dir.name, registrations });
+        out.push({ dir: dir.id, registrations });
     }
     return out;
 }
@@ -101,7 +113,7 @@ function scanFrontends(): {
 const ids = (): string[] => allModules().map((mod) => mod.id);
 
 describe("module registries", () => {
-    // The device modules are discovered from modules/*/backend.ts in the
+    // The device modules are discovered from <root>/*/backend.ts in the
     // canonical dependency order (the registry's start order).
     test("backend registry enumerates the device modules in order", () => {
         const deviceIds = ids().filter((id) => DEVICE_ORDER.includes(id));
@@ -159,7 +171,7 @@ describe("module registries", () => {
         expect(extra).toEqual([]);
         // The SRTLA card composes the routing table and modem panels.
         const srtlaSrc = readFileSync(
-            join(modulesDir, "srtla", "frontend.tsx"),
+            join(moduleDir("srtla"), "frontend.tsx"),
             "utf8",
         );
         expect(srtlaSrc).toContain("mod-srtla-modems");
@@ -181,10 +193,10 @@ describe("module registries", () => {
 
     test("frontend registry discovers via the generated manifest (no per-module imports, no Glob)", () => {
         const src = readFileSync(
-            join(import.meta.dir, "..", "frontend", "ts", "module-registry.ts"),
+            join(appDir, "shared", "ui", "module-registry.ts"),
             "utf8",
         );
-        expect(src).not.toMatch(/from "\.\.\/modules\/[\w-]+\/frontend/);
+        expect(src).not.toMatch(/modules\/[\w-]+\/frontend/);
         expect(src).not.toMatch(
             /import\.meta\.glob|Bun\.Glob|from "bun\/glob"|modules\/\*\/frontend/,
         );
@@ -203,21 +215,17 @@ describe("module registries", () => {
 
     test("settings framework discovers via the generated manifest (no per-module imports)", () => {
         const settings = readFileSync(
-            join(import.meta.dir, "..", "frontend", "ts", "settings.tsx"),
+            join(appDir, "client", "frontend", "ts", "settings.tsx"),
             "utf8",
         );
-        expect(settings).not.toMatch(
-            /from "\.\.\/\.\.\/modules\/[\w-]+\/settings/,
-        );
+        expect(settings).not.toMatch(/modules\/[\w-]+\/settings/);
         const framework = readFileSync(
-            join(import.meta.dir, "..", "frontend", "ts", "modules.tsx"),
+            join(appDir, "client", "frontend", "ts", "modules.tsx"),
             "utf8",
         );
-        expect(framework).not.toMatch(
-            /from "\.\.\/\.\.\/modules\/[\w-]+\/settings/,
-        );
+        expect(framework).not.toMatch(/modules\/[\w-]+\/settings/);
         expect(framework).toMatch(
-            /from "\.\.\/\.\.\/generated\/modules\.settings\*?"/,
+            /from "(\.\.\/)+generated\/modules\.settings\*?"/,
         );
         const manifest = join(
             import.meta.dir,
@@ -234,8 +242,8 @@ describe("module registries", () => {
             join(import.meta.dir, "..", "shared", "registry.ts"),
             "utf8",
         );
-        expect(src).not.toMatch(/from "\.\.\/modules\/[\w-]+\/backend/);
-        expect(src).toMatch(/readdirSync\(MODULES_DIR\)/);
+        expect(src).not.toMatch(/modules\/[\w-]+\/backend/);
+        expect(src).toMatch(/for \(const root of MODULE_ROOTS\)/);
         // Compiled binaries (bun build --compile) cannot run the scan — they
         // fall back to the generated manifest, like the frontend registry.
         expect(src).toMatch(/"\.\.\/generated\/modules\.backend"/);
@@ -249,72 +257,17 @@ describe("module registries", () => {
         expect(readFileSync(manifest, "utf8")).toMatch(/AUTO-GENERATED/i);
     });
 
-    /**
-     * Core files may only discover frontend modules through the generated
-     * manifest. Module-specific UI is provided through generic contributions.
-     * The test itself sits at the project root, so it is not in scope and its
-     * own expectations never trip the scan.
-     */
-    test("core (backend/ + frontend/ts/) names no module by id", () => {
-        const moduleIds = new Set<string>();
-        for (const dir of readdirSync(modulesDir, { withFileTypes: true }))
-            if (dir.isDirectory()) moduleIds.add(dir.name);
-        /** The generated frontend/backend manifests are the only sanctioned paths. */
-        const allow = new Set<string>([".generated"]);
-        const walk = (dir: string): string[] =>
-            readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
-                e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)],
-            );
-        const filesOf = (root: string): string[] =>
-            walk(root).filter((f) => f.endsWith(".ts") || f.endsWith(".tsx"));
-        const offenders: string[] = [];
-        for (const root of [
-            join(import.meta.dir, "..", "backend", "client"),
-            join(import.meta.dir, "..", "backend", "server"),
-            join(import.meta.dir, "..", "frontend", "ts"),
-        ]) {
-            for (const file of filesOf(root)) {
-                readFileSync(file, "utf8")
-                    .split("\n")
-                    .forEach((line, i) => {
-                        const m = line.match(
-                            /(?:from\s+|require\()\s*["']([^"']+)["']/,
-                        );
-                        if (!m) return;
-                        const spec = m[1];
-                        const at = spec.indexOf("modules/");
-                        if (at < 0) return;
-                        const tail = `/${spec.slice(at)}`; // e.g. "/modules/encoder/frontend"
-                        const seg = spec
-                            .slice(at + "modules/".length)
-                            .split("/")[0];
-                        if (
-                            [...allow].some(
-                                (a) => tail.endsWith(a) || seg.startsWith("."),
-                            )
-                        )
-                            return; // sanctioned doors
-                        if (moduleIds.has(seg))
-                            offenders.push(`${file}:${i + 1} → ${spec}`);
-                    });
-            }
-        }
-        expect(
-            offenders,
-            `core names module ids:\n${offenders.join("\n")}`,
-        ).toEqual([]);
-    });
+    // The import-graph boundary (core never imports a module, modules never
+    // import each other, client/server only meet through shared/) is pinned
+    // by test/boundaries.test.ts.
 
     test("core frontend pages compose module contributions without feature branches", () => {
-        const readPage = (name: string) =>
-            readFileSync(
-                join(import.meta.dir, "..", "frontend", "ts", name),
-                "utf8",
-            );
-        const app = readPage("app.tsx");
-        const dashboard = readPage("dashboard.tsx");
-        const setup = readPage("setup.tsx");
-        const devices = readPage("devices.tsx");
+        const readPage = (side: "client" | "server", name: string) =>
+            readFileSync(join(appDir, side, "frontend", "ts", name), "utf8");
+        const app = readPage("client", "app.tsx");
+        const dashboard = readPage("server", "dashboard.tsx");
+        const setup = readPage("client", "setup.tsx");
+        const devices = readPage("server", "devices.tsx");
 
         expect(app).not.toMatch(
             /moduleCard\(["'](encoder|srtla|obs-controller)/,
@@ -333,7 +286,7 @@ describe("module registries", () => {
 
     test("device modules declare their frontend contributions", () => {
         const frontend = (id: string) =>
-            readFileSync(join(modulesDir, id, "frontend.tsx"), "utf8");
+            readFileSync(join(moduleDir(id), "frontend.tsx"), "utf8");
         const encoder = frontend("encoder");
         const srtla = frontend("srtla");
         const obs = frontend("obs-controller");
@@ -349,59 +302,17 @@ describe("module registries", () => {
         expect(obs).not.toContain("st.obs");
     });
 
-    test("frontend modules do not import one another", () => {
-        const moduleIds = new Set(
-            readdirSync(modulesDir, { withFileTypes: true })
-                .filter(
-                    (entry) =>
-                        entry.isDirectory() &&
-                        existsSync(
-                            join(modulesDir, entry.name, "frontend.tsx"),
-                        ),
-                )
-                .map((entry) => entry.name),
-        );
-        const offenders: string[] = [];
-        for (const id of moduleIds) {
-            const source = readFileSync(
-                join(modulesDir, id, "frontend.tsx"),
-                "utf8",
-            );
-            source.split("\n").forEach((line, index) => {
-                const specifier = line.match(/from\s+["']([^"']+)["']/)?.[1];
-                const importedModule = specifier?.match(/^\.\.\/([^/]+)/)?.[1];
-                if (
-                    importedModule &&
-                    importedModule !== id &&
-                    moduleIds.has(importedModule)
-                )
-                    offenders.push(`${id}/frontend.tsx:${index + 1}`);
-            });
-        }
-        expect(offenders).toEqual([]);
-    });
+    // "frontend modules do not import one another" is covered by
+    // test/boundaries.test.ts ("a module never imports another module").
 
     test("the encoder owns its dedicated pipeline editor page", () => {
-        const modulePage = join(
-            modulesDir,
-            "encoder",
-            "pages",
-            "pipelineedit.html",
-        );
+        const modulePage = join(moduleDir("encoder"), "pages", "pipelineedit.html");
         expect(existsSync(modulePage)).toBe(true);
         expect(readFileSync(modulePage, "utf8")).toContain(
             "../pipeline-editor.tsx",
         );
         expect(
-            existsSync(
-                join(
-                    import.meta.dir,
-                    "..",
-                    "frontend",
-                    "app",
-                    "pipelineedit.html",
-                ),
-            ),
+            existsSync(join(appDir, "client", "frontend", "pages", "pipelineedit.html")),
         ).toBe(false);
     });
 });

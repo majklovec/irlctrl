@@ -2,7 +2,7 @@
  * The backend module registration contract — the only shape the core knows
  * about a module. `modules/<id>/backend.ts` default-exports one of these;
  * the registry (shared/registry.ts) discovers and validates it, the device
- * lifecycle (backend/client/modules.ts) drives it.
+ * lifecycle (client/backend/modules.ts) drives it.
  *
  * Everything module-specific lives behind this contract: a module parses its
  * own CLI arguments, owns its persisted config sections (`core.state.data`),
@@ -71,7 +71,7 @@ export interface EmitOptions {
 
 export type Emit = (event: string, data: unknown, opts?: EmitOptions) => void;
 
-/** What `start()` receives. `TCore` is the process-services bag (see backend/client/module-core.ts). */
+/** What `start()` receives. `TCore` is the process-services bag (see client/backend/module-core.ts). */
 export interface ModuleStartContext<TCore = unknown> {
     /** The module's persisted settings slice (`settings.modules[<configKey>]`). */
     config: Record<string, unknown>;

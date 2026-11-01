@@ -8,7 +8,7 @@ import {
     orphanedButtons,
     parseButtons,
     serializeButtons,
-} from "../modules/deck/types";
+} from "../server/modules/deck/types";
 import {
     ALL_MODULES,
     dashboardActionKey,

@@ -7,9 +7,9 @@ import {
     STATS_EDITOR_FIELDS,
     statsSeriesCapFromConfig,
     statsSpecsFromConfig,
-} from "../modules/stats/config";
-import { currentViewerTotal, mergeViewerSeries } from "../modules/stats/series";
-import type { StatsLive } from "../modules/stats/types";
+} from "../server/modules/stats/config";
+import { currentViewerTotal, mergeViewerSeries } from "../server/modules/stats/series";
+import type { StatsLive } from "../server/modules/stats/types";
 import { visibleWidgetConfigFields } from "../shared/types";
 
 describe("stats channel configuration", () => {

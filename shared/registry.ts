@@ -4,7 +4,7 @@
  * Every modules/<id>/backend.ts default-exports a BackendModule registration
  * (shared/module-contract.ts). Discovery has two modes:
  *
- *  - unbundled (bun backend/server/server.ts, bun test): a runtime directory
+ *  - unbundled (bun server/backend/server.ts, bun test): a runtime directory
  *    scan anchored on import.meta.url — adding a module needs no edit here.
  *  - compiled binaries (bun build --compile): the build-time manifest
  *    generated/modules.backend.ts (scripts/gen-modules.ts); a compiled process
@@ -12,12 +12,11 @@
  *
  * Malformed registrations are rejected at load with the module id in the
  * message. Both processes share this file: the device lifecycle
- * (backend/client/modules.ts) drives start/stop/dispatch, the control server
+ * (client/backend/modules.ts) drives start/stop/dispatch, the control server
  * uses the widget hubs, pages and widget declarations.
  */
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { registerLogWording } from "./logMessages";
 import type {
     BackendModule,
@@ -30,9 +29,8 @@ import type {
 } from "./module-contract";
 import type { Role, RoleDefinition } from "./roles";
 import type { ServerDashboard, Status, WidgetConfigField } from "./types";
+import { appPath, MODULE_ROOTS } from "./paths";
 import { isCompiledBinary } from "./util";
-
-const MODULES_DIR = fileURLToPath(new URL("../modules", import.meta.url));
 
 export type {
     BackendModule,
@@ -230,10 +228,11 @@ async function discover(): Promise<Map<string, BackendModule>> {
             );
         return found;
     }
-    for (const entry of readdirSync(MODULES_DIR).sort()) {
-        const backendPath = join(MODULES_DIR, entry, "backend.ts");
+    for (const root of MODULE_ROOTS)
+    for (const entry of readdirSync(appPath(root)).sort()) {
+        const backendPath = join(appPath(root), entry, "backend.ts");
         if (!existsSync(backendPath)) continue;
-        const file = `modules/${entry}/backend.ts`;
+        const file = `${root}/${entry}/backend.ts`;
         let ns: { default?: unknown };
         try {
             ns = (await import(backendPath)) as { default?: unknown };
