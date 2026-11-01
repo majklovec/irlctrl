@@ -1,17 +1,18 @@
 /** @jsx m */
-import m from "mithril";
-import { Icon } from "../../../../shared/ui/components/icons";
-import type { Vnode } from "mithril";
-import { DEFAULT_RECTANGLE_PROPS } from "../overlay_schema";
-import { t } from "../../../../shared/ui/i18n";
+
+import { Icon } from "@ui/components/icons";
+import { t } from "@ui/i18n";
 import type {
 	ElementContext,
 	ElementProps,
 	OverlayElement,
 	OverlayElementDef,
-} from "../../../../shared/ui/overlay/element";
-import { strProp, numProp } from "../../../../shared/ui/overlay/element";
-import { bindField } from "../../../../shared/ui/overlay/fields";
+} from "@ui/overlay/element";
+import { numProp, strProp } from "@ui/overlay/element";
+import { bindField } from "@ui/overlay/fields";
+import type { Vnode } from "mithril";
+import m from "mithril";
+import { DEFAULT_RECTANGLE_PROPS } from "../overlay_schema";
 
 function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	// `element` is already resolved by the renderer — props carry binding values.
@@ -25,8 +26,7 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	return m(".overlay-shape", {
 		style: {
 			background: fill,
-			border:
-				strokeWidth > 0 ? `${strokeWidth}px solid ${stroke}` : undefined,
+			border: strokeWidth > 0 ? `${strokeWidth}px solid ${stroke}` : undefined,
 			borderRadius: "0",
 		},
 	});

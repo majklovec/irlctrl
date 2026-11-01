@@ -15,22 +15,18 @@
  * `?<name>=<value>` pairs); token segments render in the accent colour.
  */
 
-import type { Vnode } from "mithril";
-import m from "mithril";
-import { Icon } from "../../../../shared/ui/components/icons";
-import { t } from "../../../../shared/ui/i18n";
+import { Icon } from "@ui/components/icons";
+import { t } from "@ui/i18n";
 import type {
 	ElementContext,
 	ElementProps,
 	OverlayElement,
 	OverlayElementDef,
-} from "../../../../shared/ui/overlay/element";
-import {
-	numProp,
-	strProp,
-	triggerPhase,
-} from "../../../../shared/ui/overlay/element";
-import { bindField } from "../../../../shared/ui/overlay/fields";
+} from "@ui/overlay/element";
+import { numProp, strProp, triggerPhase } from "@ui/overlay/element";
+import { bindField } from "@ui/overlay/fields";
+import type { Vnode } from "mithril";
+import m from "mithril";
 import {
 	ALERT_INTRO_ANIMATIONS,
 	ALERT_OUTRO_ANIMATIONS,

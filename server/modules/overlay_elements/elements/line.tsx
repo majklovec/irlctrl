@@ -1,17 +1,18 @@
 /** @jsx m */
-import m from "mithril";
-import { Icon } from "../../../../shared/ui/components/icons";
-import type { Vnode } from "mithril";
-import { DEFAULT_LINE_PROPS } from "../overlay_schema";
-import { t } from "../../../../shared/ui/i18n";
+
+import { Icon } from "@ui/components/icons";
+import { t } from "@ui/i18n";
 import type {
 	ElementContext,
 	ElementProps,
 	OverlayElement,
 	OverlayElementDef,
-} from "../../../../shared/ui/overlay/element";
-import { strProp, numProp } from "../../../../shared/ui/overlay/element";
-import { bindField } from "../../../../shared/ui/overlay/fields";
+} from "@ui/overlay/element";
+import { numProp, strProp } from "@ui/overlay/element";
+import { bindField } from "@ui/overlay/fields";
+import type { Vnode } from "mithril";
+import m from "mithril";
+import { DEFAULT_LINE_PROPS } from "../overlay_schema";
 
 /**
  * Which box diagonal a drag delta runs along. The box is stored in min/abs
@@ -49,7 +50,7 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 			// margin shorthand is top/right/bottom/left — the -length/2 must be on
 			// the LEFT side so the bar's center (and rotation axis) lands on the
 			// box center; the line then spans corner-to-corner of w/h
-			margin: `${(-(thickness / 2).toFixed(1))}px 0 0 ${(-(Math.max(1, length) / 2).toFixed(1))}px`,
+			margin: `${-(thickness / 2).toFixed(1)}px 0 0 ${-(Math.max(1, length) / 2).toFixed(1)}px`,
 			position: "absolute",
 		},
 	});

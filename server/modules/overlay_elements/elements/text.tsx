@@ -1,17 +1,18 @@
 /** @jsx m */
-import m from "mithril";
-import { Icon } from "../../../../shared/ui/components/icons";
-import type { Vnode } from "mithril";
-import { DEFAULT_TEXT_PROPS } from "../overlay_schema";
-import { t } from "../../../../shared/ui/i18n";
+
+import { Icon } from "@ui/components/icons";
+import { t } from "@ui/i18n";
 import type {
 	ElementContext,
 	ElementProps,
 	OverlayElement,
 	OverlayElementDef,
-} from "../../../../shared/ui/overlay/element";
-import { strProp, numProp } from "../../../../shared/ui/overlay/element";
-import { bindField } from "../../../../shared/ui/overlay/fields";
+} from "@ui/overlay/element";
+import { numProp, strProp } from "@ui/overlay/element";
+import { bindField } from "@ui/overlay/fields";
+import type { Vnode } from "mithril";
+import m from "mithril";
+import { DEFAULT_TEXT_PROPS } from "../overlay_schema";
 
 interface TextProps {
 	text: string;
@@ -32,8 +33,7 @@ function textProps(p: Record<string, unknown>): TextProps {
 		color: strProp(p, "color", "#ffffff"),
 		fontWeight: numProp(p, "fontWeight", 600),
 		lineHeight: numProp(p, "lineHeight", 1.2),
-		textAlign:
-			align === "center" || align === "right" ? align : "left",
+		textAlign: align === "center" || align === "right" ? align : "left",
 	};
 }
 
@@ -145,9 +145,7 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 						value={String(p.textAlign ?? "left")}
 						onchange={(ev: Event) =>
 							mutate((el) => {
-								el.props.textAlign = (
-									ev.target as HTMLSelectElement
-								).value;
+								el.props.textAlign = (ev.target as HTMLSelectElement).value;
 							})
 						}
 					>
@@ -164,8 +162,7 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 
 function validate(e: OverlayElement): string[] {
 	const problems: string[] = [];
-	if (typeof e.props.text !== "string")
-		problems.push("text is not a string");
+	if (typeof e.props.text !== "string") problems.push("text is not a string");
 	const size = numProp(e.props, "fontSize", 48);
 	if (!(size >= 1 && size <= 2000))
 		problems.push("font size out of range (1–2000)");

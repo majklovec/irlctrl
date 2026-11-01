@@ -1,3 +1,6 @@
+import { apiTry } from "@ui/api_client";
+import { elementDef } from "@ui/overlay/registry";
+import { uuid } from "@ui/util";
 import m from "mithril";
 import type {
     Asset,
@@ -8,9 +11,6 @@ import type {
     Variable,
     VariableValue,
 } from "../../../../shared/overlay";
-import { apiTry } from "../../../../shared/ui/api_client";
-import { elementDef } from "../../../../shared/ui/overlay/registry";
-import { uuid } from "../../../../shared/ui/util";
 import { serverLive } from "../services/serverws";
 import type { ElementContext } from "./overlay_render";
 import { assetUrl, resolveElement } from "./overlay_render";

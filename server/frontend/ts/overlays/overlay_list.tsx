@@ -10,11 +10,11 @@ import {
 	Table,
 	Toolbar,
 } from "@ui/components/";
+import { confirmDialog } from "@ui/components/confirm";
+import { Icon } from "@ui/components/icons";
+import { t } from "@ui/i18n";
+import { mountPage } from "@ui/util";
 import m from "mithril";
-import { confirmDialog } from "../../../../shared/ui/components/confirm";
-import { Icon } from "../../../../shared/ui/components/icons";
-import { t } from "../../../../shared/ui/i18n";
-import { mountPage } from "../../../../shared/ui/util";
 import {
 	createScene,
 	deleteScene,

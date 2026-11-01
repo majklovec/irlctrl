@@ -10,25 +10,25 @@
  * registry; no element-specific code lives here.
  */
 
-import type { Vnode } from "mithril";
-import m from "mithril";
-import type { OverlayElement } from "../../../../shared/overlay";
-import { overlayElementSchema } from "../../../../shared/overlay_elements";
 import {
 	assetUrl,
 	elementStyle,
 	resolveElement,
 	resolveElementProps,
-} from "../../../../shared/ui/overlay/element";
+} from "@ui/overlay/element";
+import type { Vnode } from "mithril";
+import m from "mithril";
+import type { OverlayElement } from "../../../../shared/overlay";
+import { overlayElementSchema } from "../../../../shared/overlay_elements";
 
 export type {
 	CSS,
 	ElementContext,
-} from "../../../../shared/ui/overlay/element";
+} from "@ui/overlay/element";
 export { assetUrl, elementStyle, resolveElement, resolveElementProps };
 
-import type { ElementContext } from "../../../../shared/ui/overlay/element";
-import { elementDef } from "../../../../shared/ui/overlay/registry";
+import type { ElementContext } from "@ui/overlay/element";
+import { elementDef } from "@ui/overlay/registry";
 
 /** Render one element (content + positioning) for editor and runtime.
  * Each element is resolved against its variable bindings ONCE here; both the

@@ -1,17 +1,18 @@
 /** @jsx m */
-import m from "mithril";
-import { Icon } from "../../../../shared/ui/components/icons";
-import type { Vnode } from "mithril";
-import { DEFAULT_PROGRESS_PROPS } from "../overlay_schema";
-import { t } from "../../../../shared/ui/i18n";
+
+import { Icon } from "@ui/components/icons";
+import { t } from "@ui/i18n";
 import type {
 	ElementContext,
 	ElementProps,
 	OverlayElement,
 	OverlayElementDef,
-} from "../../../../shared/ui/overlay/element";
-import { strProp, numProp } from "../../../../shared/ui/overlay/element";
-import { bindField } from "../../../../shared/ui/overlay/fields";
+} from "@ui/overlay/element";
+import { numProp, strProp } from "@ui/overlay/element";
+import { bindField } from "@ui/overlay/fields";
+import type { Vnode } from "mithril";
+import m from "mithril";
+import { DEFAULT_PROGRESS_PROPS } from "../overlay_schema";
 
 /** Clamp the (possibly bound) value into 0–100 so a bad variable can't widen
  * the fill past the track. */
@@ -25,7 +26,11 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	const p = element.props;
 	const value = clampedValue(p);
 	const fill = strProp(p, "fill", DEFAULT_PROGRESS_PROPS.fill);
-	const background = strProp(p, "background", DEFAULT_PROGRESS_PROPS.background);
+	const background = strProp(
+		p,
+		"background",
+		DEFAULT_PROGRESS_PROPS.background,
+	);
 	const radius = numProp(p, "radius", DEFAULT_PROGRESS_PROPS.radius);
 	// The fill is laid out with absolute positioning, NOT flexbox. OBS's
 	// embedded Chromium (CEF) can collapse a flex container whose height
@@ -110,8 +115,7 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 						value={strProp(p, "background", DEFAULT_PROGRESS_PROPS.background)}
 						oninput={(ev: Event) =>
 							mutate((el) => {
-								el.props.background =
-									(ev.target as HTMLInputElement).value;
+								el.props.background = (ev.target as HTMLInputElement).value;
 							})
 						}
 					/>,
@@ -128,9 +132,7 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 					value={numProp(p, "radius", DEFAULT_PROGRESS_PROPS.radius)}
 					oninput={(ev: Event) =>
 						mutate((el) => {
-							el.props.radius = Number(
-								(ev.target as HTMLInputElement).value,
-							);
+							el.props.radius = Number((ev.target as HTMLInputElement).value);
 						})
 					}
 				/>,

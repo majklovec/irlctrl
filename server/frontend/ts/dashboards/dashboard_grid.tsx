@@ -2,6 +2,8 @@
  * `.grid-stack-item` DOM (position + drag/resize); Mithril owns the inner live
  * widget content, mounted into each item's `.grid-stack-item-content`. The page
  * passes its reactive `widgets` array; here we reconcile the grid to it. */
+
+import type { MithrilJSXComponent } from "@ui/jsx";
 import { GridStack, type GridStackWidget } from "gridstack";
 import m from "mithril";
 import type { ServerDashboardWidget } from "../../../../shared/contracts/wire";
@@ -10,7 +12,6 @@ import {
 	widgetInner,
 	widgetSize,
 } from "./dashboard_widgets";
-import type { MithrilJSXComponent } from "../../../../shared/ui/jsx";
 
 export interface GridProps {
 	widgets: ServerDashboardWidget[];

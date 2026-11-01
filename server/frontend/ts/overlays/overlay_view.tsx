@@ -14,6 +14,13 @@
  *   `overlays.applyAlert` WS uplink — so a queued alert's values never
  *   clobber the on-air ones early, and the written values persist
  */
+
+import {
+	type ElementContext,
+	TRIGGER_OUTRO_MS,
+	type TriggerState,
+} from "@ui/overlay/element";
+import { elementDef } from "@ui/overlay/registry";
 import m from "mithril";
 import type {
 	Asset,
@@ -23,16 +30,7 @@ import type {
 	Variable,
 	VariableValue,
 } from "../../../../shared/overlay";
-import {
-	type ElementContext,
-	TRIGGER_OUTRO_MS,
-	type TriggerState,
-} from "../../../../shared/ui/overlay/element";
-import { elementDef } from "../../../../shared/ui/overlay/registry";
-import {
-	assetUrl,
-	sceneElementsView,
-} from "./overlay_render";
+import { assetUrl, sceneElementsView } from "./overlay_render";
 import "../../css/overlay.css";
 
 interface RuntimeState {
@@ -85,10 +83,7 @@ interface PendingAlert {
  * one); drained when the element's current trigger expires. Values are
  * applied only when the alert plays, so queued alerts never clobber the
  * on-air values early */
-const alertQueues = new Map<
-	string,
-	PendingAlert[]
->();
+const alertQueues = new Map<string, PendingAlert[]>();
 
 let ws: WebSocket | undefined;
 let delay = 1000;
@@ -198,16 +193,14 @@ function playAlert(
 ): boolean {
 	for (const [name, value] of Object.entries(payload)) {
 		const variable = state.variables.find((v) => v.name === name);
-		if (variable)
-			variable.value = value as VariableValue;
+		if (variable) variable.value = value as VariableValue;
 	}
-	const duration =
-		elementDef(element.type)?.onTrigger(
-			element,
-			eventName,
-			payload,
-			runtimeCtx(),
-		);
+	const duration = elementDef(element.type)?.onTrigger(
+		element,
+		eventName,
+		payload,
+		runtimeCtx(),
+	);
 	if (duration === undefined || !Number.isFinite(duration) || duration <= 0)
 		return false;
 	activateTrigger(element.id, payload, duration);
@@ -241,13 +234,9 @@ function scheduleTriggerLifecycle(elementId: string, duration: number): void {
 				if (queue && queue.length > 0) {
 					while (queue.length > 0) {
 						const [next, ...rest] = queue;
-						if (rest.length > 0)
-							alertQueues.set(elementId, rest);
+						if (rest.length > 0) alertQueues.set(elementId, rest);
 						else alertQueues.delete(elementId);
-						if (
-							playAlert(next.element, next.eventName, next.payload)
-						)
-							break;
+						if (playAlert(next.element, next.eventName, next.payload)) break;
 					}
 				}
 				m.redraw();

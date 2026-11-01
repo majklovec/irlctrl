@@ -10,6 +10,7 @@
  * conflict. Broadcast `dashboards.changed` events rebase the dashboard from
  * the server. */
 
+import { ApiError, apiJson, apiTry } from "@ui/api_client";
 import {
 	Button,
 	IconButton,
@@ -19,15 +20,14 @@ import {
 	Toast,
 	useToast,
 } from "@ui/components/";
+import { Icon } from "@ui/components/icons";
+import { t } from "@ui/i18n";
+import { mountPage, setHeaderColor } from "@ui/util";
 import m from "mithril";
 import type {
 	ServerDashboard,
 	ServerDashboardWidget,
 } from "../../../../shared/contracts/wire";
-import { ApiError, apiJson, apiTry } from "../../../../shared/ui/api_client";
-import { Icon } from "../../../../shared/ui/components/icons";
-import { t } from "../../../../shared/ui/i18n";
-import { mountPage, setHeaderColor } from "../../../../shared/ui/util";
 import { DEFAULT_COLOR } from "../../../../shared/validate";
 import { GridDashboard } from "./dashboard_grid";
 import {

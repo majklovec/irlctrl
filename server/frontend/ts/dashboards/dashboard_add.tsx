@@ -7,7 +7,11 @@
  * free grid slot and the page returns to the (live) dashboard view. A 409
  * conflict reloads the server copy; the widget is not added twice. */
 
+import { ApiError, apiJson, apiTry } from "@ui/api_client";
 import { Button, Field, Input, Page, ServerNav } from "@ui/components/";
+import { t } from "@ui/i18n";
+import { widgetModule } from "@ui/module_registry";
+import { mountPage, setHeaderColor, uuid } from "@ui/util";
 import m from "mithril";
 import type {
 	ServerDashboard,
@@ -18,10 +22,6 @@ import {
 	configFieldName,
 	visibleWidgetConfigFields,
 } from "../../../../shared/contracts/wire";
-import { ApiError, apiJson, apiTry } from "../../../../shared/ui/api_client";
-import { t } from "../../../../shared/ui/i18n";
-import { widgetModule } from "../../../../shared/ui/module_registry";
-import { mountPage, setHeaderColor, uuid } from "../../../../shared/ui/util";
 import { DEFAULT_COLOR } from "../../../../shared/validate";
 import { dashboardViewUrl } from "./dashboard_urls";
 import {

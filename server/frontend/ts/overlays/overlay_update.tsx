@@ -18,9 +18,9 @@
  */
 
 import { Page, ServerNav } from "@ui/components/";
+import { t } from "@ui/i18n";
+import { mountPage } from "@ui/util";
 import m from "mithril";
-import { t } from "../../../../shared/ui/i18n";
-import { mountPage } from "../../../../shared/ui/util";
 import { canvasArea } from "./editor/canvas";
 import { onKey } from "./editor/keyboard";
 import { inspector } from "./editor/layers";

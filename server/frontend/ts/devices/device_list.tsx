@@ -2,15 +2,15 @@
  * list (devices.snapshot / devices.changed over the shared feed websocket). */
 
 import { Badge, Card, Page, ServerNav } from "@ui/components/";
-import m from "mithril";
-import type { DeviceSummary } from "../../../../shared/contracts/wire";
-import { RoleTag } from "../../../../shared/ui/components/role_tag";
-import { i18nReady, t } from "../../../../shared/ui/i18n";
+import { RoleTag } from "@ui/components/role_tag";
+import { i18nReady, t } from "@ui/i18n";
 import {
 	deviceSummaryColumnDefinitions,
 	deviceSummaryColumnsFor,
-} from "../../../../shared/ui/module_registry";
-import { mountPage, since } from "../../../../shared/ui/util";
+} from "@ui/module_registry";
+import { mountPage, since } from "@ui/util";
+import m from "mithril";
+import type { DeviceSummary } from "../../../../shared/contracts/wire";
 import { serverLive } from "../services/serverws";
 
 const state = {

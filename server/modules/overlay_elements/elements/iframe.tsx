@@ -1,17 +1,18 @@
 /** @jsx m */
-import m from "mithril";
-import { Icon } from "../../../../shared/ui/components/icons";
-import type { Vnode } from "mithril";
-import { DEFAULT_IFRAME_PROPS } from "../overlay_schema";
-import { t } from "../../../../shared/ui/i18n";
+
+import { Icon } from "@ui/components/icons";
+import { t } from "@ui/i18n";
 import type {
 	ElementContext,
 	ElementProps,
 	OverlayElement,
 	OverlayElementDef,
-} from "../../../../shared/ui/overlay/element";
-import { drawIframe } from "../../../../shared/ui/overlay/element";
-import { bindField } from "../../../../shared/ui/overlay/fields";
+} from "@ui/overlay/element";
+import { drawIframe } from "@ui/overlay/element";
+import { bindField } from "@ui/overlay/fields";
+import type { Vnode } from "mithril";
+import m from "mithril";
+import { DEFAULT_IFRAME_PROPS } from "../overlay_schema";
 
 function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 	// `element` is already resolved by the renderer — drawIframe reads props.url.
@@ -43,8 +44,7 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 
 function validate(e: OverlayElement): string[] {
 	const problems: string[] = [];
-	if (typeof e.props.url !== "string")
-		problems.push("url is not a string");
+	if (typeof e.props.url !== "string") problems.push("url is not a string");
 	return problems;
 }
 

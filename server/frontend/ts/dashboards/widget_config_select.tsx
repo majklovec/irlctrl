@@ -3,10 +3,11 @@
 // — e.g. the chat widget's speech voices, which only the browser knows);
 // until those arrive the select shows a placeholder and the saved value, if
 // any.
+
+import { t } from "@ui/i18n";
 import m from "mithril";
-import type { VisibleWidgetConfigField } from "../../../../shared/contracts/wire";
-import { t } from "../../../../shared/ui/i18n";
 import type { ChannelWidgetModule } from "../../../../shared/contracts/frontend_module";
+import type { VisibleWidgetConfigField } from "../../../../shared/contracts/wire";
 
 /** A visible select field (the non-string, non-hidden `WidgetConfigField`). */
 type SelectField = Extract<VisibleWidgetConfigField, { type: "select" }>;

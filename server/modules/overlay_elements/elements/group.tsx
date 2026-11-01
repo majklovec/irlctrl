@@ -1,11 +1,12 @@
 /** @jsx m */
-import type { Children, Vnode } from "mithril";
+
 import type {
 	ElementContext,
 	ElementProps,
 	OverlayElement,
 	OverlayElementDef,
-} from "../../../../shared/ui/overlay/element";
+} from "@ui/overlay/element";
+import type { Children, Vnode } from "mithril";
 
 // A group is a container: it renders no content of its own (children are the
 // elements that set `parentId` to it) and shows no resize handles — it is
