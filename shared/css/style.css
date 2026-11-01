@@ -1,69 +1,6 @@
 @import "../../node_modules/gridstack/dist/gridstack.min.css";
+@import "./tokens.css";
 
-:root {
-    color-scheme: dark;
-
-    /* ──────────────────────────────────────────────────────────
-     THEME SEED — change this one value to retheme the whole UI.
-     Everything below derives from it. Try: #3b82f6, #8b5cf6,
-     #10b981, #f97316, #ef4444, #0ea5e9, #eab308.
-     ────────────────────────────────────────────────────────── */
-    --header-color: #3b82f6;
-
-    /* Neutral base the theme tints toward */
-    --base: #0b0d12;
-    --base-2: #14171e;
-
-    /* ── Derived palette (do not edit unless you want to change the recipe) ── */
-    --bg: color-mix(in srgb, var(--header-color) 6%, var(--base));
-    --bg-glow: color-mix(in srgb, var(--header-color) 22%, transparent);
-    --bg-glow-2: color-mix(in srgb, var(--header-color) 12%, transparent);
-
-    --header-bg: color-mix(in srgb, var(--header-color) 10%, var(--base));
-    --header-bg-blur: color-mix(in srgb, var(--header-bg) 78%, transparent);
-
-    --card-solid: color-mix(in srgb, var(--header-color) 5%, var(--base-2));
-    --card: color-mix(in srgb, var(--card-solid) 82%, transparent);
-    --card-subtle: color-mix(in srgb, var(--card-solid) 55%, transparent);
-
-    --border: color-mix(in srgb, var(--header-color) 14%, #262b36);
-    --border-strong: color-mix(in srgb, var(--header-color) 28%, #353b48);
-
-    --text: color-mix(in srgb, var(--header-color) 6%, #e6e8ee);
-    --muted: color-mix(in srgb, var(--header-color) 10%, #8b93a7);
-
-    --accent: var(--header-color);
-    --accent-hover: color-mix(in srgb, var(--accent) 78%, white);
-
-    --ok: #22c55e;
-    --warn: #f59e0b;
-    --bad: #ef4444;
-
-    --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-    --ring: color-mix(in srgb, var(--accent) 35%, transparent);
-
-    --radius-xs: 6px;
-    --radius-sm: 10px;
-    --radius: 12px;
-    --radius-lg: 16px;
-    --radius-pill: 999px;
-    --t: 160ms ease;
-
-    /* Mobile-first breakpoint scale (Bulma/Pico inspired). Browsers do not
-     * accept var() in @media conditions, so the queries below spell out the
-     * same literal values — these variables document the shared scale. */
-    --bp-sm: 576px;
-    --bp-md: 768px;
-    --bp-lg: 1024px;
-    --bp-xl: 1216px;
-
-    font-family:
-        system-ui,
-        -apple-system,
-        "Segoe UI",
-        Roboto,
-        sans-serif;
-}
 
 * {
     box-sizing: border-box;
@@ -209,7 +146,7 @@ header:has(.profile-menu) > .actions {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    box-shadow: var(--shadow-sm);
 }
 .profile-menu-dropdown > * {
     display: block;
@@ -661,7 +598,7 @@ button {
     cursor: pointer;
     background: var(--accent);
     border-color: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
     font-weight: 600;
     box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 30%, transparent);
     transition:
@@ -946,7 +883,7 @@ input[type="checkbox"]::before {
     content: "";
     inline-size: 0.7rem;
     block-size: 0.7rem;
-    background: #fff;
+    background: var(--on-accent);
     clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
     transform: scale(0);
     transition: transform var(--t);
@@ -1241,7 +1178,7 @@ td.num {
 .wiz-item.done .wiz-dot {
     background: var(--accent);
     border-color: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
 }
 .wiz-item.done + .wiz-item::before {
     background: var(--accent);
@@ -1332,7 +1269,7 @@ td.num {
 .dash-widget-version.stale {
     opacity: 1;
     font-weight: 600;
-    color: #d97706;
+    color: var(--warn-strong);
 }
 .dash-widget-badge {
     flex-shrink: 0;
@@ -1361,11 +1298,11 @@ td.num {
 }
 .dash-widget-actions .icon-btn:hover {
     background: var(--border);
-    color: #fff;
+    color: var(--text-strong);
     transform: none;
 }
 .dash-widget-actions .dash-widget-remove:hover {
-    color: var(--danger, #ef4444);
+    color: var(--danger);
 }
 .dash-widget-body {
     flex: 1;
@@ -1389,7 +1326,7 @@ td.num {
     white-space: nowrap;
 }
 .dash-back:hover {
-    color: #fff;
+    color: var(--text-strong);
 }
 .dash-name-btn {
     position: relative;
@@ -1411,7 +1348,7 @@ td.num {
     background: var(--base-2);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    box-shadow: 0 8px 26px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-lg);
     padding: 0.4rem;
     display: flex;
     flex-direction: column;
@@ -1421,7 +1358,7 @@ td.num {
     text-align: left;
 }
 .dash-name-menu button.danger {
-    color: var(--danger, #ef4444);
+    color: var(--danger);
 }
 /* "Add widget" bar — above the grid, edit mode only */
 .dash-add-bar {
@@ -1470,10 +1407,10 @@ header h1 .dash-name-input {
     color: var(--accent);
 }
 .dash-save-saved {
-    color: var(--success, #10b981);
+    color: var(--success);
 }
 .dash-save-error {
-    color: var(--danger, #ef4444);
+    color: var(--danger);
 }
 .dash-online {
     white-space: nowrap;
@@ -1489,7 +1426,7 @@ header h1 .dash-name-input {
     border-left: 3px solid var(--accent);
     border-radius: var(--radius);
     padding: 0.5rem 0.9rem;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    box-shadow: var(--shadow-toast);
     max-width: 80vw;
 }
 .dash-empty {
@@ -1553,7 +1490,7 @@ header h1 .dash-name-input {
 .tab.active {
     background: var(--accent);
     border-color: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
 }
 
 /* Editor tables + toolbars */
@@ -1794,11 +1731,11 @@ p.message {
     border-radius: 12px;
     overflow: hidden;
     background:
-        linear-gradient(45deg, #1a1e27 25%, transparent 25%) 0 0 / 24px 24px,
-        linear-gradient(-45deg, #1a1e27 25%, transparent 25%) 0 12px / 24px 24px,
-        linear-gradient(45deg, transparent 75%, #1a1e27 75%) 12px -12px / 24px 24px,
-        linear-gradient(-45deg, transparent 75%, #1a1e27 75%) 12px 0 / 24px 24px
-            #10131a;
+        linear-gradient(45deg, var(--canvas-check) 25%, transparent 25%) 0 0 / 24px 24px,
+        linear-gradient(-45deg, var(--canvas-check) 25%, transparent 25%) 0 12px / 24px 24px,
+        linear-gradient(45deg, transparent 75%, var(--canvas-check) 75%) 12px -12px / 24px 24px,
+        linear-gradient(-45deg, transparent 75%, var(--canvas-check) 75%) 12px 0 / 24px 24px
+            var(--canvas-bg);
 }
 .ov-canvas-scroll {
     flex: 1;
@@ -1809,7 +1746,7 @@ p.message {
     position: relative;
     box-shadow:
         0 0 0 1px var(--border-strong),
-        0 12px 40px rgb(0 0 0 / 50%);
+        var(--shadow-lg);
 }
 .ov-selection {
     position: absolute;
@@ -1948,7 +1885,7 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
     cursor: text;
     /* opaque wrapper + textarea fully hide the text element underneath,
     so the glyphs never double up while editing */
-    background: #10131a;
+    background: var(--canvas-bg);
 }
 .ov-inline-edit-input::selection {
     background: color-mix(in srgb, var(--accent) 40%, transparent);
@@ -2018,7 +1955,7 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
     text-align: center;
     font-size: 11px;
     border-radius: 9px;
-    background: var(--card-subtle, rgba(127, 127, 127, 0.18));
+    background: var(--card-subtle);
     color: var(--muted);
 }
 .ov-layers-list {
@@ -2050,7 +1987,7 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
     text-align: left;
 }
 .ov-layer:hover {
-    background: var(--card-subtle, rgba(127, 127, 127, 0.12));
+    background: var(--card-subtle);
 }
 .ov-layer-sel {
     border-color: var(--accent);
@@ -2225,7 +2162,7 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
     color: var(--accent);
 }
 .ov-var-copy.ov-copied {
-    color: var(--ok, #3fb950);
+    color: var(--ok);
 }
 .ov-var input {
     flex: 1;
@@ -2286,7 +2223,7 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
     background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 .ov-copied {
-    color: var(--ok, #3fb950);
+    color: var(--ok);
 }
 
 /* Second strip flush under the main header (the overlay editor's icon
@@ -2344,7 +2281,7 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
     align-items: center;
     justify-content: center;
     padding: 1rem;
-    background: rgba(0, 0, 0, 0.55);
+    background: var(--scrim);
     backdrop-filter: blur(2px);
 }
 .modal {

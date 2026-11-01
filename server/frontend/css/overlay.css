@@ -11,7 +11,9 @@ body,
 }
 
 body {
-    color: #fff;
+    /* the runtime page is theme-less: white text over a transparent body */
+    --text: #fff;
+    color: var(--text);
     font-family:
         "Inter",
         system-ui,

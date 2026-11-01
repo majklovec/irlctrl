@@ -1,0 +1,89 @@
+/*
+ * Design tokens — the single place colours, radii, motion and breakpoints
+ * are defined. Everything else (shared/css/style.css, the module
+ * stylesheets) uses these variables; test/css_tokens.test.ts rejects a hex
+ * literal anywhere but a custom-property value, so a module that needs a
+ * colour of its own (a platform brand, a syntax palette) declares it as a
+ * variable in its own stylesheet.
+ */
+:root {
+    color-scheme: dark;
+
+    /* ──────────────────────────────────────────────────────────
+     THEME SEED — change this one value to retheme the whole UI.
+     Everything below derives from it. Try: #3b82f6, #8b5cf6,
+     #10b981, #f97316, #ef4444, #0ea5e9, #eab308.
+     ────────────────────────────────────────────────────────── */
+    --header-color: #3b82f6;
+
+    /* Neutral base the theme tints toward */
+    --base: #0b0d12;
+    --base-2: #14171e;
+
+    /* ── Derived palette (do not edit unless you want to change the recipe) ── */
+    --bg: color-mix(in srgb, var(--header-color) 6%, var(--base));
+    --bg-glow: color-mix(in srgb, var(--header-color) 22%, transparent);
+    --bg-glow-2: color-mix(in srgb, var(--header-color) 12%, transparent);
+
+    --header-bg: color-mix(in srgb, var(--header-color) 10%, var(--base));
+    --header-bg-blur: color-mix(in srgb, var(--header-bg) 78%, transparent);
+
+    --card-solid: color-mix(in srgb, var(--header-color) 5%, var(--base-2));
+    --card: color-mix(in srgb, var(--card-solid) 82%, transparent);
+    --card-subtle: color-mix(in srgb, var(--card-solid) 55%, transparent);
+
+    --border: color-mix(in srgb, var(--header-color) 14%, #262b36);
+    --border-strong: color-mix(in srgb, var(--header-color) 28%, #353b48);
+
+    --text: color-mix(in srgb, var(--header-color) 6%, #e6e8ee);
+    --muted: color-mix(in srgb, var(--header-color) 10%, #8b93a7);
+
+    --accent: var(--header-color);
+    --accent-hover: color-mix(in srgb, var(--accent) 78%, white);
+
+    --ok: #22c55e;
+    --warn: #f59e0b;
+    --warn-strong: #d97706;
+    --bad: #ef4444;
+    /* aliases: the names some components and modules reach for */
+    --success: var(--ok);
+    --danger: var(--bad);
+
+    /* Text on an accent / status fill (buttons, active tabs, done steps). */
+    --on-accent: #fff;
+    /* Pure white for emphasis on hover. */
+    --text-strong: #fff;
+    /* The overlay editor canvas: its backing and checkerboard tile. */
+    --canvas-bg: #10131a;
+    --canvas-check: #1a1e27;
+
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.25);
+    --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.5);
+    --shadow-toast: 0 6px 20px rgba(0, 0, 0, 0.4);
+    /* Dimmed backdrop behind modals. */
+    --scrim: rgba(0, 0, 0, 0.55);
+    --ring: color-mix(in srgb, var(--accent) 35%, transparent);
+
+    --radius-xs: 6px;
+    --radius-sm: 10px;
+    --radius: 12px;
+    --radius-lg: 16px;
+    --radius-pill: 999px;
+    --t: 160ms ease;
+
+    /* Mobile-first breakpoint scale (Bulma/Pico inspired). Browsers do not
+     * accept var() in @media conditions, so the queries below spell out the
+     * same literal values — these variables document the shared scale. */
+    --bp-sm: 576px;
+    --bp-md: 768px;
+    --bp-lg: 1024px;
+    --bp-xl: 1216px;
+
+    font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
+}

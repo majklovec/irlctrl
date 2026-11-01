@@ -73,5 +73,6 @@ select[name="pipeline"] {
 
 /* The encoder role's accent: its pictogram in role tags, setup and the device list. */
 .role-icon-encoder {
-    color: #ff6c6c;
+    --role-encoder: #ff6c6c;
+    color: var(--role-encoder);
 }

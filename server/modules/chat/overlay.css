@@ -8,8 +8,10 @@ body,
 }
 
 body {
-    color: #fff;
+    --text: #fff;
+    --ink: #000;
     --accent: #9dcaff;
+    color: var(--text);
     overflow: hidden;
 }
 
@@ -17,7 +19,7 @@ body {
     box-sizing: border-box;
     padding: 8px;
     font-size: 24px;
-    text-shadow: 0 1px 3px #000, 0 0 2px #000;
+    text-shadow: 0 1px 3px var(--ink), 0 0 2px var(--ink);
     scrollbar-width: none;
 }
 
@@ -27,5 +29,5 @@ body {
 
 .chat-overlay-error {
     font: 16px sans-serif;
-    text-shadow: 0 1px 3px #000;
+    text-shadow: 0 1px 3px var(--ink);
 }

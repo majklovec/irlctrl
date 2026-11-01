@@ -1,3 +1,10 @@
+/* Platform brand colours (the stats rows and spark lines). */
+.dash-widget-body {
+    --brand-youtube: #ff0000;
+    --brand-twitch: #9146ff;
+    --brand-kick: #53fc18;
+}
+
 /* stats widget body — scoped to the dashboard card (.dash-widget-body) */
 
 /* Stats card */
@@ -46,13 +53,13 @@
     background: var(--accent);
 }
 .dash-widget-body .stats-row-youtube .stats-row-label::before {
-    background: #ff0000;
+    background: var(--brand-youtube);
 }
 .dash-widget-body .stats-row-twitch .stats-row-label::before {
-    background: #9146ff;
+    background: var(--brand-twitch);
 }
 .dash-widget-body .stats-row-kick .stats-row-label::before {
-    background: #53fc18;
+    background: var(--brand-kick);
 }
 .dash-widget-body .stats-row-title {
     overflow: hidden;
@@ -121,13 +128,13 @@
     vector-effect: non-scaling-stroke;
 }
 .dash-widget-body svg.spark .spark-line .stats-line-youtube {
-    stroke: #ff0000;
+    stroke: var(--brand-youtube);
 }
 .dash-widget-body svg.spark .spark-line .stats-line-twitch {
-    stroke: #9146ff;
+    stroke: var(--brand-twitch);
 }
 .dash-widget-body svg.spark .spark-line .stats-line-kick {
-    stroke: #53fc18;
+    stroke: var(--brand-kick);
 }
 .dash-widget-body svg.spark .spark-line .stats-line-total {
     stroke: var(--accent-hover);

@@ -16,5 +16,5 @@
 }
 .mod-broadcaster .broadcaster-links .total td {
 	font-weight: 600;
-	border-top: 1px solid var(--border, rgba(128, 128, 128, 0.4));
+	border-top: 1px solid var(--border);
 }

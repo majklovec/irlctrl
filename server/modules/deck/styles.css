@@ -247,7 +247,7 @@
 }
 .deck-form-actions .icon-btn:hover {
     background: var(--border);
-    color: var(--danger, #ef4444);
+    color: var(--danger);
 }
 .deck-orphan-tag {
     font-size: 0.75rem;

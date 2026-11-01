@@ -1,3 +1,20 @@
+/* GStreamer pipeline syntax palette. */
+.pipe-code {
+    --hl-source: #3fb950;
+    --hl-sink: #f85149;
+    --hl-parser: #a371f7;
+    --hl-demuxer: #bc8cff;
+    --hl-muxer: #58a6ff;
+    --hl-decoder: #f0883e;
+    --hl-encoder: #db61a2;
+    --hl-converter: #79c0ff;
+    --hl-filter: #8b949e;
+    --hl-other: #6e7681;
+    --hl-caps: #d29922;
+    --hl-link: #39c5cf;
+    --hl-value: #c9d1d9;
+}
+
 /* Pipeline editor panel — every block on its own full-width row. */
 .pipeline-editor {
     flex-direction: column;
@@ -78,43 +95,43 @@
     color: var(--text);
 }
 .pipe-code .hl-source {
-    color: #3fb950;
+    color: var(--hl-source);
 }
 .pipe-code .hl-sink {
-    color: #f85149;
+    color: var(--hl-sink);
 }
 .pipe-code .hl-parser {
-    color: #a371f7;
+    color: var(--hl-parser);
 }
 .pipe-code .hl-demuxer {
-    color: #bc8cff;
+    color: var(--hl-demuxer);
 }
 .pipe-code .hl-muxer {
-    color: #58a6ff;
+    color: var(--hl-muxer);
 }
 .pipe-code .hl-decoder {
-    color: #f0883e;
+    color: var(--hl-decoder);
 }
 .pipe-code .hl-encoder {
-    color: #db61a2;
+    color: var(--hl-encoder);
 }
 .pipe-code .hl-converter {
-    color: #79c0ff;
+    color: var(--hl-converter);
 }
 .pipe-code .hl-filter {
-    color: #8b949e;
+    color: var(--hl-filter);
 }
 .pipe-code .hl-other {
-    color: #6e7681;
+    color: var(--hl-other);
 }
 .pipe-code .hl-caps {
-    color: #d29922;
+    color: var(--hl-caps);
 }
 .pipe-code .hl-link {
-    color: #39c5cf;
+    color: var(--hl-link);
 }
 .pipe-code .hl-value {
-    color: #c9d1d9;
+    color: var(--hl-value);
 }
 .pipe-legend-box {
     padding: 0.5rem 0.75rem 0.65rem;

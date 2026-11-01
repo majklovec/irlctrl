@@ -38,11 +38,11 @@
 }
 
 .chat-status-icon.on {
-    color: var(--ok, #2ea04a);
+    color: var(--ok);
 }
 
 .chat-status-icon.off {
-    color: var(--bad, #d64545);
+    color: var(--bad);
 }
 
 /* TTS status (🔊 on / 🔇 off in the card head); dimmed while TTS is off or

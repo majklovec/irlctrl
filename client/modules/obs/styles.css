@@ -1,8 +1,10 @@
 /* OBS Studio card (modules/obs) — everything scoped under the card's class. */
 .mod-obs .obs-preview-stage {
+    /* video backing: black regardless of theme */
+    --video-bg: #000;
     position: relative;
     aspect-ratio: 16 / 9;
-    background: #000;
+    background: var(--video-bg);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     overflow: hidden;
