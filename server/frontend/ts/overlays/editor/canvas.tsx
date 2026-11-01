@@ -262,6 +262,9 @@ export function canvasArea(): m.Vnode {
 						// (clientX/Y - rect) / state.zoom math below is unaffected because
 						// getBoundingClientRect() already reflects `zoom`.
 						zoom: state.zoom,
+						// exposed to CSS so .ov-handle can counter-scale and keep
+						// a constant on-screen size regardless of zoom
+						"--ov-zoom": String(state.zoom),
 					}}
 					onmousedown={(ev: MouseEvent) => {
 						// clicking an element selects + begins a drag; clicking

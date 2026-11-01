@@ -84,6 +84,11 @@
     border: 1.5px solid var(--accent);
     border-radius: 3px;
     z-index: 2;
+    /* counter-scale against the canvas `zoom` so the handle keeps a constant
+       on-screen size (--ov-zoom is set on .overlay-canvas-scaled); scaling
+       about the handle's own center keeps it anchored to the selection
+       corner / edge mid-point */
+    transform: scale(calc(1 / max(var(--ov-zoom, 1), 0.01)));
 }
 .ov-handle.ov-nw {
     top: -6px;
