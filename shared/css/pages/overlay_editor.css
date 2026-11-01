@@ -81,7 +81,7 @@
     width: 10px;
     height: 10px;
     background: var(--base);
-    border: 1.5px solid var(--accent);
+    border: 1px solid var(--accent);
     border-radius: 3px;
     z-index: 2;
     /* counter-scale against the canvas `zoom` so the handle keeps a constant
