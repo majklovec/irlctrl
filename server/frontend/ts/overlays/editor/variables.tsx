@@ -1,4 +1,4 @@
-import { Button, Card } from "@ui/components/";
+import { Button, Modal } from "@ui/components/";
 import { Icon } from "@ui/components/icons";
 import { t } from "@ui/i18n";
 import m from "mithril";
@@ -97,40 +97,41 @@ function varRow(v: Variable): m.Vnode {
 	);
 }
 
-export function variablesPanel(): m.Vnode {
+/** Variables modal: opened from the toolbar icon. One row per variable
+ * (name, type chip, in-row value editor, usage badge, copy/delete), with the
+ * add-variable form at the top. Call it while `state.variablesDialogOpen`. */
+export function variablesDialog(): m.Vnode {
 	const vars = state.project.variables;
 	return (
-		<Card
+		<Modal
 			title={t("overlay.variables")}
-			class="ov-bottom"
-			headActions={
-				<span class="ov-newvar">
-					<input
-						type="text"
-						placeholder={t("overlay.variable_name")}
-						value={state.newVariableName}
-						oninput={(ev: Event) =>
-							(state.newVariableName = (ev.target as HTMLInputElement).value)
-						}
-					/>
-					<select
-						value={state.newVariableType}
-						onchange={(ev: Event) =>
-							(state.newVariableType = (ev.target as HTMLSelectElement).value)
-						}
-					>
-						<option value="string">string</option>
-						<option value="number">number</option>
-						<option value="boolean">boolean</option>
-						<option value="color">color</option>
-					</select>
-					<Button
-						label={t("overlay.add")}
-						onclick={() => void createVariable()}
-					/>
-				</span>
-			}
-		>
+			class="ov-vars-modal"
+			onClose={() => (state.variablesDialogOpen = false)}>
+			<span class="ov-newvar">
+				<input
+					type="text"
+					placeholder={t("overlay.variable_name")}
+					value={state.newVariableName}
+					oninput={(ev: Event) =>
+						(state.newVariableName = (ev.target as HTMLInputElement).value)
+					}
+				/>
+				<select
+					value={state.newVariableType}
+					onchange={(ev: Event) =>
+						(state.newVariableType = (ev.target as HTMLSelectElement).value)
+					}
+				>
+					<option value="string">string</option>
+					<option value="number">number</option>
+					<option value="boolean">boolean</option>
+					<option value="color">color</option>
+				</select>
+				<Button
+					label={t("overlay.add")}
+					onclick={() => void createVariable()}
+				/>
+			</span>
 			<div class="ov-var-list">
 				{vars.length === 0 ? (
 					<p class="muted">{t("overlay.no_variables")}</p>
@@ -138,6 +139,6 @@ export function variablesPanel(): m.Vnode {
 					vars.map(varRow)
 				)}
 			</div>
-		</Card>
+		</Modal>
 	);
 }

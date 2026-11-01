@@ -4,9 +4,11 @@
 .ov-layout {
     display: grid;
     grid-template-columns: 1fr 380px;
-    grid-template-rows: 1fr auto;
+    grid-template-rows: 1fr;
     gap: 12px;
-    /* 192px = header + the icon toolbar strip + main paddings + footer */
+    /* 192px = header + the icon toolbar strip + main paddings + version
+       footer — the single row stretches to fill it, so the canvas takes
+       the maximum available height */
     height: calc(100vh - 192px);
     min-height: 480px;
 }
@@ -556,71 +558,33 @@ identically here and on the runtime page */
     flex: 1;
     min-width: 0;
 }
-/* chain-icon link affordance used by both bind states */
-.ov-icon {
+/* the chain-icon binding toggle, in place of the old checkbox. Muted when
+   unbound; yellow (`.on`) while the picker is open or the field is bound,
+   so bound fields are recognizable at a glance */
+.ov-bind-chk {
     display: inline-flex;
     align-items: center;
-    color: var(--muted);
     flex-shrink: 0;
-}
-/* unbound: a compact "pick a variable" select next to the field's control */
-.ov-bind {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    flex-shrink: 0;
-}
-.ov-bind-sel {
-    width: auto;
-    max-width: 90px;
-    border: 1px solid var(--border);
-    background: transparent;
-    border-radius: 6px;
-    color: var(--muted);
-    font-size: 12px;
-    padding: 0.1rem 4px;
-}
-.ov-bind-sel:hover {
-    border-color: var(--accent);
-    color: var(--text);
-}
-/* bound: a pill that names the linked variable, switches it, and detaches */
-.ov-bound {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    width: 100%;
-    min-width: 0;
-    border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
-    background: color-mix(in srgb, var(--accent) 10%, transparent);
-    border-radius: 6px;
-    padding: 0 4px 0 6px;
-}
-.ov-bound .ov-icon {
-    color: var(--accent);
-}
-.ov-var-pick {
-    flex: 1;
-    min-width: 0;
-    width: auto;
-    border: none;
-    background: transparent;
-    font-size: 13px;
-    color: var(--text);
-    padding: 0.1rem 0;
-}
-.ov-unbind {
-    display: inline-flex;
-    align-items: center;
+    margin: 0;
+    padding: 2px;
     background: none;
     border: none;
-    padding: 2px;
     color: var(--muted);
     cursor: pointer;
-    flex-shrink: 0;
 }
-.ov-unbind:hover {
-    color: var(--bad);
+.ov-bind-chk:hover {
+    color: var(--text);
+}
+.ov-bind-chk.on {
+    color: var(--warn);
+}
+.ov-bind-chk.on:hover {
+    color: color-mix(in srgb, var(--warn) 70%, var(--text));
+}
+/* variable picker shown in place of a field's control while bound (or
+   while the picker is open) */
+.ov-var-sel {
+    width: 100%;
 }
 .ov-check {
     display: flex;
@@ -640,17 +604,11 @@ identically here and on the runtime page */
     background: color-mix(in srgb, var(--bad) 14%, transparent) !important;
 }
 
-/* footer panels */
-.ov-footers {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
-}
-.ov-bottom {
-    min-width: 0;
-    max-height: 210px;
-    overflow-y: auto;
+/* variables modal: opened from the toolbar icon — wide enough for
+   name + type chip + value + usage + actions, height-capped and
+   scrollable so big projects don't push it off-screen */
+.ov-vars-modal {
+    width: min(46rem, 100%);
 }
 .ov-newvar {
     display: flex;
@@ -667,6 +625,8 @@ identically here and on the runtime page */
     flex-direction: column;
     gap: 4px;
     margin-top: 10px;
+    max-height: min(55vh, 420px);
+    overflow-y: auto;
 }
 .ov-var {
     display: flex;

@@ -68,6 +68,8 @@ export const state = {
     editingElementId: null as string | null,
     /** Runtime URL dialog (opened from the toolbar icon) is open. */
     runtimeDialogOpen: false,
+    /** Variables modal (opened from the toolbar icon) is open. */
+    variablesDialogOpen: false,
 };
 
 /** Page URLs: the list and one editor page per scene (linkable). */

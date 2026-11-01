@@ -2,12 +2,12 @@
 /*
  * Shared inspector building blocks. Every element's `editForm` composes its
  * type-specific fields out of `bindField`, so all elements share one look and
- * one binding affordance. While unbound, a field shows its normal control plus
- * a compact **bind select** on the right (a chain icon next to a dropdown; pick
- * a variable to bind). While bound, the control is replaced by a **pill** —
- * the linked variable by name, switchable inline, with an ✕ to detach. (Element
- * *content* lives in the per-element modules; nothing here is specific to a
- * single element type.)
+ * one binding affordance. Each bindable control has a small **chain-icon
+ * toggle** on its right. Clicking it turns the chain yellow and swaps the
+ * control for a variable picker; picking a variable binds the field (the
+ * chain stays yellow, marking the field as bound). Clicking the yellow
+ * chain again detaches. (Element *content* lives in the per-element
+ * modules; nothing here is specific to a single element type.)
  */
 import m from "mithril";
 import type { Vnode, VnodeDOM } from "mithril";
@@ -16,95 +16,14 @@ import { t } from "../i18n";
 import { Icon } from "../components/icons";
 import type { ElementProps, OverlayElement } from "./element";
 
+/** element id + path of fields whose picker is open. Module scope on
+ * purpose: Mithril re-creates per-render closures, so a `view()`-local
+ * "open" flag would reset on every redraw and the picker would never
+ * stay open. */
+const pickOpen = new Set<string>();
+
 export function lbl(label: string): Vnode {
 	return <span class="ov-lbl">{label}</span>;
-}
-
-/** The unbound bind affordance: a chain icon beside a native select. The
- * select's empty value *is* the "not bound" state, so there is no open/closed
- * state to manage. With no variables defined it carries a single "No
- * variables" option (nothing to bind to). */
-function bindSelect(
-	variables: Variable[],
-	onpick: (id: string) => void,
-): Vnode {
-	if (variables.length === 0)
-		return (
-			<span class="ov-bind">
-				<span class="ov-icon" aria-hidden="true">
-					<Icon name="link" />
-				</span>
-				<select class="ov-bind-sel" disabled value="">
-					<option value="">{t("overlay.no_variables")}</option>
-				</select>
-			</span>
-		);
-	return (
-		<span class="ov-bind">
-			<span class="ov-icon" aria-hidden="true">
-				<Icon name="link" />
-			</span>
-			<select
-				class="ov-bind-sel"
-				value=""
-				aria-label={t("overlay.bind_variable")}
-				onchange={(ev: Event) => {
-					const id = (ev.target as HTMLSelectElement).value;
-					if (id) onpick(id);
-				}}
-			>
-				<option value="" disabled hidden>
-					{t("overlay.bind_variable")}
-				</option>
-				{variables.map((v) => (
-					<option key={v.id} value={v.id}>
-						{v.name}
-					</option>
-				))}
-			</select>
-		</span>
-	);
-}
-
-/** A field bound to a variable: a compact pill — a chain icon, the linked
- * variable's name, a switcher that changes it in place, and an ✕ to detach.
- * Rendering it in place of the field's normal control makes the binding
- * obvious at a glance. */
-function boundPill(
-	variables: Variable[],
-	variableId: string,
-	onpick: (id: string) => void,
-): Vnode {
-	return (
-		<span class="ov-bound">
-			<span class="ov-icon" aria-hidden="true">
-				<Icon name="link" />
-			</span>
-			<select
-				class="ov-var-pick"
-				value={variableId}
-				aria-label={t("overlay.bind_variable")}
-				onchange={(ev: Event) => {
-					const id = (ev.target as HTMLSelectElement).value;
-					if (id) onpick(id);
-				}}
-			>
-				{variables.map((v) => (
-					<option key={v.id} value={v.id}>
-						{v.name}
-					</option>
-				))}
-			</select>
-			<button
-				class="ov-unbind"
-				type="button"
-				label={t("overlay.unbind_variable")}
-				onclick={() => onpick("")}
-			>
-				<Icon name="close" />
-			</button>
-		</span>
-	);
 }
 
 /** Selects and checkboxes offer a fixed choice set, so a variable binding
@@ -118,13 +37,13 @@ function isBindable(control: Vnode): boolean {
 	return true;
 }
 
-/** One inspector field with an inline binding affordance. `title` is the
+/** One inspector field with the chain-icon binding toggle. `title` is the
  * label shown above the control, `path` the full binding key the schema
- * accepts (`props.<name>`, `transform.<field>`, or `visible`) and `input` the
- * field's normal control. Unbound fields render `input` plus a bind select
- * (see `bindSelect`) on the right; bound fields replace `input` with a pill
- * (see `boundPill`) naming the linked variable. The affordance is omitted for
- * selects and checkboxes (see `isBindable`). */
+ * accepts (`props.<name>`, `transform.<field>`, or `visible`) and `input`
+ * the field's normal control. While the picker is open — or the field is
+ * bound — the control is replaced by a `select` of the project's variables
+ * and the chain stays yellow. A binding to a since-deleted variable
+ * renders as unbound (the stale reference is replaced on the next bind). */
 export function bindField(
 	e: OverlayElement,
 	path: string,
@@ -132,9 +51,7 @@ export function bindField(
 	input: Vnode,
 	props: Pick<ElementProps, "mutate" | "variables">,
 ): Vnode {
-	const bindable = isBindable(input);
-	const { mutate, variables } = props;
-	if (!bindable)
+	if (!isBindable(input))
 		return (
 			<div class="ov-field">
 				<span class="ov-lbl">{title}</span>
@@ -142,21 +59,82 @@ export function bindField(
 			</div>
 		);
 
+	const { mutate, variables } = props;
+	const key = e.id + ":" + path;
 	const binding = e.bindings[path];
-	const setPick = (id: string) =>
-		mutate((el) => {
-			if (id) el.bindings[path] = { kind: "variable", variableId: id };
-			else delete el.bindings[path];
-		});
+	const bound =
+		binding !== undefined &&
+		variables.some((v) => v.id === binding.variableId);
+	const open = !bound && pickOpen.has(key);
+	const active = bound || open;
+
+	const setPick = (id: string): void => {
+		pickOpen.delete(key);
+		if (id)
+			mutate((el) => {
+				el.bindings[path] = { kind: "variable", variableId: id };
+			});
+		else m.redraw();
+	};
+
+	const toggle = (): void => {
+		if (bound) {
+			pickOpen.delete(key);
+			mutate((el) => {
+				delete el.bindings[path];
+			});
+		} else if (open) {
+			pickOpen.delete(key);
+			m.redraw();
+		} else {
+			pickOpen.add(key);
+			m.redraw();
+		}
+	};
+
+	const picker = (
+		<select
+			class="ov-var-sel"
+			value={bound ? (binding?.variableId ?? "") : ""}
+			aria-label={t("overlay.bind_variable")}
+			onchange={(ev: Event) =>
+				setPick((ev.target as HTMLSelectElement).value)
+			}
+		>
+			{variables.length === 0 ? (
+				<option value="" disabled>
+					{t("overlay.no_variables")}
+				</option>
+			) : (
+				<>
+					<option value="" disabled hidden>
+						{t("overlay.bind_variable")}
+					</option>
+					{variables.map((v) => (
+						<option key={v.id} value={v.id}>
+							{v.name}
+						</option>
+					))}
+				</>
+			)}
+		</select>
+	);
 
 	return (
 		<div class="ov-field">
 			<span class="ov-lbl">{title}</span>
 			<div class="ov-field-row">
-				<div class="ov-field-ctl">
-					{binding ? boundPill(variables, binding.variableId, setPick) : input}
-				</div>
-				{binding ? null : bindSelect(variables, setPick)}
+				<div class="ov-field-ctl">{active ? picker : input}</div>
+				<button
+					class={active ? "ov-bind-chk on" : "ov-bind-chk"}
+					type="button"
+					title={bound ? t("overlay.unbind_variable") : t("overlay.bind_variable")}
+					aria-label={bound ? t("overlay.unbind_variable") : t("overlay.bind_variable")}
+					aria-pressed={bound}
+					onclick={toggle}
+				>
+					<Icon name="link" class="role-icon" />
+				</button>
 			</div>
 		</div>
 	);

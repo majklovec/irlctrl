@@ -57,6 +57,12 @@ export function editorToolbar(): m.Vnode {
 			</span>
 			<span class="ov-toolsep" aria-hidden="true" />
 			<IconButton
+				label={t("overlay.variables")}
+				title={t("overlay.variables")}
+				icon={<Icon name="link" class="role-icon" />}
+				onclick={() => (state.variablesDialogOpen = true)}
+			/>
+			<IconButton
 				label={t("overlay.runtime_url")}
 				title={t("overlay.runtime_url")}
 				icon={<Icon name="view" class="role-icon" />}

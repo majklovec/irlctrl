@@ -6,7 +6,7 @@
  *   center:     zoomable canvas — select / drag / resize / nudge / snap
  *   right rail: the layers list, each row expanding into the element's
  *               inspector (transform, props, bindings)
- *   footers:    variables (live)
+ *   modal:      variables (live, opened from the toolbar icon)
  *
  * The scene renders through the SHARED overlay render views so the preview is
  * pixel-identical to the OBS runtime; the editor only layers a selection box +
@@ -27,7 +27,7 @@ import { onKey } from "./editor/keyboard";
 import { inspector } from "./editor/layers";
 import { runtimeDialog } from "./editor/runtime_dialog";
 import { editorTitle, editorToolbar } from "./editor/toolbar";
-import { variablesPanel } from "./editor/variables";
+import { variablesDialog } from "./editor/variables";
 import {
 	LIST_URL,
 	load,
@@ -63,9 +63,9 @@ const overlayUpdatePage: m.Component = {
 				<div class="ov-layout">
 					<div class="ov-center">{canvasArea()}</div>
 					<div class="ov-right">{inspector()}</div>
-					<div class="ov-footers">{variablesPanel()}</div>
 				</div>
 				{state.runtimeDialogOpen ? runtimeDialog() : null}
+				{state.variablesDialogOpen ? variablesDialog() : null}
 			</Page>
 		);
 	},
