@@ -111,6 +111,20 @@ export const SHAPES = {
 			<path d="M3 9h18" />
 		</>
 	),
+	"zoom-in": (
+		<>
+			<circle cx="11" cy="11" r="7" />
+			<path d="M11 8v6M8 11h6" />
+			<path d="m20.5 20.5-4.2-4.2" />
+		</>
+	),
+	"zoom-out": (
+		<>
+			<circle cx="11" cy="11" r="7" />
+			<path d="M8 11h6" />
+			<path d="m20.5 20.5-4.2-4.2" />
+		</>
+	),
 } as const;
 
 export type IconName = keyof typeof SHAPES;

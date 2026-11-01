@@ -45,11 +45,14 @@
     border-radius: 12px;
     overflow: hidden;
     background:
-        linear-gradient(45deg, var(--canvas-check) 25%, transparent 25%) 0 0 / 24px 24px,
-        linear-gradient(-45deg, var(--canvas-check) 25%, transparent 25%) 0 12px / 24px 24px,
-        linear-gradient(45deg, transparent 75%, var(--canvas-check) 75%) 12px -12px / 24px 24px,
-        linear-gradient(-45deg, transparent 75%, var(--canvas-check) 75%) 12px 0 / 24px 24px
-            var(--canvas-bg);
+        linear-gradient(45deg, var(--canvas-check) 25%, transparent 25%) 0 0 /
+            24px 24px,
+        linear-gradient(-45deg, var(--canvas-check) 25%, transparent 25%) 0 12px /
+            24px 24px,
+        linear-gradient(45deg, transparent 75%, var(--canvas-check) 75%) 12px -12px /
+            24px 24px,
+        linear-gradient(-45deg, transparent 75%, var(--canvas-check) 75%) 12px 0 /
+            24px 24px var(--canvas-bg);
 }
 .ov-canvas-scroll {
     flex: 1;
@@ -551,8 +554,11 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
     border-bottom: 1px solid var(--border);
     background: var(--header-bg);
 }
-/* The editor's icon strip is a `Toolbar` inside the subbar: tight, no margins. */
+/* The editor's icon strip is a `Toolbar` inside the subbar: tight, no margins.
+   It stretches to the full subbar width so the trailing zoom cluster can be
+   pushed to the right edge via `margin-left: auto`. */
 .page-subbar .dash-toolbar {
+    flex: 1;
     gap: 4px;
     margin: 0;
 }
@@ -579,13 +585,15 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
     margin: 0 4px;
     background: var(--border);
 }
+/* Pushes the trailing zoom cluster to the right edge of the toolbar. */
 .ov-zoom {
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    margin-left: auto;
 }
 .ov-zoom-val {
-    min-width: 44px;
+    min-width: 30px;
     text-align: center;
     font-size: 12px;
     color: var(--muted);

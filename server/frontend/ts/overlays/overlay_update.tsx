@@ -24,7 +24,7 @@ import { canvasArea } from "./editor/canvas";
 import { onKey } from "./editor/keyboard";
 import { inspector } from "./editor/layers";
 import { runtimePanel } from "./editor/runtime_panel";
-import { editorTitle, editorToolbar, headerRight } from "./editor/toolbar";
+import { editorTitle, editorToolbar } from "./editor/toolbar";
 import { triggersPanel } from "./editor/triggers";
 import { variablesPanel } from "./editor/variables";
 import {
@@ -58,7 +58,6 @@ const overlayUpdatePage: m.Component = {
 				title={editorTitle()}
 				nav={<ServerNav active="overlays" />}
 				toolbar={editorToolbar()}
-				headerRight={headerRight()}
 			>
 				<div class="ov-layout">
 					<div class="ov-center">{canvasArea()}</div>

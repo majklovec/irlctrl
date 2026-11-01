@@ -1,10 +1,6 @@
 import m from "mithril";
 import { Icon } from "../../../../../shared/ui/components/icons";
-import {
-	Button,
-	IconButton,
-	Toolbar,
-} from "../../../../../shared/ui/components/ui";
+import { IconButton, Toolbar } from "../../../../../shared/ui/components/ui";
 import { t } from "../../../../../shared/ui/i18n";
 import { addableElements } from "../../../../../shared/ui/overlay/registry";
 import {
@@ -44,25 +40,22 @@ export function editorToolbar(): m.Vnode {
 					onclick={() => addElement(def.type)}
 				/>
 			))}
+			<span class="ov-zoom">
+				<IconButton
+					label={t("overlay.zoom_out")}
+					title={t("overlay.zoom_out")}
+					icon={<Icon name="zoom-out" class="role-icon" />}
+					onclick={() => (state.zoom = clamp(state.zoom * 0.8, 0.1, 3))}
+				/>
+				<span class="ov-zoom-val">{Math.round(state.zoom * 100)}%</span>
+				<IconButton
+					label={t("overlay.zoom_in")}
+					title={t("overlay.zoom_in")}
+					icon={<Icon name="zoom-in" class="role-icon" />}
+					onclick={() => (state.zoom = clamp(state.zoom * 1.25, 0.1, 3))}
+				/>
+			</span>
 		</Toolbar>
-	);
-}
-
-export function headerRight(): m.Vnode {
-	return (
-		<span class="ov-zoom">
-			<Button
-				label="−"
-				title={t("overlay.zoom_out")}
-				onclick={() => (state.zoom = clamp(state.zoom * 0.8, 0.1, 3))}
-			/>
-			<span class="ov-zoom-val">{Math.round(state.zoom * 100)}%</span>
-			<Button
-				label="+"
-				title={t("overlay.zoom_in")}
-				onclick={() => (state.zoom = clamp(state.zoom * 1.25, 0.1, 3))}
-			/>
-		</span>
 	);
 }
 
