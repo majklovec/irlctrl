@@ -18,6 +18,7 @@ import {
 	CHAT_PLATFORMS,
 	chatOrderFromConfig,
 	chatPlatformIconsFromConfig,
+	chatSpecsFromConfig,
 	chatTimestampsFromConfig,
 	chatTtsConfig,
 	chatTtsShouldSpeak,
@@ -717,8 +718,8 @@ export function chatFeed(w: FeedWidget, showEmpty = true): m.Children {
 // Chromium with GPU compositing paints every iframe on its own opaque layer,
 // so a chat page in an iframe shows as a solid white box inside a transparent
 // editor canvas — CSS cannot make the layer transparent. Editors therefore
-// render the feed directly in the canvas DOM, polling the same token-
-// authenticated endpoint the standalone overlay page uses.
+// render the feed directly in the canvas DOM, fed by the same token-
+// authenticated websocket the standalone overlay page uses.
 
 /** The token-authenticated chat overlay page URL, parsed back to its target. */
 const OVERLAY_URL = /^\/chat\/([^/]+)\/([^/?#]+)/;
@@ -740,50 +741,34 @@ function parseOverlayUrl(url: string): OverlayPreviewTarget | undefined {
 
 interface LivePreviewState {
 	state?: ChatOverlayState;
+	/** The widget's channel specs, from the snapshot's config. */
+	specs?: Set<string>;
 	error: boolean;
-	timer?: ReturnType<typeof setInterval>;
+	stopped: boolean;
+	timer?: ReturnType<typeof setTimeout>;
+	attempt: number;
+	socket?: WebSocket;
 }
 
-async function livePreviewPoll(
-	s: LivePreviewState,
-	target: OverlayPreviewTarget,
-): Promise<void> {
-	try {
-		const response = await fetch(
-			`/api/chat/${encodeURIComponent(target.dashboardId)}/${encodeURIComponent(target.widgetId)}`,
-			{
-				headers: { authorization: `Bearer ${target.token}` },
-				cache: "no-store",
-				credentials: "omit",
-			},
-		);
-		if (!response.ok) throw new Error(`status ${response.status}`);
-		const next = (await response.json()) as ChatOverlayState;
-		onFrame?.("widget.snapshot", { chat: next.chat });
-		s.state = next;
-		s.error = false;
-	} catch (cause) {
-		console.error("[chat preview]", cause);
-		s.error = true;
-	} finally {
-		m.redraw();
-	}
-}
-
-/** The live chat feed rendered straight into an editor's canvas DOM — the
- * module owns it (core reaches it only through the registry contract). */
+/**
+ * The live chat feed rendered straight into an editor's canvas DOM — the
+ * module owns it (core reaches it only through the registry contract). Fed
+ * by the same token-authenticated websocket the standalone overlay page
+ * uses; the snapshot frame seeds state, then the hub stream is narrowed to
+ * the widget's channel specs.
+ */
 const LiveChatPreview: m.Component<OverlayPreviewTarget, LivePreviewState> = {
 	oninit(vnode) {
 		// `state` is pre-initialized by mithril; mutate it, never reassign.
 		vnode.state.error = true;
-		vnode.state.timer = setInterval(
-			() => void livePreviewPoll(vnode.state, vnode.attrs),
-			1000,
-		);
-		void livePreviewPoll(vnode.state, vnode.attrs);
+		vnode.state.stopped = false;
+		vnode.state.attempt = 0;
+		livePreviewConnect(vnode);
 	},
 	onremove(vnode) {
-		clearInterval(vnode.state.timer);
+		vnode.state.stopped = true;
+		clearTimeout(vnode.state.timer);
+		vnode.state.socket?.close();
 	},
 	view(vnode) {
 		const s = vnode.state;
@@ -794,6 +779,81 @@ const LiveChatPreview: m.Component<OverlayPreviewTarget, LivePreviewState> = {
 				: m("p.chat-overlay-error", { role: "alert" }, "…");
 	},
 };
+
+/**
+ * Connect the preview's socket: same origin, ws(s) scheme, token in the
+ * query string — the browser WebSocket API cannot set the Authorization
+ * header, and the server accepts the token via `?token=` on the upgrade.
+ */
+function livePreviewConnect(vnode: m.Vnode<OverlayPreviewTarget, LivePreviewState>): void {
+	const s = vnode.state;
+	if (s.stopped) return;
+	const { dashboardId, widgetId, token } = vnode.attrs;
+	const url = new URL(
+		`/api/chat/${encodeURIComponent(dashboardId)}/${encodeURIComponent(widgetId)}/ws`,
+		location.origin,
+	);
+	url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
+	url.searchParams.set("token", token);
+	const socket = new WebSocket(url);
+	s.socket = socket;
+
+	socket.onopen = () => { s.attempt = 0; };
+
+	socket.onmessage = (event) => {
+		let frame: { type?: string; event?: string; data?: unknown };
+		try {
+			frame = JSON.parse(String(event.data)) as typeof frame;
+		} catch {
+			return;
+		}
+		if (frame.type !== "event" || !frame.event) return;
+		if (frame.event === "chat.overlay.snapshot") {
+			const snap = frame.data as ChatOverlayState;
+			s.state = snap;
+			s.specs = new Set(
+				chatSpecsFromConfig(snap.widget.config).filter(
+					(spec): spec is string => spec !== null,
+				),
+			);
+			onFrame?.("widget.snapshot", { chat: snap.chat });
+			s.error = false;
+			m.redraw();
+			return;
+		}
+		// The hub stream carries every channel — keep only this widget's.
+		if (!frame.event.endsWith(".chat")) return;
+		const channel = (frame.data as { channel?: unknown } | null)?.channel;
+		if (typeof channel !== "string") return;
+		const dot = frame.event.indexOf(".");
+		const spec = `${frame.event.slice(0, dot)}:${channel.toLowerCase()}`;
+		// Before the snapshot arrives we can't filter — drop the frame.
+		if (!s.specs?.has(spec)) return;
+		onFrame?.(frame.event, frame.data);
+		m.redraw();
+	};
+
+	socket.onclose = (event) => {
+		s.socket = undefined;
+		if (s.stopped) return;
+		if (event.code === 1008) {
+			// The token was rotated, removed, or the widget is gone —
+			// reconnecting can never succeed.
+			s.stopped = true;
+			s.state = undefined;
+			s.error = true;
+			m.redraw();
+			return;
+		}
+		s.state = undefined;
+		s.error = true;
+		m.redraw();
+		const delay = Math.min(1_000 * 2 ** s.attempt, 15_000);
+		s.attempt += 1;
+		console.warn(`[chat preview] connection closed (${event.code}), retrying in ${delay} ms`);
+		s.timer = setTimeout(() => livePreviewConnect(vnode), delay);
+	};
+}
 
 function overlayPreview(target: OverlayPreviewTarget): m.Vnode {
 	// `dash-widget-body` is the scoping class styles.css uses for the feed.

@@ -8,20 +8,20 @@ import { notFound } from "../../shared/http";
 import { i18nReady } from "../../shared/i18n";
 import { pwaRoutes } from "../../shared/pwa";
 import { ALL_MODULES, widgetHubSnapshot } from "../../shared/registry";
-import { createAuth } from "./auth/auth";
-import type { Publish } from "./contracts";
-import { createDashboards } from "./dashboards/dashboard_store";
-import { createDevices } from "./devices/device_registry";
-import { createOverlays } from "./overlays/overlay_store";
 import { accountRoutes } from "./auth/account_routes";
+import { createAuth } from "./auth/auth";
 import { authenticatedHandler } from "./auth/authenticated";
+import { publicRoutes } from "./auth/public_routes";
+import { type Publish, WIDGET_HUB_TOPIC } from "./contracts";
 import { dashboardRoutes } from "./dashboards/dashboard_routes";
+import { createDashboards } from "./dashboards/dashboard_store";
 import { deviceConnectionRoutes } from "./devices/device_connection_routes";
 import { deviceListRoutes } from "./devices/device_list_routes";
 import { devicePageRoutes } from "./devices/device_page_routes";
+import { createDevices } from "./devices/device_registry";
 import { deviceViewerRoutes } from "./devices/device_viewer_routes";
 import { overlayRoutes } from "./overlays/overlay_routes";
-import { publicRoutes } from "./auth/public_routes";
+import { createOverlays } from "./overlays/overlay_store";
 import { staticRoutes } from "./static_routes";
 
 interface ControlServerOptions {
@@ -63,11 +63,14 @@ export async function createControlServer(options: ControlServerOptions) {
 
     for (const mod of ALL_MODULES) {
         if (mod.controlRoutes)
-            app.use(mod.controlRoutes({
-                dashboardById: dashboards.dashboardById,
-                htmlResponse: frontend.htmlResponse,
-                widgetHubSnapshot,
-            }));
+            app.use(
+                mod.controlRoutes({
+                    dashboardById: dashboards.dashboardById,
+                    htmlResponse: frontend.htmlResponse,
+                    widgetHubSnapshot,
+                    widgetHubTopic: () => WIDGET_HUB_TOPIC,
+                }),
+            );
     }
 
     app.use(publicRoutes(auth, frontend))

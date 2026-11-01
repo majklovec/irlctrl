@@ -95,6 +95,8 @@ export interface ControlRouteContext {
     dashboardById(id: string): ServerDashboard | undefined;
     htmlResponse(page: string): Response;
     widgetHubSnapshot(): Record<string, unknown>;
+    /** The topic the channel widget hubs publish their live frames to. */
+    widgetHubTopic(): string;
 }
 
 /** What a device widget's server-side `validateConfig` can look at. */
