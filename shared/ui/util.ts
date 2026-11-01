@@ -42,8 +42,6 @@ export const HOSTNAME_PATTERN = "[A-Za-z0-9][A-Za-z0-9.\\-]{0,62}";
 export const optionalNumber = (v: string): number | undefined =>
     v === "" ? undefined : Number(v);
 
-/** Form value → number; "" counts as 0. */
-export const toNumber = (v: string): number => (v === "" ? 0 : Number(v));
 
 /** Whether a form value is a number within [min, max]. */
 export const inRange = (v: string, min: number, max: number): boolean => {
