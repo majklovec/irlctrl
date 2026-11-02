@@ -103,8 +103,7 @@ export function editorTitle(): m.Vnode {
 					<path d="M10 12L6 8l4-4" />
 				</svg>
 			</a>{" "}
-			{t("overlay.title")}
-			{s ? <> / {s.name}</> : null}
+			{s ? s.name : null}
 		</>
 	);
 }

@@ -518,7 +518,7 @@ identically here and on the runtime page */
 /* compact controls in the inspector */
 .ov-inspect input,
 .ov-inspect select {
-    padding: 0.1rem;
+    padding: 0.1rem 0.4rem;
 }
 .ov-inspect select {
     width: 100% !important;
