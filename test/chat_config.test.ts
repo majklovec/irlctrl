@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { CHAT_CONFIG_FIELDS, chatPlatformIconsFromConfig } from "../server/modules/chat/config";
+import {
+    CHAT_CONFIG_FIELDS,
+    chatPlatformIconsFromConfig,
+} from "../server/modules/chat/config";
 
 describe("chat platform icons", () => {
     test("declares automatic, show and hide choices", () => {

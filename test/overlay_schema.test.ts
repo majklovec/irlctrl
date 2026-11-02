@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { DEFAULT_CHAT_PROPS } from "../server/modules/chat/overlay_schema";
 import {
     DEFAULT_LINE_PROPS,
     DEFAULT_PROGRESS_PROPS,
@@ -260,6 +261,51 @@ describe("overlay schema", () => {
             props: {},
         });
         expect(bare.props.url).toBe("");
+    });
+
+    test("chat element normalizes its spacing and fade-out props", () => {
+        const el = parseElementInput({
+            ...textElement(),
+            type: "chat",
+            props: {
+                messageSpacing: 12,
+                fadeDirection: "bottom",
+                fadeSize: 48,
+                textAlign: "justify",
+            },
+        });
+        expect(el.props.messageSpacing).toBe(12);
+        expect(el.props.fadeDirection).toBe("bottom");
+        expect(el.props.fadeSize).toBe(48);
+        expect(el.props.textAlign).toBe("justify");
+
+        // missing props fall back to the defaults (no fade, no spacing)
+        const bare = parseElementInput({
+            ...textElement(),
+            type: "chat",
+            props: {},
+        });
+        expect(bare.props.messageSpacing).toBe(DEFAULT_CHAT_PROPS.messageSpacing);
+        expect(bare.props.fadeDirection).toBe("off");
+        expect(bare.props.fadeSize).toBe(DEFAULT_CHAT_PROPS.fadeSize);
+        expect(bare.props.textAlign).toBe("left");
+
+        // out-of-range values, an invalid direction and an invalid alignment
+        // fall back to defaults
+        const bad = parseElementInput({
+            ...textElement(),
+            type: "chat",
+            props: {
+                messageSpacing: 999,
+                fadeDirection: "side",
+                fadeSize: -1,
+                textAlign: "oblique",
+            },
+        });
+        expect(bad.props.messageSpacing).toBe(DEFAULT_CHAT_PROPS.messageSpacing);
+        expect(bad.props.fadeDirection).toBe("off");
+        expect(bad.props.fadeSize).toBe(DEFAULT_CHAT_PROPS.fadeSize);
+        expect(bad.props.textAlign).toBe("left");
     });
 
     test("line props are normalized and in-range values kept", () => {

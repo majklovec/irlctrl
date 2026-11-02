@@ -108,6 +108,27 @@ function chatTextProps(p: Record<string, unknown>) {
 		color: strProp(p, "color", "#ffffff"),
 		fontWeight: numProp(p, "fontWeight", 600),
 		lineHeight: numProp(p, "lineHeight", 1.2),
+		messageSpacing: numProp(p, "messageSpacing", 0),
+		fadeDirection: [
+			"off",
+			"top",
+			"bottom",
+		].includes(strProp(p, "fadeDirection", "off"))
+			? (strProp(p, "fadeDirection", "off") as "off" | "top" | "bottom")
+			: "off",
+		fadeSize: numProp(p, "fadeSize", 96),
+		textAlign: [
+			"left",
+			"center",
+			"right",
+			"justify",
+		].includes(strProp(p, "textAlign", "left"))
+			? (strProp(p, "textAlign", "left") as
+					| "left"
+					| "center"
+					| "right"
+					| "justify")
+			: "left",
 	};
 }
 
@@ -116,7 +137,9 @@ function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 	const preview = overlayPreview(url);
 	const t = chatTextProps(element.props);
 	return m(
-		".chat-element",
+		`.chat-element${
+			t.fadeDirection !== "off" ? ` chat-element-fade-${t.fadeDirection}` : ""
+		}`,
 		{
 			style: {
 				width: "100%",
@@ -126,6 +149,9 @@ function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 				"--ov-chat-color": t.color,
 				"--ov-chat-font-weight": `${t.fontWeight}`,
 				"--ov-chat-line-height": `${t.lineHeight}`,
+				"--ov-chat-message-gap": `${t.messageSpacing}px`,
+				"--ov-chat-fade": `${t.fadeSize}px`,
+				"--ov-chat-text-align": t.textAlign,
 			},
 		},
 		[preview ?? (drawIframe(element) as Vnode)],
@@ -245,6 +271,91 @@ const ChatPicker: m.ClosureComponent<ElementProps> = () => {
 							sp,
 						)}
 					</div>
+					<div class="ov-grid2">
+						{bindField(
+							e,
+							"props.messageSpacing",
+							t("overlay.message_spacing"),
+							<input
+								type="number"
+								value={Number(p.messageSpacing ?? 0)}
+								oninput={(ev: Event) =>
+									mutate((el) => {
+										el.props.messageSpacing = Number(
+											(ev.target as HTMLInputElement).value,
+										);
+									})
+								}
+							/>,
+							sp,
+						)}
+						{bindField(
+							e,
+							"props.fadeDirection",
+							t("overlay.fade_direction"),
+							<select
+								value={String(p.fadeDirection ?? "off")}
+								onchange={(ev: Event) =>
+									mutate((el) => {
+										el.props.fadeDirection = (
+											ev.target as HTMLSelectElement
+										).value;
+									})
+								}
+							>
+								<option value="off">{t("overlay.fade_direction.off")}</option>
+								<option value="top">{t("overlay.fade_direction.top")}</option>
+								<option value="bottom">
+									{t("overlay.fade_direction.bottom")}
+								</option>
+							</select>,
+							sp,
+						)}
+					</div>
+					{bindField(
+						e,
+						"props.fadeSize",
+						t("overlay.fade_size"),
+						<input
+							type="number"
+							value={Number(p.fadeSize ?? 96)}
+							oninput={(ev: Event) =>
+								mutate((el) => {
+									el.props.fadeSize = Number(
+										(ev.target as HTMLInputElement).value,
+									);
+								})
+							}
+						/>,
+						sp,
+					)}
+					{bindField(
+						e,
+						"props.textAlign",
+						t("overlay.text_align"),
+						<select
+							value={String(p.textAlign ?? "left")}
+							onchange={(ev: Event) =>
+								mutate((el) => {
+									el.props.textAlign = (
+										ev.target as HTMLSelectElement
+									).value;
+								})
+							}
+						>
+							<option value="left">{t("overlay.text_align.left")}</option>
+							<option value="center">
+								{t("overlay.text_align.center")}
+							</option>
+							<option value="right">
+								{t("overlay.text_align.right")}
+							</option>
+							<option value="justify">
+								{t("overlay.text_align.justify")}
+							</option>
+						</select>,
+						sp,
+					)}
 					{bindField(
 						e,
 						"props.fontFamily",
@@ -293,6 +404,10 @@ export const chatElement: OverlayElementDef = {
 		"color",
 		"fontWeight",
 		"lineHeight",
+		"messageSpacing",
+		"fadeDirection",
+		"fadeSize",
+		"textAlign",
 	],
 	defaultSize: { width: 360, height: 480 },
 	draw,

@@ -22,6 +22,14 @@ export interface ChatProps {
     fontWeight: number;
     /** Feed text line-height (unitless). */
     lineHeight: number;
+    /** Spacing between feed lines in px (0 = none). */
+    messageSpacing: number;
+    /** Which feed edge fades out into the background. */
+    fadeDirection: "off" | "top" | "bottom";
+    /** Fade-out size in px. */
+    fadeSize: number;
+    /** Alignment of the feed text. */
+    textAlign: "left" | "center" | "right" | "justify";
 }
 
 export const DEFAULT_CHAT_PROPS: Required<ChatProps> = {
@@ -31,6 +39,11 @@ export const DEFAULT_CHAT_PROPS: Required<ChatProps> = {
     color: "#ffffff",
     fontWeight: 600,
     lineHeight: 1.2,
+    messageSpacing: 0,
+    fadeDirection: "off",
+    // ~6rem — the size of a few feed lines.
+    fadeSize: 96,
+    textAlign: "left",
 };
 
 export const chatSchema: OverlayElementSchema = {
@@ -47,6 +60,18 @@ export const chatSchema: OverlayElementSchema = {
             color: read.hex("color", d.color),
             fontWeight: read.num("fontWeight", d.fontWeight, 100, 900),
             lineHeight: read.num("lineHeight", d.lineHeight, 0.1, 10),
+            messageSpacing: read.num("messageSpacing", d.messageSpacing, 0, 100),
+            fadeDirection: read.oneOf(
+                "fadeDirection",
+                ["off", "top", "bottom"] as const,
+                d.fadeDirection,
+            ),
+            fadeSize: read.num("fadeSize", d.fadeSize, 1, 500),
+            textAlign: read.oneOf(
+                "textAlign",
+                ["left", "center", "right", "justify"] as const,
+                d.textAlign,
+            ),
         };
     },
 };
