@@ -10,9 +10,9 @@ import type {
 } from "@ui/overlay/element";
 import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
-import { DEFAULT_VIDEO_PROPS } from "../overlay_schema";
 import type { Vnode } from "mithril";
 import m from "mithril";
+import { DEFAULT_VIDEO_PROPS } from "../overlay_schema";
 
 /** Defensive read of a boolean prop (the contract has no `boolProp`). */
 const boolProp = (p: Record<string, unknown>, key: string, fb: boolean) =>
@@ -46,18 +46,10 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 		oncreate: (vnode) => {
 			const video = (vnode as unknown as { dom?: Element })
 				.dom as HTMLVideoElement;
-			// Apply the media props as DOM properties (the `muted`/`volume`
-			// content attributes only set *defaults*). The runtime page starts
-			// playback; the editor's design state stays paused and silent.
 			video.muted = boolProp(element.props, "muted", true);
 			video.loop = boolProp(element.props, "loop", true);
-			video.volume = clamp01(
-				numProp(element.props, "volume", 1),
-			);
-			if (
-				ctx.activeTriggers !== undefined &&
-				boolProp(element.props, "autoplay", true)
-			)
+			video.volume = clamp01(numProp(element.props, "volume", 1));
+			if (boolProp(element.props, "autoplay", true))
 				void video.play().catch(() => {});
 		},
 	});
