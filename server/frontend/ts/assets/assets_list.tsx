@@ -517,18 +517,20 @@ function filesPanel(): m.Vnode {
 									m.redraw();
 								}}
 							>
-								<td class="dash-name asset-file-name">
+								<td class="dash-name">
 									{state.renamingFileId === file.id
 										? renameFileInput(file)
-										: [
-												<span class="asset-file-icon">
-													<Icon
-														name={fileIcon(file.mimeType, file.name)}
-														class="role-icon"
-													/>
-												</span>,
-												file.name,
-											]}
+										: (
+												<span class="asset-file-name">
+													<span class="asset-file-icon">
+														<Icon
+															name={fileIcon(file.mimeType, file.name)}
+															class="role-icon"
+														/>
+													</span>
+													{file.name}
+												</span>
+											)}
 								</td>
 								<td class="muted">{formatBytes(file.size)}</td>
 								<td class="muted">{formatDateTime(file.updatedAt)}</td>
