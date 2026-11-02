@@ -1,5 +1,6 @@
 {
     "assets.cancel": "Cancelar",
+    "assets.move_would_cycle": "Este movimiento crearía un ciclo entre carpetas.",
     "assets.confirm_delete_file": "¿Borrar «{{name}}»? El archivo no se podrá restaurar.",
     "assets.confirm_delete_folder": "¿Borrar «{{name}}» y todo su contenido? Esta acción no se puede deshacer.",
     "assets.create": "Crear",

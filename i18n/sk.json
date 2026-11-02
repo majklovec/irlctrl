@@ -1,5 +1,6 @@
 {
     "assets.cancel": "Zrušiť",
+    "assets.move_would_cycle": "Tento presun by vytvoril cyklus medzi priečinkami.",
     "assets.confirm_delete_file": "Zmazať „{{name}}“? Súbor sa nebude dávať obnoviť.",
     "assets.confirm_delete_folder": "Zmazať „{{name}}“ vrátane celého obsahu? Túto akciu nie je možné vrátiť naspäť.",
     "assets.create": "Vytvoriť",

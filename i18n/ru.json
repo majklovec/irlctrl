@@ -1,5 +1,6 @@
 {
     "assets.cancel": "Отмена",
+    "assets.move_would_cycle": "Это перемещение создаст цикл между папками.",
     "assets.confirm_delete_file": "Удалить «{{name}}»? Файл не будет восстановлен.",
     "assets.confirm_delete_folder": "Удалить «{{name}}» вместе со всем содержимым? Это действие нельзя отменить.",
     "assets.create": "Создать",

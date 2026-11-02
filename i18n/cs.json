@@ -1,5 +1,6 @@
 {
     "assets.cancel": "Zrušit",
+    "assets.move_would_cycle": "Tento přesun by vytvořil kruhový odkaz mezi složkami.",
     "assets.confirm_delete_file": "Smazat „{{name}}“? Soubor nebude možné obnovit.",
     "assets.confirm_delete_folder": "Smazat „{{name}}“ včetně celého obsahu? Tuto akci nelze vrátit zpět.",
     "assets.create": "Vytvořit",

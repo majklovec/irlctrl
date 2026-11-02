@@ -1,5 +1,6 @@
 {
     "assets.cancel": "キャンセル",
+    "assets.move_would_cycle": "この移動はフォルダー間の循環を作り出します。",
     "assets.confirm_delete_file": "「{{name}}」を削除しますか？ファイルは復元できません。",
     "assets.confirm_delete_folder": "「{{name}}」とその中身をすべて削除しますか？この操作は取り消せません。",
     "assets.create": "作成",

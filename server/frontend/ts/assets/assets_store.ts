@@ -539,21 +539,5 @@ export async function loadMoveTargets(
 	return state.modalFolders;
 }
 
-/** Ancestors of `folder` already known in the loaded tree (DnD guard: a
- * folder must not be droppable onto itself or its own subtree). */
-export function knownAncestors(folder: FolderNode): Set<string> {
-	const byId = new Map<string, FolderNode>();
-	for (const c of state.children.values())
-		if (Array.isArray(c)) for (const f of c) byId.set(f.id, f);
-	const ancestors = new Set<string>();
-	let cursor: FolderNode | undefined = byId.get(folder.id);
-	let guard = 0;
-	while (cursor && cursor.parentId !== null && guard++ < 64) {
-		ancestors.add(cursor.parentId);
-		cursor = byId.get(cursor.parentId);
-	}
-	return ancestors;
-}
-
 /** The currently selected folder object. */
 export const selectedFolderNode = selectedFolder;

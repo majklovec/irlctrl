@@ -1,5 +1,6 @@
 {
     "assets.cancel": "Cancel",
+    "assets.move_would_cycle": "This move would create a cycle between folders.",
     "assets.confirm_delete_file": "Delete “{{name}}”? The file cannot be restored.",
     "assets.confirm_delete_folder": "Delete “{{name}}” and everything inside it? This cannot be undone.",
     "assets.create": "Create",

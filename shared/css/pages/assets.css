@@ -197,35 +197,46 @@ tr.dragging td {
     opacity: 0.5;
 }
 
-/* ── Trash drop zone (files toolbar) ─────────────────────────── */
+/* ── Trash drop zone (floating, bottom-right) ────────────────── */
 /* Drag-and-drop is the only way to delete, so the zone quietly arms
  * while an asset is dragged and lights up red over it. */
 .asset-trash {
-    display: inline-flex;
+    position: fixed;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    z-index: 40;
+    display: flex;
     align-items: center;
     justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    margin-left: auto;
-    border: 1px dashed transparent;
-    border-radius: var(--radius);
+    width: 4.5rem;
+    height: 4.5rem;
+    border: 2px dashed transparent;
+    border-radius: 50%;
+    background: var(--card);
     color: var(--muted);
-    box-shadow: none;
-    opacity: 0.55;
+    box-shadow: var(--shadow-sm);
+    opacity: 0.6;
     transition:
         background var(--t),
         border-color var(--t),
         color var(--t),
-        opacity var(--t);
+        opacity var(--t),
+        transform var(--t);
+}
+.asset-trash .role-icon {
+    width: 2rem;
+    height: 2rem;
 }
 .asset-trash.armed {
     opacity: 1;
     color: var(--bad);
     border-color: color-mix(in srgb, var(--bad) 45%, transparent);
+    transform: scale(1.06);
 }
 .asset-trash.over {
     opacity: 1;
     color: var(--bad);
-    background: color-mix(in srgb, var(--bad) 15%, transparent);
+    background: color-mix(in srgb, var(--bad) 15%, var(--card));
     border-color: var(--bad);
+    transform: scale(1.12);
 }

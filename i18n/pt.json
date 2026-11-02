@@ -1,5 +1,6 @@
 {
     "assets.cancel": "Cancelar",
+    "assets.move_would_cycle": "Esta movimentação criaria um ciclo entre as pastas.",
     "assets.confirm_delete_file": "Excluir “{{name}}”? O arquivo não poderá ser restaurado.",
     "assets.confirm_delete_folder": "Excluir “{{name}}” e todo o seu conteúdo? Esta ação não pode ser desfeita.",
     "assets.create": "Criar",

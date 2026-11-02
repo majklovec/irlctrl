@@ -40,7 +40,6 @@ import {
 	formatBytes,
 	formatDateTime,
 	init,
-	knownAncestors,
 	loadFiles,
 	moveFile,
 	moveFolder,
@@ -61,6 +60,9 @@ const DND_FILE = "application/x-asset-file";
 
 const toast = useToast();
 
+/** The "can't drop on own subtree" toast may show at most once per drag. */
+let blockedDropToastShown = false;
+
 /* ------------------------------------------------------------------ *
  *  Folder tree
  * ------------------------------------------------------------------ */
@@ -77,10 +79,17 @@ function treeNode(folder: FolderNode): m.Vnode {
 	const isFocus = state.focusId === folder.id;
 	const isDropTarget = state.dropTarget === folder.id;
 	const drag = state.dragging;
+	// The dragged folder moves into the target folder. Moving up (onto an
+	// ancestor, a sibling, …) is fine; it is blocked only onto itself, its
+	// direct parent (a no-op) and onto a folder inside its own subtree
+	// (that would create a cycle).
+	const dragNode = drag?.kind === "folder" ? findFolder(drag.id) : undefined;
 	const dropBlocked =
 		!!drag &&
 		drag.kind === "folder" &&
-		(drag.id === folder.id || knownAncestors(folder).has(drag.id));
+		(drag.id === folder.id ||
+			folder.id === dragNode?.parentId ||
+			(dragNode !== undefined && descendantIds(dragNode).has(folder.id)));
 
 	const keyNav = (ev: KeyboardEvent): void => {
 		const nodes = visibleTree();
@@ -161,6 +170,7 @@ function treeNode(folder: FolderNode): m.Vnode {
 			}}
 			aria-selected={isSelected}
 			aria-expanded={folder.hasChildren ? isExpanded : undefined}
+			title={dropBlocked ? t("assets.move_would_cycle") : undefined}
 			tabindex={isFocus ? 0 : -1}
 			onkeydown={keyNav}
 			onfocus={() => {
@@ -172,6 +182,7 @@ function treeNode(folder: FolderNode): m.Vnode {
 				dt?.setData(DND_FOLDER, folder.id);
 				if (dt) dt.effectAllowed = "move";
 				state.dragging = { kind: "folder", id: folder.id };
+				blockedDropToastShown = false;
 				m.redraw();
 			}}
 			ondragend={() => {
@@ -187,7 +198,16 @@ function treeNode(folder: FolderNode): m.Vnode {
 					!!ev.dataTransfer?.files.length;
 				const isAssetDrag =
 					types.includes(DND_FOLDER) || types.includes(DND_FILE);
-				if ((isAssetDrag && !dropBlocked) || isFileDrag) {
+				if (isAssetDrag && dropBlocked) {
+					// The drop is refused (cycle); keep the browser's no-drop
+					// cursor and explain the reason once per drag.
+					if (!blockedDropToastShown) {
+						blockedDropToastShown = true;
+						toast.show(t("assets.move_would_cycle"));
+					}
+					return;
+				}
+				if (isAssetDrag || isFileDrag) {
 					ev.preventDefault();
 					if (state.dropTarget !== folder.id) {
 						state.dropTarget = folder.id;
@@ -209,7 +229,12 @@ function treeNode(folder: FolderNode): m.Vnode {
 				state.dropTarget = null;
 				state.dragging = null;
 				m.redraw();
-				if (draggedFolder) await moveFolder(folder, draggedFolder);
+				// The dragged folder moves into the (target) folder it is
+				// dropped on — standard file-manager semantics.
+				if (draggedFolder) {
+					const dNode = findFolder(draggedFolder);
+					if (dNode) await moveFolder(dNode, folder.id);
+				}
 				else if (draggedFile) await moveFileToFolder(draggedFile, folder.id);
 				else if (dt?.files.length)
 					await uploadFiles(folder.id, Array.from(dt.files));
@@ -418,41 +443,6 @@ function filesPanel(): m.Vnode {
 					label={t("assets.new_folder")}
 					onclick={() => openNewFolder(folder.id)}
 				/>
-				<div
-					class={[
-						"asset-trash",
-						state.dragging ? "armed" : "",
-						state.trashOver ? "over" : "",
-					]
-						.filter(Boolean)
-						.join(" ")}
-					role="img"
-					aria-label={t("assets.trash_drop")}
-					title={t("assets.trash_drop")}
-					ondragover={(ev: DragEvent) => {
-						const types = Array.from(ev.dataTransfer?.types ?? []);
-						if (types.includes(DND_FOLDER) || types.includes(DND_FILE)) {
-							ev.preventDefault();
-							if (ev.dataTransfer) ev.dataTransfer.dropEffect = "move";
-							if (!state.trashOver) {
-								state.trashOver = true;
-								m.redraw();
-							}
-						}
-					}}
-					ondragleave={() => {
-						if (state.trashOver) {
-							state.trashOver = false;
-							m.redraw();
-						}
-					}}
-					ondrop={(ev: DragEvent) => {
-						ev.preventDefault();
-						void trashDrop(ev);
-					}}
-				>
-					<Icon name="delete" class="role-icon" />
-				</div>
 			</Toolbar>
 			<div
 				class={state.filesOverPanel ? "asset-dropzone over" : "asset-dropzone"}
@@ -567,6 +557,47 @@ function filesPanel(): m.Vnode {
 	);
 }
 
+/** The floating trash drop zone (bottom-right corner of the page). */
+function trashZone(): m.Vnode {
+	return (
+		<div
+			class={[
+				"asset-trash",
+				state.dragging ? "armed" : "",
+				state.trashOver ? "over" : "",
+			]
+				.filter(Boolean)
+				.join(" ")}
+			role="img"
+			aria-label={t("assets.trash_drop")}
+			title={t("assets.trash_drop")}
+			ondragover={(ev: DragEvent) => {
+				const types = Array.from(ev.dataTransfer?.types ?? []);
+				if (types.includes(DND_FOLDER) || types.includes(DND_FILE)) {
+					ev.preventDefault();
+					if (ev.dataTransfer) ev.dataTransfer.dropEffect = "move";
+					if (!state.trashOver) {
+						state.trashOver = true;
+						m.redraw();
+					}
+				}
+			}}
+			ondragleave={() => {
+				if (state.trashOver) {
+					state.trashOver = false;
+					m.redraw();
+				}
+			}}
+			ondrop={(ev: DragEvent) => {
+				ev.preventDefault();
+				void trashDrop(ev);
+			}}
+		>
+			<Icon name="delete" class="role-icon" />
+		</div>
+	);
+}
+
 /** A loaded folder node by id (the lazy tree keeps loaded levels here). */
 function findFolder(id: string): FolderNode | undefined {
 	for (const kids of state.children.values())
@@ -575,6 +606,23 @@ function findFolder(id: string): FolderNode | undefined {
 			if (found) return found;
 		}
 	return undefined;
+}
+
+/** Loaded descendant ids of `folder` (DnD cycle guard). */
+function descendantIds(folder: FolderNode): Set<string> {
+	const out = new Set<string>();
+	const queue: FolderNode[] = [folder];
+	let guard = 0;
+	while (queue.length && guard++ < 512) {
+		const node = queue.shift()!;
+		const kids = state.children.get(node.id);
+		if (Array.isArray(kids))
+			for (const k of kids) {
+				out.add(k.id);
+				queue.push(k);
+			}
+	}
+	return out;
 }
 
 /** Drop a dragged folder/file on the trash: confirm, then delete. */
@@ -773,6 +821,7 @@ const assetsPage: m.Component = {
 				</Card>
 				{filesPanel()}
 			</div>
+			{trashZone()}
 			{modalView()}
 			<Toast message={toast.message} />
 		</Page>

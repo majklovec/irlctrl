@@ -1,5 +1,6 @@
 {
     "assets.cancel": "Annulla",
+    "assets.move_would_cycle": "Questo spostamento creerebbe un ciclo tra le cartelle.",
     "assets.confirm_delete_file": "Eliminare “{{name}}”? Il file non potrà essere ripristinato.",
     "assets.confirm_delete_folder": "Eliminare “{{name}}” e tutto il suo contenuto? L’operazione non può essere annullata.",
     "assets.create": "Crea",

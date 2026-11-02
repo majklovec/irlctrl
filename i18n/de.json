@@ -1,5 +1,6 @@
 {
     "assets.cancel": "Abbrechen",
+    "assets.move_would_cycle": "Dieser Vorgang würde einen Kreislauf zwischen Ordnern erzeugen.",
     "assets.confirm_delete_file": "„{{name}}“ löschen? Die Datei kann nicht wiederhergestellt werden.",
     "assets.confirm_delete_folder": "„{{name}}“ samt allem Inhalt löschen? Das kann nicht rückgängig gemacht werden.",
     "assets.create": "Erstellen",

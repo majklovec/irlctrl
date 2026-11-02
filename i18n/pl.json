@@ -1,5 +1,6 @@
 {
     "assets.cancel": "Anuluj",
+    "assets.move_would_cycle": "To przeniesienie stworzyłoby cykl między folderami.",
     "assets.confirm_delete_file": "Usunąć „{{name}}”? Pliku nie da się przywrócić.",
     "assets.confirm_delete_folder": "Usunąć „{{name}}” wraz z całą jego zawartością? Tej operacji nie można cofnąć.",
     "assets.create": "Utwórz",

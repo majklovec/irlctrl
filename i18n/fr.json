@@ -1,5 +1,6 @@
 {
     "assets.cancel": "Annuler",
+    "assets.move_would_cycle": "Ce déplacement créerait un cycle entre les dossiers.",
     "assets.confirm_delete_file": "Supprimer « {{name}} » ? Le fichier ne pourra pas être restauré.",
     "assets.confirm_delete_folder": "Supprimer « {{name}} » et tout son contenu ? Cette action est irréversible.",
     "assets.create": "Créer",
