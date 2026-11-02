@@ -1,3 +1,10 @@
+## [2.5.1](https://github.com/majklovec/irlctrl/compare/v2.5.0...v2.5.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* adjust padding for inspector controls for better usability ([deed77b](https://github.com/majklovec/irlctrl/commit/deed77ba5bf95f8a1261bf6843d2ca9da7012fd4))
+
 # [2.5.0](https://github.com/majklovec/irlctrl/compare/v2.4.0...v2.5.0) (2026-11-01)
 
 
