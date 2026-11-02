@@ -62,5 +62,13 @@
   "overlay.stroke_width": "Stroke width",
   "overlay.text": "Text",
   "overlay.upload": "Upload image",
-  "overlay.value": "Valore"
+  "overlay.value": "Valore",
+  "overlay.add_video": "Video",
+  "overlay.missing_video": "nessun video selezionato",
+  "overlay.upload_video": "Carica un video",
+  "overlay.video_asset": "Video",
+  "overlay.video_autoplay": "Riproduzione automatica",
+  "overlay.video_loop": "Ripeti in loop",
+  "overlay.video_muted": "Muto",
+  "overlay.video_volume": "Volume"
 }

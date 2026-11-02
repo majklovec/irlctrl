@@ -59,6 +59,13 @@ body {
     object-fit: fill;
 }
 
+.overlay-video {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: fill;
+}
+
 .overlay-shape {
     width: 100%;
     height: 100%;

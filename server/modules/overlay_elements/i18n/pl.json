@@ -62,5 +62,13 @@
   "overlay.stroke_width": "Stroke width",
   "overlay.text": "Text",
   "overlay.upload": "Upload image",
-  "overlay.value": "Wartość"
+  "overlay.value": "Wartość",
+  "overlay.add_video": "Wideo",
+  "overlay.missing_video": "nie wybrano wideo",
+  "overlay.upload_video": "Wgraj wideo",
+  "overlay.video_asset": "Wideo",
+  "overlay.video_autoplay": "Odtwarzanie automatyczne",
+  "overlay.video_loop": "Pętla",
+  "overlay.video_muted": "Wyciszony",
+  "overlay.video_volume": "Głośność"
 }

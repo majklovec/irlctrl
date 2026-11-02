@@ -5,6 +5,7 @@ import {
     DEFAULT_PROGRESS_PROPS,
     DEFAULT_RECTANGLE_PROPS,
     DEFAULT_TEXT_PROPS,
+    DEFAULT_VIDEO_PROPS,
 } from "../server/modules/overlay_elements/overlay_schema";
 import {
     defaultProject,
@@ -184,7 +185,7 @@ describe("overlay schema", () => {
     test("elements must be an object and have a valid type", () => {
         expect(() => parseElementInput("x")).toThrow();
         expect(() =>
-            parseElementInput({ ...textElement(), type: "video" }),
+            parseElementInput({ ...textElement(), type: "banana" }),
         ).toThrow();
         expect(() => parseElementInput({ ...textElement(), id: "" })).toThrow();
     });
@@ -333,6 +334,55 @@ describe("overlay schema", () => {
             props: { flip: "yes" },
         });
         expect(bad.props.flip).toBe(false);
+    });
+
+    test("video props are normalized and in-range values kept", () => {
+        const el = parseElementInput({
+            ...textElement(),
+            type: "video",
+            props: {
+                assetId: "asset-2",
+                volume: 0.5,
+                muted: false,
+                loop: false,
+                autoplay: false,
+            },
+        });
+        expect(el.type).toBe("video");
+        expect(el.props.assetId).toBe("asset-2");
+        expect(el.props.volume).toBe(0.5);
+        expect(el.props.muted).toBe(false);
+        expect(el.props.loop).toBe(false);
+        expect(el.props.autoplay).toBe(false);
+    });
+
+    test("video props fall back to the defaults when missing or invalid", () => {
+        const bare = parseElementInput({
+            ...textElement(),
+            type: "video",
+            props: { assetId: "" },
+        });
+        expect(bare.props.volume).toBe(DEFAULT_VIDEO_PROPS.volume);
+        expect(bare.props.muted).toBe(DEFAULT_VIDEO_PROPS.muted);
+        expect(bare.props.loop).toBe(DEFAULT_VIDEO_PROPS.loop);
+        expect(bare.props.autoplay).toBe(DEFAULT_VIDEO_PROPS.autoplay);
+
+        const bad = parseElementInput({
+            ...textElement(),
+            type: "video",
+            props: {
+                assetId: 42,
+                volume: 9,
+                muted: "no",
+                loop: 7,
+                autoplay: null,
+            },
+        });
+        expect(bad.props.assetId).toBe("");
+        expect(bad.props.volume).toBe(DEFAULT_VIDEO_PROPS.volume);
+        expect(bad.props.muted).toBe(DEFAULT_VIDEO_PROPS.muted);
+        expect(bad.props.loop).toBe(DEFAULT_VIDEO_PROPS.loop);
+        expect(bad.props.autoplay).toBe(DEFAULT_VIDEO_PROPS.autoplay);
     });
 
     test("bindings must be variable references and target existing variables", () => {

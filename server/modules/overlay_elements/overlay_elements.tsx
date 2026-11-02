@@ -12,6 +12,7 @@ import { lineElement } from "./elements/line";
 import { progressElement } from "./elements/progress";
 import { rectangleElement } from "./elements/rectangle";
 import { textElement } from "./elements/text";
+import { videoElement } from "./elements/video";
 
 export default [
 	textElement,
@@ -20,6 +21,7 @@ export default [
 	lineElement,
 	progressElement,
 	imageElement,
+	videoElement,
 	iframeElement,
 	groupElement,
 	alertsElement,

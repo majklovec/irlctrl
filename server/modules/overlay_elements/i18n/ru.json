@@ -62,5 +62,13 @@
   "overlay.stroke_width": "Stroke width",
   "overlay.text": "Text",
   "overlay.upload": "Upload image",
-  "overlay.value": "Значение"
+  "overlay.value": "Значение",
+  "overlay.add_video": "Видео",
+  "overlay.missing_video": "видео не выбрано",
+  "overlay.upload_video": "Загрузить видео",
+  "overlay.video_asset": "Видео",
+  "overlay.video_autoplay": "Автовоспроизведение",
+  "overlay.video_loop": "Зациклить",
+  "overlay.video_muted": "Заглушить",
+  "overlay.video_volume": "Громкость"
 }

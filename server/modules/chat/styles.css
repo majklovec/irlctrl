@@ -74,33 +74,40 @@
     text-align: var(--ov-chat-text-align, left);
 }
 
+/* Fade-mask colour stops (a mask only sees alpha, so a white gradient works
+   for any per-line colour). */
+.chat-element {
+    --ov-chat-fade-opaque: #fff;
+    --ov-chat-fade-clear: #fff0;
+}
+
 .chat-element.chat-element-fade-bottom .chat-feed {
     -webkit-mask-image: linear-gradient(
         180deg,
-        #fff 0,
-        #fff calc(100% - var(--ov-chat-fade, 96px)),
-        #fff0 100%
+        var(--ov-chat-fade-opaque) 0,
+        var(--ov-chat-fade-opaque) calc(100% - var(--ov-chat-fade, 96px)),
+        var(--ov-chat-fade-clear) 100%
     );
     mask-image: linear-gradient(
         180deg,
-        #fff 0,
-        #fff calc(100% - var(--ov-chat-fade, 96px)),
-        #fff0 100%
+        var(--ov-chat-fade-opaque) 0,
+        var(--ov-chat-fade-opaque) calc(100% - var(--ov-chat-fade, 96px)),
+        var(--ov-chat-fade-clear) 100%
     );
 }
 
 .chat-element.chat-element-fade-top .chat-feed {
     -webkit-mask-image: linear-gradient(
         0deg,
-        #fff 0,
-        #fff calc(100% - var(--ov-chat-fade, 96px)),
-        #fff0 100%
+        var(--ov-chat-fade-opaque) 0,
+        var(--ov-chat-fade-opaque) calc(100% - var(--ov-chat-fade, 96px)),
+        var(--ov-chat-fade-clear) 100%
     );
     mask-image: linear-gradient(
         0deg,
-        #fff 0,
-        #fff calc(100% - var(--ov-chat-fade, 96px)),
-        #fff0 100%
+        var(--ov-chat-fade-opaque) 0,
+        var(--ov-chat-fade-opaque) calc(100% - var(--ov-chat-fade, 96px)),
+        var(--ov-chat-fade-clear) 100%
     );
 }
 

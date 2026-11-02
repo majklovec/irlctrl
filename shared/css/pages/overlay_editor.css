@@ -193,6 +193,13 @@ rules). Mirrored here, scoped, so the canvas preview matches the OBS runtime
     display: block;
     object-fit: fill;
 }
+
+.ov-canvas-wrap .overlay-video {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: fill;
+}
 .ov-canvas-wrap .overlay-shape {
     width: 100%;
     height: 100%;

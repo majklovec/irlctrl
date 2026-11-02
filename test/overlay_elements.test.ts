@@ -334,7 +334,7 @@ describe("element registry contract", () => {
     });
 
     test("unknown / legacy types resolve to undefined", () => {
-        expect(elementDef("video")).toBeUndefined();
+        expect(elementDef("banana")).toBeUndefined();
         expect(elementDef("shape")).toBeUndefined();
     });
 });

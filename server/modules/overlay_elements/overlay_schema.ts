@@ -179,6 +179,50 @@ export const imageSchema: OverlayElementSchema = {
     },
 };
 
+export interface VideoProps {
+    /** id of a project video asset; `""` (or a missing asset) renders an empty box */
+    assetId: string;
+    /** 0–1, the video's audio track (no effect while muted) */
+    volume: number;
+    /** muted videos are the only ones browsers allow to autoplay — the safe default */
+    muted: boolean;
+    /** restart from the beginning when the video ends */
+    loop: boolean;
+    /** start playing on page load (a browser may defer it while un-muted) */
+    autoplay: boolean;
+}
+
+export const DEFAULT_VIDEO_PROPS: Required<VideoProps> = {
+    assetId: "",
+    volume: 1,
+    muted: true,
+    loop: true,
+    autoplay: true,
+};
+
+export const videoSchema: OverlayElementSchema = {
+    type: "video",
+    defaultProps: DEFAULT_VIDEO_PROPS,
+    assetProps: ["assetId"],
+    normalizeProps(props, read) {
+        const d = DEFAULT_VIDEO_PROPS;
+        return {
+            assetId: read.str("assetId", ""),
+            volume: read.num("volume", d.volume, 0, 1),
+            // `read.bool` can't express a default of `true` (a missing key
+            // reads as `false`), so these flags keep their default unless the
+            // stored value is a real boolean.
+            muted:
+                typeof props.muted === "boolean" ? props.muted : d.muted,
+            loop: typeof props.loop === "boolean" ? props.loop : d.loop,
+            autoplay:
+                typeof props.autoplay === "boolean"
+                    ? props.autoplay
+                    : d.autoplay,
+        };
+    },
+};
+
 export interface IframeProps {
     /** The page to embed. Any absolute URL; `""` renders a placeholder box. */
     url: string;
@@ -373,6 +417,7 @@ export const alertSchema: OverlayElementSchema = {
 export default [
     textSchema,
     imageSchema,
+    videoSchema,
     rectangleSchema,
     ellipseSchema,
     lineSchema,
