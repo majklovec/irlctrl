@@ -74,3 +74,7 @@ export async function apiTry<T>(
 /** The message to show a user for a failed call. */
 export const apiErrorMessage = (err: unknown): string =>
 	err instanceof Error ? err.message : String(err);
+
+/** True when a call failed because the session is missing or expired. */
+export const isUnauthorized = (err: unknown): boolean =>
+	err instanceof ApiError && err.status === 401;

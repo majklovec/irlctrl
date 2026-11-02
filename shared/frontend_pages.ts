@@ -17,6 +17,7 @@ export const SERVER_PAGES = [
     "overlay_list",
     "overlay_update",
     "overlay_view",
+    "assets_list",
 ] as const;
 
 export const PAGES = [...CLIENT_PAGES, ...SERVER_PAGES] as const;

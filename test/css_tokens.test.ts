@@ -31,8 +31,10 @@ describe("css design tokens", () => {
                 stripComments(readFileSync(file, "utf8"))
                     .split("\n")
                     .forEach((line, i) => {
-                        if (!COLOR_LITERAL.test(line)) return;
+                        // reset: /g + .test() is stateful and would skip the
+                        // even-numbered line after a match
                         COLOR_LITERAL.lastIndex = 0;
+                        if (!COLOR_LITERAL.test(line)) return;
                         // `--name: <value>;` declares a token — allowed anywhere
                         if (/^\s*--[\w-]+\s*:/.test(line)) return;
                         offenders.push(`${relative(ROOT, file)}:${i + 1}: ${line.trim()}`);

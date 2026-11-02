@@ -1,0 +1,231 @@
+/* Assets manager: the two-pane layout (tree | files) and the tree rows. */
+
+.asset-layout {
+    display: grid;
+    grid-template-columns: minmax(220px, 320px) 1fr;
+    gap: 1rem;
+    align-items: start;
+}
+
+@media (max-width: 900px) {
+    .asset-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* The tree card stays put while the file list grows. */
+.asset-tree-card {
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 6rem);
+    display: flex;
+    flex-direction: column;
+}
+
+.asset-tree {
+    overflow-y: auto;
+    flex: 1;
+}
+
+.asset-tree-node {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.4rem;
+    /* Fixed height: the hover actions must not change the row size. */
+    height: 2rem;
+    box-sizing: border-box;
+    border-radius: var(--radius, 8px);
+    cursor: pointer;
+    user-select: none;
+    outline: none;
+}
+
+.asset-tree-node:hover {
+    background: var(--card-subtle);
+}
+
+.asset-tree-node:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.asset-tree-node.selected {
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.asset-tree-node.dragging {
+    opacity: 0.5;
+}
+
+.asset-tree-node.drop-target {
+    outline: 2px dashed var(--accent);
+    outline-offset: -2px;
+}
+
+.asset-tree-node.drop-blocked {
+    outline: 2px dashed var(--bad);
+    outline-offset: -2px;
+    cursor: not-allowed;
+}
+
+.asset-tree-kids {
+    padding-left: 1.4rem;
+}
+
+.asset-chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    padding: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+    color: var(--muted);
+    cursor: pointer;
+    flex: none;
+}
+
+/* The chevron is a plain toggle: keep the global hover/active/focus
+ * button treatments (accent background, ring, press shift) off it —
+ * the row keeps its own affordances. */
+.asset-chevron:hover,
+.asset-chevron:active,
+.asset-chevron:focus,
+.asset-chevron:focus-visible {
+    background: none;
+    border-color: transparent;
+    box-shadow: none;
+    transform: none;
+}
+
+.asset-chevron.spacer {
+    cursor: default;
+}
+
+.asset-chevron svg {
+    transition: transform 120ms ease;
+}
+
+.asset-chevron.open svg {
+    transform: rotate(90deg);
+}
+
+.asset-tree-icon {
+    display: inline-flex;
+    color: var(--muted);
+    flex: none;
+}
+
+.asset-tree-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.asset-tree-count {
+    font-size: 0.75rem;
+    flex: none;
+}
+
+/* Row actions stay out of the way until the row is hovered/focused. */
+.asset-tree-actions {
+    display: none;
+    flex: none;
+    gap: 0.15rem;
+    align-items: center;
+}
+
+.asset-tree-node:hover .asset-tree-actions,
+.asset-tree-node:focus-within .asset-tree-actions {
+    display: inline-flex;
+}
+
+/* The 2rem global icon button is taller than the row; shrink it so the
+ * actions fit the fixed row height and the node does not grow on hover. */
+.asset-tree-actions .icon-link {
+    width: 1.4rem;
+    height: 1.4rem;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    color: var(--muted);
+}
+
+.asset-tree-actions .icon-link:hover {
+    color: var(--text);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.asset-tree-actions .dash-delete:hover {
+    color: var(--bad);
+    background: color-mix(in srgb, var(--bad) 12%, transparent);
+}
+
+/* ── Files panel ─────────────────────────────────────────────── */
+
+.asset-files-card .dash-toolbar {
+    margin-bottom: 0.75rem;
+}
+
+.asset-dropzone {
+    min-height: 6rem;
+}
+
+.asset-dropzone.over {
+    outline: 2px dashed var(--accent);
+    outline-offset: 4px;
+    border-radius: var(--radius-lg);
+}
+
+.asset-file-name {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.asset-file-icon {
+    display: inline-flex;
+    color: var(--muted);
+    flex: none;
+}
+
+tr.dragging td {
+    opacity: 0.5;
+}
+
+/* ── Trash drop zone (files toolbar) ─────────────────────────── */
+/* Drag-and-drop is the only way to delete, so the zone quietly arms
+ * while an asset is dragged and lights up red over it. */
+.asset-trash {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    margin-left: auto;
+    border: 1px dashed transparent;
+    border-radius: var(--radius);
+    color: var(--muted);
+    box-shadow: none;
+    opacity: 0.55;
+    transition:
+        background var(--t),
+        border-color var(--t),
+        color var(--t),
+        opacity var(--t);
+}
+.asset-trash.armed {
+    opacity: 1;
+    color: var(--bad);
+    border-color: color-mix(in srgb, var(--bad) 45%, transparent);
+}
+.asset-trash.over {
+    opacity: 1;
+    color: var(--bad);
+    background: color-mix(in srgb, var(--bad) 15%, transparent);
+    border-color: var(--bad);
+}

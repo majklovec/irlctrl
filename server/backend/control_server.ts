@@ -8,6 +8,8 @@ import { notFound } from "../../shared/http";
 import { i18nReady } from "../../shared/i18n";
 import { pwaRoutes } from "../../shared/pwa";
 import { ALL_MODULES, widgetHubSnapshot } from "../../shared/registry";
+import { assetRoutes } from "./assets/asset_routes";
+import { createAssets } from "./assets/asset_store";
 import { accountRoutes } from "./auth/account_routes";
 import { createAuth } from "./auth/auth";
 import { authenticatedHandler } from "./auth/authenticated";
@@ -60,6 +62,7 @@ export async function createControlServer(options: ControlServerOptions) {
         databaseFile: options.databaseFile,
         publish,
     });
+    const assets = createAssets({ db: auth.db });
 
     for (const mod of ALL_MODULES) {
         if (mod.controlRoutes)
@@ -78,6 +81,7 @@ export async function createControlServer(options: ControlServerOptions) {
         .use(accountRoutes(auth, frontend))
         .use(dashboardRoutes(auth, dashboards, devices, frontend))
         .use(overlayRoutes(auth, overlays, frontend))
+        .use(assetRoutes(auth, assets, frontend))
         .use(deviceListRoutes(auth, devices, frontend))
         .use(deviceConnectionRoutes(devices))
         .use(deviceViewerRoutes(auth, devices))
