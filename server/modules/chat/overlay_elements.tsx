@@ -24,13 +24,9 @@ import type {
 	OverlayElementDef,
 } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
-import type { Vnode, Children } from "mithril";
+import type { Children, Vnode } from "mithril";
 import m from "mithril";
-import {
-	CHAT_PLATFORMS,
-	chatPropsToConfig,
-	type ChatChannel,
-} from "./config";
+import { CHAT_PLATFORMS, type ChatChannel, chatPropsToConfig } from "./config";
 import { EmbeddedChat } from "./frontend";
 import { type ChatProps, DEFAULT_CHAT_PROPS } from "./overlay_schema";
 
@@ -62,11 +58,12 @@ function choiceField(
 		label,
 		<select
 			value={value}
-			oninput={(ev: Event) =>
-				apply((ev.target as HTMLSelectElement).value)
-			}>
+			oninput={(ev: Event) => apply((ev.target as HTMLSelectElement).value)}
+		>
 			{options.map((o) => (
-				<option key={o.value} value={o.value}>{o.label}</option>
+				<option key={o.value} value={o.value}>
+					{o.label}
+				</option>
 			))}
 		</select>,
 		props,
@@ -78,93 +75,75 @@ function choiceField(
  * normalizes on load so the stored value is always a clean array. */
 function channelsField(props: ElementProps): Children {
 	const element = props.element;
-		const channels = (element.props.channels ?? []) as ChatChannel[];
-		const set = (next: ChatChannel[]): void =>
-			props.mutate((el) => {
-				el.props.channels = next;
-			});
-		return (
-			<div class="ov-field">
-				<span class="ov-lbl">{t("overlay.chat_channels")}</span>
-				<div class="ov-channels">
-					{channels.length === 0
-						? (
-							<div class="ov-channels-empty">
-								{t("overlay.chat_no_channels")}
-							</div>
-						)
-						: channels.map((c, i) => (
-							<div class="ov-channel-row" key={i}>
-								<select
-									value={c.platform}
-									aria-label={t("overlay.chat_platform")}
-									onchange={(ev: Event) => {
-										const platform =
-											(ev.target as HTMLSelectElement)
-												.value as ChatChannel["platform"];
-										set(
-											channels.map((row, j) =>
-												j === i
-													? { ...row, platform }
-													: row,
-											),
-										);
-									}}
-								>
-									{CHAT_PLATFORMS.map((pf) => (
-										<option key={pf} value={pf}>
-											{platformLabel(pf)}
-										</option>
-									))}
-								</select>
-								<input
-									value={c.channel}
-									placeholder={t("overlay.chat_channel_ph")}
-									aria-label={t("overlay.chat_channel")}
-									oninput={(ev: Event) => {
-										const channel = (
-											ev.target as HTMLInputElement
-										).value;
-										set(
-											channels.map((row, j) =>
-												j === i
-													? { ...row, channel }
-													: row,
-											),
-										);
-									}}
-								/>
-								<button
-									class="ov-channel-remove"
-									type="button"
-									aria-label={t("overlay.chat_remove_channel")}
-									onclick={() =>
-										set(
-											channels.filter(
-												(_, j) => j !== i,
-											),
-										)
-									}
-								>
-									<Icon name="close" width="12" height="12" />
-								</button>
-							</div>
-						))}
-					<button
-						class="ov-channel-add"
-						type="button"
-						onclick={() =>
-							set([
-								...channels,
-								{ platform: CHAT_PLATFORMS[0], channel: "" },
-							])
-						}
-					>
-						+ {t("overlay.chat_add_channel")}
-					</button>
-				</div>
+	const channels = (element.props.channels ?? []) as ChatChannel[];
+	const set = (next: ChatChannel[]): void =>
+		props.mutate((el) => {
+			el.props.channels = next;
+		});
+	return (
+		<div class="ov-field">
+			<span class="ov-lbl">{t("overlay.chat_channels")}</span>
+			<div class="ov-channels">
+				{channels.length === 0 ? (
+					<div class="ov-channels-empty">{t("overlay.chat_no_channels")}</div>
+				) : (
+					channels.map((c, i) => (
+						<div class="ov-channel-row" key={i}>
+							<select
+								value={c.platform}
+								aria-label={t("overlay.chat_platform")}
+								onchange={(ev: Event) => {
+									const platform = (ev.target as HTMLSelectElement)
+										.value as ChatChannel["platform"];
+									set(
+										channels.map((row, j) =>
+											j === i ? { ...row, platform } : row,
+										),
+									);
+								}}
+							>
+								{CHAT_PLATFORMS.map((pf) => (
+									<option key={pf} value={pf}>
+										{platformLabel(pf)}
+									</option>
+								))}
+							</select>
+							<input
+								value={c.channel}
+								placeholder={t("overlay.chat_channel_ph")}
+								aria-label={t("overlay.chat_channel")}
+								oninput={(ev: Event) => {
+									const channel = (ev.target as HTMLInputElement).value;
+									set(
+										channels.map((row, j) =>
+											j === i ? { ...row, channel } : row,
+										),
+									);
+								}}
+							/>
+							<button
+								class="ov-channel-remove"
+								type="button"
+								aria-label={t("overlay.chat_remove_channel")}
+								onclick={() => set(channels.filter((_, j) => j !== i))}
+							>
+								<Icon name="close" width="12" height="12" />
+							</button>
+						</div>
+					))
+				)}
+				<button
+					class="ov-channel-add"
+					type="button"
+					onclick={() =>
+						set([...channels, { platform: CHAT_PLATFORMS[0], channel: "" }])
+					}
+				>
+					+ {t("overlay.chat_add_channel")}
+				</button>
 			</div>
-		);
+		</div>
+	);
 }
 
 /** Draw the element as a live chat feed in the current DOM. `ctx` carries the
@@ -178,9 +157,7 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	return (
 		<div
 			class={`chat-element${
-				p.fadeDirection !== "off"
-					? ` chat-element-fade-${p.fadeDirection}`
-					: ""
+				p.fadeDirection !== "off" ? ` chat-element-fade-${p.fadeDirection}` : ""
 			}`}
 			style={{
 				"--ov-chat-font-size": `${p.fontSize}px`,
@@ -206,14 +183,12 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 function editForm(props: ElementProps): Children {
 	const e = props.element;
 	const p = e.props as unknown as ChatProps;
-	const mutate = (fn: (el: OverlayElement) => void): void =>
-		props.mutate(fn);
+	const mutate = (fn: (el: OverlayElement) => void): void => props.mutate(fn);
 
 	return (
 		<>
 			{channelsField(props)}
 
-			// Message display.
 			{bindField(
 				e,
 				"props.history",
@@ -225,8 +200,7 @@ function editForm(props: ElementProps): Children {
 					oninput={(ev: Event) =>
 						mutate((el) => {
 							el.props.history =
-								Number((ev.target as HTMLInputElement).value) ||
-								1;
+								Number((ev.target as HTMLInputElement).value) || 1;
 						})
 					}
 				/>,
@@ -267,8 +241,7 @@ function editForm(props: ElementProps): Children {
 				],
 				(v) =>
 					mutate((el) => {
-						el.props.bannedMessages =
-							v as ChatProps["bannedMessages"];
+						el.props.bannedMessages = v as ChatProps["bannedMessages"];
 					}),
 				props,
 			)}
@@ -308,13 +281,11 @@ function editForm(props: ElementProps): Children {
 				],
 				(v) =>
 					mutate((el) => {
-						el.props.platformIcons =
-							v as ChatProps["platformIcons"];
+						el.props.platformIcons = v as ChatProps["platformIcons"];
 					}),
 				props,
 			)}
 
-			// Feed text.
 			{bindField(
 				e,
 				"props.fontSize",
@@ -326,8 +297,7 @@ function editForm(props: ElementProps): Children {
 					oninput={(ev: Event) =>
 						mutate((el) => {
 							el.props.fontSize =
-								Number((ev.target as HTMLInputElement).value) ||
-								8;
+								Number((ev.target as HTMLInputElement).value) || 8;
 						})
 					}
 				/>,
@@ -345,7 +315,8 @@ function editForm(props: ElementProps): Children {
 								(ev.target as HTMLSelectElement).value,
 							);
 						})
-					}>
+					}
+				>
 					<option value={400}>400</option>
 					<option value={500}>500</option>
 					<option value={700}>700</option>
@@ -361,9 +332,7 @@ function editForm(props: ElementProps): Children {
 					value={p.color}
 					oninput={(ev: Event) =>
 						mutate((el) => {
-							el.props.color = (
-								ev.target as HTMLInputElement
-							).value;
+							el.props.color = (ev.target as HTMLInputElement).value;
 						})
 					}
 				/>,
@@ -381,8 +350,7 @@ function editForm(props: ElementProps): Children {
 					oninput={(ev: Event) =>
 						mutate((el) => {
 							el.props.lineHeight =
-								Number((ev.target as HTMLInputElement).value) ||
-								1;
+								Number((ev.target as HTMLInputElement).value) || 1;
 						})
 					}
 				/>,
@@ -399,8 +367,7 @@ function editForm(props: ElementProps): Children {
 					oninput={(ev: Event) =>
 						mutate((el) => {
 							el.props.messageSpacing =
-								Number((ev.target as HTMLInputElement).value) ||
-								0;
+								Number((ev.target as HTMLInputElement).value) || 0;
 						})
 					}
 				/>,
@@ -427,8 +394,7 @@ function editForm(props: ElementProps): Children {
 				],
 				(v) =>
 					mutate((el) => {
-						el.props.fadeDirection =
-							v as ChatProps["fadeDirection"];
+						el.props.fadeDirection = v as ChatProps["fadeDirection"];
 					}),
 				props,
 			)}
@@ -443,8 +409,7 @@ function editForm(props: ElementProps): Children {
 					oninput={(ev: Event) =>
 						mutate((el) => {
 							el.props.fadeSize =
-								Number((ev.target as HTMLInputElement).value) ||
-								0;
+								Number((ev.target as HTMLInputElement).value) || 0;
 						})
 					}
 				/>,
