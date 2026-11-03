@@ -1,3 +1,10 @@
+# [2.13.0](https://github.com/majklovec/irlctrl/compare/v2.12.0...v2.13.0) (2026-11-03)
+
+
+### Features
+
+* **chat:** implement Twitch and YouTube badge parsing and rendering ([9b43844](https://github.com/majklovec/irlctrl/commit/9b43844ca75bdd462842f1a503138a9243923a25))
+
 # [2.12.0](https://github.com/majklovec/irlctrl/compare/v2.11.0...v2.12.0) (2026-11-03)
 
 
