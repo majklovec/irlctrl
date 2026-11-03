@@ -1,3 +1,10 @@
+# [2.12.0](https://github.com/majklovec/irlctrl/compare/v2.11.0...v2.12.0) (2026-11-03)
+
+
+### Features
+
+* add overlays table for OBS overlay editor ([ba421ee](https://github.com/majklovec/irlctrl/commit/ba421ee1b9661b2120e95345f2e90d8ca1f80e52))
+
 # [2.11.0](https://github.com/majklovec/irlctrl/compare/v2.10.0...v2.11.0) (2026-11-03)
 
 
