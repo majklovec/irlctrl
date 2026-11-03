@@ -1,3 +1,19 @@
+# [2.10.0](https://github.com/majklovec/irlctrl/compare/v2.9.0...v2.10.0) (2026-11-03)
+
+
+### Bug Fixes
+
+* **chat:** clip the in-scene feed to the element box ([d517867](https://github.com/majklovec/irlctrl/commit/d51786758dd7596534cd40ac1fee1f4bb97c225a))
+* **chat:** don't double-stream a feed after a channel change ([3baac3e](https://github.com/majklovec/irlctrl/commit/3baac3e851e3d8936e89212521350cea5d7cac90))
+* **chat:** pin the top-ordered feed to the top of the element ([208c905](https://github.com/majklovec/irlctrl/commit/208c905ab8808cea89753cb5555d033330cc7679))
+* **chat:** wrap long messages in the in-scene chat element ([9474dd0](https://github.com/majklovec/irlctrl/commit/9474dd0a6e0aa18781c162df64798e9860744868))
+
+
+### Features
+
+* **chat:** add a show/hide option for sender badges ([5806022](https://github.com/majklovec/irlctrl/commit/580602203ff40ffef162eae176d7b4a256445d12))
+* **chat:** auto-size the overlay element's visible history ([06ab953](https://github.com/majklovec/irlctrl/commit/06ab953613a9bc9ebe5a4f8de9e157c37824053f))
+
 # [2.9.0](https://github.com/majklovec/irlctrl/compare/v2.8.0...v2.9.0) (2026-11-03)
 
 
