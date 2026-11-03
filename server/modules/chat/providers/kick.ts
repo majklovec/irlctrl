@@ -10,6 +10,7 @@
  * `disconnected` and re-polls until the stream goes live.
  */
 import type { ChatBadge, ChatLive, PublishFn } from "../types";
+import { kickRoleBadgeUrl } from "./kick_badges";
 import { ChatProvider } from "./base";
 
 /** Channel slug -> chatroom id lookup. */
@@ -68,6 +69,10 @@ async function resolvePusherKey(
 
 export class KickChatProvider extends ChatProvider {
     #chatroom: number | null = null;
+    /** Channel-specific subscriber badge artwork, resolved from the same
+     * `kick.com/api/v2/channels/<slug>` response that supplies the chatroom id
+     * (Kick's chat wire only carries the month `count`, never the image). */
+    #subscriberTiers: { months: number; url: string }[] = [];
     #ws: WebSocket | null = null;
     #subscribed = false;
     #subscribeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -93,7 +98,7 @@ export class KickChatProvider extends ChatProvider {
                 this.#staleKey = "";
                 throw err;
             })
-            .then(({ id, isLive }) => {
+            .then(({ id, isLive, subscriberTiers }) => {
                 if (this.stopped) return;
                 if (!isLive) {
                     // Channel is offline: report disconnected and re-poll
@@ -104,6 +109,7 @@ export class KickChatProvider extends ChatProvider {
                     return;
                 }
                 this.#chatroom = id;
+                this.#subscriberTiers = subscriberTiers;
                 const ws = new WebSocket(pusherUrl(this.#pusher));
                 this.#ws = ws;
                 ws.addEventListener("message", (ev: MessageEvent) =>
@@ -193,7 +199,7 @@ export class KickChatProvider extends ChatProvider {
                 } catch {
                     return;
                 }
-                const line = asChatMessage(payload);
+                const line = asChatMessage(payload, this.#subscriberTiers);
                 if (!line) return;
                 this.deliver(line);
                 // Any chat traffic proves the subscription is alive.
@@ -282,10 +288,14 @@ export class KickChatProvider extends ChatProvider {
 
 /** Resolve a channel slug to the chatroom id hosting its chat, plus
  * whether the channel is currently live (`livestream.is_live` in the same
- * response). */
-async function resolveChatroom(
-    slug: string,
-): Promise<{ id: number; isLive: boolean }> {
+ * response) and the channel's subscriber badge artwork (per-month image urls).
+ * Subscriber art lives only here — the chat wire carries just the month count
+ * — so it is resolved once per connect from this same endpoint. */
+async function resolveChatroom(slug: string): Promise<{
+    id: number;
+    isLive: boolean;
+    subscriberTiers: { months: number; url: string }[];
+}> {
     const res = await fetch(`${KICK_CHANNEL_API}/${encodeURIComponent(slug)}`, {
         headers: { accept: "application/json" },
         signal: AbortSignal.timeout(RESOLVE_TIMEOUT_MS),
@@ -294,15 +304,54 @@ async function resolveChatroom(
     const data = (await res.json()) as {
         chatroom?: { id?: number };
         livestream?: { is_live?: boolean };
+        subscriber_badges?: {
+            months?: number;
+            badge_image?: { src?: string };
+        }[];
     };
     const id = data.chatroom?.id;
     if (id === undefined || id === null)
         throw new Error("no chatroom id in response");
-    return { id, isLive: data.livestream?.is_live === true };
+    return {
+        id,
+        isLive: data.livestream?.is_live === true,
+        subscriberTiers: parseSubscriberTiers(data.subscriber_badges),
+    };
 }
 
-/** Map one Pusher ChatMessageEvent payload to the wire shape. */
-function asChatMessage(raw: unknown): ChatLive | null {
+/** Map the channel's `subscriber_badges` (per-month artwork) to a month
+ * -> image-url table, ascending. Entries without a usable image or a sane
+ * month count are dropped. */
+function parseSubscriberTiers(
+    raw:
+        |
+            { months?: number; badge_image?: { src?: string } }[]
+        | undefined,
+): { months: number; url: string }[] {
+    if (!Array.isArray(raw)) return [];
+    const tiers = new Map<number, string>();
+    for (const entry of raw) {
+        if (!entry || typeof entry !== "object") continue;
+        const months = entry.months;
+        const url = entry.badge_image?.src;
+        if (
+            typeof months !== "number" ||
+            !Number.isInteger(months) ||
+            months < 1
+        )
+            continue;
+        if (typeof url !== "string" || !/^https?:\/\//.test(url)) continue;
+        if (!tiers.has(months)) tiers.set(months, url);
+    }
+    return [...tiers.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([months, url]) => ({ months, url }));
+}
+
+function asChatMessage(
+    raw: unknown,
+    subscriberTiers: { months: number; url: string }[] = [],
+): ChatLive | null {
     if (!raw || typeof raw !== "object") return null;
     const msg = raw as Record<string, unknown>;
     if (msg.id === undefined || msg.id === null) return null;
@@ -317,7 +366,7 @@ function asChatMessage(raw: unknown): ChatLive | null {
         /^#[0-9a-fA-F]{3,8}$/.test(identity.color)
             ? identity.color
             : undefined;
-    const badges = parseIdentityBadges(identity.badges);
+    const badges = parseIdentityBadges(identity, subscriberTiers);
 
     let text =
         typeof msg.content === "string" && msg.content !== ""
@@ -353,32 +402,133 @@ function asChatMessage(raw: unknown): ChatLive | null {
     return out;
 }
 
-/** Map a Kick `sender.identity.badges` array (objects with `type`, `text`,
- * optional `count`, and sometimes a `url`) to the wire `ChatBadge` shape,
- * dropping entries that yield no usable label or icon. */
-function parseIdentityBadges(raw: unknown): ChatBadge[] {
-    if (!Array.isArray(raw)) return [];
+const V2_BADGE_IMAGE_RE =
+    /^https:\/\/ext\.cdn\.kick\.com\/chat\/badges\/[a-zA-Z0-9_-]{1,200}\.(?:png|webp)(\?width=\d+,format=webp,quality=\d{1,3})?$/;
+
+/** Map a Kick `sender.identity` object to the wire `ChatBadge` shape. Kick
+ * sends two arrays per sender:
+ *   - `badges_v2`: the current system, where every badge carries its own
+ *     `image_url` (global/channel/user custom badges, the user's level) —
+ *     rendered directly as an image. A v2 entry that names a role badge
+ *     (moderator, vip, verified, …) but ships no image falls back to that
+ *     role's inline-SVG data-URI.
+ *   - `badges`: the legacy array, where a `subscriber` entry is just
+ *     `{ type, count }` with no image; the channel-specific artwork is looked
+ *     up from `subscriberTiers` (fetched from the channel API) by month. Other
+ *     role badges (moderator, vip, verified, founder, og, sub_gifter, staff,
+ *     broadcaster, sidekick) also ship no image and are mapped to their
+ *     inline-SVG data-URI.
+ * Only badges that resolve to a real image (CDN url or inline-SVG data-URI)
+ * are emitted (image-only, matching Kick's rendered chat). */
+function parseIdentityBadges(
+    identity: Record<string, unknown>,
+    subscriberTiers: { months: number; url: string }[],
+): ChatBadge[] {
     const out: ChatBadge[] = [];
-    for (const item of raw) {
+    const seen = new Set<string>();
+    const push = (badge: ChatBadge) => {
+        // Dedup by `type` (fall back to url/text) so a role that appears in
+        // both the v2 and legacy arrays is shown once; the first (v2) wins,
+        // preferring real CDN artwork over the inline-SVG fallback.
+        const key = badge.type ?? badge.url ?? badge.text ?? "";
+        if (seen.has(key)) return;
+        seen.add(key);
+        out.push(badge);
+    };
+
+    // 1) `badges_v2` — each entry supplies its artwork via `image_url`.
+    const v2 = Array.isArray(identity.badges_v2) ? identity.badges_v2 : [];
+    const v2Badges = v2
+        .map((item) => {
+            if (!item || typeof item !== "object") return null;
+            const b = item as Record<string, unknown>;
+            const name =
+                typeof b.name === "string" && b.name ? b.name : undefined;
+            // Prefer the CDN artwork; role badges that ship no image fall
+            // back to their inline-SVG data-URI.
+            const cdnUrl =
+                typeof b.image_url === "string" &&
+                V2_BADGE_IMAGE_RE.test(b.image_url)
+                    ? b.image_url
+                    : undefined;
+            const url = cdnUrl ?? (name ? kickRoleBadgeUrl(name) : undefined);
+            // The level marker renders even when not explicitly selected;
+            // all other cosmetics only when the user has chosen to display
+            // them.
+            if (name !== "level") {
+                const selected = b.selected === true || b.active === true;
+                if (!selected) return null;
+            }
+            if (!name || !url) return null;
+            const level =
+                typeof b.metadata === "object" && b.metadata
+                    ? (b.metadata as Record<string, unknown>).level
+                    : undefined;
+            const text =
+                name === "level" &&
+                typeof level === "number" &&
+                Number.isInteger(level)
+                    ? `Level ${level}`
+                    : name;
+            const badge: ChatBadge = { type: name, text, url };
+            if (name === "level" && typeof level === "number")
+                badge.count = level;
+            return badge;
+        })
+        .filter((b): b is ChatBadge => b !== null);
+    for (const badge of v2Badges) push(badge);
+
+    // 2) legacy `badges` — resolve the subscriber artwork from the channel.
+    const legacy = Array.isArray(identity.badges) ? identity.badges : [];
+    for (const item of legacy) {
         if (!item || typeof item !== "object") continue;
         const b = item as Record<string, unknown>;
-        const type = typeof b.type === "string" && b.type ? b.type : undefined;
-        const text = typeof b.text === "string" && b.text ? b.text : undefined;
+        const type = typeof b.type === "string" ? b.type : undefined;
+        const text =
+            typeof b.text === "string" && b.text ? b.text : undefined;
         const count =
             typeof b.count === "number" && Number.isFinite(b.count)
                 ? b.count
                 : undefined;
+        if (type === "subscriber") {
+            const url = resolveSubscriberUrl(subscriberTiers, count);
+            if (!url) continue;
+            const badge: ChatBadge = { type: "subscriber", url };
+            if (text) badge.text = text;
+            if (count !== undefined) badge.count = count;
+            push(badge);
+            continue;
+        }
+        // Other legacy roles (moderator, vip, verified, founder, og,
+        // sub_gifter, staff, broadcaster, sidekick) ship no image; map them to
+        // their inline-SVG data-URI, falling back to an explicit url if the
+        // payload happens to provide one.
         const url =
-            typeof b.url === "string" && /^https?:\/\//.test(b.url)
+            kickRoleBadgeUrl(type) ??
+            (typeof b.url === "string" && /^https?:\/\//.test(b.url)
                 ? b.url
-                : undefined;
-        if (!type && !text && !url) continue;
-        const badge: ChatBadge = {};
-        if (type) badge.type = type;
-        if (text) badge.text = text;
-        if (count !== undefined) badge.count = count;
-        if (url) badge.url = url;
-        out.push(badge);
+                : undefined);
+        if (url) {
+            const badge: ChatBadge = { url };
+            if (type) badge.type = type;
+            if (text) badge.text = text;
+            if (count !== undefined) badge.count = count;
+            push(badge);
+        }
     }
     return out;
+}
+
+/** Pick the channel subscriber artwork for a given month count: the exact
+ * month when available, else the highest tier at or below it (Kick's
+ * milestone art, e.g. 42 months -> the 36-month badge). */
+function resolveSubscriberUrl(
+    tiers: { months: number; url: string }[],
+    count?: number,
+): string | undefined {
+    if (!count || count < 1) return undefined;
+    const exact = tiers.find((t) => t.months === count);
+    if (exact) return exact.url;
+    const milestone = tiers.filter((t) => t.months <= count).at(-1);
+    return milestone?.url;
 }

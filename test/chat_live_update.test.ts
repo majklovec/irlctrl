@@ -162,7 +162,12 @@ describe("chat overlay live update (headless DOM)", () => {
 				text: "hello",
 				ts: 10,
 				badges: [
-					{ type: "subscriber", text: "Subscriber", count: 3 },
+					{
+						type: "subscriber",
+						text: "Subscriber",
+						count: 3,
+						url: "https://files.kick.com/channel_subscriber_badges/3/conversion/original-fullsize.png",
+					},
 					{ type: "moderator", text: "Moderator" },
 				],
 			},
@@ -180,19 +185,24 @@ describe("chat overlay live update (headless DOM)", () => {
 		await flush();
 
 		// Both lines carry a badge group, rendered before the username.
-		const badgeWraps = root.querySelectorAll(".chat-badges");
-		expect(badgeWraps.length).toBe(2);
 		const lines = root.querySelectorAll(".chat-line");
 		const withBadges = [...lines].filter((l) => l.querySelector(".chat-badges")).length;
 		expect(withBadges).toBe(2);
 
-		const text = [...badgeWraps].map((el) => el.textContent).join(" | ");
-		expect(text).toContain("Subscriber");
-		expect(text).toContain("Moderator");
-		expect(text).toContain("3");
-
-		// A badge with a `url` renders as an image.
-		const imgBadges = root.querySelectorAll(".chat-badge");
-		expect([...imgBadges].some((el) => el.tagName === "IMG")).toBe(true);
+		// Badges render as images (Kick's art), not text chips. The moderator
+		// has no url so it is skipped; the subscriber and the vip render as
+		// <img>.
+		const imgBadges = [...root.querySelectorAll(".chat-badge")];
+		expect(imgBadges.length).toBe(2);
+		expect(imgBadges.every((el) => el.tagName === "IMG")).toBe(true);
+		expect(
+			imgBadges.some((el) =>
+				el.getAttribute("src")?.startsWith(
+					"https://files.kick.com/channel_subscriber_badges/",
+				),
+			),
+		).toBe(true);
+		// No text chip badges are emitted.
+		expect(root.querySelector(".chat-badge--chip")).toBeNull();
 	});
 });

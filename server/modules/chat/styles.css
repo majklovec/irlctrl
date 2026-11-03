@@ -167,32 +167,13 @@
     vertical-align: -0.15em;
 }
 
-/* Image badge (the badge payload carried a `url`). */
+/* Image badge — strictly 1em tall so it matches the line height of the feed
+   font in both the 0.7rem widget and the larger overlay element. */
 .chat-feed .chat-badge {
     display: inline-block;
     height: 1em;
     width: auto;
-}
-
-/* Text chip badge (no image): a compact pill beside the name. `currentColor`
-   + opacity keep it reading against any feed colour. */
-.chat-feed .chat-badge--chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    padding: 0 0.35em;
-    font-size: 0.85em;
-    font-weight: 600;
-    line-height: 1.1;
-    border: 1px solid currentColor;
-    border-radius: 0.3em;
-    opacity: 0.85;
-    white-space: nowrap;
-}
-
-.chat-feed .chat-badge-count {
-    font-weight: 700;
-    font-size: 0.9em;
+    vertical-align: middle;
 }
 
 .dash-widget-body .chat-line .chat-text {

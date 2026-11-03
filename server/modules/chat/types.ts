@@ -12,11 +12,12 @@
  * `kick.chat`) so the dashboard websocket carries the frames unchanged.
  */
 
-/** A sender badge (e.g. Kick subscriber / moderator / verified / channel badge).
- * `type` is the platform's identifier, `text` a human label, `count` an
- * optional number (e.g. subscription months), and `url` an icon image when the
- * platform provides one (Kick's own payloads carry no url — the icon is
- * derived from `type`). */
+/** A sender badge (e.g. Kick subscriber / level / verified / channel badge).
+ * Rendered as an image in the feed. `type` is the platform's identifier, `text`
+ * a human label (used for the image's alt/tooltip), `count` an optional number
+ * (e.g. subscription months), and `url` the badge artwork. The Kick provider
+ * only emits badges that resolve to a `url` (Kick's chat art), so `url` is
+ * effectively always present on the wire. */
 export interface ChatBadge {
     type?: string;
     text?: string;

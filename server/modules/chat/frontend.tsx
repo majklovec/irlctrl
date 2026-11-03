@@ -544,43 +544,32 @@ function lineSegments(text: string): m.Children {
 	});
 }
 
-/** Render a sender's badges before the username. A badge with a `url` is
- * shown as an image; otherwise it's a compact text chip labelled by its
- * `text` (or `type` fallback). `count` (e.g. subscription months) is folded
- * into the chip and its tooltip. */
+/** Render a sender's badges before the username as images, mirroring Kick's
+ * own chat art (subscriber month squares, level, custom/global badges). The
+ * provider only emits badges that resolve to an image, so each entry is an
+ * `<img>`; a badge with no url is skipped. */
 function renderBadges(badges: ChatBadge[] | undefined): m.Children {
-	if (!badges?.length) return null;
+	// The provider only emits badges that resolve to an image, but guard
+	// against a stray image-less entry: filter first (returning holes inside a
+	// keyed `.map` makes Mithril throw on mixed key/none fragments).
+	const images = (badges ?? []).filter((badge) => badge.url);
+	if (!images.length) return null;
 	return (
 		<span class="chat-badges">
-			{badges.map((badge, index) => {
+			{images.map((badge, index) => {
 				const label = badge.text ?? badge.type ?? "";
-				const title = badge.count ? `${label} (${badge.count})` : label;
-				if (badge.url) {
-					return (
-						<img
-							class="chat-badge"
-							key={index}
-							src={badge.url}
-							alt={label}
-							title={title}
-							loading="lazy"
-						/>
-					);
-				}
+				const title = badge.count
+					? `${label} (${badge.count})`
+					: label;
 				return (
-					<span
-						class={
-							"chat-badge chat-badge--chip" +
-							(badge.type ? ` chat-badge--${badge.type}` : "")
-						}
+					<img
+						class="chat-badge"
 						key={index}
+						src={badge.url}
+						alt={label}
 						title={title}
-					>
-						{label}
-						{badge.count ? (
-							<span class="chat-badge-count">{badge.count}</span>
-						) : null}
-					</span>
+						loading="lazy"
+					/>
 				);
 			})}
 		</span>
