@@ -1,3 +1,10 @@
+# [2.8.0](https://github.com/majklovec/irlctrl/compare/v2.7.0...v2.8.0) (2026-11-03)
+
+
+### Features
+
+* **overlays:** add versioning to overlay snapshots and implement reload on new deployment ([c20bc3f](https://github.com/majklovec/irlctrl/commit/c20bc3fb9b48fa6de4a4b3fec09c280b28d68304))
+
 # [2.7.0](https://github.com/majklovec/irlctrl/compare/v2.6.0...v2.7.0) (2026-11-03)
 
 
