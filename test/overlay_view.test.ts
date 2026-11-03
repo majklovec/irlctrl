@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { APP_VERSION } from "../generated/version";
 
 /**
  * The runtime page script (`server/frontend/ts/overlays/overlay_view.tsx`) is
  * bundled the way the server does and run against a happy-dom window + a fake
- * WebSocket, fed frames the way the server sends them. The chat overlay element
- * is now self-contained (its own token-scoped stream), so the runtime no longer
- * reloads when the dashboard publishes `overlays.channelsChanged` — those frames
- * are ignored here. (The websocket e2e in overlays.test.ts proves the server
- * still publishes the frame to dashboards.)
+ * WebSocket, fed frames the way the server sends them. The snapshot carries the
+ * full overlay (`{ overlay, version }`); a frame whose `version` differs from
+ * this bundle's triggers a reload, and frames the runtime doesn't own are
+ * ignored.
  */
 describe("overlay runtime auto-reload (headless DOM)", () => {
     let pageBundleText = "";
@@ -162,13 +162,16 @@ describe("overlay runtime auto-reload (headless DOM)", () => {
         await Bun.sleep(10);
     }
 
-    /** A scene the way the server's `overlays.snapshot` carries it, with one
-     * iframe element per URL. */
+    /** An overlay the way the server's `overlays.snapshot` carries it, with
+     * one iframe element per URL. */
     function snapshot(urls: string[]): void {
         frame("overlays.snapshot", {
-            scene: {
-                id: "scene-1",
-                name: "scene",
+            overlay: {
+                schemaVersion: 1,
+                name: "overlay",
+                canvas: { width: 1920, height: 1080 },
+                variables: [],
+                assets: [],
                 elements: urls.map((url, i) => ({
                     id: `el-${i}`,
                     name: `embed ${i}`,
@@ -188,9 +191,7 @@ describe("overlay runtime auto-reload (headless DOM)", () => {
                     props: { url },
                 })),
             },
-            variables: [],
-            canvas: { width: 1920, height: 1080 },
-            assets: [],
+            version: APP_VERSION,
         });
     }
 

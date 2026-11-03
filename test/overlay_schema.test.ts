@@ -9,18 +9,17 @@ import {
 } from "../server/modules/overlay_elements/overlay_schema";
 import {
 	cssFilterString,
-	defaultProject,
+	defaultOverlay,
 	generateOverlayToken,
 	isAcceptedAssetMime,
 	isMimeKind,
-	migrateProjectBlob,
+	migrateOverlayBlob,
 	normalizeFilters,
-	normalizeProject,
+	normalizeOverlay,
 	OVERLAY_SCHEMA_VERSION,
 	overlayTokenMatches,
 	parseCanvasInput,
 	parseElementInput,
-	parseSceneInput,
 	parseVariableValueInput,
 	type Transform,
 	type Variable,
@@ -54,66 +53,55 @@ const textElement = (
 	...over,
 });
 
-type RawProject = {
+type RawOverlay = {
 	schemaVersion: number;
+	name: string;
 	canvas: { width: number; height: number };
 	variables: unknown[];
 	assets: unknown[];
-	scenes: Record<string, unknown>[];
+	elements: Record<string, unknown>[];
 } & Record<string, unknown>;
 
-const validV1Project = (): RawProject => ({
+const validV1Overlay = (): RawOverlay => ({
 	schemaVersion: 1,
+	name: "Overlay 1",
 	canvas: { width: 1920, height: 1080 },
 	variables: [],
 	assets: [],
-	scenes: [
-		{
-			id: "sc-1",
-			name: "Scene 1",
-			elements: [textElement()],
-		},
-	],
+	elements: [textElement()],
 });
 
 describe("overlay schema", () => {
-	test("default project is a valid v1 project", () => {
-		const project = defaultProject();
-		expect(project.schemaVersion).toBe(OVERLAY_SCHEMA_VERSION);
-		expect(project.canvas).toEqual({ width: 1920, height: 1080 });
-		expect(project.scenes).toHaveLength(1);
-		// the scene's UUID id is its only identifier
-		expect(project.scenes[0].id).toMatch(/^[0-9a-f-]{36}$/);
-		// a fresh project must round-trip through the loader
-		const loaded = migrateProjectBlob(clone(project));
-		expect(loaded.project.scenes[0].id).toBe(project.scenes[0].id);
+	test("default overlay is a valid v1 overlay", () => {
+		const overlay = defaultOverlay();
+		expect(overlay.schemaVersion).toBe(OVERLAY_SCHEMA_VERSION);
+		expect(overlay.name).toBe("Overlay 1");
+		expect(overlay.canvas).toEqual({ width: 1920, height: 1080 });
+		expect(overlay.elements).toHaveLength(0);
+		// a fresh overlay must round-trip through the loader
+		const loaded = migrateOverlayBlob(clone(overlay));
+		expect(loaded.overlay.name).toBe(overlay.name);
 	});
 
-	test("migrateProjectBlob accepts a v1 project and preserves unknown fields", () => {
-		const raw = validV1Project();
+	test("migrateOverlayBlob accepts a v1 overlay and preserves unknown fields", () => {
+		const raw = validV1Overlay();
 		raw.customFlag = "keep-me";
-		const scene = raw.scenes[0] as Record<string, unknown>;
-		scene.customSceneField = 42;
-		const el0 = (scene.elements as Record<string, unknown>[])[0];
+		const el0 = raw.elements[0] as Record<string, unknown>;
 		el0.note = "editor draft marker";
 
-		const { project, migrated } = migrateProjectBlob(raw);
+		const { overlay, migrated } = migrateOverlayBlob(raw);
 		expect(migrated).toBe(false);
-		expect(project).toHaveProperty("customFlag", "keep-me");
-		expect(project.scenes[0]).toHaveProperty("customSceneField", 42);
-		expect(project.scenes[0].elements[0]).toHaveProperty(
-			"note",
-			"editor draft marker",
-		);
+		expect(overlay).toHaveProperty("customFlag", "keep-me");
+		expect(overlay.elements[0]).toHaveProperty("note", "editor draft marker");
 	});
 
-	test("migrateProjectBlob rejects unmigratable projects", () => {
-		expect(() => migrateProjectBlob("nope")).toThrow("not a JSON object");
+	test("migrateOverlayBlob rejects unmigratable overlays", () => {
+		expect(() => migrateOverlayBlob("nope")).toThrow("not a JSON object");
 		expect(() =>
-			migrateProjectBlob({ canvas: { width: 1, height: 1 } }),
+			migrateOverlayBlob({ canvas: { width: 1, height: 1 } }),
 		).toThrow("no schemaVersion");
 		expect(() =>
-			migrateProjectBlob({ ...validV1Project(), schemaVersion: 99 }),
+			migrateOverlayBlob({ ...validV1Overlay(), schemaVersion: 99 }),
 		).toThrow("too old to load it");
 	});
 
@@ -128,49 +116,39 @@ describe("overlay schema", () => {
 		expect(overlayTokenMatches("", "")).toBe(false);
 	});
 
-	test("normalizeProject validates and types variables", () => {
-		const raw = validV1Project();
+	test("normalizeOverlay validates and types variables", () => {
+		const raw = validV1Overlay();
 		raw.variables = [
 			{ id: "v1", name: "score", type: "number", value: "12" },
 			{ id: "v2", name: "accent", type: "color", value: "#ABCDEF" },
 			{ id: "v3", name: "flag", type: "boolean", value: "yes" },
 			{ id: "v4", name: "title", type: "string", value: 7 },
 		];
-		const project = normalizeProject(raw);
-		expect(project.variables[0].value).toBe(12);
-		expect(project.variables[1].value).toBe("#abcdef");
-		expect(project.variables[2].value).toBe(true);
-		expect(project.variables[3].value).toBe("7");
+		const overlay = normalizeOverlay(raw);
+		expect(overlay.variables[0].value).toBe(12);
+		expect(overlay.variables[1].value).toBe("#abcdef");
+		expect(overlay.variables[2].value).toBe(true);
+		expect(overlay.variables[3].value).toBe("7");
 	});
 
 	test("variable normalization rejects bad names and types", () => {
-		const raw = validV1Project();
+		const raw = validV1Overlay();
 		raw.variables = [{ id: "v1", name: "9lives", type: "string", value: "x" }];
-		expect(() => normalizeProject(raw)).toThrow();
+		expect(() => normalizeOverlay(raw)).toThrow();
 		raw.variables = [{ id: "v1", name: "ok_name", type: "float", value: 1 }];
-		expect(() => normalizeProject(raw)).toThrow();
+		expect(() => normalizeOverlay(raw)).toThrow();
 	});
 
-	test("normalizeProject enforces unique scene ids", () => {
-		const raw = validV1Project();
-		raw.scenes = [
-			{ id: "a", name: "A", elements: [] },
-			{ id: "a", name: "B", elements: [] },
-		];
-		expect(() => normalizeProject(raw)).toThrow("duplicate scene id a");
-	});
-
-	test("normalizeProject preserves unknown element props (forward compatibility)", () => {
-		const raw = validV1Project();
-		const el = (raw.scenes[0] as { elements: Record<string, unknown>[] })
-			.elements[0] as Record<string, unknown>;
-		(el as Record<string, unknown>).props = {
+	test("normalizeOverlay preserves unknown element props (forward compatibility)", () => {
+		const raw = validV1Overlay();
+		const el = raw.elements[0] as Record<string, unknown>;
+		el.props = {
 			text: "Hi",
 			fontSize: 42,
 			customEffect: "glow",
 		};
-		const project = normalizeProject(raw);
-		const props = project.scenes[0].elements[0].props;
+		const overlay = normalizeOverlay(raw);
+		const props = overlay.elements[0].props as Record<string, unknown>;
 		expect(props.customEffect).toBe("glow");
 		// known text props get defaults where missing
 		expect(props.fontSize).toBe(42);
@@ -391,42 +369,40 @@ describe("overlay schema", () => {
 	});
 
 	test("bindings must be variable references and target existing variables", () => {
-		const raw = validV1Project();
-		const el = (raw.scenes[0] as { elements: Record<string, unknown>[] })
-			.elements[0] as Record<string, unknown>;
-		(el as Record<string, unknown>).bindings = {
+		const raw = validV1Overlay();
+		const el = raw.elements[0] as Record<string, unknown>;
+		el.bindings = {
 			"props.text": { kind: "variable", variableId: "v1" },
 		};
-		expect(() => normalizeProject(raw)).toThrow(
+		expect(() => normalizeOverlay(raw)).toThrow(
 			"binding to unknown variable v1",
 		);
 		raw.variables = [{ id: "v1", name: "title", type: "string", value: "hi" }];
-		const ok = normalizeProject(raw);
-		expect(ok.scenes[0].elements[0].bindings["props.text"]).toEqual({
+		const ok = normalizeOverlay(raw);
+		expect(ok.elements[0].bindings["props.text"]).toEqual({
 			kind: "variable",
 			variableId: "v1",
 		});
 
 		// non-variable binding kinds are rejected in v1
-		(el as Record<string, unknown>).bindings = {
+		el.bindings = {
 			"props.text": { kind: "expr", expression: "1+1" },
 		};
-		expect(() => normalizeProject(raw)).toThrow();
+		expect(() => normalizeOverlay(raw)).toThrow();
 	});
 
 	test("bindings may target any attribute path (props.*, transform.*, visible)", () => {
-		const raw = validV1Project();
+		const raw = validV1Overlay();
 		raw.variables = [{ id: "v1", name: "x", type: "string", value: "0" }];
-		const el = (raw.scenes[0] as { elements: Record<string, unknown>[] })
-			.elements[0] as Record<string, unknown>;
-		(el as Record<string, unknown>).bindings = {
+		const el = raw.elements[0] as Record<string, unknown>;
+		el.bindings = {
 			"props.title": { kind: "variable", variableId: "v1" },
 			"transform.x": { kind: "variable", variableId: "v1" },
 			"transform.opacity": { kind: "variable", variableId: "v1" },
 			visible: { kind: "variable", variableId: "v1" },
 		};
-		const ok = normalizeProject(raw);
-		expect(ok.scenes[0].elements[0].bindings).toEqual({
+		const ok = normalizeOverlay(raw);
+		expect(ok.elements[0].bindings).toEqual({
 			"props.title": { kind: "variable", variableId: "v1" },
 			"transform.x": { kind: "variable", variableId: "v1" },
 			"transform.opacity": { kind: "variable", variableId: "v1" },
@@ -435,14 +411,14 @@ describe("overlay schema", () => {
 	});
 
 	test("image elements must reference existing assets", () => {
-		const raw = validV1Project();
-		(raw.scenes[0] as Record<string, unknown>).elements = [
+		const raw = validV1Overlay();
+		raw.elements = [
 			{
 				...textElement({ id: "img-1", type: "image" }),
 				props: { assetId: "missing-asset" },
 			},
 		];
-		expect(() => normalizeProject(raw)).toThrow("missing asset");
+		expect(() => normalizeOverlay(raw)).toThrow("missing asset");
 		raw.assets = [
 			{
 				id: "a1",
@@ -452,15 +428,13 @@ describe("overlay schema", () => {
 				dataBase64: "AAAA",
 			},
 		];
-		(raw.scenes[0] as Record<string, unknown>).elements = [
+		raw.elements = [
 			{
 				...textElement({ id: "img-1", type: "image" }),
 				props: { assetId: "a1" },
 			},
 		];
-		expect(normalizeProject(raw).scenes[0].elements[0].props.assetId).toBe(
-			"a1",
-		);
+		expect(normalizeOverlay(raw).elements[0].props.assetId).toBe("a1");
 	});
 
 	test("image, video and audio asset mimes are accepted", () => {
@@ -482,7 +456,7 @@ describe("overlay schema", () => {
 	});
 
 	test("normalization keeps video/audio mimes, rejects others", () => {
-		const raw = validV1Project();
+		const raw = validV1Overlay();
 		raw.assets = [
 			{
 				id: "vid",
@@ -499,7 +473,7 @@ describe("overlay schema", () => {
 				dataBase64: "AAAA",
 			},
 		];
-		const assets = normalizeProject(raw).assets;
+		const assets = normalizeOverlay(raw).assets;
 		expect(assets.find((a) => a.id === "vid")?.mime).toBe("video/mp4");
 		expect(assets.find((a) => a.id === "snd")?.mime).toBe("audio/mpeg");
 
@@ -510,12 +484,12 @@ describe("overlay schema", () => {
 			filename: "x.exe",
 			dataBase64: "AAAA",
 		});
-		expect(() => normalizeProject(raw)).toThrow("mime");
+		expect(() => normalizeOverlay(raw)).toThrow("mime");
 	});
 
 	test("parent elements must exist, be groups, and be acyclic", () => {
 		const base = () => {
-			const raw = validV1Project();
+			const raw = validV1Overlay();
 			raw.variables = [];
 			raw.assets = [];
 			return raw;
@@ -524,26 +498,24 @@ describe("overlay schema", () => {
 		// missing parent
 		{
 			const raw = base();
-			(raw.scenes[0] as Record<string, unknown>).elements = [
-				{ ...textElement(), parentId: "ghost" },
-			];
-			expect(() => normalizeProject(raw)).toThrow("missing parent");
+			raw.elements = [{ ...textElement(), parentId: "ghost" }];
+			expect(() => normalizeOverlay(raw)).toThrow("missing parent");
 		}
 
 		// non-group parent
 		{
 			const raw = base();
-			(raw.scenes[0] as Record<string, unknown>).elements = [
+			raw.elements = [
 				textElement(),
 				{ ...textElement({ id: "el-2", parentId: "el-1" }) },
 			];
-			expect(() => normalizeProject(raw)).toThrow("non-group parent");
+			expect(() => normalizeOverlay(raw)).toThrow("non-group parent");
 		}
 
 		// cycle
 		{
 			const raw = base();
-			(raw.scenes[0] as Record<string, unknown>).elements = [
+			raw.elements = [
 				{
 					id: "g1",
 					name: "g1",
@@ -567,7 +539,7 @@ describe("overlay schema", () => {
 					props: {},
 				},
 			];
-			expect(() => normalizeProject(raw)).toThrow();
+			expect(() => normalizeOverlay(raw)).toThrow();
 		}
 	});
 
@@ -582,11 +554,6 @@ describe("overlay schema", () => {
 		expect(() => parseCanvasInput({ width: "90000", height: 600 })).toThrow(
 			ApiError,
 		);
-	});
-
-	test("parseSceneInput requires at least one field", () => {
-		expect(() => parseSceneInput({})).toThrow("name or elements");
-		expect(parseSceneInput({ name: "New" })).toEqual({ name: "New" });
 	});
 
 	test("parseVariableValueInput coerces by variable type", () => {
@@ -617,11 +584,11 @@ describe("overlay schema", () => {
 	});
 
 	test("canvas size limits are enforced", () => {
-		const raw = validV1Project();
+		const raw = validV1Overlay();
 		raw.canvas = { width: 9999, height: 1080 };
-		expect(() => normalizeProject(raw)).toThrow("canvas");
+		expect(() => normalizeOverlay(raw)).toThrow("canvas");
 		raw.canvas = { width: 8192, height: 16 };
-		expect(normalizeProject(raw).canvas).toEqual({ width: 8192, height: 16 });
+		expect(normalizeOverlay(raw).canvas).toEqual({ width: 8192, height: 16 });
 	});
 
 	test("normalizeFilters clamps values to each type's range", () => {

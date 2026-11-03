@@ -9,7 +9,6 @@ import {
     syncWidgetHub,
     validateDeviceWidgetConfig,
     WIDGET_SIZES,
-    widgetChannelSpecsForConfig,
     widgetConfigFields,
 } from "../../../shared/registry";
 import type {
@@ -23,7 +22,6 @@ import {
     dashboardsTopic,
     event,
     LOCAL_USER,
-    overlayRuntimeTopic,
     type Publish,
     WIDGET_HUB_TOPIC,
 } from "../contracts";
@@ -332,44 +330,6 @@ export function createDashboards({
         );
     }
 
-    /** The channel widgets that changed their channel between two saves of the
-     * same dashboard (a widget absent from one side never counts: a fresh
-     * widget has no open overlay embedding it, a removed one keeps showing its
-     * last state). */
-    function changedChannelWidgets(
-        prev: ServerDashboardWidget[],
-        next: ServerDashboardWidget[],
-    ): ServerDashboardWidget[] {
-        const specKey = (w: ServerDashboardWidget) =>
-            widgetChannelSpecsForConfig(w.type, w.config)
-                .filter((spec): spec is string => spec !== null)
-                .sort()
-                .join(",");
-        return next.filter((w) => {
-            if (!isChannelWidgetType(w.type)) return false;
-            const old = prev.find((p) => p.id === w.id);
-            return old !== undefined && specKey(old) !== specKey(w);
-        });
-    }
-
-    /** Tell the owner's overlay runtime pages which of their embedded chat
-     * widgets went live on a new channel: the runtime embeds a widget's
-     * overlay page in an iframe that only re-reads its channel on reload. */
-    function broadcastChannelChanges(
-        d: ServerDashboard,
-        prev: ServerDashboardWidget[],
-        next: ServerDashboardWidget[],
-    ): void {
-        for (const w of changedChannelWidgets(prev, next))
-            publish(
-                overlayRuntimeTopic(d.owner ?? LOCAL_USER),
-                event("overlays.channelsChanged", {
-                    dashboardId: d.id,
-                    widgetId: w.id,
-                }),
-            );
-    }
-
     /** Dashboards owned by `user`, in stored order. Ownerless (legacy) dashboards
      * belong to the `local` profile. */
     const dashboardsFor = (user: string) =>
@@ -475,7 +435,6 @@ export function createDashboards({
                         { status: 409 },
                     );
                 }
-                const previousWidgets = dashboardsById.widgets;
                 dashboardsById.name = name;
                 // Absent/empty color clears it (the list dot falls back to muted)
                 dashboardsById.color = parseColor(body.color);
@@ -488,11 +447,6 @@ export function createDashboards({
                 saveDashboards();
                 syncHub();
                 broadcastDashboard(dashboardsById);
-                broadcastChannelChanges(
-                    dashboardsById,
-                    previousWidgets,
-                    dashboardsById.widgets,
-                );
                 return Response.json({
                     ok: true,
                     dashboard: dashboardsById,

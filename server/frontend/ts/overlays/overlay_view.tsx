@@ -28,8 +28,8 @@ import { APP_VERSION } from "../../../../shared/app_version";
 import type {
 	Asset,
 	Canvas,
+	Overlay,
 	OverlayElement,
-	Scene,
 	Variable,
 	VariableValue,
 } from "../../../../shared/overlay";
@@ -37,7 +37,7 @@ import { assetUrl, sceneElementsView } from "./overlay_render";
 import "../../css/overlay.css";
 
 interface RuntimeState {
-	scene: Scene | undefined;
+	overlay: Overlay | undefined;
 	canvas: Canvas;
 	variables: Variable[];
 	assets: Asset[];
@@ -54,14 +54,14 @@ const root = document.getElementById("app");
 if (!root) throw new Error("Missing overlay root");
 
 const token = new URLSearchParams(location.search).get("token") ?? "";
-const sceneId = location.pathname.split("/").filter(Boolean).pop() ?? "";
+const overlayId = location.pathname.split("/").filter(Boolean).pop() ?? "";
 const wsBase =
 	(location.protocol === "https:" ? "wss://" : "ws://") + location.host;
 const wsUrl =
-	wsBase + "/overlay/" + encodeURIComponent(sceneId) + "/ws?token=" + token;
+	wsBase + "/overlay/" + encodeURIComponent(overlayId) + "/ws?token=" + token;
 
 const state: RuntimeState = {
-	scene: undefined,
+	overlay: undefined,
 	canvas: { width: 1920, height: 1080 },
 	variables: [],
 	assets: [],
@@ -134,13 +134,28 @@ function assetMap(): Map<string, string> {
 }
 
 function applySnapshot(data: Record<string, unknown>): void {
-	const scene = data.scene as Scene | null | undefined;
-	if (scene) state.scene = scene;
-	if (Array.isArray(data.variables)) state.variables = data.variables;
-	const canvas = data.canvas as Canvas | undefined;
-	if (canvas) state.canvas = canvas;
-	if (Array.isArray(data.assets)) state.assets = data.assets;
+	const overlay = data.overlay as Overlay | null | undefined;
+	if (overlay) {
+		state.overlay = overlay;
+		if (overlay.canvas) state.canvas = overlay.canvas;
+		if (Array.isArray(overlay.variables)) state.variables = overlay.variables;
+		if (Array.isArray(overlay.assets)) state.assets = overlay.assets;
+	}
 	m.redraw();
+}
+
+/** A full `overlays.overlay` frame (element/canvas/variable change): apply the
+ * whole overlay, dropping a stale push (lower rev) that lags a fresher one. */
+function applyOverlayFrame(overlay: Overlay): void {
+	const local = state.overlay;
+	if (
+		local &&
+		typeof local.rev === "number" &&
+		typeof overlay.rev === "number" &&
+		overlay.rev < local.rev
+	)
+		return;
+	applySnapshot({ overlay });
 }
 
 function handleMessage(raw: MessageEvent, first: { open: boolean }): void {
@@ -160,9 +175,9 @@ function handleMessage(raw: MessageEvent, first: { open: boolean }): void {
 			first.open = true;
 			break;
 		}
-		case "overlays.scene": {
-			const scene = data.scene as Scene | null | undefined;
-			if (scene && scene.id === state.scene?.id) state.scene = scene;
+		case "overlays.overlay": {
+			const overlay = data.overlay as Overlay | null | undefined;
+			if (overlay) applyOverlayFrame(overlay);
 			break;
 		}
 		case "overlays.variables":
@@ -192,7 +207,7 @@ function handleMessage(raw: MessageEvent, first: { open: boolean }): void {
 }
 
 /** Element render context carrying assets, variables, live trigger state, and
- * the scene's token + id (a self-contained chat element uses both to open
+ * the overlay's token + id (a self-contained chat element uses both to open
  * its token-scoped feed). */
 function runtimeCtx(): ElementContext {
 	return {
@@ -201,7 +216,7 @@ function runtimeCtx(): ElementContext {
 		variableNames: variableNamesMap(),
 		activeTriggers: state.activeTriggers,
 		token,
-		sceneId,
+		overlayId,
 	};
 }
 
@@ -235,7 +250,7 @@ function playAlert(
 		const variable = state.variables.find((v) => v.name === name);
 		if (variable) variable.value = value as VariableValue;
 	}
-	const duration = elementDef(element.type)?.onTrigger(
+	const duration = elementDef(element.type)?.onTrigger?.(
 		element,
 		eventName,
 		payload,
@@ -295,9 +310,9 @@ function handleTrigger(
 	eventName: string,
 	payload: Record<string, unknown>,
 ): void {
-	const scene = state.scene;
-	if (!scene || !eventName) return;
-	for (const element of scene.elements) {
+	const overlay = state.overlay;
+	if (!overlay || !eventName) return;
+	for (const element of overlay.elements) {
 		if (!elementDef(element.type)?.onTrigger) continue;
 		if (state.activeTriggers.has(element.id)) {
 			// the element is showing an earlier alert: queue the claim
@@ -329,10 +344,10 @@ function connect(): void {
 
 m.mount(root, {
 	view: () => {
-		const scene = state.scene;
-		if (!scene) return null; // blank (transparent) until the first frame
+		const overlay = state.overlay;
+		if (!overlay) return null; // blank (transparent) until the first frame
 		const ctx = runtimeCtx();
-		const elements = sceneElementsView(scene.elements, ctx);
+		const elements = sceneElementsView(overlay.elements, ctx);
 		return m(
 			".overlay-canvas",
 			{

@@ -4,9 +4,8 @@ import { uuid } from "@ui/util";
 import m from "mithril";
 import type {
     Asset,
+    Overlay,
     OverlayElement,
-    OverlayProject,
-    Scene,
     Transform,
     Variable,
     VariableValue,
@@ -15,8 +14,17 @@ import { serverLive } from "../services/serverws";
 import type { ElementContext } from "./overlay_render";
 import { assetUrl, resolveElement } from "./overlay_render";
 
+/** A user's overlay as the list page renders it (no element payload). */
+export interface OverlaySummary {
+    id: string;
+    name: string;
+    token: string;
+    elementCount: number;
+    updatedAt: number;
+}
+
 export interface HistEntry {
-    sceneId: string;
+    overlayId: string;
     elements: OverlayElement[];
 }
 
@@ -30,28 +38,19 @@ export interface Drag {
     moved: boolean;
 }
 
-export function initialProject(): OverlayProject {
-    return {
-        schemaVersion: 1,
-        canvas: { width: 1920, height: 1080 },
-        variables: [],
-        assets: [],
-        scenes: [
-            // the scene's UUID id is its only identifier (runtime + editor)
-            { id: uuid(), name: "Scene 1", elements: [] },
-        ],
-    };
-}
-
 export const state = {
     loaded: false,
-    project: initialProject(),
+    /** the user's overlays (list page). */
+    overlays: [] as OverlaySummary[],
+    /** the overlay the editor page has loaded (full state), or null. */
+    overlay: null as Overlay | null,
+    /** the loaded overlay's token (editor); the list carries per-row tokens. */
     token: "",
-    selectedSceneId: null as string | null,
+    selectedOverlayId: null as string | null,
     selectedElementId: null as string | null,
     zoom: 0.5,
-    newSceneName: "",
-    renamingSceneId: null as string | null,
+    newOverlayName: "",
+    renamingOverlayId: null as string | null,
     renameValue: "",
     drag: null as Drag | null,
     snapX: null as number | null,
@@ -63,8 +62,8 @@ export const state = {
     copied: false,
     /** Variable whose modify URL was just copied (icon turns green). */
     copiedVariableName: null as string | null,
-    /** Scene whose runtime URL was just copied from the list (icon turns green). */
-    copiedSceneId: null as string | null,
+    /** Overlay whose runtime URL was just copied from the list (green icon). */
+    copiedOverlayId: null as string | null,
     /** Element currently expanded in the inspector list (accordion). */
     expandedElementId: null as string | null,
     /** Text element being inline-edited on the canvas. */
@@ -75,12 +74,12 @@ export const state = {
     variablesDialogOpen: false,
 };
 
-/** Page URLs: the list and one editor page per scene (linkable). */
+/** Page URLs: the list and one editor page per overlay (linkable). */
 export const LIST_URL = "/overlays/";
-export const editorUrl = (sceneId: string): string =>
-    `/overlays/edit/${encodeURIComponent(sceneId)}/`;
-/** The scene id an editor page URL names, or null on any other URL. */
-export const sceneIdFromLocation = (): string | null => {
+export const editorUrl = (overlayId: string): string =>
+    `/overlays/edit/${encodeURIComponent(overlayId)}/`;
+/** The overlay id an editor page URL names, or null on any other URL. */
+export const overlayIdFromLocation = (): string | null => {
     const m = /\/overlays\/edit\/([^/]+)\/?$/.exec(location.pathname);
     return m ? decodeURIComponent(m[1]) : null;
 };
@@ -95,9 +94,9 @@ export const roundToStep = (v: number, step: number) =>
 
 /** Fit the whole canvas into the editor viewport (clamped to the zoom limits). */
 export function fitZoom(): void {
-    const c = state.project.canvas;
+    const c = state.overlay?.canvas;
     const scroll = document.querySelector<HTMLElement>(".ov-canvas-scroll");
-    if (!scroll || !c.width || !c.height) return;
+    if (!scroll || !c?.width || !c?.height) return;
 
     const pad = 0;
     state.zoom = clamp(
@@ -111,27 +110,37 @@ export function fitZoom(): void {
     m.redraw();
 }
 
-export function scene(): Scene | undefined {
-    return state.project.scenes.find((s) => s.id === state.selectedSceneId);
+/** The overlay the editor page has loaded (the single source of truth). */
+export function overlay(): Overlay | undefined {
+    return state.overlay ?? undefined;
 }
 
 export function selElement(): OverlayElement | undefined {
-    const s = scene();
-    return s?.elements.find((e) => e.id === state.selectedElementId);
+    return state.overlay?.elements.find(
+        (e) => e.id === state.selectedElementId,
+    );
 }
 
 export function ctx(): ElementContext {
-    const project = state.project;
+    const o = state.overlay;
+    if (!o)
+        return {
+            assetUrls: new Map(),
+            variables: new Map(),
+            variableNames: new Map(),
+            token: state.token,
+            overlayId: undefined,
+        };
     return {
-        assetUrls: new Map(project.assets.map((a) => [a.id, assetUrl(a)])),
+        assetUrls: new Map(o.assets.map((a) => [a.id, assetUrl(a)])),
         variables: new Map(
-            project.variables.map((v) => [v.id, v.value as VariableValue]),
+            o.variables.map((v) => [v.id, v.value as VariableValue]),
         ),
         variableNames: new Map(
-            project.variables.map((v) => [v.name, v.value as VariableValue]),
+            o.variables.map((v) => [v.name, v.value as VariableValue]),
         ),
         token: state.token,
-        sceneId: scene()?.id,
+        overlayId: state.selectedOverlayId ?? undefined,
     };
 }
 
@@ -141,13 +150,15 @@ export function resolvedTransform(e: OverlayElement): Transform {
     return resolveElement(e, ctx().variables).transform;
 }
 
-export function runtimeUrl(s: Scene): string {
+/** The runtime URL for an overlay (its own token, its own id). Accepts a list
+ * row (`OverlaySummary`) or the editor's `{ id, token }` pair. */
+export function runtimeUrl(s: { id: string; token: string }): string {
     return (
         location.origin +
         "/overlay/" +
         encodeURIComponent(s.id) +
         "?token=" +
-        state.token
+        s.token
     );
 }
 
@@ -164,14 +175,17 @@ export function variableUrl(name: string): string {
     );
 }
 
-/** Copy the scene's runtime URL so it can be pasted straight into OBS.
- * The row's copy icon turns green until the state expires. */
-export async function copySceneUrl(s: Scene): Promise<void> {
+/** Copy an overlay's runtime URL so it can be pasted straight into OBS.
+ * The list row's copy icon turns green until the state expires. */
+export async function copyOverlayUrl(s: {
+    id: string;
+    token: string;
+}): Promise<void> {
     try {
         await navigator.clipboard.writeText(runtimeUrl(s));
-        state.copiedSceneId = s.id;
+        state.copiedOverlayId = s.id;
         setTimeout(() => {
-            state.copiedSceneId = null;
+            state.copiedOverlayId = null;
             m.redraw();
         }, 1500);
     } catch {
@@ -179,146 +193,144 @@ export async function copySceneUrl(s: Scene): Promise<void> {
     }
 }
 
-/** How many field bindings in the current scene follow the given variable.
+/** How many field bindings in the loaded overlay follow the given variable.
  * Zero variables read as "unused", so the panel can flag them. */
 export function variableUsage(variableId: string): number {
-    const s = scene();
-    if (!s) return 0;
+    const o = state.overlay;
+    if (!o) return 0;
     let n = 0;
-    for (const e of s.elements)
+    for (const e of o.elements)
         for (const b of Object.values(e.bindings))
             if (b.kind === "variable" && b.variableId === variableId) n++;
     return n;
 }
 
-/** Fetch the project; an editor page passes the scene id its URL names. */
-export async function load(sceneId: string | null = null): Promise<void> {
-    const body = await apiTry<{ project: OverlayProject; token: string }>(
-        "/api/overlays",
-    );
-    if (body?.project) {
-        state.project = body.project;
-        state.token = body.token ?? "";
-        if (sceneId) state.selectedSceneId = sceneId;
-        if (!state.selectedSceneId || !scene())
-            state.selectedSceneId = state.project.scenes[0]?.id ?? null;
-        state.past = [];
-        state.future = [];
+/** Fetch the overlay list; an editor page also loads the overlay its URL
+ * names. */
+export async function load(overlayId: string | null = null): Promise<void> {
+    const list = await apiTry<{ overlays: OverlaySummary[] }>("/api/overlays");
+    if (list?.overlays) state.overlays = list.overlays;
+    if (overlayId) {
+        const body = await apiTry<{ token: string; overlay: Overlay }>(
+            `/api/overlays/${encodeURIComponent(overlayId)}`,
+        );
+        if (body?.overlay) {
+            state.overlay = body.overlay;
+            state.token = body.token ?? "";
+            state.selectedOverlayId = overlayId;
+        }
     }
+    state.past = [];
+    state.future = [];
     state.loaded = true;
     m.redraw();
 }
 
 export function snapshot(): void {
-    const s = scene();
-    if (!s) return;
-    state.past.push({ sceneId: s.id, elements: clone(s.elements) });
+    const o = state.overlay;
+    if (!o || !state.selectedOverlayId) return;
+    state.past.push({
+        overlayId: state.selectedOverlayId,
+        elements: clone(o.elements),
+    });
     if (state.past.length > 100) state.past.shift();
     state.future = [];
 }
 
 export function applyElements(elements: OverlayElement[]): void {
-    const s = scene();
-    if (!s) return;
-    s.elements = elements;
-    void saveSceneElements(s);
+    const o = state.overlay;
+    if (!o) return;
+    o.elements = elements;
+    void saveOverlayElements(o);
     m.redraw();
 }
 
 export function undo(): void {
-    const s = scene();
-    if (!s || !state.past.length) return;
-    state.future.push({ sceneId: s.id, elements: clone(s.elements) });
+    const o = state.overlay;
+    if (!o || !state.past.length) return;
+    state.future.push({
+        overlayId: state.selectedOverlayId ?? "",
+        elements: clone(o.elements),
+    });
     const entry = state.past.pop()!;
-    if (entry.sceneId === s.id) applyElements(entry.elements);
+    if (entry.overlayId === state.selectedOverlayId)
+        applyElements(entry.elements);
 }
 
 export function redo(): void {
-    const s = scene();
-    if (!s || !state.future.length) return;
-    state.past.push({ sceneId: s.id, elements: clone(s.elements) });
+    const o = state.overlay;
+    if (!o || !state.future.length) return;
+    state.past.push({
+        overlayId: state.selectedOverlayId ?? "",
+        elements: clone(o.elements),
+    });
     const entry = state.future.pop()!;
-    if (entry.sceneId === s.id) applyElements(entry.elements);
+    if (entry.overlayId === state.selectedOverlayId)
+        applyElements(entry.elements);
 }
 
-export async function createScene(): Promise<void> {
-    const name = state.newSceneName.trim() || "Scene";
-    const body = await apiTry<{ scene: Scene }>("/api/overlays/scenes", {
+/** Create a fresh overlay and open it in the editor. */
+export async function createOverlay(): Promise<void> {
+    const name = state.newOverlayName.trim() || "Overlay";
+    const body = await apiTry<{ id: string }>(`/api/overlays`, {
         method: "POST",
         body: { name },
     });
-    if (body?.scene) {
-        // upsert — the server's `overlays.scene` WS push may already have added
-        // this scene (it fires before the HTTP response), so a raw push would
-        // create a duplicate
-        upsertScene(body.scene);
-        state.newSceneName = "";
-        location.assign(editorUrl(body.scene.id));
+    if (body?.id) {
+        state.newOverlayName = "";
+        location.assign(editorUrl(body.id));
     }
 }
 
-/** Idempotently insert or replace a scene by id (mirrors the WS handler). */
-export function upsertScene(sc: Scene): void {
-    const i = state.project.scenes.findIndex((x) => x.id === sc.id);
-    if (i >= 0) state.project.scenes[i] = sc;
-    else state.project.scenes.push(sc);
+/** An overlay id from a full/summary frame, kept in sync with the list. */
+export function upsertListEntry(id: string, patch: Partial<OverlaySummary>): void {
+    const i = state.overlays.findIndex((x) => x.id === id);
+    if (i >= 0) state.overlays[i] = { ...state.overlays[i], ...patch };
 }
 
-/** Duplicate a scene (server clones it under a fresh id and name) and
- * open the clone in the editor, like createScene. */
-export async function duplicateScene(id: string): Promise<void> {
-    const body = await apiTry<{ scene: Scene }>(
-        `/api/overlays/scenes/${encodeURIComponent(id)}/duplicate`,
-        { method: "POST" },
-    );
-    if (body?.scene) {
-        // upsert — same double-add race as createScene: the `overlays.scene`
-        // WS push lands before the HTTP response and already contains the
-        // clone, so a raw push would create a duplicate
-        upsertScene(body.scene);
-        //location.assign(editorUrl(body.scene.id));
-    }
-}
-
-export function selectScene(id: string): void {
-    state.selectedSceneId = id;
-    state.selectedElementId = null;
-    state.past = [];
-    state.future = [];
-}
-
-export async function renameScene(id: string, name: string): Promise<void> {
-    const s = state.project.scenes.find((x) => x.id === id);
+export async function renameOverlay(id: string, name: string): Promise<void> {
+    const s = state.overlays.find((x) => x.id === id);
     if (!s || !name.trim()) return;
     s.name = name.trim();
-    const body = await apiTry<{ scene: Scene }>(
-        `/api/overlays/scenes/${encodeURIComponent(id)}`,
+    const body = await apiTry<{ overlay: Overlay }>(
+        `/api/overlays/${encodeURIComponent(id)}`,
         { method: "PUT", body: { name: s.name } },
     );
-    if (body?.scene) {
-        const i = state.project.scenes.findIndex((x) => x.id === id);
-        if (i >= 0) state.project.scenes[i] = body.scene;
+    if (body?.overlay) {
+        upsertListEntry(id, { name: body.overlay.name, elementCount: body.overlay.elements.length });
+        if (state.selectedOverlayId === id && state.overlay)
+            state.overlay.name = body.overlay.name;
         m.redraw();
     }
 }
 
-export async function deleteScene(id: string): Promise<void> {
+export async function deleteOverlay(id: string): Promise<void> {
     const body = await apiTry<{ ok: boolean }>(
-        `/api/overlays/scenes/${encodeURIComponent(id)}`,
+        `/api/overlays/${encodeURIComponent(id)}`,
         { method: "DELETE" },
     );
     if (body) {
-        state.project.scenes = state.project.scenes.filter((s) => s.id !== id);
-        if (state.selectedSceneId === id)
-            selectScene(state.project.scenes[0]?.id ?? "");
+        state.overlays = state.overlays.filter((s) => s.id !== id);
+        if (state.selectedOverlayId === id) {
+            state.selectedOverlayId = null;
+            state.overlay = null;
+        }
         m.redraw();
     }
 }
 
-export async function saveSceneElements(s: Scene): Promise<void> {
-    await apiTry(`/api/overlays/scenes/${encodeURIComponent(s.id)}`, {
+export async function duplicateOverlay(id: string): Promise<void> {
+    await apiTry<{ id: string }>(
+        `/api/overlays/${encodeURIComponent(id)}/duplicate`,
+        { method: "POST" },
+    );
+}
+
+export async function saveOverlayElements(o: Overlay): Promise<void> {
+    if (!state.selectedOverlayId) return;
+    await apiTry(`/api/overlays/${encodeURIComponent(state.selectedOverlayId)}`, {
         method: "PUT",
-        body: { elements: s.elements },
+        body: { elements: o.elements },
     });
 }
 
@@ -328,20 +340,20 @@ export function mutateElement(fn: (e: OverlayElement) => void): void {
 
 /**
  * Apply `fn` to one element by id (not to the canvas selection) and persist
- * the scene. The inspector rows use this so expanded-row edits always hit
+ * the overlay. The inspector rows use this so expanded-row edits always hit
  * the row's element, even when it is not the canvas-selected one.
  */
 export function mutateElementOf(
     elementId: string | null,
     fn: (e: OverlayElement) => void,
 ): void {
-    const s = scene();
-    if (!s) return;
-    const e = s.elements.find((x) => x.id === elementId);
+    const o = state.overlay;
+    if (!o) return;
+    const e = o.elements.find((x) => x.id === elementId);
     if (!e || e.locked) return;
     snapshot();
     fn(e);
-    void saveSceneElements(s);
+    void saveOverlayElements(o);
     m.redraw();
 }
 
@@ -349,13 +361,13 @@ export function mutateElementOf(
  * `mutateElementOf` — its `e.locked` guard is what protects locked elements
  * from edits, and it would also block the very action that unlocks them. */
 export function setElementLocked(elementId: string, locked: boolean): void {
-    const s = scene();
-    if (!s) return;
-    const e = s.elements.find((x) => x.id === elementId);
+    const o = state.overlay;
+    if (!o) return;
+    const e = o.elements.find((x) => x.id === elementId);
     if (!e || e.locked === locked) return;
     snapshot();
     e.locked = locked;
-    void saveSceneElements(s);
+    void saveOverlayElements(o);
     m.redraw();
 }
 
@@ -363,14 +375,14 @@ export function setElementLocked(elementId: string, locked: boolean): void {
  * props and size come from its `OverlayElementDef` — the core never
  * hardcodes element-specific defaults. */
 export function addElement(type: string): void {
-    const s = scene();
-    if (!s) return;
+    const o = state.overlay;
+    if (!o) return;
     const def = elementDef(type);
     if (!def) return;
     snapshot();
     const el: OverlayElement = {
         id: uuid(),
-        name: type + " " + (s.elements.length + 1),
+        name: type + " " + (o.elements.length + 1),
         type,
         transform: {
             x: 120,
@@ -386,106 +398,104 @@ export function addElement(type: string): void {
         bindings: {},
         props: { ...def.defaultProps },
     };
-    s.elements.push(el);
+    o.elements.push(el);
     state.selectedElementId = el.id;
     state.expandedElementId = el.id;
-    void saveSceneElements(s);
+    void saveOverlayElements(o);
     m.redraw();
 }
 
 export function deleteElement(id: string): void {
-    const s = scene();
-    if (!s) return;
+    const o = state.overlay;
+    if (!o) return;
     snapshot();
-    s.elements = s.elements
+    o.elements = o.elements
         .filter((e) => e.id !== id)
         .map((e) => (e.parentId === id ? { ...e, parentId: null } : e));
     if (state.selectedElementId === id) state.selectedElementId = null;
     if (state.expandedElementId === id) state.expandedElementId = null;
-    void saveSceneElements(s);
+    void saveOverlayElements(o);
     m.redraw();
 }
 
 /**
- * Reorder an element within `scene.elements` (back-to-front array order =
+ * Reorder an element within `overlay.elements` (back-to-front array order =
  * z-order). Works on locked elements too — stacking is not a positional edit.
  */
 export function reorderElement(
     elementId: string,
     op: "forward" | "backward",
 ): void {
-    const s = scene();
-    if (!s) return;
-    const i = s.elements.findIndex((x) => x.id === elementId);
+    const o = state.overlay;
+    if (!o) return;
+    const i = o.elements.findIndex((x) => x.id === elementId);
     if (i < 0) return;
-    if (op === "forward" && i === s.elements.length - 1) return;
+    if (op === "forward" && i === o.elements.length - 1) return;
     if (op === "backward" && i === 0) return;
     snapshot();
-    const list = [...s.elements];
+    const list = [...o.elements];
     const [el] = list.splice(i, 1);
     const to = op === "forward" ? i + 1 : i - 1;
     list.splice(to, 0, el);
-    s.elements = list;
-    void saveSceneElements(s);
+    o.elements = list;
+    void saveOverlayElements(o);
     m.redraw();
 }
 
 export async function createVariable(): Promise<void> {
+    const o = state.overlay;
+    if (!o) return;
     const name = state.newVariableName.trim();
     if (!name) return;
     const body = await apiTry<{ variable: Variable }>(
-        "/api/overlays/variables",
+        `/api/overlays/${encodeURIComponent(state.selectedOverlayId ?? "")}/variables`,
         {
             method: "POST",
             body: { name, type: state.newVariableType },
         },
     );
     if (body?.variable) {
-        // upsert — same double-add race as createScene: the `overlays.variables`
-        // WS push lands before the HTTP response and already contains the new
-        // variable, so a raw push would duplicate it
-        upsertVariable(body.variable);
         state.newVariableName = "";
         m.redraw();
     }
-}
-
-/** Idempotently insert or replace a variable by id (mirrors the WS handler). */
-export function upsertVariable(v: Variable): void {
-    const i = state.project.variables.findIndex((x) => x.id === v.id);
-    if (i >= 0) state.project.variables[i] = v;
-    else state.project.variables.push(v);
 }
 
 export async function setVariable(
     id: string,
     value: VariableValue,
 ): Promise<void> {
-    const v = state.project.variables.find((x) => x.id === id);
+    const o = state.overlay;
+    if (!o) return;
+    const v = o.variables.find((x) => x.id === id);
     if (!v) return;
     v.value = value;
-    await apiTry(`/api/overlays/variables/${encodeURIComponent(id)}`, {
-        method: "PUT",
-        body: { value },
-    });
+    await apiTry(
+        `/api/overlays/${encodeURIComponent(state.selectedOverlayId ?? "")}/variables/${encodeURIComponent(id)}`,
+        {
+            method: "PUT",
+            body: { value },
+        },
+    );
     m.redraw();
 }
 
 export async function deleteVariable(id: string): Promise<void> {
+    const o = state.overlay;
+    if (!o) return;
     const body = await apiTry<{ ok: boolean }>(
-        `/api/overlays/variables/${encodeURIComponent(id)}`,
+        `/api/overlays/${encodeURIComponent(state.selectedOverlayId ?? "")}/variables/${encodeURIComponent(id)}`,
         { method: "DELETE" },
     );
     if (body) {
-        state.project.variables = state.project.variables.filter(
-            (v) => v.id !== id,
-        );
+        o.variables = o.variables.filter((v) => v.id !== id);
         m.redraw();
     }
 }
 
 /** Upload a file and return the (deduplicated by hash) asset. */
 export async function uploadAsset(file: File): Promise<Asset | null> {
+    const o = state.overlay;
+    if (!o) return null;
     const dataBase64 = await new Promise<string>((resolve, reject) => {
         const r = new FileReader();
         r.onload = () => {
@@ -495,28 +505,36 @@ export async function uploadAsset(file: File): Promise<Asset | null> {
         r.onerror = reject;
         r.readAsDataURL(file);
     });
-    const res = await apiTry<{ asset?: Asset }>("/api/overlays/assets", {
-        method: "POST",
-        body: {
-            filename: file.name,
-            mime: file.type,
-            dataBase64,
+    const res = await apiTry<{ asset?: Asset }>(
+        `/api/overlays/${encodeURIComponent(state.selectedOverlayId ?? "")}/assets`,
+        {
+            method: "POST",
+            body: {
+                filename: file.name,
+                mime: file.type,
+                dataBase64,
+            },
         },
-    });
+    );
     return res?.asset ?? null;
 }
 
 export async function rotateToken(): Promise<void> {
-    const body = await apiTry<{ token: string }>("/api/overlays/token/rotate", {
-        method: "POST",
-    });
+    if (!state.selectedOverlayId) return;
+    const body = await apiTry<{ token: string }>(
+        `/api/overlays/${encodeURIComponent(state.selectedOverlayId)}/token/rotate`,
+        { method: "POST" },
+    );
     if (body?.token) {
         state.token = body.token;
         m.redraw();
     }
 }
 
-export async function copyRuntimeUrl(s: Scene): Promise<void> {
+export async function copyRuntimeUrl(s: {
+    id: string;
+    token: string;
+}): Promise<void> {
     try {
         await navigator.clipboard.writeText(runtimeUrl(s));
         state.copied = true;
@@ -560,7 +578,7 @@ export function toggleElementRow(elementId: string): void {
 
 /** Enter inline text editing on the canvas (double-click a text element). */
 export function startInlineEdit(elementId: string): void {
-    const e = scene()?.elements.find((x) => x.id === elementId);
+    const e = state.overlay?.elements.find((x) => x.id === elementId);
     const inline = e && elementDef(e.type)?.inlineEdit;
     if (!e || !inline || e.locked) return;
     // a bound prop wins over the raw value — inline editing the raw value
@@ -578,64 +596,58 @@ export function stopInlineEdit(): void {
     m.redraw();
 }
 
-/** A pushed scene is stale when it carries a lower server rev than the copy
+/** A pushed overlay is stale when it carries a lower server rev than the copy
  * we already have locally — an out-of-order broadcast must not clobber a
- * newer applied state. Scenes without revs (pre-rev data) are never stale. */
-export function sceneIsStale(local: Scene | undefined, pushed: Scene): boolean {
+ * newer applied state. Overlays without revs (pre-rev data) are never stale. */
+export function overlayIsStale(
+    local: Overlay | undefined,
+    pushed: Overlay,
+): boolean {
     if (!local || typeof local.rev !== "number") return false;
     return typeof pushed.rev === "number" && pushed.rev < local.rev;
 }
 
-serverLive.rpc.on("overlays.scene", (data) => {
-    const sc = (data as { scene?: Scene })?.scene;
-    if (!sc) return;
-    const i = state.project.scenes.findIndex((x) => x.id === sc.id);
-    if (i >= 0) {
-        if (sceneIsStale(state.project.scenes[i], sc)) return;
-        state.project.scenes[i] = sc;
-    } else state.project.scenes.push(sc);
-    m.redraw();
-});
+/** Keep the list row in sync (name + element count) after an overlay change. */
+function syncListFromOverlay(id: string, o: Overlay): void {
+    const i = state.overlays.findIndex((x) => x.id === id);
+    if (i >= 0)
+        state.overlays[i] = {
+            ...state.overlays[i],
+            name: o.name,
+            elementCount: o.elements.length,
+        };
+}
 
-serverLive.rpc.on("overlays.sceneDeleted", (data) => {
-    const id = (data as { sceneId?: string })?.sceneId;
-    if (!id) return;
-    state.project.scenes = state.project.scenes.filter((s) => s.id !== id);
-    if (state.selectedSceneId === id)
-        selectScene(state.project.scenes[0]?.id ?? "");
-    m.redraw();
-});
-
-serverLive.rpc.on("overlays.variables", (data) => {
-    const list = (data as { variables?: Variable[] })?.variables;
+serverLive.rpc.on("overlays.overlays", (data) => {
+    const list = (data as { overlays?: OverlaySummary[] })?.overlays;
     if (list) {
-        state.project.variables = list;
+        state.overlays = list;
         m.redraw();
     }
 });
 
-serverLive.rpc.on("overlays.project", (data) => {
-    const p = (data as { project?: OverlayProject })?.project;
-    if (p) {
-        // An out-of-order project push must not roll back scenes whose local
-        // copy is already fresher (higher server rev) than the push.
-        const localRev = new Map(
-            state.project.scenes.map((s) => [s.id, s.rev] as const),
-        );
-        p.scenes = p.scenes.map((sc) => {
-            const lr = localRev.get(sc.id);
-            return typeof lr === "number" &&
-                typeof sc.rev === "number" &&
-                sc.rev < lr
-                ? state.project.scenes.find((x) => x.id === sc.id) ?? sc
-                : sc;
-        });
-        state.project = p;
-        m.redraw();
+serverLive.rpc.on("overlays.overlay", (data) => {
+    const { overlayId, overlay: o } = (data as {
+        overlayId?: string;
+        overlay?: Overlay;
+    }) ?? {};
+    if (!overlayId || !o) return;
+    syncListFromOverlay(overlayId, o);
+    if (overlayId === state.selectedOverlayId && state.overlay) {
+        if (overlayIsStale(state.overlay, o)) return;
+        state.overlay = o;
     }
+    m.redraw();
 });
 
 serverLive.rpc.on("overlays.token", (data) => {
-    const tk = (data as { token?: string })?.token;
-    if (tk) state.token = tk;
+    const { overlayId, token } = (data as {
+        overlayId?: string;
+        token?: string;
+    }) ?? {};
+    if (!overlayId || !token) return;
+    const i = state.overlays.findIndex((x) => x.id === overlayId);
+    if (i >= 0) state.overlays[i] = { ...state.overlays[i], token };
+    if (overlayId === state.selectedOverlayId) state.token = token;
+    m.redraw();
 });

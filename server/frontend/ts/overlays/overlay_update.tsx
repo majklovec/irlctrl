@@ -1,6 +1,6 @@
 /** @jsx m */
 /*
- * Overlay editor page (/overlays/edit/<scene id>/):
+ * Overlay editor page (/overlays/edit/<overlay id>/):
  *   toolbar:    undo/redo + one "add" button per registered element type,
  *               and the runtime URL (dialog: the OBS source URL, copy/rotate)
  *   center:     zoomable canvas — select / drag / resize / nudge / snap
@@ -8,11 +8,11 @@
  *               inspector (transform, props, bindings)
  *   modal:      variables (live, opened from the toolbar icon)
  *
- * The scene renders through the SHARED overlay render views so the preview is
+ * The overlay renders through the SHARED overlay render views so the preview is
  * pixel-identical to the OBS runtime; the editor only layers a selection box +
  * resize handles on top. The server is the source of truth: every mutation is
  * pushed to the REST API and the live feed re-syncs the local copy
- * (overlay_store.ts). Undo/redo (100 steps) tracks the active scene's
+ * (overlay_store.ts). Undo/redo (100 steps) tracks the active overlay's
  * elements. Controls are raw <input>/<select> bound imperatively (the ui
  * kit's bound controls target a fixed state object, which doesn't fit a
  * canvas editor).
@@ -32,16 +32,16 @@ import {
 	fitZoom,
 	LIST_URL,
 	load,
-	scene,
-	sceneIdFromLocation,
+	overlay,
+	overlayIdFromLocation,
 	state,
 } from "./overlay_store";
 
 const overlayUpdatePage: m.Component = {
 	oncreate() {
-		void load(sceneIdFromLocation()).then(() => {
-			// the URL names a scene that no longer exists → back to the list
-			if (state.loaded && !scene()) location.replace(LIST_URL);
+		void load(overlayIdFromLocation()).then(() => {
+			// the URL names an overlay that no longer exists → back to the list
+			if (state.loaded && !overlay()) location.replace(LIST_URL);
 			// default zoom: fit the whole canvas into the viewport
 			else requestAnimationFrame(fitZoom);
 		});
@@ -51,7 +51,7 @@ const overlayUpdatePage: m.Component = {
 		window.removeEventListener("keydown", onKey, true);
 	},
 	view: () => {
-		if (!state.loaded || !scene())
+		if (!state.loaded || !overlay())
 			return (
 				<Page nav={<ServerNav active="overlays" />}>
 					<p class="muted">{t("overlay.loading")}</p>

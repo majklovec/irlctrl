@@ -1,7 +1,7 @@
 /*
  * OBS overlay editor routes:
  *   GET  /overlays/                the overlay list page (cookie auth)
- *   GET  /overlays/edit/:id/       the scene editor page (cookie auth)
+ *   GET  /overlays/edit/:id/       the overlay editor page (cookie auth)
  *   GET  /overlay/:id?token=…      the runtime page (token auth, transparent)
  *   GET  /overlay/variables?…      revalue variables: ?<name>=<value>…, an
  *                                  empty value clears (token auth)
@@ -10,19 +10,19 @@
  *   GET  /overlay/alert/:name?…    trigger an alert whose element event
  *                                  matches <name>; optional ?<name>=<value>
  *                                  pairs ride with the alert and land in
- *                                  project variables when the alert plays
+ *                                  overlay variables when the alert plays
  *                                  (token auth)
  *   WS   /overlay/:id/ws?token=…   the runtime live feed (token auth);
  *                                  also accepts the runtime page's
  *                                  `overlays.applyAlert` uplink (it writes
  *                                  an on-air alert's values to variables)
- *   POST /api/overlays/scenes/:id/duplicate
- *                            copy a scene with its elements (cookie auth);
- *                            the clone gets a fresh id and name
+ *   POST /api/overlays/:id/duplicate
+ *                            copy an overlay (cookie auth); the clone gets a
+ *                            fresh id, name and token
  *   …    /api/overlays…            the editor REST API (cookie auth)
  *
  * The runtime page is what OBS loads as a Browser Source: no session, only
- * the project token (chat-overlay pattern), a fully transparent body.
+ * the overlay token (chat-overlay pattern), a fully transparent body.
  */
 import { Elysia } from "elysia";
 import { APP_VERSION } from "../../../shared/app_version";
@@ -40,16 +40,13 @@ type Frontend = Awaited<ReturnType<typeof createFrontend>>;
 /** Runs a token-authenticated store action and maps the outcome: ApiError
  * → JSON `{ok:false, error, code}`, `null` → 404 "Not found" (a token probe
  * must not leak project existence, exactly like /overlay/:id). */
+type TokenResult = { status: number; body: Record<string, unknown> } | null;
+
 function tokenJson(
-    action: () => Promise<
-        { status: number; body: Record<string, unknown> } | null
-    >,
+    action: () => TokenResult | Promise<TokenResult>,
 ): Promise<Response> {
     return (async (): Promise<Response> => {
-        let result: {
-            status: number;
-            body: Record<string, unknown>;
-        } | null;
+        let result: TokenResult;
         try {
             result = await action();
         } catch (err: unknown) {
@@ -194,23 +191,21 @@ export function overlayRoutes(
                     RUNTIME_WS_RE,
                 );
                 if (!m) return ws.close(1008, "Unknown overlay route");
-                const sceneId = decodeURIComponent(m[1]);
-                const feed = overlays.runtimeScene(
+                const overlayId = decodeURIComponent(m[1]);
+                const feed = overlays.runtimeOverlay(
                     runtimeToken(ws.data.request),
-                    sceneId,
+                    overlayId,
                 );
                 if (!feed) return ws.close(1008, "Invalid overlay token");
-                // the message handler reuses the already-validated owner
-                (ws.data as { user?: string }).user = feed.user;
+                // the message handler reuses the already-validated overlay id
+                (ws.data as { overlayId?: string }).overlayId = overlayId;
                 // snapshot first, then the live topic (the server publishes
                 // topic messages to this socket from the next tick on)
-                ws.subscribe(overlayRuntimeTopic(feed.user));
+                ws.subscribe(overlayRuntimeTopic(overlayId));
+                const o = feed.overlay;
                 ws.send(
                     event("overlays.snapshot", {
-                        scene: feed.scene,
-                        variables: feed.variables,
-                        canvas: feed.canvas,
-                        assets: feed.assets,
+                        overlay: o,
                         // the runtime page compares this to its own bundled
                         // version and reloads when a new deployment replaced
                         // the server (a restart drops the socket, so the
@@ -220,10 +215,10 @@ export function overlayRoutes(
                 );
             },
             message(ws, message) {
-                // uplink from the runtime page: an alert went on air and
-                // its values must land in the project variables
-                const user = (ws.data as { user?: string }).user;
-                if (!user) return;
+                // uplink from the runtime page: an alert went on air and its
+                // values must land in the overlay variables
+                const overlayId = (ws.data as { overlayId?: string }).overlayId;
+                if (!overlayId) return;
                 // Elysia pre-parses JSON text frames; socketMessage
                 // restores the raw string
                 let frame: { event?: string; data?: unknown };
@@ -245,12 +240,12 @@ export function overlayRoutes(
                     return;
                 try {
                     overlays.applyAlertValues(
-                        user,
+                        overlayId,
                         values as Record<string, unknown>,
                     );
                 } catch {
                     // the values came from this page's own validated
-                    // trigger payload; an apply failure means the project
+                    // trigger payload; an apply failure means the overlay
                     // changed underneath — the alert already played, there
                     // is nothing safe to surface over a fire-and-forget WS
                 }

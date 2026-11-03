@@ -1,10 +1,15 @@
 # Overlay editor (OBS)
 
-The control server ships a visual overlay editor. Scenes you compose there are
+The control server ships a visual overlay editor. Overlays you compose there are
 served as transparent runtime pages that OBS loads with a **Browser Source**.
 
-- Overlay list: `/overlays/`, scene editor: `/overlays/edit/<scene id>/` (logged-in users only)
-- Runtime: `/overlay/<scene id>?token=<token>` (no session, token-gated)
+A user can have **multiple independent overlays** (stored in the `overlays`
+table). Each overlay is fully self-contained — its own canvas, variables,
+assets and elements — and has its **own runtime token**, so one account can
+run several OBS scenes side by side.
+
+- Overlay list: `/overlays/`, overlay editor: `/overlays/edit/<overlay id>/` (logged-in users only)
+- Runtime: `/overlay/<overlay id>?token=<token>` (no session, token-gated)
 - Schema, limits and normalization: [`shared/overlay.ts`](../shared/overlay.ts)
 - Element plugin contract: [`shared/contracts/overlay_element.ts`](../shared/contracts/overlay_element.ts)
   (schema half) and [`shared/ui/overlay/element.ts`](../shared/ui/overlay/element.ts)
@@ -16,14 +21,14 @@ served as transparent runtime pages that OBS loads with a **Browser Source**.
 
 ## OBS setup
 
-1. Open **Overlays** in the control server, select (or create) a scene.
-2. In the footer's *OBS* panel, copy the scene's **runtime URL**
+1. Open **Overlays** in the control server, select (or create) an overlay.
+2. In the footer's *OBS* panel, copy the overlay's **runtime URL**
    (includes the token) and note the canvas size (default 1920×1080).
 3. In OBS, add a **Browser Source**:
    - *Load a local file, network stream, or URL* → paste the runtime URL.
-   - Width/height → the scene's canvas size.
+   - Width/height → the overlay's canvas size.
    - *Refresh browser when scene becomes active* → off (state is restored
-     automatically from the saved scene).
+     automatically from the saved overlay).
 4. Recommended: enable *"Shutdown source when not visible"* for scenes that do
    not need to keep running off-screen.
 
@@ -32,9 +37,9 @@ control server restarts; OBS should not need to re-add the source.
 
 ## Elements
 
-Each element is one row of a scene (`Scene.elements`); the array order is the
-z-order, index 0 renders at the back. Every element shares the same base shape
-(see `ElementBase` in [`shared/overlay.ts`](../shared/overlay.ts)):
+Each element is one row of an overlay (`Overlay.elements`); the array order is
+the z-order, index 0 renders at the back. Every element shares the same base
+shape (see `ElementBase` in [`shared/overlay.ts`](../shared/overlay.ts)):
 
 | Field         | Meaning                                                                             |
 | ------------- | ----------------------------------------------------------------------------------- |
@@ -52,7 +57,7 @@ z-order, index 0 renders at the back. Every element shares the same base shape
 | Type         | Props                                                                                       | Selector handles |
 | ------------ | ------------------------------------------------------------------------------------------- | ---------------- |
 | `text`       | `text`, `fontSize` (1–2000, 48), `fontFamily`, `color`, `fontWeight` (400/600/700/900), `lineHeight` (0.1–10), `textAlign` (left/center/right) | box |
-| `image`      | `assetId` — references a project asset; a missing asset renders an empty placeholder box    | box |
+| `image`      | `assetId` — references an overlay asset; a missing asset renders an empty placeholder box   | box |
 | `rectangle`  | `fill`, `stroke` (both `#rrggbb`), `strokeWidth` (0–500), `radius` (corner radius, 0 = square) | box |
 | `ellipse`    | `fill`, `stroke`, `strokeWidth`                                                             | box |
 | `line`       | `stroke`, `strokeWidth` (1–500), `flip` (box diagonal: false = TL→BR, true = TR→BL)         | two endpoint handles |
@@ -68,21 +73,22 @@ the editor (`pointer-events: none` so drags/select fall through) and runs
 unsandboxed at runtime, so it can execute its own scripts and authenticated
 fetches.
 
-### Project limits
+### Overlay limits
 
-From `OVERLAY_LIMITS`: canvas 16…8192 px per axis, ≤ 50 scenes, ≤ 500 elements
-per scene, ≤ 200 variables, ≤ 100 assets, ≤ 25 MB base64 per asset, ≤ 100 MB
-total asset data, coordinates ≤ 100 000.
+From `OVERLAY_LIMITS`: ≤ 50 overlays per user; canvas 16…8192 px per axis,
+≤ 500 elements per overlay, ≤ 200 variables, ≤ 100 assets, ≤ 25 MB base64 per
+asset, ≤ 100 MB total asset data, coordinates ≤ 100 000.
 
 ## Variables
 
-Project-scoped named values, edited in the editor's *Variables* footer.
+Overlay-scoped named values, edited in the editor's *Variables* footer (each
+overlay has its own set).
 
 - **Types**: `string`, `number` (finite), `boolean`, `color` (`#rrggbb`).
-- **Names**: unique per project, `^[a-zA-Z_][a-zA-Z0-9_]*$`, max 120 chars.
-- **Values** live in the project blob and are mutable at any time via
-  `PUT /api/overlays/variables/:id` — including while a scene is on air;
-  bound elements re-render live in the runtime page.
+- **Names**: unique per overlay, `^[a-zA-Z_][a-zA-Z0-9_]*$`, max 120 chars.
+- **Values** live in the overlay row and are mutable at any time via
+  `PUT /api/overlays/:id/variables/:vid` — including while an overlay is on
+  air; bound elements re-render live in the runtime page.
 - **Modify URL** — each row of the *Variables* footer shows a copy icon next
   to the name; it copies the variable's token URL
   (`<origin>/overlay/variables?token=…&<name>=`). Completing the URL with a
@@ -95,9 +101,9 @@ Project-scoped named values, edited in the editor's *Variables* footer.
   as a JSON body (`{<name>: value|null}`, typed JSON values, `null`/`""`
   empties). The
   fetch returns `{"ok":true,"variables":[…]}` and fans out exactly like an
-  in-editor edit (editor feed + runtime feed, so a live scene re-renders) —
+  in-editor edit (editor feed + runtime feed, so a live overlay re-renders) —
   the whole batch in one frame. A missing token or variable 404s; a bad value
-  400s. The token is a write credential for the project's variables — treat
+  400s. The token is a write credential for that overlay's variables — treat
   the URL like a password.
 
 ### Binding
@@ -129,9 +135,9 @@ Every element attribute is bindable, through three path families:
 
 In the inspector, every bindable attribute gets a small, label-less checkbox
 directly next to its field (its tooltip is the only visible hint, e.g.
-"Bind to variable"). Checking it binds the attribute to the first project
-variable immediately and swaps the field's control for a select over the
-project variables; unchecking removes the binding. The toggle stays disabled
+"Bind to variable"). Checking it binds the attribute to the first of the
+overlay's variables immediately and swaps the field's control for a select over
+the overlay's variables; unchecking removes the binding. The toggle stays disabled
 while no variables exist, so a bound-but-unresolvable state can never be
 created. Transform fields and visibility live in the core inspector; the
 element-specific props get their toggles where the element's `editForm`
@@ -143,7 +149,7 @@ Resolution happens once per element at render time in
 — editor canvas and runtime page share the exact same code path, so a bound
 element looks identical in both. Unknown paths are ignored, so stale
 bindings on element-type changes never break rendering. Deleting a variable
-removes every binding that references it (server-side, before the project is
+removes every binding that references it (server-side, before the overlay is
 persisted).
 
 ## Events
@@ -154,29 +160,25 @@ Every mutation goes over REST and is fanned out to two WebSocket topics
 1. **Editor feed** — topic `dashboards:<user>` on the shared `WS /dashboards/ws`
    (cookie session). Delivered to every open editor tab, so multiple editors
    stay in sync.
-2. **Runtime feed** — topic `overlay-runtime:<user>` on
-   `WS /overlay/<scene id>/ws?token=…` (project token, no session).
-   Delivered to the OBS runtime page(s).
+2. **Runtime feed** — topic `overlay-runtime:<overlay id>` on
+   `WS /overlay/<overlay id>/ws?token=…` (overlay token, no session).
+   Delivered to that one overlay's OBS runtime page (each overlay feeds its
+   own topic, so one user's overlays never feed each other).
 
 | Event                 | Payload                    | Fires when                                                        | Editor | Runtime |
 | --------------------- | -------------------------- | ------------------------------------------------------------------ | :----: | :-----: |
-| `overlays.snapshot`   | `{scene, variables, canvas, assets, version}` | Runtime WS connects, after the token check (full initial state; `version` is the server build stamp the page compares to its own bundle to reload after a new deployment) | –    | ✔ |
-| `overlays.scene`      | `{scene}`                  | any scene mutation: rename, add/update/delete elements               | ✔      | ✔ (applied only if it is the loaded scene) |
-| `overlays.sceneDeleted` | `{sceneId}`              | a scene is deleted                                                 | ✔      | – |
-| `overlays.variables`  | `{variables}`              | a variable is created/renamed/retyped/revalued/deleted             | ✔      | ✔ |
-| `overlays.project`    | `{project}`                | canvas resize; asset upload/delete (full project, editor-only)     | ✔      | – |
-| `overlays.canvas`     | `{canvas}`                 | canvas resize (runtime gets the slim payload)                      | –      | ✔ |
-| `overlays.assets`     | `{assets}`                 | asset upload/delete                                                | –      | ✔  |
+| `overlays.snapshot`   | `{overlay, version}`       | Runtime WS connects, after the token check (the full overlay; `version` is the server build stamp the page compares to its own bundle to reload after a new deployment) | –    | ✔ |
+| `overlays.overlays`   | `{overlays}`               | the user's overlay list changed (create/delete/duplicate) — each item is a summary `{id, name, token, elementCount, updatedAt}` | ✔      | – |
+| `overlays.overlay`    | `{overlay}`                | any mutation of one overlay: rename, element add/update/delete, canvas resize, variable create/rename/retype/revalue/delete, asset upload/delete (the full overlay — the editor and the runtime both read it) | ✔      | ✔ |
 | `overlays.alert`      | `{name, payload}`          | `GET /overlay/alert/<name>` was called (the trigger event; `payload` carries the trigger's validated `<name>=<value>` pairs) | – | ✔  |
-| `overlays.channelsChanged` | `{dashboardId, widgetId}` | a dashboard save changed a channel widget's channels (published on the owner's runtime topic); the runtime page reloads when one of its iframes embeds that widget's module page | – | ✔  |
-| `overlays.applyAlert` | `{values}`                 | uplink: the runtime page goes on air with an alert and writes its values to the project variables (`overlays.variables` frame is the ack) | – | uplink |
-| `overlays.token`      | `{token}`                  | token rotation                                                     | ✔      | –  |
+| `overlays.applyAlert` | `{values}`                 | uplink: the runtime page goes on air with an alert and writes its values to the overlay variables (`overlays.overlay` frame is the ack) | – | uplink |
+| `overlays.token`      | `{overlayId, token}`       | that overlay's token rotation                                       | ✔      | –  |
 
 Notes:
 
-- Every scene mutation bumps `scene.rev` (server-managed monotonic counter).
-  Editors drop out-of-order pushes carrying a lower `rev` so a late broadcast
-  can never clobber a newer local state.
+- Every overlay mutation bumps `overlay.rev` (server-managed monotonic counter).
+  The editor and the runtime page drop out-of-order pushes carrying a lower
+  `rev` so a late broadcast can never clobber a newer local state.
 - The runtime page holds its last known state on disconnect and reconnects
   with exponential backoff (1 s → 30 s); a bad token keeps it blank (the
   server closes the WS with 1008).
@@ -188,10 +190,10 @@ Notes:
   when the first expires (different elements fire independently). Any
   `?<name>=<value>` pairs are validated in the same call (typed like the
   variables endpoint, 404/400 on unknown/bad values) and ride in the
-  frame's `payload`; the runtime page writes them to the project variables
+  frame's `payload`; the runtime page writes them to the overlay variables
   **when the alert goes on air** — so a queued alert's values never
   clobber the on-air ones early — and persists them with the
-  `overlays.applyAlert` WS uplink (the `overlays.variables` frame that
+  `overlays.applyAlert` WS uplink (the `overlays.overlay` frame that
   follows is the ack). The written values persist: the runtime page never
   clears them (variation `amount` thresholds read the variable, so
   templates and TTS see the trigger's values while the alert is on air).
@@ -203,19 +205,20 @@ Notes:
 
 | URL                                        | Auth                       | Serves                                     |
 | ------------------------------------------ | -------------------------- | ------------------------------------------ |
-| `/overlays/`                               | cookie session             | the editor page                             |
-| `/overlay/<scene id>`                      | project token in `?token=` | the transparent runtime page (OBS Browser Source); a bad token renders a blank page |
-| `/overlay/variables?token=&<name>=<value>…`| project token              | revalue variables from the querystring (several `<name>=<value>` pairs per fetch; an empty value empties the variable to its neutral value: 0 / false / `#000000` / ""), returns the new variable list |
-| `POST /overlay/variables?token=`           | project token              | revalue variables from a JSON body `{<name>: value\|null}` (`null`/`""` empties), returns the new variable list |
-| `/overlay/alert/<name>?token=…[&<name>=<value>…]` | project token      | trigger every alert element whose *Event* prop equals `<name>` (queues FIFO per element); optional `<name>=<value>` pairs ride with the alert and are written to project variables when the alert plays (persist), returns `{"ok":true,"name":…}` |
-| `/overlay/<scene id>/ws?token=`            | project token              | the runtime live feed (WebSocket; also the page's `overlays.applyAlert` uplink) |
+| `/overlays/`                               | cookie session             | the overlay list; the editor lives at `/overlays/edit/<overlay id>/` |
+| `/overlay/<overlay id>`                    | overlay token in `?token=` | the transparent runtime page (OBS Browser Source); a bad token renders a blank page |
+| `/overlay/variables?token=&<name>=<value>…`| overlay token              | revalue variables from the querystring (several `<name>=<value>` pairs per fetch; an empty value empties the variable to its neutral value: 0 / false / `#000000` / ""), returns the new variable list |
+| `POST /overlay/variables?token=`           | overlay token              | revalue variables from a JSON body `{<name>: value\|null}` (`null`/`""` empties), returns the new variable list |
+| `/overlay/alert/<name>?token=…[&<name>=<value>…]` | overlay token      | trigger every alert element whose *Event* prop equals `<name>` (queues FIFO per element); optional `<name>=<value>` pairs ride with the alert and are written to the overlay variables when the alert plays (persist), returns `{"ok":true,"name":…}` |
+| `/overlay/<overlay id>/ws?token=`          | overlay token              | the runtime live feed (WebSocket; also the page's `overlays.applyAlert` uplink) |
 | `/chat/<dashboardId>/<widgetId>?token=`    | per-widget token           | a chat widget's live page                   |
 
-**Project token** — one per user (per overlay project), 64 hex chars, the
-only credential the runtime needs. It is returned by `GET /api/overlays` and
-shown (with copy) in the editor footer; **Rotate**
-(`POST /api/overlays/token/rotate`) invalidates every previously shared URL
-immediately.
+**Overlay token** — one per overlay, 64 hex chars, the only credential the
+runtime needs. It is returned by `GET /api/overlays/:id` (the list GET
+returns each overlay's token too) and shown (with copy) in the editor;
+**Rotate** (`POST /api/overlays/:id/token/rotate`) invalidates that
+overlay's previously shared URL immediately. The token alone addresses the
+overlay, so the runtime URLs never carry an overlay id.
 
 **Element URLs** — the `iframe` and `chat` elements carry a `props.url`:
 
@@ -229,13 +232,13 @@ immediately.
 
 ## Tokens
 
-- One runtime token per control server (one per user account's project).
+- One runtime token per overlay (the token alone addresses the overlay).
 - The token is the only credential the runtime URL needs. Requests without a
   valid token render an **empty page** (no data, no error text).
-- **Rotate** in the editor footer: every previously shared URL stops
+- **Rotate** in the editor: that overlay's previously shared URL stops
   immediately; copy the new URL into the OBS Browser Source.
-- Treat the token like a password: it grants read access to your scenes and
-  variable values.
+- Treat the token like a password: it grants read access to that overlay and
+  its variable values. Other overlays in the same account are unaffected.
 
 ## Adding a new element type
 
@@ -250,8 +253,8 @@ contribute elements; a new type never touches `shared/overlay.ts`,
    `type`, `defaultProps`, `normalizeProps(props, read)` (coerce the known
    props with the `read.num/hex/str/oneOf/bool` helpers; unknown keys are
    preserved by the core for forward compatibility), optional `container`
-   (may parent other elements) and `assetProps` (props holding a project
-   asset id, validated against the project's assets). This file must stay
+   (may parent other elements) and `assetProps` (props holding an overlay
+   asset id, validated against the overlay's assets). This file must stay
    environment-free — it runs on the control server too.
 2. **Browser half** — add (or extend) `<module>/overlay_elements.tsx`,
    default-exporting an array of `OverlayElementDef`
@@ -270,5 +273,5 @@ contribute elements; a new type never touches `shared/overlay.ts`,
    `predev` / `pretest`) regenerates `generated/overlay_schemas.ts` and
    `generated/overlay_elements.ts`.
 4. Bump `OVERLAY_SCHEMA_VERSION` **only** if the change breaks existing
-   stored projects, and add a migration step to `MIGRATIONS` in
+   stored overlays, and add a migration step to `MIGRATIONS` in
    `shared/overlay.ts`.

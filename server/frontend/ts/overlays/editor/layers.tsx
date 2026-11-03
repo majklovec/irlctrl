@@ -14,8 +14,8 @@ import {
 import {
 	deleteElement,
 	mutateElementOf,
+	overlay,
 	reorderElement,
-	scene,
 	setElementLocked,
 	state,
 	toggleElementRow,
@@ -27,8 +27,8 @@ import {
  * (eye / lock icons) in front of the forward / backward z-order arrows.
  */
 export function zorderButtons(elementId: string): m.Vnode {
-	const el = scene()?.elements.find((x) => x.id === elementId);
-	const list = scene()?.elements ?? [];
+	const el = overlay()?.elements.find((x) => x.id === elementId);
+	const list = overlay()?.elements ?? [];
 	const idx = list.findIndex((x) => x.id === elementId);
 	const atFront = idx === list.length - 1;
 	const atBack = idx === 0;
@@ -120,14 +120,14 @@ export function zArrow(op: "forward" | "backward"): m.Vnode {
 }
 
 /**
- * List of every element in the scene, topmost (front) first. Each element is
+ * List of every element in the overlay, topmost (front) first. Each element is
  * an individually collapsible row: its header carries the name plus the
  * visibility/lock toggles and the z-order buttons, and expanding reveals the
  * element's property fields. Clicking a row also selects the element on the
  * canvas.
  */
 export function layersPanel(): m.Vnode {
-	const els = scene()?.elements ?? [];
+	const els = overlay()?.elements ?? [];
 	const frontFirst = [...els].reverse();
 	return (
 		<div class="ov-layers">
@@ -353,7 +353,7 @@ export function elementProps(e: OverlayElement): m.Vnode {
 							/>,
 							{
 								mutate: (fn) => mutateElementOf(e.id, fn),
-								variables: state.project.variables,
+								variables: state.overlay?.variables ?? [],
 							},
 						)}
 					</div>
@@ -380,7 +380,7 @@ export function elementProps(e: OverlayElement): m.Vnode {
 						/>,
 						{
 							mutate: (fn) => mutateElementOf(e.id, fn),
-							variables: state.project.variables,
+							variables: state.overlay?.variables ?? [],
 						},
 					)}
 				</div>
@@ -390,8 +390,8 @@ export function elementProps(e: OverlayElement): m.Vnode {
 				? def.editForm({
 						element: e,
 						mutate: (fn) => mutateElementOf(e.id, fn),
-						assets: state.project.assets,
-						variables: state.project.variables,
+						assets: state.overlay?.assets ?? [],
+						variables: state.overlay?.variables ?? [],
 						upload: (f: File) => uploadAsset(f).then((a) => a?.id ?? null),
 					})
 				: null}

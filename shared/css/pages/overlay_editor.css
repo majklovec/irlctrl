@@ -682,11 +682,12 @@ identically here and on the runtime page */
     padding: 2px;
     background: none;
     border: none;
-    color: var(--muted);
+    color: var(--bad);
     cursor: pointer;
 }
 .ov-channel-remove:hover {
-    color: var(--bad);
+    color: #fff;
+    background: var(--bad);
 }
 .ov-channel-add {
     align-self: flex-start;

@@ -101,7 +101,7 @@ function varRow(v: Variable): m.Vnode {
  * (name, type chip, in-row value editor, usage badge, copy/delete), with the
  * add-variable form at the top. Call it while `state.variablesDialogOpen`. */
 export function variablesDialog(): m.Vnode {
-	const vars = state.project.variables;
+	const vars = state.overlay?.variables ?? [];
 	return (
 		<Modal
 			title={t("overlay.variables")}

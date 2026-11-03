@@ -1,13 +1,15 @@
 /*
- * OBS overlay editor: shared project schema, validation and migrations.
+ * OBS overlay editor: shared schema, validation and migrations.
  *
- * The control server persists one `Project` per user as a JSON blob
- * (see server/backend/overlays/overlay_store.ts). The runtime page renders a scene from the
- * same types (server/frontend/ts/overlays/overlay_render.tsx). Validation is hand-rolled
+ * The control server persists one overlay per row in the `overlays` table as a
+ * JSON blob (see server/backend/overlays/overlay_store.ts). An overlay is
+ * self-contained: its own canvas, variables, assets, elements and token. The
+ * runtime page renders an overlay from the same types
+ * (server/frontend/ts/overlays/overlay_render.tsx). Validation is hand-rolled
  * `ApiError` style like the rest of the server (no Zod in this repo).
  *
  * Round-trip rule: unknown fields on every object are preserved so newer
- * server/clients can read projects written by older ones.
+ * server/clients can read overlays written by older ones.
  */
 import type {
 	OverlayElementSchema,
@@ -159,28 +161,28 @@ export type ElementBase = {
 
 export type OverlayElement = ElementBase & Record<string, unknown>;
 
-export interface Scene {
-	id: string;
+/**
+ * A self-contained overlay: one row in the `overlays` table. It owns its own
+ * canvas, variables, assets, elements and (in the DB) token. The editor edits
+ * one overlay at a time; the runtime page renders one overlay.
+ */
+export interface Overlay {
+	schemaVersion: number;
 	name: string;
+	canvas: Canvas;
+	variables: Variable[];
+	assets: Asset[];
 	/** back-to-front order: index 0 renders first */
 	elements: OverlayElement[];
-	/** Server-managed monotonic counter (bumped on every scene mutation).
+	/** Server-managed monotonic counter (bumped on every element mutation).
 	 * Editors ignore stale WS pushes that carry a lower rev than the
 	 * freshest state they already applied, so out-of-order broadcasts can't
-	 * clobber recent edits. Absent from scenes created before this field;
+	 * clobber recent edits. Absent from overlays saved before this field;
 	 * normalization preserves it via spreadRest. */
 	rev?: number;
 }
 
-export interface OverlayProject {
-	schemaVersion: number;
-	canvas: Canvas;
-	variables: Variable[];
-	assets: Asset[];
-	scenes: Scene[];
-}
-
-/** Scene canvas size in logical px (OBS renders at 1:1 when unscaled). */
+/** Overlay canvas size in logical px (OBS renders at 1:1 when unscaled). */
 export interface Canvas {
 	width: number;
 	height: number;
@@ -194,14 +196,16 @@ export const OVERLAY_LIMITS = {
 	canvasMax: 8192,
 	canvasMin: 16,
 	nameMax: 120,
-	scenesMax: 50,
+	/** max overlays a single user may have */
+	overlaysMax: 50,
+	/** per-overlay element/variable/asset caps */
 	elementsMax: 500,
 	variablesMax: 200,
 	assetsMax: 100,
 	/** base64 length (chars) of a single asset */
 	assetBase64Max: 1024 * 1024 * 25,
-	/** base64 length of the whole asset set */
-	projectBase64Max: 1024 * 1024 * 100,
+	/** base64 length of one overlay's whole asset set */
+	overlayBase64Max: 1024 * 1024 * 100,
 	coordMax: 100000,
 } as const;
 
@@ -236,21 +240,16 @@ export function defaultCanvas(): { width: number; height: number } {
 	return { width: 1920, height: 1080 };
 }
 
-/** A fresh per-user project: empty scene, ready to compose. The scene's
+/** A fresh overlay: an empty canvas, ready to compose. The overlay's
  * UUID id is its only identifier (the runtime URL and editor URL both use it). */
-export function defaultProject(): OverlayProject {
+export function defaultOverlay(name = "Overlay 1"): Overlay {
 	return {
 		schemaVersion: OVERLAY_SCHEMA_VERSION,
+		name,
 		canvas: defaultCanvas(),
 		variables: [],
 		assets: [],
-		scenes: [
-			{
-				id: crypto.randomUUID(),
-				name: "Scene 1",
-				elements: [],
-			},
-		],
+		elements: [],
 	};
 }
 
@@ -482,17 +481,14 @@ const normalizeElement = (raw: unknown): OverlayElement => {
 	};
 };
 
-const normalizeScene = (raw: unknown): Scene => {
-	if (!isRecord(raw)) throw new Error("scene must be an object");
-	const id = typeof raw.id === "string" && raw.id ? raw.id : "";
-	const name =
-		typeof raw.name === "string" && raw.name
-			? raw.name.slice(0, OVERLAY_LIMITS.nameMax)
-			: "";
-	const elementsRaw = Array.isArray(raw.elements) ? raw.elements : [];
-	if (elementsRaw.length > OVERLAY_LIMITS.elementsMax)
-		throw new Error("scene has too many elements");
-	const elements = elementsRaw.map(normalizeElement);
+/** Validate the elements array of one overlay: normalize each element, then
+ * run the structural checks (ids unique, parents exist and are groups, no
+ * parent cycles). Returns the clean elements list. */
+const normalizeElements = (raw: unknown, label = "overlay"): OverlayElement[] => {
+	if (!Array.isArray(raw)) return [];
+	if (raw.length > OVERLAY_LIMITS.elementsMax)
+		throw new Error(`${label} has too many elements`);
+	const elements = raw.map(normalizeElement);
 	// structural checks: parent exists and is a group; no parent cycles
 	const byId = new Map(elements.map((e) => [e.id, e] as const));
 	const ids = new Set<string>();
@@ -510,7 +506,8 @@ const normalizeScene = (raw: unknown): Scene => {
 		let d = 0;
 		if (el?.parentId) {
 			const parent = byId.get(el.parentId);
-			if (!parent) throw new Error(`element ${el.name} has missing parent`);
+			if (!parent)
+				throw new Error(`element ${el.name} has missing parent`);
 			if (!overlayElementSchema(parent.type)?.container)
 				throw new Error(`element ${el.name} has a non-group parent`);
 			const pd = walk(parent.id);
@@ -521,13 +518,7 @@ const normalizeScene = (raw: unknown): Scene => {
 		return d;
 	};
 	for (const e of elements) walk(e.id);
-	if (!id || !name) throw new Error("scene needs id and name");
-	return {
-		id,
-		name,
-		elements,
-		...spreadRest(raw, ["id", "name", "elements"]),
-	};
+	return elements;
 };
 
 /** Preserve unknown fields (everything not consumed by a known shape). */
@@ -544,100 +535,96 @@ function spreadRest(
 
 // ── migrations ──────────────────────────────────────────────────────────
 
-type Migration = (p: OverlayProject) => OverlayProject;
+type Migration = (p: Overlay) => Overlay;
 
-/** Ordered chain: MIGRATIONS[v] migrates a project FROM version v to v+1.
+/** Ordered chain: MIGRATIONS[v] migrates an overlay FROM version v to v+1.
  * Add the next step here when the schema bumps. */
 const MIGRATIONS: Record<number, Migration> = {
 	// v1 is the first schema; nothing to migrate into it.
 };
 
 /**
- * Load a persisted project: run pending migrations, then normalize.
- * Throws `Error` with a user-visible message when the project is corrupt or
+ * Load a persisted overlay: run pending migrations, then normalize.
+ * Throws `Error` with a user-visible message when the overlay is corrupt or
  * from an unknown (newer) schema — callers surface that, never render half
- * a scene.
+ * an overlay.
  */
-export function migrateProjectBlob(raw: unknown): {
-	project: OverlayProject;
+export function migrateOverlayBlob(raw: unknown): {
+	overlay: Overlay;
 	migrated: boolean;
 } {
 	let p: Record<string, unknown>;
-	if (!isRecord(raw)) throw new Error("overlay project is not a JSON object");
+	if (!isRecord(raw)) throw new Error("overlay is not a JSON object");
 	p = { ...raw };
 	const version = Number(p.schemaVersion);
 	if (!Number.isInteger(version) || version < 1)
-		throw new Error("overlay project has no schemaVersion");
+		throw new Error("overlay has no schemaVersion");
 	if (version > OVERLAY_SCHEMA_VERSION)
 		throw new Error(
-			`overlay project is schemaVersion ${version}; this control server is too old to load it`,
+			`overlay is schemaVersion ${version}; this control server is too old to load it`,
 		);
 	let migrated = false;
 	for (let v = version; v < OVERLAY_SCHEMA_VERSION; v++) {
 		const step = MIGRATIONS[v];
 		if (!step) throw new Error(`missing migration v${v}→v${v + 1}`);
-		p = step(p as unknown as OverlayProject) as unknown as Record<
-			string,
-			unknown
-		>;
+		p = step(p as unknown as Overlay) as unknown as Record<string, unknown>;
 		migrated = true;
 	}
 	p.schemaVersion = OVERLAY_SCHEMA_VERSION;
-	const project = normalizeProject(p);
-	return { project, migrated };
+	const overlay = normalizeOverlay(p);
+	return { overlay, migrated };
 }
 
-export function normalizeProject(raw: Record<string, unknown>): OverlayProject {
+export function normalizeOverlay(raw: Record<string, unknown>): Overlay {
+	const name =
+		typeof raw.name === "string" && raw.name
+			? raw.name.slice(0, OVERLAY_LIMITS.nameMax)
+			: "Overlay";
 	const canvas = normalizeCanvas(raw.canvas);
 	const variablesRaw = Array.isArray(raw.variables) ? raw.variables : [];
 	const assetsRaw = Array.isArray(raw.assets) ? raw.assets : [];
-	const scenesRaw = Array.isArray(raw.scenes) ? raw.scenes : [];
+	const elementsRaw = Array.isArray(raw.elements) ? raw.elements : [];
 	if (variablesRaw.length > OVERLAY_LIMITS.variablesMax)
-		throw new Error("project has too many variables");
+		throw new Error("overlay has too many variables");
 	if (assetsRaw.length > OVERLAY_LIMITS.assetsMax)
-		throw new Error("project has too many assets");
-	if (scenesRaw.length > OVERLAY_LIMITS.scenesMax)
-		throw new Error("project has too many scenes");
+		throw new Error("overlay has too many assets");
 	const variables = variablesRaw.map(normalizeVariable);
 	const assets = assetsRaw.map(normalizeAsset);
 	const varIds = new Set(variables.map((v) => v.id));
 	const assetIds = new Set(assets.map((a) => a.id));
-	const projectBase64 = assets.reduce((n, a) => n + a.dataBase64.length, 0);
-	if (projectBase64 > OVERLAY_LIMITS.projectBase64Max)
-		throw new Error("overlay project assets are too large");
-	const scenes = scenesRaw.map(normalizeScene);
-	const sceneIds = new Set<string>();
-	for (const s of scenes) {
-		if (sceneIds.has(s.id)) throw new Error(`duplicate scene id ${s.id}`);
-		sceneIds.add(s.id);
-		// bindings must reference existing variables; image assets must exist
-		for (const e of s.elements) {
-			for (const b of Object.values(e.bindings))
-				if (!varIds.has(b.variableId))
-					throw new Error(
-						`scene ${s.name}: binding to unknown variable ${b.variableId}`,
-					);
-			for (const key of overlayElementSchema(e.type)?.assetProps ?? []) {
-				const aid = e.props[key];
-				if (typeof aid === "string" && aid && !assetIds.has(aid))
-					throw new Error(
-						`scene ${s.name}: element ${e.name} references a missing asset`,
-					);
-			}
+	const overlayBase64 = assets.reduce((n, a) => n + a.dataBase64.length, 0);
+	if (overlayBase64 > OVERLAY_LIMITS.overlayBase64Max)
+		throw new Error("overlay assets are too large");
+	const elements = normalizeElements(elementsRaw, name);
+	// bindings must reference existing variables; image assets must exist
+	for (const e of elements) {
+		for (const b of Object.values(e.bindings))
+			if (!varIds.has(b.variableId))
+				throw new Error(
+					`overlay ${name}: binding to unknown variable ${b.variableId}`,
+				);
+		for (const key of overlayElementSchema(e.type)?.assetProps ?? []) {
+			const aid = e.props[key];
+			if (typeof aid === "string" && aid && !assetIds.has(aid))
+				throw new Error(
+					`overlay ${name}: element ${e.name} references a missing asset`,
+				);
 		}
 	}
 	return {
 		schemaVersion: OVERLAY_SCHEMA_VERSION,
+		name,
 		canvas,
 		variables,
 		assets,
-		scenes,
+		elements,
 		...spreadRest(raw, [
 			"schemaVersion",
+			"name",
 			"canvas",
 			"variables",
 			"assets",
-			"scenes",
+			"elements",
 		]),
 	};
 }
@@ -655,7 +642,9 @@ export function parseCanvasInput(raw: unknown): {
 	}
 }
 
-export function parseSceneInput(raw: unknown): {
+/** Strict validator for a `PUT /api/overlays/:id` overlay patch: at least one
+ * of `name` / `elements` (a `canvas` patch rides on its own endpoint). */
+export function parseOverlayInput(raw: unknown): {
 	name?: string;
 	elements?: OverlayElement[];
 } {
@@ -675,7 +664,7 @@ export function parseSceneInput(raw: unknown): {
 		}
 	}
 	if (name === undefined && elements === undefined)
-		throw new ApiError("scene patch needs name or elements");
+		throw new ApiError("overlay patch needs name or elements");
 	return { name, elements };
 }
 

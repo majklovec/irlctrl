@@ -7,9 +7,9 @@ import {
 	addElement,
 	clamp,
 	LIST_URL,
+	overlay,
 	redo,
 	roundToStep,
-	scene,
 	state,
 	undo,
 } from "../overlay_store";
@@ -77,9 +77,9 @@ export function editorToolbar(): m.Vnode {
 	);
 }
 
-/** Editor header: back-to-list link + "Overlays / <scene>". */
+/** Editor header: back-to-list link + "Overlays / <overlay>". */
 export function editorTitle(): m.Vnode {
-	const s = scene();
+	const s = overlay();
 	return (
 		<>
 			<a

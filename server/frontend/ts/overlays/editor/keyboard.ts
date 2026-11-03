@@ -1,9 +1,9 @@
 import m from "mithril";
 import {
 	deleteElement,
+	overlay,
 	redo,
-	saveSceneElements,
-	scene,
+	saveOverlayElements,
 	selElement,
 	snapshot,
 	state,
@@ -43,8 +43,8 @@ export function onKey(ev: KeyboardEvent): void {
 	if (moved) {
 		ev.preventDefault();
 		snapshot();
-		const s = scene();
-		if (s) void saveSceneElements(s);
+		const s = overlay();
+		if (s) void saveOverlayElements(s);
 		m.redraw();
 	}
 }

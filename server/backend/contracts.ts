@@ -26,8 +26,10 @@ export type Publish = (topic: string, message: string) => void;
 export const viewersTopic = (id: string) => `viewers:${id}`;
 export const dashboardsTopic = (user: string) => `dashboards:${user}`;
 export const devicesTopic = (user: string) => `devices:${user}`;
-export const overlayRuntimeTopic = (user: string) =>
-    `overlay-runtime:${user}`;
+// keyed per overlay id (not per user) so one owner's overlays can't feed
+// each other's OBS runtime pages
+export const overlayRuntimeTopic = (overlayId: string) =>
+    `overlay-runtime:${overlayId}`;
 export const WIDGET_HUB_TOPIC = "widgets:hub";
 
 export const event = (name: string, data: unknown) =>

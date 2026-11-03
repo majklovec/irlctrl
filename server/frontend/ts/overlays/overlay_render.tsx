@@ -2,7 +2,7 @@
 /*
  * Shared overlay element renderer. Used by BOTH the editor preview and the
  * OBS runtime page so positions are pixel-identical: one function, one style
- * model (absolute scene coordinates, CSS px at 1:1 when unscaled).
+ * model (absolute overlay coordinates, CSS px at 1:1 when unscaled).
  *
  * This file is intentionally thin — it knows HOW to wrap and position an
  * element, not WHAT one is. Every concrete element implements
@@ -72,8 +72,9 @@ export function overlayElementView(
 	);
 }
 
-/** All elements of a scene, back to front. Groups render after (above) so
- * their children — drawn in absolute canvas space — stay selectable. */
+/** All elements of an overlay, back to front. Groups render after (above)
+ * their children so the children — drawn in absolute canvas space — stay
+ * selectable. */
 export function sceneElementsView(
 	elements: OverlayElement[],
 	ctx: ElementContext,

@@ -128,7 +128,7 @@ function channelsField(props: ElementProps): Children {
 								aria-label={t("overlay.chat_remove_channel")}
 								onclick={() => set(channels.filter((_, j) => j !== i))}
 							>
-								<Icon name="close" width="12" height="12" />
+								<Icon name="close" class="role-icon" />
 							</button>
 						</div>
 					))
@@ -175,7 +175,7 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 				id: element.id,
 				config: chatPropsToConfig(element.props),
 				token: ctx.token ?? "",
-				sceneId: ctx.sceneId ?? "",
+				overlayId: ctx.overlayId ?? "",
 			})}
 		</div>
 	);

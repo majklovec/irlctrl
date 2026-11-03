@@ -16,40 +16,41 @@ import { t } from "@ui/i18n";
 import { mountPage } from "@ui/util";
 import m from "mithril";
 import {
-	copySceneUrl,
-	createScene,
-	deleteScene,
-	duplicateScene,
+	copyOverlayUrl,
+	createOverlay,
+	deleteOverlay,
+	duplicateOverlay,
 	editorUrl,
 	load,
-	renameScene,
+	renameOverlay,
 	runtimeUrl,
 	state,
 } from "./overlay_store";
 
 export function listToolbar(): m.Vnode {
 	return (
-		<Toolbar label={t("overlay.new_scene")}>
+		<Toolbar label={t("overlay.new_overlay")}>
 			<input
 				type="text"
-				placeholder={t("overlay.scene_name")}
-				value={state.newSceneName}
+				placeholder={t("overlay.overlay_name")}
+				value={state.newOverlayName}
 				oninput={(ev: Event) => {
-					state.newSceneName = (ev.target as HTMLInputElement).value;
+					state.newOverlayName = (ev.target as HTMLInputElement).value;
 					m.redraw();
 				}}
 			/>
 			<Button
-				label={t("overlay.new_scene")}
-				disabled={!state.newSceneName.trim()}
-				onclick={() => void createScene()}
+				label={t("overlay.new_overlay")}
+				disabled={!state.newOverlayName.trim()}
+				onclick={() => void createOverlay()}
 			/>
 		</Toolbar>
 	);
 }
 
-/** Inline rename control for a scene row (Enter / blur commit, Escape cancels). */
-function renameInput(sceneId: string): m.Vnode {
+/** Inline rename control for an overlay row (Enter / blur commit, Escape
+ * cancels). */
+function renameInput(overlayId: string): m.Vnode {
 	return (
 		<input
 			class="ov-rename"
@@ -60,13 +61,13 @@ function renameInput(sceneId: string): m.Vnode {
 			onkeydown={(ev: KeyboardEvent) => {
 				if (ev.key === "Enter") (ev.target as HTMLInputElement).blur();
 				if (ev.key === "Escape") {
-					state.renamingSceneId = null;
+					state.renamingOverlayId = null;
 					m.redraw();
 				}
 			}}
 			onblur={() => {
-				void renameScene(sceneId, state.renameValue);
-				state.renamingSceneId = null;
+				void renameOverlay(overlayId, state.renameValue);
+				state.renamingOverlayId = null;
 				m.redraw();
 			}}
 			oncreate={(v) => {
@@ -78,12 +79,13 @@ function renameInput(sceneId: string): m.Vnode {
 	);
 }
 
-/** Dashboards-style list of overlays; click a scene name to open its editor. */
+/** Dashboards-style list of a user's overlays; click a name to open its
+ * editor. */
 export function overlayList(): m.Vnode {
-	const scenes = state.project.scenes;
+	const overlays = state.overlays;
 	return (
 		<Card>
-			{scenes.length ? (
+			{overlays.length ? (
 				[
 					<Table
 						columns={[
@@ -92,10 +94,10 @@ export function overlayList(): m.Vnode {
 							{ key: "elements", header: t("overlay.elements") },
 						]}
 					>
-						{scenes.map((s) => (
+						{overlays.map((s) => (
 							<tr key={s.id}>
 								<td class="dash-name">
-									{state.renamingSceneId === s.id ? (
+									{state.renamingOverlayId === s.id ? (
 										renameInput(s.id)
 									) : (
 										<a class="dash-row-link" href={editorUrl(s.id)}>
@@ -115,18 +117,20 @@ export function overlayList(): m.Vnode {
 									</a>
 									<IconButton
 										class={
-											state.copiedSceneId === s.id ? "ov-copied" : undefined
+											state.copiedOverlayId === s.id
+												? "ov-copied"
+												: undefined
 										}
 										label={
-											state.copiedSceneId === s.id
+											state.copiedOverlayId === s.id
 												? t("overlay.copied")
 												: t("overlay.copy")
 										}
 										icon={<Icon name="copy" class="role-icon" />}
-										onclick={() => void copySceneUrl(s)}
+										onclick={() => void copyOverlayUrl(s)}
 									/>
 								</td>
-								<td class="muted">{s.elements.length}</td>
+								<td class="muted">{s.elementCount}</td>
 								<RowActions>
 									<IconLink
 										href={editorUrl(s.id)}
@@ -134,30 +138,30 @@ export function overlayList(): m.Vnode {
 										icon={<Icon name="view" class="role-icon" />}
 									/>
 									<IconButton
-										label={t("overlay.duplicate_scene")}
+										label={t("overlay.duplicate_overlay")}
 										icon={<Icon name="copy" class="role-icon" />}
-										onclick={() => void duplicateScene(s.id)}
+										onclick={() => void duplicateOverlay(s.id)}
 									/>
 									<IconButton
-										label={t("overlay.rename_scene")}
+										label={t("overlay.rename_overlay")}
 										icon={<Icon name="edit" class="role-icon" />}
 										onclick={() => {
-											state.renamingSceneId = s.id;
+											state.renamingOverlayId = s.id;
 											state.renameValue = s.name;
 											m.redraw();
 										}}
 									/>
 									<IconButton
 										danger
-										label={t("overlay.delete_scene")}
+										label={t("overlay.delete_overlay")}
 										icon={<Icon name="delete" class="role-icon" />}
 										onclick={async () => {
 											if (
-												await confirmDialog(t("overlay.confirm_delete_scene"), {
+												await confirmDialog(t("overlay.confirm_delete_overlay"), {
 													danger: true,
 												})
 											)
-												void deleteScene(s.id);
+												void deleteOverlay(s.id);
 										}}
 									/>
 								</RowActions>
@@ -167,7 +171,7 @@ export function overlayList(): m.Vnode {
 					listToolbar(),
 				]
 			) : (
-				<EmptyState message={t("overlay.empty_list")}>
+				<EmptyState message={t("overlay.empty_overlays")}>
 					{listToolbar()}
 				</EmptyState>
 			)}

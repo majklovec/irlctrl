@@ -106,11 +106,11 @@ export interface ControlRouteContext {
     /** The matching release of `acquireChatChannels`. */
     releaseChatChannels(specs: string[]): void;
     /**
-     * The channel specs an OBS scene's chat elements display, resolved from
-     * the scene's project token + id; `null` when the token is unknown or
-     * does not own a scene with that id.
+     * The channel specs an overlay's chat elements display, resolved from the
+     * overlay's token + id; `null` when the token is unknown or does not own an
+     * overlay with that id.
      */
-    overlayChatSceneSpecs(token: string, sceneId: string): string[] | null;
+    overlayChatOverlaySpecs(token: string, overlayId: string): string[] | null;
 }
 
 /** What a device widget's server-side `validateConfig` can look at. */

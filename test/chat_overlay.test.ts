@@ -125,8 +125,8 @@ function fixture() {
         releaseChatChannels: (specs) => {
             releases.push(specs);
         },
-        overlayChatSceneSpecs: (token, sceneId) =>
-            token === "scene-token" && sceneId === "mystream"
+        overlayChatOverlaySpecs: (token, overlayId) =>
+            token === "scene-token" && overlayId === "mystream"
                 ? sceneChannels["scene-token"]
                 : null,
     });

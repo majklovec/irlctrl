@@ -1,8 +1,8 @@
 import { elementDef } from "@ui/overlay/registry";
 import m from "mithril";
 import type {
+	Overlay,
 	OverlayElement,
-	Scene,
 	Transform,
 } from "../../../../../shared/overlay";
 import {
@@ -13,9 +13,9 @@ import {
 import type { Drag } from "../overlay_store";
 import {
 	ctx,
+	overlay,
 	resolvedTransform,
-	saveSceneElements,
-	scene,
+	saveOverlayElements,
 	selElement,
 	selectElement,
 	snapshot,
@@ -43,8 +43,8 @@ export function applySnap(
 	e: OverlayElement,
 	t: Transform,
 ): { gx: number | null; gy: number | null } {
-	const C = state.project.canvas;
-	const s = scene();
+	const C = state.overlay?.canvas ?? { width: 1920, height: 1080 };
+	const s = overlay();
 	const TH = 6 / state.zoom;
 	const xTargets = [0, C.width, C.width / 2];
 	const yTargets = [0, C.height, C.height / 2];
@@ -96,7 +96,7 @@ export function startDrag(
 	// prevent the browser from starting its own drags (element content
 	// selection, image ghosting) which would swallow mousemove mid-drag
 	(ev as Event).preventDefault();
-	const e = scene()?.elements.find((x) => x.id === elementId);
+	const e = overlay()?.elements.find((x) => x.id === elementId);
 	if (!e || e.locked) return;
 	state.selectedElementId = elementId;
 	const p = toScenePoint(ev);
@@ -118,7 +118,7 @@ export function startDrag(
 export function onDrag(ev: MouseEvent): void {
 	const d = state.drag;
 	if (!d) return;
-	const e = scene()?.elements.find((x) => x.id === d.elementId);
+	const e = overlay()?.elements.find((x) => x.id === d.elementId);
 	if (!e) return;
 	const ev2 = toScenePoint(ev);
 	const dx = ev2.x - d.startX;
@@ -230,8 +230,8 @@ export function onDrag(ev: MouseEvent): void {
 
 export function endDrag(): void {
 	if (state.drag?.moved) {
-		const s = scene();
-		if (s) void saveSceneElements(s);
+		const s = overlay();
+		if (s) void saveOverlayElements(s);
 	}
 	state.drag = null;
 	state.snapX = null;
@@ -242,8 +242,8 @@ export function endDrag(): void {
 }
 
 export function canvasArea(): m.Vnode {
-	const s = scene();
-	const C = state.project.canvas;
+	const s = overlay();
+	const C = state.overlay?.canvas ?? { width: 1920, height: 1080 };
 	const el = selElement();
 	return (
 		<div class="ov-canvas-wrap">
@@ -274,7 +274,7 @@ export function canvasArea(): m.Vnode {
 						);
 						if (hit?.dataset.element) {
 							const id = hit.dataset.element;
-							const el = scene()?.elements.find((x) => x.id === id);
+							const el = overlay()?.elements.find((x) => x.id === id);
 							if (el && !el.locked) startDrag(ev, id, "move");
 							else selectElement(id);
 							return;
@@ -374,7 +374,7 @@ export function canvasArea(): m.Vnode {
  */
 export function inlineTextEdit(
 	elementId: string,
-	s: Scene | undefined,
+	s: Overlay | undefined,
 ): m.Children {
 	const e = s?.elements.find((x) => x.id === elementId);
 	const inline = e && elementDef(e.type)?.inlineEdit;
@@ -417,11 +417,11 @@ export function inlineTextEdit(
 				value={typeof value === "string" ? value : ""}
 				ref={(dom: HTMLTextAreaElement | null) => dom?.focus()}
 				oninput={(ev: Event) => {
-					const sc = scene();
+					const sc = overlay();
 					const el = sc?.elements.find((x) => x.id === elementId);
 					if (!sc || !el) return;
 					el.props[inline.prop] = (ev.target as HTMLTextAreaElement).value;
-					void saveSceneElements(sc);
+					void saveOverlayElements(sc);
 				}}
 				onkeydown={(ev: KeyboardEvent) => {
 					if (ev.key === "Enter" && !ev.shiftKey) {
