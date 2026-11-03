@@ -167,7 +167,14 @@ function onFrame(event: string, data: unknown): void {
 	const target = liveFor(`${platform}:${frame.channel}`);
 
 	if ("message" in frame) {
-		target.chat = [frame.message, ...(target.chat ?? [])].slice(0, CAP);
+		// The same message can reach the shared live map from two sources
+		// (the dashboard widget's frame and a scene element's socket):
+		// drop any buffered copy of it before prepending the fresh one.
+		const id = `${platform}:${frame.message.id}`;
+		const rest = (target.chat ?? []).filter(
+			(line) => `${platform}:${line.id}` !== id,
+		);
+		target.chat = [frame.message, ...rest].slice(0, CAP);
 
 		// Read the new message out loud (the batch snapshot frames don't). The
 		// speech id is namespaced per platform so a ban can cancel the exact
@@ -862,7 +869,15 @@ export const EmbeddedChat: m.Component<EmbeddedChatAttrs, EmbeddedChatState> = {
 		);
 		if (!sameSpecs(vnode.state.specs, wanted)) {
 			vnode.state.specs = wanted;
-			vnode.state.socket?.close();
+			// Drop the connection AND any pending retry: a retry that fires
+			// after this reconnect would open a second socket for the same
+			// channels (doubled messages).
+			clearTimeout(vnode.state.timer);
+			vnode.state.timer = undefined;
+			vnode.state.attempt = 0;
+			const old = vnode.state.socket;
+			vnode.state.socket = undefined;
+			old?.close();
 			embeddedChatConnect(vnode);
 		}
 	},
@@ -915,11 +930,19 @@ function embeddedChatConnect(
 	const socket = new WebSocket(url);
 	s.socket = socket;
 
+	// A replacement socket supersedes this one (channel change, retry):
+	// its close/retry must never touch the state of the connection that
+	// came after it, or two sockets end up streaming the same channels
+	// into the shared live map at once (doubled messages).
+	const isActive = (): boolean => s.socket === socket;
+
 	socket.onopen = () => {
+		if (!isActive()) return;
 		s.attempt = 0;
 	};
 
 	socket.onmessage = (event) => {
+		if (!isActive()) return;
 		let frame: { type?: string; event?: string; data?: unknown };
 		try {
 			frame = JSON.parse(String(event.data)) as typeof frame;
@@ -946,6 +969,7 @@ function embeddedChatConnect(
 	};
 
 	socket.onclose = (event) => {
+		if (!isActive()) return;
 		s.socket = undefined;
 		if (s.stopped) return;
 		if (event.code === 1008) {
