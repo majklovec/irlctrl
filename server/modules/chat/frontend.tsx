@@ -613,9 +613,17 @@ const ChatFeed: m.Component<ChatFeedAttrs> = {
 	onupdate(vnode) {
 		const el = vnode.dom as HTMLElement;
 
-		if (!vnode.attrs.bottom || !chatAutoScroll.get(el)) {
+		if (!vnode.attrs.bottom) {
+			// Top order: new lines enter at the top of the feed. Pin the feed
+			// there — without this, a feed that was following its bottom in
+			// bottom order stays scrolled to the (stable) tail and the new
+			// top lines stay off-clip in a non-scrollable (overflow:hidden)
+			// element.
+			if (el.scrollTop > 0) el.scrollTop = 0;
 			return;
 		}
+
+		if (!chatAutoScroll.get(el)) return;
 
 		requestAnimationFrame(() => {
 			if (el.isConnected && chatAutoScroll.get(el)) {
@@ -629,13 +637,18 @@ const ChatFeed: m.Component<ChatFeedAttrs> = {
 	},
 
 	view(vnode) {
-		const { lines, showPlatformIcons, showTimestamps, feedKey } = vnode.attrs;
+		const { lines, bottom, showPlatformIcons, showTimestamps, feedKey } =
+			vnode.attrs;
 
 		return (
 			<div
 				class="chat-feed"
 				key={feedKey}
 				onscroll={(event: Event) => {
+					// The top-order pin (onupdate) scrolls the feed too — don't
+					// let that reset the auto-follow state, which only bottom
+					// order uses.
+					if (!bottom) return;
 					const el = event.currentTarget as HTMLElement;
 
 					const distance = el.scrollHeight - el.clientHeight - el.scrollTop;
