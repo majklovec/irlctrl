@@ -1,3 +1,10 @@
+# [2.7.0](https://github.com/majklovec/irlctrl/compare/v2.6.0...v2.7.0) (2026-11-03)
+
+
+### Features
+
+* **chat:** implement versioning for chat overlay and reload on new deployment ([131f647](https://github.com/majklovec/irlctrl/commit/131f64767127ecda8c335651a98fbcd96773ecd8))
+
 # [2.6.0](https://github.com/majklovec/irlctrl/compare/v2.5.1...v2.6.0) (2026-11-03)
 
 
