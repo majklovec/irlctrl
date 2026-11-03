@@ -1,3 +1,10 @@
+# [2.15.0](https://github.com/majklovec/irlctrl/compare/v2.14.0...v2.15.0) (2026-11-03)
+
+
+### Features
+
+* Refactor asset handling in overlays to utilize server-side asset library ([7e252b1](https://github.com/majklovec/irlctrl/commit/7e252b1872ddb39cd58a2506d41e3c25ccf62535))
+
 # [2.14.0](https://github.com/majklovec/irlctrl/compare/v2.13.0...v2.14.0) (2026-11-03)
 
 
