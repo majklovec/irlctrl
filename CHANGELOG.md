@@ -1,3 +1,10 @@
+## [2.15.1](https://github.com/majklovec/irlctrl/compare/v2.15.0...v2.15.1) (2026-11-03)
+
+
+### Bug Fixes
+
+* **device_list:** correct device link URL format in row function ([c8d5482](https://github.com/majklovec/irlctrl/commit/c8d54823f9e6620bbbfe10d96a865ffe2ba4e017))
+
 # [2.15.0](https://github.com/majklovec/irlctrl/compare/v2.14.0...v2.15.0) (2026-11-03)
 
 
