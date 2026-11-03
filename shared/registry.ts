@@ -453,6 +453,16 @@ export function initWidgetHub(publish: (msg: string) => void): void {
     for (const w of WIDGETS) w.hub = w.create(publish);
 }
 
+/** The channel specs one widget config subscribes to (`[]` for a
+ * non-channel widget type); the dashboards write path diffs these to spot
+ * a widget's channel changing. */
+export function widgetChannelSpecsForConfig(
+    type: string,
+    config: Record<string, string> | undefined,
+): readonly (string | null)[] {
+    return WIDGETS.find((w) => w.type === type)?.spec(config) ?? [];
+}
+
 /** Sync the widget backends with the dashboard configs (the dashboards write path). */
 export function syncWidgetHub(dashboards: ServerDashboard[]): void {
     for (const w of WIDGETS) {

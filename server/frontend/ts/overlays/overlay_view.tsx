@@ -6,6 +6,8 @@
  * - initial state + live updates over WS /overlay/:slug/ws
  * - when the snapshot's server version differs from this bundle's, reload
  *   (a new deployment replaced the server while the page was open)
+ * - when the channel of a module page this scene embeds in an iframe
+ *   changes, reload (the iframe only re-reads its channel on a fresh load)
  * - on disconnect: hold last-known state, reconnect with exponential backoff
  * - an `overlays.alert` frame shows every alert element whose event matches
  *   the frame's name; an element already showing an alert queues the new
@@ -17,6 +19,7 @@
  *   clobber the on-air ones early, and the written values persist
  */
 
+import { FRONTS } from "@ui/module_registry";
 import {
 	type ElementContext,
 	TRIGGER_OUTRO_MS,
@@ -100,17 +103,49 @@ let reloading = false;
  * `no-store` and the bundles are content-hashed, so the reload loads the
  * new version from scratch.
  */
-function reloadOnNewVersion(version: string): void {
-	if (reloading || version === APP_VERSION) return;
+/** Ask a registered service worker to drop its stale cache, then reload: the
+ * page is served `no-store` and the bundles are content-hashed, so the reload
+ * loads the fresh content from scratch. */
+function reloadPage(reason: string): void {
+	if (reloading) return;
 	reloading = true;
-	console.info(
-		`[overlay] new server version v${version} (this page runs v${APP_VERSION}), reloading`,
-	);
+	console.info(`[overlay] ${reason}, reloading`);
 	navigator.serviceWorker
 		?.getRegistration()
 		.then((reg) => reg?.update())
 		.catch(() => {});
 	location.reload();
+}
+
+function reloadOnNewVersion(version: string): void {
+	if (version === APP_VERSION) return;
+	reloadPage(
+		`new server version v${version} (this page runs v${APP_VERSION})`,
+	);
+}
+
+/** Whether any element of this scene embeds the changed widget's module page
+ * in an iframe. The owning module recognizes its own page URL
+ * (`parseOverlayUrl`), so the core page never names a module's route. */
+function embedsChangedWidget(data: Record<string, unknown>): boolean {
+	const dashboardId = data.dashboardId;
+	const widgetId = data.widgetId;
+	if (typeof dashboardId !== "string" || typeof widgetId !== "string")
+		return false;
+	for (const element of state.scene?.elements ?? []) {
+		const url = element.props?.url;
+		if (typeof url !== "string") continue;
+		for (const reg of FRONTS) {
+			const target = reg.parseOverlayUrl?.(url);
+			if (
+				target &&
+				target.dashboardId === dashboardId &&
+				target.widgetId === widgetId
+			)
+				return true;
+		}
+	}
+	return false;
 }
 
 function variableMap(): Map<string, Variable["value"]> {
@@ -176,6 +211,13 @@ function handleMessage(raw: MessageEvent, first: { open: boolean }): void {
 			break;
 		case "overlays.canvas":
 			if (data.canvas) state.canvas = data.canvas as Canvas;
+			break;
+		case "overlays.channelsChanged":
+			// a chat widget's channel changed and this scene embeds that
+			// widget's page in an iframe: the iframe keeps its stale channel
+			// and only re-reads it on a fresh load
+			if (embedsChangedWidget(data))
+				reloadPage("the channel of an embedded chat page changed");
 			break;
 		default:
 			return;

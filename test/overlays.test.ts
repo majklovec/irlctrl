@@ -912,6 +912,113 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                 runtimeSocket.close();
             }
 
+            // ── channel widget change → the runtime feed frame ──
+            // a chat widget's overlay page may be embedded in a runtime
+            // scene's iframe; the page reloads when its channel changes. A
+            // dashboard save publishes the changed widget to the owner's
+            // runtime topic (cosmetic-only changes publish nothing)
+            const chatDashboardRes = await fetch(`${baseUrl}/api/dashboards`, {
+                method: "POST",
+                headers: { cookie, "content-type": "application/json" },
+                body: JSON.stringify({
+                    name: "Chat embed",
+                    widgets: [
+                        {
+                            id: "chat-widget-1",
+                            type: "chat",
+                            x: 0,
+                            y: 0,
+                            w: 3,
+                            h: 8,
+                            visible: true,
+                            config: { twitch: "alice", token: "embed-token" },
+                        },
+                    ],
+                }),
+            });
+            expect(chatDashboardRes.status).toBe(201);
+            const chatDashboard = (await chatDashboardRes.json()) as {
+                dashboard: {
+                    id: string;
+                    version: number;
+                    widgets: Array<{
+                        id: string;
+                        type: string;
+                        config: Record<string, string>;
+                    }>;
+                };
+            };
+
+            const channelSocket = await connectSocket(
+                `${baseUrl.replace(/^http/, "ws")}/overlay/${sceneBody.scene.slug}/ws?token=${token}`,
+            );
+            try {
+                await nextFrame(
+                    channelSocket,
+                    (f) => f.event === "overlays.snapshot",
+                );
+
+                // a cosmetic-only change (history) → no channelsChanged frame
+                const cosmeticRes = await fetch(
+                    `${baseUrl}/api/dashboards/${chatDashboard.dashboard.id}`,
+                    {
+                        method: "PUT",
+                        headers: { cookie, "content-type": "application/json" },
+                        body: JSON.stringify({
+                            name: "Chat embed",
+                            version: chatDashboard.dashboard.version,
+                            widgets: chatDashboard.dashboard.widgets.map(
+                                (w) => ({
+                                    ...w,
+                                    config: { ...w.config, history: "20" },
+                                }),
+                            ),
+                        }),
+                    },
+                );
+                expect(cosmeticRes.status).toBe(200);
+                const cosmetic = (await cosmeticRes.json()) as {
+                    dashboard: { version: number };
+                };
+                await Bun.sleep(100);
+                expect(
+                    (frameQueues.get(channelSocket) ?? []).some(
+                        (f) => f.event === "overlays.channelsChanged",
+                    ),
+                ).toBe(false);
+
+                // a channel change (twitch: alice → bob) → a frame naming the
+                // dashboard and the widget
+                const channelRes = await fetch(
+                    `${baseUrl}/api/dashboards/${chatDashboard.dashboard.id}`,
+                    {
+                        method: "PUT",
+                        headers: { cookie, "content-type": "application/json" },
+                        body: JSON.stringify({
+                            name: "Chat embed",
+                            version: cosmetic.dashboard.version,
+                            widgets: chatDashboard.dashboard.widgets.map(
+                                (w) => ({
+                                    ...w,
+                                    config: { ...w.config, twitch: "bob" },
+                                }),
+                            ),
+                        }),
+                    },
+                );
+                expect(channelRes.status).toBe(200);
+                const changed = await nextFrame(
+                    channelSocket,
+                    (f) => f.event === "overlays.channelsChanged",
+                );
+                expect(changed.data).toEqual({
+                    dashboardId: chatDashboard.dashboard.id,
+                    widgetId: "chat-widget-1",
+                });
+            } finally {
+                channelSocket.close();
+            }
+
             // ── GET /overlay/alert/<name>: the dedicated trigger endpoint ──
             // an alert element listens for a named event; the endpoint fires
             // it by name and optional ?<name>=<value> pairs ride with the

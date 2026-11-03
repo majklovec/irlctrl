@@ -26,6 +26,8 @@ export type Publish = (topic: string, message: string) => void;
 export const viewersTopic = (id: string) => `viewers:${id}`;
 export const dashboardsTopic = (user: string) => `dashboards:${user}`;
 export const devicesTopic = (user: string) => `devices:${user}`;
+export const overlayRuntimeTopic = (user: string) =>
+    `overlay-runtime:${user}`;
 export const WIDGET_HUB_TOPIC = "widgets:hub";
 
 export const event = (name: string, data: unknown) =>

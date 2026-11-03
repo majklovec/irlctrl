@@ -34,7 +34,8 @@ import {
     type Variable,
 } from "../../../shared/overlay";
 import { overlayElementSchema } from "../../../shared/overlay_elements";
-import { event, type Publish } from "../contracts";
+import { event, overlayRuntimeTopic, type Publish } from "../contracts";
+export { overlayRuntimeTopic };
 
 // single ApiError class shared with shared/overlay.ts so `instanceof`
 // classification (400 vs 500) works across the module boundary
@@ -47,9 +48,6 @@ interface Store {
     token: string;
     updatedAt: number;
 }
-
-/** Runtime feed topic: one per project (== owner). */
-export const overlayRuntimeTopic = (user: string) => `overlay-runtime:${user}`;
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
     typeof v === "object" && v !== null && !Array.isArray(v);

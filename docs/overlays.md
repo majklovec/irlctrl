@@ -168,6 +168,7 @@ Every mutation goes over REST and is fanned out to two WebSocket topics
 | `overlays.canvas`     | `{canvas}`                 | canvas resize (runtime gets the slim payload)                      | –      | ✔ |
 | `overlays.assets`     | `{assets}`                 | asset upload/delete                                                | –      | ✔  |
 | `overlays.alert`      | `{name, payload}`          | `GET /overlay/alert/<name>` was called (the trigger event; `payload` carries the trigger's validated `<name>=<value>` pairs) | – | ✔  |
+| `overlays.channelsChanged` | `{dashboardId, widgetId}` | a dashboard save changed a channel widget's channels (published on the owner's runtime topic); the runtime page reloads when one of its iframes embeds that widget's module page | – | ✔  |
 | `overlays.applyAlert` | `{values}`                 | uplink: the runtime page goes on air with an alert and writes its values to the project variables (`overlays.variables` frame is the ack) | – | uplink |
 | `overlays.token`      | `{token}`                  | token rotation                                                     | ✔      | –  |
 
