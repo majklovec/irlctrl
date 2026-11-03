@@ -2,11 +2,12 @@
  * Twitch chat provider — one IRC-over-websocket connection per channel on
  * Twitch's public relay (`wss://irc-ws.chat.twitch.tv`, anonymous
  * `justinfan` nick, no auth). CAP REQ for IRCv3 tags (color, display-name,
- * message id); every PRIVMSG becomes a `twitch.chat` push; PING/PONG keeps
- * the connection alive.
+ * message id, badges); every PRIVMSG becomes a `twitch.chat` push;
+ * PING/PONG keeps the connection alive.
  */
 import type { ChatLive, PublishFn } from "../types";
 import { ChatProvider } from "./base";
+import { parseTwitchBadges } from "./twitch_badges";
 
 /** Twitch's public IRC relay (no auth, anonymous `justinfan` nick). */
 const TWITCH_WS_URL = "wss://irc-ws.chat.twitch.tv:443";
@@ -119,8 +120,8 @@ function parseTags(line: string): {
 }
 
 /**
- * Map one IRC PRIVMSG line to the wire shape (message id, display name and
- * color all come from the IRCv3 tag block).
+ * Map one IRC PRIVMSG line to the wire shape (message id, display name,
+ * color and badges all come from the IRCv3 tag block).
  */
 function asChatMessage(raw: string): ChatLive | null {
     const { tags, rest } = parseTags(raw);
@@ -135,5 +136,7 @@ function asChatMessage(raw: string): ChatLive | null {
     const id = tags.id || `${username}:${text}:${Date.now()}`;
     const out: ChatLive = { id, username, text, ts: Date.now() };
     if (color) out.color = color;
+    const badges = parseTwitchBadges(tags.badges ?? "");
+    if (badges) out.badges = badges;
     return out;
 }

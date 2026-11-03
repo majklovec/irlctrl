@@ -104,6 +104,10 @@
     text-decoration: none;
 }
 
+.chat-element .chat-feed .chat-line .chat-icon {
+    margin-right: 5px;
+}
+
 /* The word-break rule for message text is scoped under `.dash-widget-body`
  * (dashboard + iframe page) — the in-scene element needs its own so unbroken
  * strings (URLs, long handles) wrap too. */

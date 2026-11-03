@@ -20,11 +20,13 @@ import { parseChatData } from "youtube-chat-next/dist/parser";
 import type { ChatItem } from "youtube-chat-next/dist/types/data";
 import type {
     Action,
+    AuthorBadge,
     FetchOptions,
     GetLiveChatResponse,
 } from "youtube-chat-next/dist/types/yt-response";
 import type { ChatLive, PublishFn } from "../types";
 import { ChatProvider } from "./base";
+import { badgesByItemId, parseYtBadges } from "./youtube_badges";
 
 /** Fixed poll cadence in ms (see module docs: ignore the 10 s throttle). */
 const POLL_INTERVAL_MS = 1_000;
@@ -70,8 +72,9 @@ function userNameColor(username: string): string {
 /** Map one chat ChatItem to the wire shape (text parts joined, emoji parts
  * rendered by their unicode/label). The `@` is dropped from the name (it is a
  * handle, not the display name YouTube shows in chat) and a stable color is
- * attached for the username display. */
-function asChatMessage(item: ChatItem): ChatLive | null {
+ * attached for the username display. `badges` are the raw role/membership
+ * renderers for this message's id, mapped to wire badges. */
+function asChatMessage(item: ChatItem, badges?: AuthorBadge[]): ChatLive | null {
     const text = item.message
         .map((part) =>
             "text" in (part as object)
@@ -80,13 +83,16 @@ function asChatMessage(item: ChatItem): ChatLive | null {
         )
         .join("");
     const username = item.author?.name?.replace(/^@/, "") || undefined;
-    return {
+    const out: ChatLive = {
         id: item.id,
         username,
         text,
         ts: item.timestamp.getTime(),
         color: username ? userNameColor(username) : undefined,
     };
+    const ytBadges = parseYtBadges(badges);
+    if (ytBadges) out.badges = ytBadges;
+    return out;
 }
 
 /** One `get_live_chat` action. The library's `Action` only models
@@ -250,8 +256,15 @@ export class YoutubeChatProvider extends ChatProvider {
                         live = true;
                     } else {
                         this.setConnected(true);
+                        // The library folds badges to one image + booleans, so
+                        // pull the raw role/membership renderers per message id
+                        // and attach them to the parsed items.
+                        const badgeMap = badgesByItemId(actions);
                         for (const item of items) {
-                            const line = asChatMessage(item);
+                            const line = asChatMessage(
+                                item,
+                                badgeMap.get(item.id),
+                            );
                             if (!line) continue;
                             this.deliver(line);
                         }
