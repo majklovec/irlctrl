@@ -1,3 +1,10 @@
+# [2.11.0](https://github.com/majklovec/irlctrl/compare/v2.10.0...v2.11.0) (2026-11-03)
+
+
+### Features
+
+* **overlays:** add scene duplication functionality and update UI elements ([41b8a3e](https://github.com/majklovec/irlctrl/commit/41b8a3e971126cc08228b6419d274d65292a68c6))
+
 # [2.10.0](https://github.com/majklovec/irlctrl/compare/v2.9.0...v2.10.0) (2026-11-03)
 
 
