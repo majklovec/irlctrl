@@ -81,8 +81,8 @@ export async function createControlServer(options: ControlServerOptions) {
                         acquireWidgetChannels("chat", specs),
                     releaseChatChannels: (specs) =>
                         releaseWidgetChannels("chat", specs),
-                    overlayChatSceneSpecs: (token, slug) =>
-                        overlays.runtimeSceneChatSpecs(token, slug),
+                    overlayChatSceneSpecs: (token, sceneId) =>
+                        overlays.runtimeSceneChatSpecs(token, sceneId),
                 }),
             );
     }

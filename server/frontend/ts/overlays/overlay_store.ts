@@ -37,7 +37,8 @@ export function initialProject(): OverlayProject {
         variables: [],
         assets: [],
         scenes: [
-            { id: uuid(), name: "Scene 1", slug: "scene-1", elements: [] },
+            // the scene's UUID id is its only identifier (runtime + editor)
+            { id: uuid(), name: "Scene 1", elements: [] },
         ],
     };
 }
@@ -130,7 +131,7 @@ export function ctx(): ElementContext {
             project.variables.map((v) => [v.name, v.value as VariableValue]),
         ),
         token: state.token,
-        slug: scene()?.slug,
+        sceneId: scene()?.id,
     };
 }
 
@@ -144,7 +145,7 @@ export function runtimeUrl(s: Scene): string {
     return (
         location.origin +
         "/overlay/" +
-        encodeURIComponent(s.slug) +
+        encodeURIComponent(s.id) +
         "?token=" +
         state.token
     );
@@ -263,7 +264,7 @@ export function upsertScene(sc: Scene): void {
     else state.project.scenes.push(sc);
 }
 
-/** Duplicate a scene (server clones it under a fresh id, name, slug) and
+/** Duplicate a scene (server clones it under a fresh id and name) and
  * open the clone in the editor, like createScene. */
 export async function duplicateScene(id: string): Promise<void> {
     const body = await apiTry<{ scene: Scene }>(

@@ -249,7 +249,7 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
         });
         const projectBody = (await projectRes.json()) as {
             ok: boolean;
-            project: { scenes: { id: string; slug: string }[] };
+            project: { scenes: { id: string }[] };
             token: string;
         };
         expect(projectRes.status).toBe(200);
@@ -275,10 +275,13 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
             expect(sceneRes.status).toBe(201);
             const sceneBody = (await sceneRes.json()) as {
                 ok: boolean;
-                scene: { id: string; slug: string; name: string };
+                scene: { id: string; name: string };
             };
             expect(sceneBody.scene.name).toBe("Intro");
-            expect(sceneBody.scene.slug).toMatch(/^scene-/);
+            // the scene id is a UUID and the key of the runtime URL
+            expect(sceneBody.scene.id).toMatch(
+                /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+            );
 
             const element = {
                 id: crypto.randomUUID(),
@@ -327,8 +330,7 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                     .length,
             ).toBe(1);
 
-            // a duplicate clones the scene's elements under a fresh id,
-            // name and slug
+            // a duplicate clones the scene's elements under a fresh id and name
             const dupRes = await fetch(
                 `${baseUrl}/api/overlays/scenes/${sceneBody.scene.id}/duplicate`,
                 { method: "POST", headers: { cookie } },
@@ -338,7 +340,6 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                 ok: boolean;
                 scene: {
                     id: string;
-                    slug: string;
                     name: string;
                     elements: { id: string; props?: { text?: string } }[];
                 };
@@ -346,7 +347,6 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
             expect(dupBody.ok).toBe(true);
             expect(dupBody.scene.id).not.toBe(sceneBody.scene.id);
             expect(dupBody.scene.name).toBe("Intro (copy)");
-            expect(dupBody.scene.slug).not.toBe(sceneBody.scene.slug);
             expect(dupBody.scene.elements).toHaveLength(1);
             expect(dupBody.scene.elements[0].props?.text).toBe("Live");
 
@@ -666,7 +666,7 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
             // the runtime feed gets the revalue and the clear (this is what
             // the runtime page diffs for trigger firing + auto-empty)
             const clearSocket = await connectSocket(
-                `${baseUrl.replace(/^http/, "ws")}/overlay/${sceneBody.scene.slug}/ws?token=${token}`,
+                `${baseUrl.replace(/^http/, "ws")}/overlay/${sceneBody.scene.id}/ws?token=${token}`,
             );
             try {
                 const clearSnapshot = await nextFrame(
@@ -860,29 +860,16 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                 ).status,
             ).toBe(400);
 
-            // a slug cannot collide with another scene in the same project
+            // a second scene gets its own unique id
             const secondSceneRes = await fetch(`${baseUrl}/api/overlays/scenes`, {
                 method: "POST",
                 headers: { cookie, "content-type": "application/json" },
                 body: JSON.stringify({ name: "Second" }),
             });
             const secondScene = (
-                (await secondSceneRes.json()) as {
-                    scene: { id: string; slug: string };
-                }
+                (await secondSceneRes.json()) as { scene: { id: string } }
             ).scene;
-            const slugClashRes = await fetch(
-                `${baseUrl}/api/overlays/scenes/${secondScene.id}`,
-                {
-                    method: "PUT",
-                    headers: { cookie, "content-type": "application/json" },
-                    body: JSON.stringify({ slug: sceneBody.scene.slug }),
-                },
-            );
-            expect(slugClashRes.status).toBe(400);
-            expect((await slugClashRes.json()) as { error: string }).toMatchObject({
-                error: expect.stringMatching("already used"),
-            });
+            expect(secondScene.id).not.toBe(sceneBody.scene.id);
             const delSecondRes = await fetch(
                 `${baseUrl}/api/overlays/scenes/${secondScene.id}`,
                 { method: "DELETE", headers: { cookie } },
@@ -891,7 +878,7 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
 
             // ── runtime page + WS ──
             const runtimePage = await fetch(
-                `${baseUrl}/overlay/${sceneBody.scene.slug}?token=${token}`,
+                `${baseUrl}/overlay/${sceneBody.scene.id}?token=${token}`,
             );
             expect(runtimePage.status).toBe(200);
             const runtimeHtml = await runtimePage.text();
@@ -900,7 +887,7 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
 
             // bad token → same blank page (no error text)
             const badPage = await fetch(
-                `${baseUrl}/overlay/${sceneBody.scene.slug}?token=deadbeef`,
+                `${baseUrl}/overlay/${sceneBody.scene.id}?token=deadbeef`,
             );
             expect(badPage.status).toBe(200);
             const badText = await badPage.text();
@@ -909,25 +896,25 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
 
             // bad token → the WS refuses the connection
             await connectRefused(
-                `${baseUrl.replace(/^http/, "ws")}/overlay/${sceneBody.scene.slug}/ws?token=deadbeef`,
+                `${baseUrl.replace(/^http/, "ws")}/overlay/${sceneBody.scene.id}/ws?token=deadbeef`,
             );
 
-            // unknown slug with a good token → also refused
+            // unknown scene id with a good token → also refused
             await connectRefused(
                 `${baseUrl.replace(/^http/, "ws")}/overview/ws?token=${token}`,
             );
 
             // good token → snapshot, then a live scene update
             const runtimeSocket = await connectSocket(
-                `${baseUrl.replace(/^http/, "ws")}/overlay/${sceneBody.scene.slug}/ws?token=${token}`,
+                `${baseUrl.replace(/^http/, "ws")}/overlay/${sceneBody.scene.id}/ws?token=${token}`,
             );
             try {
                 const snapshot = await nextFrame(
                     runtimeSocket,
                     (f) => f.event === "overlays.snapshot",
                 );
-                expect((snapshot.data as { scene: { slug: string } }).scene.slug).toBe(
-                    sceneBody.scene.slug,
+                expect((snapshot.data as { scene: { id: string } }).scene.id).toBe(
+                    sceneBody.scene.id,
                 );
                 expect(
                     (snapshot.data as { variables: { value: number }[] }).variables,
@@ -1000,7 +987,7 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
             };
 
             const channelSocket = await connectSocket(
-                `${baseUrl.replace(/^http/, "ws")}/overlay/${sceneBody.scene.slug}/ws?token=${token}`,
+                `${baseUrl.replace(/^http/, "ws")}/overlay/${sceneBody.scene.id}/ws?token=${token}`,
             );
             try {
                 await nextFrame(
@@ -1105,7 +1092,7 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
             expect(alertUpsertRes.status).toBe(200);
 
             const alertSocket = await connectSocket(
-                `${baseUrl.replace(/^http/, "ws")}/overlay/${sceneBody.scene.slug}/ws?token=${token}`,
+                `${baseUrl.replace(/^http/, "ws")}/overlay/${sceneBody.scene.id}/ws?token=${token}`,
             );
             try {
                 await nextFrame(
@@ -1240,11 +1227,11 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
             expect(rotated.token).not.toBe(token);
 
             await connectRefused(
-                `${baseUrl.replace(/^http/, "ws")}/overlay/${sceneBody.scene.slug}/ws?token=${token}`,
+                `${baseUrl.replace(/^http/, "ws")}/overlay/${sceneBody.scene.id}/ws?token=${token}`,
             );
 
             const freshSocket = await connectSocket(
-                `${baseUrl.replace(/^http/, "ws")}/overlay/${sceneBody.scene.slug}/ws?token=${rotated.token}`,
+                `${baseUrl.replace(/^http/, "ws")}/overlay/${sceneBody.scene.id}/ws?token=${rotated.token}`,
             );
             const freshSnapshot = await nextFrame(
                 freshSocket,

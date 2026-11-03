@@ -1,9 +1,9 @@
 /** @jsx m */
 /*
- * OBS Browser Source runtime page (loaded at /overlay/:slug?token=…).
+ * OBS Browser Source runtime page (loaded at /overlay/:id?token=…).
  * Fully transparent, no chrome, no console noise (handoff §7.3, §15).
  * - one project token in the URL query; a bad token just renders an empty page
- * - initial state + live updates over WS /overlay/:slug/ws
+ * - initial state + live updates over WS /overlay/:id/ws
  * - when the snapshot's server version differs from this bundle's, reload
  *   (a new deployment replaced the server while the page was open)
  * - on disconnect: hold last-known state, reconnect with exponential backoff
@@ -54,11 +54,11 @@ const root = document.getElementById("app");
 if (!root) throw new Error("Missing overlay root");
 
 const token = new URLSearchParams(location.search).get("token") ?? "";
-const slug = location.pathname.split("/").filter(Boolean).pop() ?? "";
+const sceneId = location.pathname.split("/").filter(Boolean).pop() ?? "";
 const wsBase =
 	(location.protocol === "https:" ? "wss://" : "ws://") + location.host;
 const wsUrl =
-	wsBase + "/overlay/" + encodeURIComponent(slug) + "/ws?token=" + token;
+	wsBase + "/overlay/" + encodeURIComponent(sceneId) + "/ws?token=" + token;
 
 const state: RuntimeState = {
 	scene: undefined,
@@ -192,7 +192,7 @@ function handleMessage(raw: MessageEvent, first: { open: boolean }): void {
 }
 
 /** Element render context carrying assets, variables, live trigger state, and
- * the scene's token + slug (a self-contained chat element uses both to open
+ * the scene's token + id (a self-contained chat element uses both to open
  * its token-scoped feed). */
 function runtimeCtx(): ElementContext {
 	return {
@@ -201,7 +201,7 @@ function runtimeCtx(): ElementContext {
 		variableNames: variableNamesMap(),
 		activeTriggers: state.activeTriggers,
 		token,
-		slug,
+		sceneId,
 	};
 }
 

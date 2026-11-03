@@ -169,7 +169,6 @@ describe("overlay runtime auto-reload (headless DOM)", () => {
             scene: {
                 id: "scene-1",
                 name: "scene",
-                slug: "scene-1",
                 elements: urls.map((url, i) => ({
                     id: `el-${i}`,
                     name: `embed ${i}`,

@@ -162,8 +162,6 @@ export type OverlayElement = ElementBase & Record<string, unknown>;
 export interface Scene {
 	id: string;
 	name: string;
-	/** URL-safe, unique per project, used in the runtime URL */
-	slug: string;
 	/** back-to-front order: index 0 renders first */
 	elements: OverlayElement[];
 	/** Server-managed monotonic counter (bumped on every scene mutation).
@@ -238,7 +236,8 @@ export function defaultCanvas(): { width: number; height: number } {
 	return { width: 1920, height: 1080 };
 }
 
-/** A fresh per-user project: empty scene, ready to compose. */
+/** A fresh per-user project: empty scene, ready to compose. The scene's
+ * UUID id is its only identifier (the runtime URL and editor URL both use it). */
 export function defaultProject(): OverlayProject {
 	return {
 		schemaVersion: OVERLAY_SCHEMA_VERSION,
@@ -249,7 +248,6 @@ export function defaultProject(): OverlayProject {
 			{
 				id: crypto.randomUUID(),
 				name: "Scene 1",
-				slug: "scene-1",
 				elements: [],
 			},
 		],
@@ -484,25 +482,12 @@ const normalizeElement = (raw: unknown): OverlayElement => {
 	};
 };
 
-export function slugify(name: string): string {
-	const s = name
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "")
-		.slice(0, 60);
-	return s || "scene";
-}
-
 const normalizeScene = (raw: unknown): Scene => {
 	if (!isRecord(raw)) throw new Error("scene must be an object");
 	const id = typeof raw.id === "string" && raw.id ? raw.id : "";
 	const name =
 		typeof raw.name === "string" && raw.name
 			? raw.name.slice(0, OVERLAY_LIMITS.nameMax)
-			: "";
-	const slug =
-		typeof raw.slug === "string" && /^[a-z0-9][a-z0-9-]{0,60}$/.test(raw.slug)
-			? raw.slug
 			: "";
 	const elementsRaw = Array.isArray(raw.elements) ? raw.elements : [];
 	if (elementsRaw.length > OVERLAY_LIMITS.elementsMax)
@@ -536,13 +521,12 @@ const normalizeScene = (raw: unknown): Scene => {
 		return d;
 	};
 	for (const e of elements) walk(e.id);
-	if (!id || !name || !slug) throw new Error("scene needs id, name and slug");
+	if (!id || !name) throw new Error("scene needs id and name");
 	return {
 		id,
 		name,
-		slug,
 		elements,
-		...spreadRest(raw, ["id", "name", "slug", "elements"]),
+		...spreadRest(raw, ["id", "name", "elements"]),
 	};
 };
 
@@ -622,10 +606,10 @@ export function normalizeProject(raw: Record<string, unknown>): OverlayProject {
 	if (projectBase64 > OVERLAY_LIMITS.projectBase64Max)
 		throw new Error("overlay project assets are too large");
 	const scenes = scenesRaw.map(normalizeScene);
-	const slugIds = new Set<string>();
+	const sceneIds = new Set<string>();
 	for (const s of scenes) {
-		if (slugIds.has(s.slug)) throw new Error(`duplicate scene slug ${s.slug}`);
-		slugIds.add(s.slug);
+		if (sceneIds.has(s.id)) throw new Error(`duplicate scene id ${s.id}`);
+		sceneIds.add(s.id);
 		// bindings must reference existing variables; image assets must exist
 		for (const e of s.elements) {
 			for (const b of Object.values(e.bindings))
@@ -673,17 +657,12 @@ export function parseCanvasInput(raw: unknown): {
 
 export function parseSceneInput(raw: unknown): {
 	name?: string;
-	slug?: string;
 	elements?: OverlayElement[];
 } {
 	if (!isRecord(raw)) throw new ApiError("body must be an object");
 	const name =
 		typeof raw.name === "string" && raw.name.trim()
 			? raw.name.trim().slice(0, OVERLAY_LIMITS.nameMax)
-			: undefined;
-	const slug =
-		typeof raw.slug === "string" && /^[a-z0-9][a-z0-9-]{0,60}$/.test(raw.slug)
-			? raw.slug
 			: undefined;
 	let elements: OverlayElement[] | undefined;
 	if (raw.elements !== undefined) {
@@ -695,9 +674,9 @@ export function parseSceneInput(raw: unknown): {
 			throw new ApiError(e instanceof Error ? e.message : "invalid elements");
 		}
 	}
-	if (name === undefined && slug === undefined && elements === undefined)
-		throw new ApiError("scene patch needs name, slug or elements");
-	return { name, slug, elements };
+	if (name === undefined && elements === undefined)
+		throw new ApiError("scene patch needs name or elements");
+	return { name, elements };
 }
 
 export function parseElementInput(raw: unknown): OverlayElement {

@@ -73,17 +73,17 @@ export interface Overlays {
     /** The current project of `user` (default project on first access). */
     projectFor(user: string): OverlayProject;
     /**
-     * Runtime feed payload for a token + scene slug, `null` when the token
-     * is unknown or does not own a scene with that slug.
+     * Runtime feed payload for a token + scene id, `null` when the token is
+     * unknown or does not own a scene with that id.
      */
-    runtimeScene(token: string, slug: string): RuntimeScene | null;
+    runtimeScene(token: string, sceneId: string): RuntimeScene | null;
     /**
      * The chat channel specs an OBS scene's chat elements display, resolved
-     * from the scene's project token + slug; `null` when the token is
-     * unknown or does not own a scene with that slug. Used by the standalone
-     * chat overlay WebSocket to know which providers to keep attached.
+     * from the scene's project token + id; `null` when the token is unknown
+     * or does not own a scene with that id. Used by the standalone chat
+     * overlay WebSocket to know which providers to keep attached.
      */
-    runtimeSceneChatSpecs(token: string, slug: string): string[] | null;
+    runtimeSceneChatSpecs(token: string, sceneId: string): string[] | null;
     /**
     * Token-authenticated batch revalue for the variables endpoint
     * (`GET /overlay/variables?token=…&<name>=<value>…` and
@@ -257,27 +257,13 @@ export function createOverlays({
         return scene;
     };
 
-    const uniqueSlug = (project: OverlayProject): string => {
-        const used = new Set(project.scenes.map((s) => s.slug));
-        let i = 1;
-        while (used.has(`scene-${i}`)) i++;
-        return `scene-${i}`;
-    };
-
     const applyScenePatch = (
         project: OverlayProject,
         scene: Scene,
-        patch: { name?: string; slug?: string; elements?: OverlayElement[] },
+        patch: { name?: string; elements?: OverlayElement[] },
     ): void => {
         if (patch.name !== undefined) scene.name = patch.name;
-        if (patch.slug !== undefined) scene.slug = patch.slug;
         if (patch.elements !== undefined) scene.elements = patch.elements;
-        if (
-            project.scenes.some(
-                (s) => s.slug === scene.slug && s.id !== scene.id,
-            )
-        )
-            throw new ApiError(`slug ${scene.slug} is already used`);
         revalidate(project);
     };
 
@@ -379,7 +365,6 @@ export function createOverlays({
                     const scene: Scene = {
                         id: randomUUID(),
                         name,
-                        slug: uniqueSlug(store.project),
                         elements: [],
                     };
                     store.project.scenes.push(scene);
@@ -390,7 +375,6 @@ export function createOverlays({
                 if (req.method === "PUT" && id && !seg2) {
                     const body = (await req.json()) as {
                         name?: unknown;
-                        slug?: unknown;
                         elements?: unknown;
                     };
                     const patch = parseSceneInput(body);
@@ -412,8 +396,7 @@ export function createOverlays({
                     feed(user, "overlays.sceneDeleted", { sceneId: id });
                     return Response.json({ ok: true });
                 }
-                // copy a scene with its elements (deep clone), under a fresh
-                // id, name and slug
+                // copy a scene with its elements (deep clone) under a fresh id
                 if (req.method === "POST" && id && seg2 === "duplicate") {
                     const store = storeFor(user);
                     const source = findScene(store.project, id);
@@ -425,7 +408,6 @@ export function createOverlays({
                             0,
                             OVERLAY_LIMITS.nameMax,
                         ),
-                        slug: uniqueSlug(store.project),
                         elements: JSON.parse(JSON.stringify(source.elements)),
                     };
                     store.project.scenes.push(scene);
@@ -913,11 +895,14 @@ export function createOverlays({
     return {
         api,
         projectFor: (user: string) => storeFor(user).project,
-        runtimeScene: (token: string, slug: string): RuntimeScene | null => {
+        runtimeScene: (
+            token: string,
+            sceneId: string,
+        ): RuntimeScene | null => {
             const hit = runtimeStore(token);
             if (!hit) return null;
             const [user, store] = hit;
-            const scene = store.project.scenes.find((s) => s.slug === slug);
+            const scene = store.project.scenes.find((s) => s.id === sceneId);
             if (!scene) return null;
             return {
                 user,
@@ -927,10 +912,13 @@ export function createOverlays({
                 assets: store.project.assets,
             };
         },
-        runtimeSceneChatSpecs: (token: string, slug: string): string[] | null => {
+        runtimeSceneChatSpecs: (
+            token: string,
+            sceneId: string,
+        ): string[] | null => {
             const hit = runtimeStore(token);
             if (!hit) return null;
-            const scene = hit[1].project.scenes.find((s) => s.slug === slug);
+            const scene = hit[1].project.scenes.find((s) => s.id === sceneId);
             if (!scene) return null;
             const specs = new Set<string>();
             for (const el of scene.elements) {

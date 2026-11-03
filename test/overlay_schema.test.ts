@@ -22,7 +22,6 @@ import {
 	parseElementInput,
 	parseSceneInput,
 	parseVariableValueInput,
-	slugify,
 	type Transform,
 	type Variable,
 } from "../shared/overlay";
@@ -72,7 +71,6 @@ const validV1Project = (): RawProject => ({
 		{
 			id: "sc-1",
 			name: "Scene 1",
-			slug: "scene-1",
 			elements: [textElement()],
 		},
 	],
@@ -84,7 +82,8 @@ describe("overlay schema", () => {
 		expect(project.schemaVersion).toBe(OVERLAY_SCHEMA_VERSION);
 		expect(project.canvas).toEqual({ width: 1920, height: 1080 });
 		expect(project.scenes).toHaveLength(1);
-		expect(project.scenes[0].slug).toBe("scene-1");
+		// the scene's UUID id is its only identifier
+		expect(project.scenes[0].id).toMatch(/^[0-9a-f-]{36}$/);
 		// a fresh project must round-trip through the loader
 		const loaded = migrateProjectBlob(clone(project));
 		expect(loaded.project.scenes[0].id).toBe(project.scenes[0].id);
@@ -129,12 +128,6 @@ describe("overlay schema", () => {
 		expect(overlayTokenMatches("", "")).toBe(false);
 	});
 
-	test("slugify is URL-safe and stable for empty input", () => {
-		expect(slugify("My Scene!")).toBe("my-scene");
-		expect(slugify("  --weird--  ")).toBe("weird");
-		expect(slugify("???")).toBe("scene");
-	});
-
 	test("normalizeProject validates and types variables", () => {
 		const raw = validV1Project();
 		raw.variables = [
@@ -158,13 +151,13 @@ describe("overlay schema", () => {
 		expect(() => normalizeProject(raw)).toThrow();
 	});
 
-	test("normalizeProject enforces unique slugs", () => {
+	test("normalizeProject enforces unique scene ids", () => {
 		const raw = validV1Project();
 		raw.scenes = [
-			{ id: "a", name: "A", slug: "dup", elements: [] },
-			{ id: "b", name: "B", slug: "dup", elements: [] },
+			{ id: "a", name: "A", elements: [] },
+			{ id: "a", name: "B", elements: [] },
 		];
-		expect(() => normalizeProject(raw)).toThrow("duplicate scene slug dup");
+		expect(() => normalizeProject(raw)).toThrow("duplicate scene id a");
 	});
 
 	test("normalizeProject preserves unknown element props (forward compatibility)", () => {
@@ -592,12 +585,8 @@ describe("overlay schema", () => {
 	});
 
 	test("parseSceneInput requires at least one field", () => {
-		expect(() => parseSceneInput({})).toThrow("name, slug or elements");
+		expect(() => parseSceneInput({})).toThrow("name or elements");
 		expect(parseSceneInput({ name: "New" })).toEqual({ name: "New" });
-		expect(parseSceneInput({ slug: "a-b-1" })).toEqual({ slug: "a-b-1" });
-		expect(() => parseSceneInput({ slug: "UPPER" })).toThrow(
-			"name, slug or elements",
-		);
 	});
 
 	test("parseVariableValueInput coerces by variable type", () => {

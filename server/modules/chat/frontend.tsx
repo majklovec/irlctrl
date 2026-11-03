@@ -831,8 +831,8 @@ type EmbeddedChatAttrs = {
 	id: string;
 	/** The OBS scene's project token. */
 	token: string;
-	/** The scene's slug (selects which scene's channels stream). */
-	slug: string;
+	/** The scene's id (selects which scene's channels stream). */
+	sceneId: string;
 };
 
 interface EmbeddedChatState {
@@ -919,10 +919,10 @@ function embeddedChatConnect(
 ): void {
 	const s = vnode.state;
 	if (s.stopped) return;
-	const { token, slug } = vnode.attrs;
-	if (!token || !slug) return;
+	const { token, sceneId } = vnode.attrs;
+	if (!token || !sceneId) return;
 	const url = new URL(
-		`/api/overlay/chat/${encodeURIComponent(slug)}/ws`,
+		`/api/overlay/chat/${encodeURIComponent(sceneId)}/ws`,
 		location.origin,
 	);
 	url.protocol = location.protocol === "https:" ? "wss:" : "ws:";

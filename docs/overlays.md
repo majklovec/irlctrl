@@ -4,7 +4,7 @@ The control server ships a visual overlay editor. Scenes you compose there are
 served as transparent runtime pages that OBS loads with a **Browser Source**.
 
 - Overlay list: `/overlays/`, scene editor: `/overlays/edit/<scene id>/` (logged-in users only)
-- Runtime: `/overlay/<scene-slug>?token=<token>` (no session, token-gated)
+- Runtime: `/overlay/<scene id>?token=<token>` (no session, token-gated)
 - Schema, limits and normalization: [`shared/overlay.ts`](../shared/overlay.ts)
 - Element plugin contract: [`shared/contracts/overlay_element.ts`](../shared/contracts/overlay_element.ts)
   (schema half) and [`shared/ui/overlay/element.ts`](../shared/ui/overlay/element.ts)
@@ -155,13 +155,13 @@ Every mutation goes over REST and is fanned out to two WebSocket topics
    (cookie session). Delivered to every open editor tab, so multiple editors
    stay in sync.
 2. **Runtime feed** — topic `overlay-runtime:<user>` on
-   `WS /overlay/<scene-slug>/ws?token=…` (project token, no session).
+   `WS /overlay/<scene id>/ws?token=…` (project token, no session).
    Delivered to the OBS runtime page(s).
 
 | Event                 | Payload                    | Fires when                                                        | Editor | Runtime |
 | --------------------- | -------------------------- | ------------------------------------------------------------------ | :----: | :-----: |
 | `overlays.snapshot`   | `{scene, variables, canvas, assets, version}` | Runtime WS connects, after the token check (full initial state; `version` is the server build stamp the page compares to its own bundle to reload after a new deployment) | –    | ✔ |
-| `overlays.scene`      | `{scene}`                  | any scene mutation: rename/slug, add/update/delete elements         | ✔      | ✔ (applied only if it is the loaded scene) |
+| `overlays.scene`      | `{scene}`                  | any scene mutation: rename, add/update/delete elements               | ✔      | ✔ (applied only if it is the loaded scene) |
 | `overlays.sceneDeleted` | `{sceneId}`              | a scene is deleted                                                 | ✔      | – |
 | `overlays.variables`  | `{variables}`              | a variable is created/renamed/retyped/revalued/deleted             | ✔      | ✔ |
 | `overlays.project`    | `{project}`                | canvas resize; asset upload/delete (full project, editor-only)     | ✔      | – |
@@ -204,11 +204,11 @@ Notes:
 | URL                                        | Auth                       | Serves                                     |
 | ------------------------------------------ | -------------------------- | ------------------------------------------ |
 | `/overlays/`                               | cookie session             | the editor page                             |
-| `/overlay/<scene-slug>`                    | project token in `?token=` | the transparent runtime page (OBS Browser Source); a bad token renders a blank page |
+| `/overlay/<scene id>`                      | project token in `?token=` | the transparent runtime page (OBS Browser Source); a bad token renders a blank page |
 | `/overlay/variables?token=&<name>=<value>…`| project token              | revalue variables from the querystring (several `<name>=<value>` pairs per fetch; an empty value empties the variable to its neutral value: 0 / false / `#000000` / ""), returns the new variable list |
 | `POST /overlay/variables?token=`           | project token              | revalue variables from a JSON body `{<name>: value\|null}` (`null`/`""` empties), returns the new variable list |
 | `/overlay/alert/<name>?token=…[&<name>=<value>…]` | project token      | trigger every alert element whose *Event* prop equals `<name>` (queues FIFO per element); optional `<name>=<value>` pairs ride with the alert and are written to project variables when the alert plays (persist), returns `{"ok":true,"name":…}` |
-| `/overlay/<scene-slug>/ws?token=`          | project token              | the runtime live feed (WebSocket; also the page's `overlays.applyAlert` uplink) |
+| `/overlay/<scene id>/ws?token=`            | project token              | the runtime live feed (WebSocket; also the page's `overlays.applyAlert` uplink) |
 | `/chat/<dashboardId>/<widgetId>?token=`    | per-widget token           | a chat widget's live page                   |
 
 **Project token** — one per user (per overlay project), 64 hex chars, the

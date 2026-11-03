@@ -2,7 +2,7 @@
  * OBS overlay editor routes:
  *   GET  /overlays/                the overlay list page (cookie auth)
  *   GET  /overlays/edit/:id/       the scene editor page (cookie auth)
- *   GET  /overlay/:slug?token=…    the runtime page (token auth, transparent)
+ *   GET  /overlay/:id?token=…      the runtime page (token auth, transparent)
  *   GET  /overlay/variables?…      revalue variables: ?<name>=<value>…, an
  *                                  empty value clears (token auth)
  *   POST /overlay/variables?…      revalue variables from a JSON body
@@ -12,13 +12,13 @@
  *                                  pairs ride with the alert and land in
  *                                  project variables when the alert plays
  *                                  (token auth)
- *   WS   /overlay/:slug/ws?token=… the runtime live feed (token auth);
+ *   WS   /overlay/:id/ws?token=…   the runtime live feed (token auth);
  *                                  also accepts the runtime page's
  *                                  `overlays.applyAlert` uplink (it writes
  *                                  an on-air alert's values to variables)
  *   POST /api/overlays/scenes/:id/duplicate
  *                            copy a scene with its elements (cookie auth);
- *                            the clone gets a fresh id, name and slug
+ *                            the clone gets a fresh id and name
  *   …    /api/overlays…            the editor REST API (cookie auth)
  *
  * The runtime page is what OBS loads as a Browser Source: no session, only
@@ -39,7 +39,7 @@ type Frontend = Awaited<ReturnType<typeof createFrontend>>;
 
 /** Runs a token-authenticated store action and maps the outcome: ApiError
  * → JSON `{ok:false, error, code}`, `null` → 404 "Not found" (a token probe
- * must not leak project existence, exactly like /overlay/:slug). */
+ * must not leak project existence, exactly like /overlay/:id). */
 function tokenJson(
     action: () => Promise<
         { status: number; body: Record<string, unknown> } | null
@@ -124,7 +124,7 @@ export function overlayRoutes(
                 frontend.htmlResponse("overlay_update"),
             ),
         )
-        // before /overlay/:slug — the static paths must win over the slug
+        // before /overlay/:id — the static paths must win over the scene id
         .get(
             "/overlay/variables",
             ({ request }) =>
@@ -174,7 +174,7 @@ export function overlayRoutes(
                     );
                 }),
         )
-        .get("/overlay/:slug", () => runtimePage(frontend))
+        .get("/overlay/:id", () => runtimePage(frontend))
         .all(
             "/api/overlays",
             authenticatedHandler(auth, (request, user) =>
@@ -187,17 +187,17 @@ export function overlayRoutes(
                 overlays.api(request, new URL(request.url), user),
             ),
         )
-        .get("/overlay/:slug/ws", () => upgradeRequired())
-        .ws("/overlay/:slug/ws", {
+        .get("/overlay/:id/ws", () => upgradeRequired())
+        .ws("/overlay/:id/ws", {
             open(ws) {
                 const m = new URL(ws.data.request.url).pathname.match(
                     RUNTIME_WS_RE,
                 );
                 if (!m) return ws.close(1008, "Unknown overlay route");
-                const slug = decodeURIComponent(m[1]);
+                const sceneId = decodeURIComponent(m[1]);
                 const feed = overlays.runtimeScene(
                     runtimeToken(ws.data.request),
-                    slug,
+                    sceneId,
                 );
                 if (!feed) return ws.close(1008, "Invalid overlay token");
                 // the message handler reuses the already-validated owner

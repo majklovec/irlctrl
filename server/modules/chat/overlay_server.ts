@@ -15,10 +15,10 @@ export function chatOverlayRoutes(context: ControlRouteContext) {
         new Response("Invalid chat token", { status: 401, headers });
 
     /** The scene's chat channel specs, `null` when the token is unknown. */
-    function sceneSpecs(slug: string, request: Request): string[] | null {
+    function sceneSpecs(sceneId: string, request: Request): string[] | null {
         return context.overlayChatSceneSpecs(
             new URL(request.url).searchParams.get("token") ?? "",
-            slug,
+            sceneId,
         );
     }
 
@@ -30,9 +30,9 @@ export function chatOverlayRoutes(context: ControlRouteContext) {
         return chat;
     }
 
-    /** The scene slug from a URL's path: the last non-empty segment, minus a
+    /** The scene id from a URL's path: the last non-empty segment, minus a
      * trailing `/ws` (the WebSocket route sits under the scene path). */
-    const slugFrom = (url: URL): string => {
+    const sceneIdFrom = (url: URL): string => {
         const parts = url.pathname.split("/").filter(Boolean);
         if (parts[parts.length - 1] === "ws") parts.pop();
         return decodeURIComponent(parts.pop() ?? "");
@@ -44,24 +44,26 @@ export function chatOverlayRoutes(context: ControlRouteContext) {
     // their providers attached for the connection, and streams the hub frames
     // narrowed to those channels.
     return new Elysia({ name: "chat-overlay" }).get(
-        "/api/overlay/chat/:slug",
+        "/api/overlay/chat/:id",
         ({ request }) => {
-            const specs = sceneSpecs(slugFrom(new URL(request.url)), request);
+            const specs = sceneSpecs(sceneIdFrom(new URL(request.url)), request);
             if (specs === null) return denied();
             return Response.json(
                 { chat: sceneChatSnapshot(specs), version: APP_VERSION },
                 { headers },
             );
         })
-        .get("/api/overlay/chat/:slug/ws", ({ request }) => {
-            if (sceneSpecs(slugFrom(new URL(request.url)), request) === null)
+        .get("/api/overlay/chat/:id/ws", ({ request }) => {
+            if (
+                sceneSpecs(sceneIdFrom(new URL(request.url)), request) === null
+            )
                 return denied();
             return upgradeRequired();
         })
-        .ws("/api/overlay/chat/:slug/ws", {
+        .ws("/api/overlay/chat/:id/ws", {
             open(ws) {
                 const url = new URL(ws.data.request.url);
-                const specs = sceneSpecs(slugFrom(url), ws.data.request);
+                const specs = sceneSpecs(sceneIdFrom(url), ws.data.request);
                 if (specs === null) return ws.close(1008, "Invalid chat token");
                 // Keep the scene's providers attached for exactly this viewer;
                 // the `close` handler releases them. `ws.data` (the upgrade

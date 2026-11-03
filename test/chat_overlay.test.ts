@@ -105,7 +105,7 @@ function fixture() {
             messages: [{ id: "private", text: "Another widget" }],
         },
     };
-    // The scene-token endpoint's model: a project token + slug map to the
+    // The scene-token endpoint's model: a project token + scene id map to the
     // chat channels that scene renders. Everything else is refused.
     const sceneChannels: Record<string, string[]> = {
         "scene-token": ["twitch:alice", "youtube:creator"],
@@ -125,8 +125,8 @@ function fixture() {
         releaseChatChannels: (specs) => {
             releases.push(specs);
         },
-        overlayChatSceneSpecs: (token, slug) =>
-            token === "scene-token" && slug === "mystream"
+        overlayChatSceneSpecs: (token, sceneId) =>
+            token === "scene-token" && sceneId === "mystream"
                 ? sceneChannels["scene-token"]
                 : null,
     });
@@ -158,7 +158,7 @@ describe("scene-token chat overlay (self-contained element)", () => {
         expect(JSON.stringify(body)).not.toContain("scene-token");
     });
 
-    test("refuses a bad token, unknown slug, or missing token", async () => {
+    test("refuses a bad token, unknown scene, or missing token", async () => {
         const { get } = fixture();
         expect(
             (await get("/api/overlay/chat/mystream?token=****")).status,

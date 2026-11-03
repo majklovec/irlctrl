@@ -12,7 +12,7 @@
  * The live text renders straight into the same DOM the overlay composites, so
  * a browser tab shows the exact feed OBS sees. It never uses an <iframe> — a
  * browser-source capture composites iframes opaquely. The feed is fed by the
- * scene token + slug via `EmbeddedChat` (./frontend.tsx); props are normalized
+ * scene token + id via `EmbeddedChat` (./frontend.tsx); props are normalized
  * & clamped by ./overlay_schema.ts, so the form only edits.
  */
 
@@ -148,8 +148,8 @@ function channelsField(props: ElementProps): Children {
 }
 
 /** Draw the element as a live chat feed in the current DOM. `ctx` carries the
- * scene token + slug the feed opens its WebSocket with: in the editor those are
- * the project token and the draft scene's slug; at runtime both come from the
+ * scene token + id the feed opens its WebSocket with: in the editor those are
+ * the project token and the draft scene's id; at runtime both come from the
  * overlay URL. */
 function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	const p = element.props as unknown as ChatProps;
@@ -175,7 +175,7 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 				id: element.id,
 				config: chatPropsToConfig(element.props),
 				token: ctx.token ?? "",
-				slug: ctx.slug ?? "",
+				sceneId: ctx.sceneId ?? "",
 			})}
 		</div>
 	);
