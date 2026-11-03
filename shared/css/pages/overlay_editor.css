@@ -363,6 +363,7 @@ identically here and on the runtime page */
     display: flex;
     flex-direction: column;
     gap: 6px;
+    background-color: var(--card);
 }
 /* row-header controls: visibility/lock toggles + z-order arrows */
 .ov-zhead {
