@@ -172,6 +172,7 @@
     "overlay.copy_variable_url": "変数のURLをコピー（値を追加して変数を変更できます）",
     "overlay.delete": "Delete",
     "overlay.delete_scene": "Delete scene",
+    "overlay.duplicate_scene": "Duplicate scene",
     "overlay.elements": "要素",
     "overlay.ellipse": "楕円",
     "overlay.empty_list": "まだオーバーレイはありません。作成して始めましょう。",

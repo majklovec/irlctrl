@@ -172,6 +172,7 @@
     "overlay.copy_variable_url": "Copiar URL da variável (adicione um valor para modificar a variável)",
     "overlay.delete": "Delete",
     "overlay.delete_scene": "Delete scene",
+    "overlay.duplicate_scene": "Duplicate scene",
     "overlay.elements": "Elementos",
     "overlay.ellipse": "Elipse",
     "overlay.empty_list": "Ainda não há sobreposições. Adicione uma para começar.",

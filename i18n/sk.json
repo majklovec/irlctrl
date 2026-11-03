@@ -172,6 +172,7 @@
     "overlay.copy_variable_url": "Skopírovať URL premennej (pridajte hodnotu pre úpravu premennej)",
     "overlay.delete": "Delete",
     "overlay.delete_scene": "Delete scene",
+    "overlay.duplicate_scene": "Duplicate scene",
     "overlay.elements": "Prvky",
     "overlay.ellipse": "Elipsa",
     "overlay.empty_list": "Zatiaľ žiadne prekryvy. Pridajte prvý.",

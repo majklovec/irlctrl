@@ -62,6 +62,8 @@ export const state = {
     copied: false,
     /** Variable whose modify URL was just copied (icon turns green). */
     copiedVariableName: null as string | null,
+    /** Scene whose runtime URL was just copied from the list (icon turns green). */
+    copiedSceneId: null as string | null,
     /** Element currently expanded in the inspector list (accordion). */
     expandedElementId: null as string | null,
     /** Text element being inline-edited on the canvas. */
@@ -161,6 +163,21 @@ export function variableUrl(name: string): string {
     );
 }
 
+/** Copy the scene's runtime URL so it can be pasted straight into OBS.
+ * The row's copy icon turns green until the state expires. */
+export async function copySceneUrl(s: Scene): Promise<void> {
+    try {
+        await navigator.clipboard.writeText(runtimeUrl(s));
+        state.copiedSceneId = s.id;
+        setTimeout(() => {
+            state.copiedSceneId = null;
+            m.redraw();
+        }, 1500);
+    } catch {
+        /* clipboard unavailable — the URL text is visible on the row */
+    }
+}
+
 /** How many field bindings in the current scene follow the given variable.
  * Zero variables read as "unused", so the panel can flag them. */
 export function variableUsage(variableId: string): number {
@@ -244,6 +261,22 @@ export function upsertScene(sc: Scene): void {
     const i = state.project.scenes.findIndex((x) => x.id === sc.id);
     if (i >= 0) state.project.scenes[i] = sc;
     else state.project.scenes.push(sc);
+}
+
+/** Duplicate a scene (server clones it under a fresh id, name, slug) and
+ * open the clone in the editor, like createScene. */
+export async function duplicateScene(id: string): Promise<void> {
+    const body = await apiTry<{ scene: Scene }>(
+        `/api/overlays/scenes/${encodeURIComponent(id)}/duplicate`,
+        { method: "POST" },
+    );
+    if (body?.scene) {
+        // upsert — same double-add race as createScene: the `overlays.scene`
+        // WS push lands before the HTTP response and already contains the
+        // clone, so a raw push would create a duplicate
+        upsertScene(body.scene);
+        //location.assign(editorUrl(body.scene.id));
+    }
 }
 
 export function selectScene(id: string): void {

@@ -16,6 +16,9 @@
  *                                  also accepts the runtime page's
  *                                  `overlays.applyAlert` uplink (it writes
  *                                  an on-air alert's values to variables)
+ *   POST /api/overlays/scenes/:id/duplicate
+ *                            copy a scene with its elements (cookie auth);
+ *                            the clone gets a fresh id, name and slug
  *   …    /api/overlays…            the editor REST API (cookie auth)
  *
  * The runtime page is what OBS loads as a Browser Source: no session, only

@@ -172,6 +172,7 @@
     "overlay.copy_variable_url": "复制变量 URL（添加值以修改变量）",
     "overlay.delete": "Delete",
     "overlay.delete_scene": "Delete scene",
+    "overlay.duplicate_scene": "Duplicate scene",
     "overlay.elements": "元素",
     "overlay.ellipse": "椭圆",
     "overlay.empty_list": "还没有覆盖层。添加一个以开始。",

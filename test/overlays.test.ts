@@ -327,6 +327,56 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                     .length,
             ).toBe(1);
 
+            // a duplicate clones the scene's elements under a fresh id,
+            // name and slug
+            const dupRes = await fetch(
+                `${baseUrl}/api/overlays/scenes/${sceneBody.scene.id}/duplicate`,
+                { method: "POST", headers: { cookie } },
+            );
+            expect(dupRes.status).toBe(201);
+            const dupBody = (await dupRes.json()) as {
+                ok: boolean;
+                scene: {
+                    id: string;
+                    slug: string;
+                    name: string;
+                    elements: { id: string; props?: { text?: string } }[];
+                };
+            };
+            expect(dupBody.ok).toBe(true);
+            expect(dupBody.scene.id).not.toBe(sceneBody.scene.id);
+            expect(dupBody.scene.name).toBe("Intro (copy)");
+            expect(dupBody.scene.slug).not.toBe(sceneBody.scene.slug);
+            expect(dupBody.scene.elements).toHaveLength(1);
+            expect(dupBody.scene.elements[0].props?.text).toBe("Live");
+
+            // the clone is an independent copy — editing it does not touch
+            // the source scene
+            const dupEditRes = await fetch(
+                `${baseUrl}/api/overlays/scenes/${dupBody.scene.id}/elements`,
+                {
+                    method: "PUT",
+                    headers: { cookie, "content-type": "application/json" },
+                    body: JSON.stringify({
+                        element: {
+                            ...dupBody.scene.elements[0],
+                            props: { text: "Cloned" },
+                        },
+                    }),
+                },
+            );
+            expect(dupEditRes.status).toBe(200);
+            const dupEditScene = (await dupEditRes.json()) as {
+                scene: { elements: { props?: { text?: string } }[] };
+            };
+            expect(dupEditScene.scene.elements[0].props?.text).toBe("Cloned");
+
+            const delDupRes = await fetch(
+                `${baseUrl}/api/overlays/scenes/${dupBody.scene.id}`,
+                { method: "DELETE", headers: { cookie } },
+            );
+            expect(delDupRes.status).toBe(200);
+
             // a binding to a nonexistent variable is rejected with a 400 and
             // must not wedge the in-memory project — the scene stays editable
             // afterwards (a failed revalidate used to leave stale state and
@@ -1235,6 +1285,14 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                         method: "DELETE",
                         headers: { cookie },
                     })
+                ).status,
+            ).toBe(404);
+            expect(
+                (
+                    await fetch(
+                        `${baseUrl}/api/overlays/scenes/nope/duplicate`,
+                        { method: "POST", headers: { cookie } },
+                    )
                 ).status,
             ).toBe(404);
             expect(

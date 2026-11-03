@@ -172,6 +172,7 @@
     "overlay.copy_variable_url": "Скопировать URL переменной (добавьте значение, чтобы изменить переменную)",
     "overlay.delete": "Delete",
     "overlay.delete_scene": "Delete scene",
+    "overlay.duplicate_scene": "Duplicate scene",
     "overlay.elements": "Элементы",
     "overlay.ellipse": "Эллипс",
     "overlay.empty_list": "Пока нет оверлеев. Добавьте первый, чтобы начать.",

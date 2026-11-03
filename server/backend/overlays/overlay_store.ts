@@ -318,7 +318,7 @@ export function createOverlays({
     ): Promise<Response> {
         try {
             const m = url.pathname.match(
-                /^\/api\/overlays$|^\/api\/overlays\/(scenes|variables|assets|token)\/?((?:[\w.-]{1,64})(?:\/elements(?:\/[\w.-]{1,64})?)?)?$/,
+                /^\/api\/overlays$|^\/api\/overlays\/(scenes|variables|assets|token)\/?((?:[\w.-]{1,64})(?:\/(elements|duplicate)(?:\/[\w.-]{1,64})?)?)?$/,
             );
             if (!m)
                 return Response.json(
@@ -335,7 +335,7 @@ export function createOverlays({
             // seg=null → the project itself
             const rest = (m[2] as string | undefined) ?? "";
             // rest shapes: "", ":sceneId", ":sceneId/elements",
-            // ":sceneId/elements/:elementId", "rotate"
+            // ":sceneId/elements/:elementId", ":sceneId/duplicate", "rotate"
             const [id, seg2, id2] = rest.split("/");
 
             if (seg === null) {
@@ -411,6 +411,28 @@ export function createOverlays({
                     commit(user, store);
                     feed(user, "overlays.sceneDeleted", { sceneId: id });
                     return Response.json({ ok: true });
+                }
+                // copy a scene with its elements (deep clone), under a fresh
+                // id, name and slug
+                if (req.method === "POST" && id && seg2 === "duplicate") {
+                    const store = storeFor(user);
+                    const source = findScene(store.project, id);
+                    if (store.project.scenes.length >= OVERLAY_LIMITS.scenesMax)
+                        throw new ApiError("Too many scenes");
+                    const scene: Scene = {
+                        id: randomUUID(),
+                        name: `${source.name} (copy)`.slice(
+                            0,
+                            OVERLAY_LIMITS.nameMax,
+                        ),
+                        slug: uniqueSlug(store.project),
+                        elements: JSON.parse(JSON.stringify(source.elements)),
+                    };
+                    store.project.scenes.push(scene);
+                    revalidate(store.project);
+                    commit(user, store);
+                    feed(user, "overlays.scene", { scene });
+                    return Response.json({ ok: true, scene }, { status: 201 });
                 }
                 if (req.method === "PUT" && id && seg2 === "elements") {
                     const body = (await req.json()) as { element?: unknown };

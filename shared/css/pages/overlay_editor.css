@@ -907,6 +907,28 @@ instead of truncating */
     color: var(--ok);
 }
 
+/* List rows: the scene's full runtime URL (link) with an inline copy icon;
+   both flow at the table's natural line height */
+.ov-row-url {
+}
+.ov-row-url-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--accent);
+    text-decoration: none;
+}
+.ov-row-url-text:hover {
+    text-decoration: underline;
+}
+.ov-row-url .icon-link {
+    flex: none;
+    width: auto;
+    height: auto;
+    border: none;
+    padding: 0 2px;
+}
+
 /* Second strip flush under the main header (the overlay editor's icon
    toolbar): a flat, opaque bar with borderless, shadowless icon buttons —
    hover shows a subtle highlight, like a graphics editor's menu bar. */

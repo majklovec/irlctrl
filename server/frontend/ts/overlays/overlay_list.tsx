@@ -16,11 +16,14 @@ import { t } from "@ui/i18n";
 import { mountPage } from "@ui/util";
 import m from "mithril";
 import {
+	copySceneUrl,
 	createScene,
 	deleteScene,
+	duplicateScene,
 	editorUrl,
 	load,
 	renameScene,
+	runtimeUrl,
 	state,
 } from "./overlay_store";
 
@@ -100,13 +103,40 @@ export function overlayList(): m.Vnode {
 										</a>
 									)}
 								</td>
-								<td class="muted">/overlay/{s.slug}</td>
+								<td class="ov-row-url">
+									<a
+										class="ov-row-url-text"
+										href={runtimeUrl(s)}
+										target="_blank"
+										rel="noreferrer"
+										title={runtimeUrl(s)}
+									>
+										{runtimeUrl(s)}
+									</a>
+									<IconButton
+										class={
+											state.copiedSceneId === s.id ? "ov-copied" : undefined
+										}
+										label={
+											state.copiedSceneId === s.id
+												? t("overlay.copied")
+												: t("overlay.copy")
+										}
+										icon={<Icon name="copy" class="role-icon" />}
+										onclick={() => void copySceneUrl(s)}
+									/>
+								</td>
 								<td class="muted">{s.elements.length}</td>
 								<RowActions>
 									<IconLink
 										href={editorUrl(s.id)}
 										label={t("overlay.open")}
 										icon={<Icon name="view" class="role-icon" />}
+									/>
+									<IconButton
+										label={t("overlay.duplicate_scene")}
+										icon={<Icon name="copy" class="role-icon" />}
+										onclick={() => void duplicateScene(s.id)}
 									/>
 									<IconButton
 										label={t("overlay.rename_scene")}
