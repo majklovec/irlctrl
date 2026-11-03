@@ -20,6 +20,7 @@ export const CHAT_CONFIG_FIELDS = [
     { name: "order", type: "select", options: ["top", "bottom"] },
     { name: "bannedMessages", type: "select", options: ["strike", "hide"] },
     { name: "timestamps", type: "select", options: ["off", "on"] },
+    { name: "badges", type: "select", options: ["off", "on"] },
     { name: "platformIcons", type: "select", options: ["auto", "on", "off"] },
     {
         name: "ttsEnabled",
@@ -90,6 +91,17 @@ export function chatTimestampsFromConfig(
     config: Record<string, string> | undefined,
 ): boolean {
     return (config?.timestamps ?? "").trim().toLowerCase() === "on";
+}
+
+/**
+ * Whether a widget shows the sender's badges in front of the username.
+ * Anything that is not "off" falls back to "on" (the historic default:
+ * badges are shown).
+ */
+export function chatBadgesFromConfig(
+    config: Record<string, string> | undefined,
+): boolean {
+    return (config?.badges ?? "").trim().toLowerCase() !== "off";
 }
 
 export function chatPlatformIconsFromConfig(
@@ -195,6 +207,7 @@ export function chatPropsToConfig(
         props.bannedMessages === "hide" ? "hide" : "strike",
     );
     config.timestamps = String(props.timestamps === "on" ? "on" : "off");
+    config.badges = String(props.badges === "off" ? "off" : "on");
     config.platformIcons = String(
         props.platformIcons === "on" || props.platformIcons === "off"
             ? props.platformIcons

@@ -249,6 +249,27 @@ function editForm(props: ElementProps): Children {
 			)}
 			{choiceField(
 				e,
+				"props.badges",
+				t("dash.widget_badges"),
+				p.badges,
+				[
+					{
+						value: "on",
+						label: t("dash.widget_badges.on"),
+					},
+					{
+						value: "off",
+						label: t("dash.widget_badges.off"),
+					},
+				],
+				(v) =>
+					mutate((el) => {
+						el.props.badges = v as ChatProps["badges"];
+					}),
+				props,
+			)}
+			{choiceField(
+				e,
 				"props.platformIcons",
 				t("dash.widget_platformIcons"),
 				p.platformIcons,
@@ -447,6 +468,7 @@ export const chatElement: OverlayElementDef = {
 		"order",
 		"bannedMessages",
 		"timestamps",
+		"badges",
 		"platformIcons",
 		"fontSize",
 		"fontWeight",

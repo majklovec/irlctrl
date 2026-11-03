@@ -99,6 +99,11 @@
     height: 1em;
 }
 
+.chat-element .chat-feed .chat-line a {
+    color: var(--ov-chat-link-color, inherit);
+    text-decoration: none;
+}
+
 /* The word-break rule for message text is scoped under `.dash-widget-body`
  * (dashboard + iframe page) — the in-scene element needs its own so unbroken
  * strings (URLs, long handles) wrap too. */

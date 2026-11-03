@@ -15,6 +15,7 @@ import {
 	bannedMessagesFromConfig,
 	CHAT_CONFIG_FIELDS,
 	CHAT_PLATFORMS,
+	chatBadgesFromConfig,
 	chatOrderFromConfig,
 	chatPlatformIconsFromConfig,
 	chatTimestampsFromConfig,
@@ -594,6 +595,8 @@ type ChatFeedAttrs = {
 	showPlatformIcons: boolean;
 	/** Show each line's arrival time next to it. */
 	showTimestamps: boolean;
+	/** Show the sender's badges in front of the username. */
+	showBadges: boolean;
 	feedKey: string;
 	/** The feed sizes itself to its box: show as many lines as fit (the
 	 * in-scene element). The dashboard widget leaves it unset (config cap). */
@@ -679,8 +682,14 @@ const ChatFeed: m.Component<ChatFeedAttrs, ChatFeedState> = {
 	},
 
 	view(vnode) {
-		const { lines, bottom, showPlatformIcons, showTimestamps, feedKey } =
-			vnode.attrs;
+		const {
+			lines,
+			bottom,
+			showPlatformIcons,
+			showTimestamps,
+			showBadges,
+			feedKey,
+		} = vnode.attrs;
 		// `auto` size: keep only the lines that fit the box — the newest in
 		// either order (bottom order lists oldest first, so its newest are at
 		// the end). `overflow: hidden` on the feed clips the rounding.
@@ -726,7 +735,7 @@ const ChatFeed: m.Component<ChatFeedAttrs, ChatFeedState> = {
 							</span>
 						)}
 
-						{renderBadges(line.badges)}
+						{showBadges ? renderBadges(line.badges) : null}
 
 						{line.username && (
 							<>
@@ -785,6 +794,7 @@ export function chatFeed(
 	const showPlatformIcons = chatPlatformIconsFromConfig(w.config, specs.length);
 	const bottom = chatOrderFromConfig(w.config) === "bottom";
 	const showTimestamps = chatTimestampsFromConfig(w.config);
+	const showBadges = chatBadgesFromConfig(w.config);
 	const feedKey = `chat-feed:${specs.map((spec) => spec.spec).join(",")}`;
 
 	return m(ChatFeed, {
@@ -794,6 +804,7 @@ export function chatFeed(
 		bottom,
 		showPlatformIcons,
 		showTimestamps,
+		showBadges,
 		maxLines,
 	});
 }

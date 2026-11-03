@@ -16,6 +16,8 @@ export interface ChatProps {
     bannedMessages: "strike" | "hide";
     /** Show each message's arrival time. */
     timestamps: "off" | "on";
+    /** Show the sender's badges (subscriber/moderator, …) in front of the name. */
+    badges: "off" | "on";
     /** Platform icons: "auto" (only when >1 channel), forced "on", or "off". */
     platformIcons: "auto" | "on" | "off";
     /** Feed text size in px. */
@@ -43,6 +45,7 @@ export const DEFAULT_CHAT_PROPS: Required<ChatProps> = {
     order: "top",
     bannedMessages: "strike",
     timestamps: "off",
+    badges: "on",
     platformIcons: "auto",
     fontSize: 48,
     fontFamily: "Inter, system-ui, sans-serif",
@@ -75,6 +78,11 @@ export const chatSchema: OverlayElementSchema = {
                 "timestamps",
                 ["off", "on"] as const,
                 d.timestamps,
+            ),
+            badges: read.oneOf(
+                "badges",
+                ["off", "on"] as const,
+                d.badges,
             ),
             platformIcons: read.oneOf(
                 "platformIcons",
