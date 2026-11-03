@@ -4,9 +4,12 @@ The control server ships a visual overlay editor. Overlays you compose there are
 served as transparent runtime pages that OBS loads with a **Browser Source**.
 
 A user can have **multiple independent overlays** (stored in the `overlays`
-table). Each overlay is fully self-contained — its own canvas, variables,
-assets and elements — and has its **own runtime token**, so one account can
-run several OBS scenes side by side.
+table). Each overlay is fully self-contained — its own canvas, variables and
+elements — and has its **own runtime token**, so one account can run several
+OBS scenes side by side. Media (images, videos, alert sounds) is not stored
+in the overlay: elements reference files in the user's asset library, which
+the server keeps on disk (the `--storage` directory) and serves to the
+runtime page through its token-scoped file endpoint.
 
 - Overlay list: `/overlays/`, overlay editor: `/overlays/edit/<overlay id>/` (logged-in users only)
 - Runtime: `/overlay/<overlay id>?token=<token>` (no session, token-gated)
@@ -57,7 +60,7 @@ shape (see `ElementBase` in [`shared/overlay.ts`](../shared/overlay.ts)):
 | Type         | Props                                                                                       | Selector handles |
 | ------------ | ------------------------------------------------------------------------------------------- | ---------------- |
 | `text`       | `text`, `fontSize` (1–2000, 48), `fontFamily`, `color`, `fontWeight` (400/600/700/900), `lineHeight` (0.1–10), `textAlign` (left/center/right) | box |
-| `image`      | `assetId` — references an overlay asset; a missing asset renders an empty placeholder box   | box |
+| `image`      | `libraryAssetId` — a file id from the asset library (the inspector's picker); a missing file renders an empty placeholder box | box |
 | `rectangle`  | `fill`, `stroke` (both `#rrggbb`), `strokeWidth` (0–500), `radius` (corner radius, 0 = square) | box |
 | `ellipse`    | `fill`, `stroke`, `strokeWidth`                                                             | box |
 | `line`       | `stroke`, `strokeWidth` (1–500), `flip` (box diagonal: false = TL→BR, true = TR→BL)         | two endpoint handles |
@@ -76,8 +79,7 @@ fetches.
 ### Overlay limits
 
 From `OVERLAY_LIMITS`: ≤ 50 overlays per user; canvas 16…8192 px per axis,
-≤ 500 elements per overlay, ≤ 200 variables, ≤ 100 assets, ≤ 25 MB base64 per
-asset, ≤ 100 MB total asset data, coordinates ≤ 100 000.
+≤ 500 elements per overlay, ≤ 200 variables, coordinates ≤ 100 000.
 
 ## Variables
 
@@ -169,8 +171,7 @@ Every mutation goes over REST and is fanned out to two WebSocket topics
 | --------------------- | -------------------------- | ------------------------------------------------------------------ | :----: | :-----: |
 | `overlays.snapshot`   | `{overlay, version}`       | Runtime WS connects, after the token check (the full overlay; `version` is the server build stamp the page compares to its own bundle to reload after a new deployment) | –    | ✔ |
 | `overlays.overlays`   | `{overlays}`               | the user's overlay list changed (create/delete/duplicate) — each item is a summary `{id, name, token, elementCount, updatedAt}` | ✔      | – |
-| `overlays.overlay`    | `{overlay}`                | any mutation of one overlay: rename, element add/update/delete, canvas resize, variable create/rename/retype/revalue/delete, asset upload/delete (the overlay **without asset bytes** — `assets` is always `[]` in these frames, so a visibility toggle costs a few KB even for an overlay with multi-MB assets) | ✔      | ✔ |
-| `overlays.assets`     | `{assets}`                 | an asset was uploaded or deleted (the full asset list, bytes included — the only live frames carrying them, next to `overlays.snapshot`) | ✔      | ✔ |
+| `overlays.overlay`    | `{overlay}`                | any mutation of one overlay: rename, element add/update/delete, canvas resize, variable create/rename/retype/revalue/delete | ✔      | ✔ |
 | `overlays.alert`      | `{name, payload}`          | `GET /overlay/alert/<name>` was called (the trigger event; `payload` carries the trigger's validated `<name>=<value>` pairs) | – | ✔  |
 | `overlays.applyAlert` | `{values}`                 | uplink: the runtime page goes on air with an alert and writes its values to the overlay variables (`overlays.overlay` frame is the ack) | – | uplink |
 | `overlays.token`      | `{overlayId, token}`       | that overlay's token rotation                                       | ✔      | –  |
@@ -254,8 +255,9 @@ contribute elements; a new type never touches `shared/overlay.ts`,
    `type`, `defaultProps`, `normalizeProps(props, read)` (coerce the known
    props with the `read.num/hex/str/oneOf/bool` helpers; unknown keys are
    preserved by the core for forward compatibility), optional `container`
-   (may parent other elements) and `assetProps` (props holding an overlay
-   asset id, validated against the overlay's assets). This file must stay
+   (may parent other elements) and `serverAssetProps` (props holding a file
+   id of the user's asset library, resolved at render time; the runtime page
+   serves them through its token-scoped file endpoint). This file must stay
    environment-free — it runs on the control server too.
 2. **Browser half** — add (or extend) `<module>/overlay_elements.tsx`,
    default-exporting an array of `OverlayElementDef`

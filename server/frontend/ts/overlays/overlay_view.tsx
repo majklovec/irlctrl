@@ -26,21 +26,20 @@ import { elementDef } from "@ui/overlay/registry";
 import m from "mithril";
 import { APP_VERSION } from "../../../../shared/app_version";
 import type {
-	Asset,
 	Canvas,
 	Overlay,
 	OverlayElement,
 	Variable,
 	VariableValue,
 } from "../../../../shared/overlay";
-import { assetUrl, sceneElementsView } from "./overlay_render";
+import { overlayElementSchema } from "../../../../shared/overlay_elements";
+import { sceneElementsView } from "./overlay_render";
 import "../../css/overlay.css";
 
 interface RuntimeState {
 	overlay: Overlay | undefined;
 	canvas: Canvas;
 	variables: Variable[];
-	assets: Asset[];
 	/** active trigger state per trigger-driven element id (intro/show/outro) */
 	activeTriggers: Map<string, TriggerState>;
 }
@@ -64,7 +63,6 @@ const state: RuntimeState = {
 	overlay: undefined,
 	canvas: { width: 1920, height: 1080 },
 	variables: [],
-	assets: [],
 	activeTriggers: new Map(),
 };
 
@@ -130,26 +128,37 @@ function variableNamesMap(): Map<string, VariableValue> {
 }
 
 function assetMap(): Map<string, string> {
-	return new Map(state.assets.map((a) => [a.id, assetUrl(a)]));
+	// Server-asset references (`libraryAssetId`, alert media/audio) are the
+	// owner's asset-library files, served through the token-scoped endpoint
+	// (this page has no session cookie).
+	const map = new Map<string, string>();
+	for (const e of state.overlay?.elements ?? [])
+		for (const key of overlayElementSchema(e.type)?.serverAssetProps ??
+			[]) {
+			const id = e.props[key];
+			if (typeof id === "string" && id && !map.has(id))
+				map.set(
+					id,
+					`/overlay/${encodeURIComponent(overlayId)}/files/${encodeURIComponent(id)}?token=${encodeURIComponent(token)}`,
+				);
+		}
+	return map;
 }
 
-/** The initial `overlays.snapshot`: the complete state — overlay, canvas,
- * variables and the asset bytes (the only frame that carries them). */
+/** The initial `overlays.snapshot`: the complete state — overlay, canvas
+ * and variables. */
 function applySnapshot(data: Record<string, unknown>): void {
 	const overlay = data.overlay as Overlay | null | undefined;
 	if (overlay) {
 		state.overlay = overlay;
 		if (overlay.canvas) state.canvas = overlay.canvas;
 		if (Array.isArray(overlay.variables)) state.variables = overlay.variables;
-		if (Array.isArray(overlay.assets)) state.assets = overlay.assets;
 	}
 	m.redraw();
 }
 
 /** An `overlays.overlay` frame (element/canvas/variable change): apply the
- * whole overlay, dropping a stale push (lower rev) that lags a fresher one.
- * The frame is slim — its `assets` never carries bytes — so the page's asset
- * list (snapshot + `overlays.assets` frames) is left untouched. */
+ * whole overlay, dropping a stale push (lower rev) that lags a fresher one. */
 function applyOverlayFrame(overlay: Overlay): void {
 	const local = state.overlay;
 	if (
@@ -200,9 +209,6 @@ function handleMessage(raw: MessageEvent, first: { open: boolean }): void {
 				String(data.name ?? ""),
 				(data.payload ?? {}) as Record<string, unknown>,
 			);
-			break;
-		case "overlays.assets":
-			if (Array.isArray(data.assets)) state.assets = data.assets;
 			break;
 		case "overlays.canvas":
 			if (data.canvas) state.canvas = data.canvas as Canvas;

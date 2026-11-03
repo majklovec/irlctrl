@@ -11,7 +11,6 @@
  */
 
 import {
-	assetUrl,
 	elementStyle,
 	resolveElement,
 	resolveElementProps,
@@ -28,7 +27,7 @@ export type {
 	CSS,
 	ElementContext,
 } from "@ui/overlay/element";
-export { assetUrl, elementStyle, resolveElement, resolveElementProps };
+export { elementStyle, resolveElement, resolveElementProps };
 
 import type { ElementContext } from "@ui/overlay/element";
 import { elementDef } from "@ui/overlay/registry";

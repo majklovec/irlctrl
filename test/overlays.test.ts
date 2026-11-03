@@ -16,6 +16,7 @@ const BunWebSocket = WebSocket as unknown as new (
 
 let tempDir: string;
 let databasePath: string;
+let storagePath: string;
 let port: number;
 let serverProcess: ReturnType<typeof Bun.spawn> | undefined;
 let baseUrl: string;
@@ -46,6 +47,8 @@ async function startServer(): Promise<void> {
             String(port),
             "--db",
             databasePath,
+            "--storage",
+            storagePath,
         ],
         { cwd: projectRoot, stdout: "ignore", stderr: "ignore" },
     );
@@ -206,6 +209,7 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
     beforeAll(async () => {
         tempDir = await mkdtemp(join(tmpdir(), "irlctrl-overlays-"));
         databasePath = join(tempDir, "users.sqlite");
+        storagePath = join(tempDir, "storage");
         port = await availablePort();
         await startServer();
     });
@@ -244,7 +248,6 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
         name: string;
         canvas: { width: number; height: number };
         variables: OverlayVariable[];
-        assets: unknown[];
         elements: OverlayElement[];
         rev?: number;
     };
@@ -402,40 +405,6 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                 (overlayEvent.data as { overlay: Overlay }).overlay.elements
                     .length,
             ).toBe(1);
-            // live frames are slim: even a fresh `overlays.overlay` frame
-            // carries no asset bytes
-            expect(overlayOf(overlayEvent).assets).toEqual([]);
-
-            // assets travel in their own frame (bytes included) plus the
-            // slim overlay frame for the rest of the state
-            const assetRes = await fetch(
-                `${baseUrl}/api/overlays/${overlayId}/assets`,
-                {
-                    method: "POST",
-                    headers: { cookie, "content-type": "application/json" },
-                    body: JSON.stringify({
-                        filename: "dot.png",
-                        mime: "image/png",
-                        dataBase64: Buffer.from("png-bytes").toString(
-                            "base64",
-                        ),
-                    }),
-                },
-            );
-            expect(assetRes.status).toBe(201);
-            const assetsEvent = await nextFrame(
-                editorSocket,
-                (f) =>
-                    f.event === "overlays.assets" &&
-                    (f.data as { assets?: unknown[] })?.assets?.length === 1,
-            );
-            const pushedAsset = (
-                (assetsEvent.data as { assets: unknown[] }).assets
-            )[0] as Record<string, unknown>;
-            expect(pushedAsset.filename).toBe("dot.png");
-            expect(pushedAsset.dataBase64).toBe(
-                Buffer.from("png-bytes").toString("base64"),
-            );
 
             // a duplicate clones the overlay's elements under a fresh id,
             // name and token
@@ -1081,11 +1050,6 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                     live.data as { overlay: Overlay }
                 ).overlay.elements[0] as OverlayElement;
                 expect(liveEl.props?.text).toBe("Updated");
-                // the live frame stays slim: asset bytes ride only in the
-                // snapshot and in `overlays.assets` frames
-                expect(
-                    (live.data as { overlay: Overlay }).overlay.assets,
-                ).toEqual([]);
             } finally {
                 runtimeSocket.close();
             }
@@ -1384,7 +1348,115 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
             editorSocket.close();
         }
 
-        // the overlay from the test is gone; the user is back to no overlays
+        // ── runtime file serving (asset-library reuse) ─────────────
+        // The user's asset library (the server-side asset manager) is what
+        // `libraryAssetId` references; the OBS runtime page has no session,
+        // so the bytes must be reachable through the overlay's token alone.
+        // A dedicated overlay keeps the assertions above (which count the
+        // "Intro" overlay's single element) intact.
+        const mediaCreate = await fetch(`${baseUrl}/api/overlays`, {
+            method: "POST",
+            headers: { cookie, "content-type": "application/json" },
+            body: JSON.stringify({ name: "Media" }),
+        });
+        expect(mediaCreate.status).toBe(201);
+        const media = (await mediaCreate.json()) as {
+            id: string;
+            token: string;
+        };
+
+        const rootRes = await fetch(`${baseUrl}/api/assets/folders`, {
+            headers: { cookie },
+        });
+        const rootFolder = (
+            (await rootRes.json()) as { folders: { id: string }[] }
+        ).folders[0].id;
+        const form = new FormData();
+        form.append("folderId", rootFolder);
+        form.append(
+            "files",
+            new File([new TextEncoder().encode("library-bytes")], "lib.png", {
+                type: "image/png",
+            }),
+        );
+        const libUpload = await fetch(`${baseUrl}/api/assets/files`, {
+            method: "POST",
+            headers: { cookie },
+            body: form,
+        });
+        expect(libUpload.status).toBe(200);
+        const libFile = (
+            (await libUpload.json()) as { files: { id: string }[] }
+        ).files[0];
+
+        const libElement: OverlayElement = {
+            id: crypto.randomUUID(),
+            name: "library-image",
+            type: "image",
+            transform: {
+                x: 0,
+                y: 0,
+                width: 120,
+                height: 80,
+                rotation: 0,
+                opacity: 1,
+            },
+            visible: true,
+            locked: false,
+            parentId: null,
+            bindings: {},
+            props: { assetId: "", libraryAssetId: libFile.id },
+        };
+        const libRes = await fetch(
+            `${baseUrl}/api/overlays/${media.id}/elements`,
+            {
+                method: "PUT",
+                headers: { cookie, "content-type": "application/json" },
+                body: JSON.stringify({ element: libElement }),
+            },
+        );
+        expect(libRes.status).toBe(200);
+
+        // the owner's file serves through the overlay's token
+        const served = await fetch(
+            `${baseUrl}/overlay/${media.id}/files/${libFile.id}?token=${media.token}`,
+        );
+        expect(served.status).toBe(200);
+        expect(served.headers.get("content-type")).toBe("image/png");
+        expect(await served.text()).toBe("library-bytes");
+
+        // a bad token, unknown overlay, or unknown file all 404 (the probe
+        // must not leak existence, like the runtime page)
+        expect(
+            (
+                await fetch(
+                    `${baseUrl}/overlay/${media.id}/files/${libFile.id}?token=00000000000000000000000000000000`,
+                )
+            ).status,
+        ).toBe(404);
+        expect(
+            (
+                await fetch(
+                    `${baseUrl}/overlay/nope/files/${libFile.id}?token=${media.token}`,
+                )
+            ).status,
+        ).toBe(404);
+        expect(
+            (
+                await fetch(
+                    `${baseUrl}/overlay/${media.id}/files/00000000-0000-4000-8000-000000000000?token=${media.token}`,
+                )
+            ).status,
+        ).toBe(404);
+
+        // tidy up so the user is back to no overlays
+        const mediaDelete = await fetch(
+            `${baseUrl}/api/overlays/${media.id}`,
+            { method: "DELETE", headers: { cookie } },
+        );
+        expect(mediaDelete.status).toBe(200);
+
+        // the overlays from the test are gone; the user is back to none
         const after = (await (
             await fetch(`${baseUrl}/api/overlays`, { headers: { cookie } })
         ).json()) as { overlays: OverlaySummary[] };

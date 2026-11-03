@@ -164,24 +164,30 @@ export const lineSchema: OverlayElementSchema = {
 };
 
 export interface ImageProps {
-    /** id of a project asset; `""` (or a missing asset) renders an empty box */
-    assetId: string;
+    /** id of a file in the user's asset library; `""` (or a missing file)
+     * renders an empty box */
+    libraryAssetId: string;
 }
 
-export const DEFAULT_IMAGE_PROPS: Required<ImageProps> = { assetId: "" };
+export const DEFAULT_IMAGE_PROPS: Required<ImageProps> = {
+    libraryAssetId: "",
+};
 
 export const imageSchema: OverlayElementSchema = {
     type: "image",
     defaultProps: DEFAULT_IMAGE_PROPS,
-    assetProps: ["assetId"],
+    serverAssetProps: ["libraryAssetId"],
     normalizeProps(_props, read) {
-        return { assetId: read.str("assetId", "") };
+        return {
+            libraryAssetId: read.str("libraryAssetId", "", 200),
+        };
     },
 };
 
 export interface VideoProps {
-    /** id of a project video asset; `""` (or a missing asset) renders an empty box */
-    assetId: string;
+    /** id of a file in the user's asset library (video/*); `""` (or a missing
+     * file) renders an empty box */
+    libraryAssetId: string;
     /** 0–1, the video's audio track (no effect while muted) */
     volume: number;
     /** muted videos are the only ones browsers allow to autoplay — the safe default */
@@ -193,7 +199,7 @@ export interface VideoProps {
 }
 
 export const DEFAULT_VIDEO_PROPS: Required<VideoProps> = {
-    assetId: "",
+    libraryAssetId: "",
     volume: 1,
     muted: true,
     loop: true,
@@ -203,11 +209,11 @@ export const DEFAULT_VIDEO_PROPS: Required<VideoProps> = {
 export const videoSchema: OverlayElementSchema = {
     type: "video",
     defaultProps: DEFAULT_VIDEO_PROPS,
-    assetProps: ["assetId"],
+    serverAssetProps: ["libraryAssetId"],
     normalizeProps(props, read) {
         const d = DEFAULT_VIDEO_PROPS;
         return {
-            assetId: read.str("assetId", ""),
+            libraryAssetId: read.str("libraryAssetId", "", 200),
             volume: read.num("volume", d.volume, 0, 1),
             // `read.bool` can't express a default of `true` (a missing key
             // reads as `false`), so these flags keep their default unless the
@@ -352,7 +358,7 @@ export const DEFAULT_ALERT_PROPS: Required<AlertProps> = {
 export const alertSchema: OverlayElementSchema = {
     type: "alert",
     defaultProps: DEFAULT_ALERT_PROPS,
-    assetProps: ["mediaAssetId", "audioAssetId"],
+    serverAssetProps: ["mediaAssetId", "audioAssetId"],
     normalizeProps(_props, read) {
         const d = DEFAULT_ALERT_PROPS;
         return {

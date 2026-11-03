@@ -3,7 +3,8 @@
  *
  * The control server persists one overlay per row in the `overlays` table as a
  * JSON blob (see server/backend/overlays/overlay_store.ts). An overlay is
- * self-contained: its own canvas, variables, assets, elements and token. The
+ * self-contained: its own canvas, variables and elements, plus (in the DB)
+ * the token. Media lives in the server-side asset library (disk). The
  * runtime page renders an overlay from the same types
  * (server/frontend/ts/overlays/overlay_render.tsx). Validation is hand-rolled
  * `ApiError` style like the rest of the server (no Zod in this repo).
@@ -31,17 +32,6 @@ export interface Variable {
 	type: VariableType;
 	/** color values are "#rrggbb"; number/boolean/string as the type says. */
 	value: string | number | boolean;
-}
-
-export interface Asset {
-	id: string;
-	/** hex content hash (sha-256) — dedupe key */
-	hash: string;
-	mime: string;
-	filename: string;
-	/** base64-encoded bytes; kept in the project blob (control-server precedent:
-	 * dashboards store whole widgets as JSON blobs, no per-file store). */
-	dataBase64: string;
 }
 
 export interface Transform {
@@ -163,15 +153,15 @@ export type OverlayElement = ElementBase & Record<string, unknown>;
 
 /**
  * A self-contained overlay: one row in the `overlays` table. It owns its own
- * canvas, variables, assets, elements and (in the DB) token. The editor edits
- * one overlay at a time; the runtime page renders one overlay.
+ * canvas, variables and elements, and (in the DB) a token. The editor edits
+ * one overlay at a time; the runtime page renders one overlay. Media lives in
+ * the server-side asset library (disk); elements reference it by file id.
  */
 export interface Overlay {
 	schemaVersion: number;
 	name: string;
 	canvas: Canvas;
 	variables: Variable[];
-	assets: Asset[];
 	/** back-to-front order: index 0 renders first */
 	elements: OverlayElement[];
 	/** Server-managed monotonic counter (bumped on every element mutation).
@@ -198,14 +188,9 @@ export const OVERLAY_LIMITS = {
 	nameMax: 120,
 	/** max overlays a single user may have */
 	overlaysMax: 50,
-	/** per-overlay element/variable/asset caps */
+	/** per-overlay element/variable caps */
 	elementsMax: 500,
 	variablesMax: 200,
-	assetsMax: 100,
-	/** base64 length (chars) of a single asset */
-	assetBase64Max: 1024 * 1024 * 25,
-	/** base64 length of one overlay's whole asset set */
-	overlayBase64Max: 1024 * 1024 * 100,
 	coordMax: 100000,
 } as const;
 
@@ -248,7 +233,6 @@ export function defaultOverlay(name = "Overlay 1"): Overlay {
 		name,
 		canvas: defaultCanvas(),
 		variables: [],
-		assets: [],
 		elements: [],
 	};
 }
@@ -325,38 +309,6 @@ export const isMimeKind = (
 	kind: "image" | "video" | "audio",
 ): boolean => mime.startsWith(`${kind}/`);
 
-export const ACCEPTED_ASSET_MIME_PREFIXES = [
-	"image/",
-	"video/",
-	"audio/",
-] as const;
-
-export const isAcceptedAssetMime = (mime: string): boolean =>
-	ACCEPTED_ASSET_MIME_PREFIXES.some((p) => mime.startsWith(p));
-
-const normalizeAsset = (raw: unknown): Asset => {
-	if (!isRecord(raw)) throw new Error("asset must be an object");
-	const id = typeof raw.id === "string" && raw.id ? raw.id : "";
-	const hash = typeof raw.hash === "string" && raw.hash ? raw.hash : "";
-	const mime =
-		typeof raw.mime === "string" && isAcceptedAssetMime(raw.mime)
-			? raw.mime
-			: "";
-	const filename =
-		typeof raw.filename === "string" && raw.filename
-			? raw.filename.slice(0, 255)
-			: "";
-	const dataBase64 =
-		typeof raw.dataBase64 === "string" &&
-		raw.dataBase64.length <= OVERLAY_LIMITS.assetBase64Max
-			? raw.dataBase64
-			: "";
-	if (!id || !hash || !mime || !filename || !dataBase64)
-		throw new Error(
-			"asset needs id, hash, image/video/audio mime, filename and data",
-		);
-	return { id, hash, mime, filename, dataBase64 };
-};
 
 const normalizeTransform = (raw: unknown): Transform => {
 	const r = isRecord(raw) ? raw : {};
@@ -582,49 +534,35 @@ export function normalizeOverlay(raw: Record<string, unknown>): Overlay {
 			: "Overlay";
 	const canvas = normalizeCanvas(raw.canvas);
 	const variablesRaw = Array.isArray(raw.variables) ? raw.variables : [];
-	const assetsRaw = Array.isArray(raw.assets) ? raw.assets : [];
 	const elementsRaw = Array.isArray(raw.elements) ? raw.elements : [];
 	if (variablesRaw.length > OVERLAY_LIMITS.variablesMax)
 		throw new Error("overlay has too many variables");
-	if (assetsRaw.length > OVERLAY_LIMITS.assetsMax)
-		throw new Error("overlay has too many assets");
 	const variables = variablesRaw.map(normalizeVariable);
-	const assets = assetsRaw.map(normalizeAsset);
 	const varIds = new Set(variables.map((v) => v.id));
-	const assetIds = new Set(assets.map((a) => a.id));
-	const overlayBase64 = assets.reduce((n, a) => n + a.dataBase64.length, 0);
-	if (overlayBase64 > OVERLAY_LIMITS.overlayBase64Max)
-		throw new Error("overlay assets are too large");
 	const elements = normalizeElements(elementsRaw, name);
-	// bindings must reference existing variables; image assets must exist
+	// bindings must reference existing variables
 	for (const e of elements) {
 		for (const b of Object.values(e.bindings))
 			if (!varIds.has(b.variableId))
 				throw new Error(
 					`overlay ${name}: binding to unknown variable ${b.variableId}`,
 				);
-		for (const key of overlayElementSchema(e.type)?.assetProps ?? []) {
-			const aid = e.props[key];
-			if (typeof aid === "string" && aid && !assetIds.has(aid))
-				throw new Error(
-					`overlay ${name}: element ${e.name} references a missing asset`,
-				);
-		}
 	}
 	return {
 		schemaVersion: OVERLAY_SCHEMA_VERSION,
 		name,
 		canvas,
 		variables,
-		assets,
 		elements,
+		// `assets` is a pre-2.x embedded-asset key: dropped on load, media
+		// now lives in the server-side asset library (disk)
 		...spreadRest(raw, [
 			"schemaVersion",
 			"name",
 			"canvas",
 			"variables",
-			"assets",
 			"elements",
+			"assets",
 		]),
 	};
 }

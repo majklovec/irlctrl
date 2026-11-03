@@ -36,6 +36,8 @@ interface ControlServerOptions {
     port: number;
     noAuth: boolean;
     databaseFile: string;
+    /** Directory the asset files are stored on disk. */
+    storageDir: string;
 }
 
 export async function createControlServer(options: ControlServerOptions) {
@@ -45,6 +47,10 @@ export async function createControlServer(options: ControlServerOptions) {
     });
     const frontend = await createFrontend();
     await i18nReady;
+    const assets = createAssets({
+        db: auth.db,
+        storageDir: options.storageDir,
+    });
 
     const app = new Elysia({ name: "control-server" });
     const publish: Publish = (topic, message) => {
@@ -67,7 +73,6 @@ export async function createControlServer(options: ControlServerOptions) {
         databaseFile: options.databaseFile,
         publish,
     });
-    const assets = createAssets({ db: auth.db });
 
     for (const mod of ALL_MODULES) {
         if (mod.controlRoutes)
@@ -91,7 +96,7 @@ export async function createControlServer(options: ControlServerOptions) {
         .use(pwaRoutes())
         .use(accountRoutes(auth, frontend))
         .use(dashboardRoutes(auth, dashboards, devices, frontend))
-        .use(overlayRoutes(auth, overlays, frontend))
+        .use(overlayRoutes(auth, overlays, assets, frontend))
         .use(assetRoutes(auth, assets, frontend))
         .use(deviceListRoutes(auth, devices, frontend))
         .use(deviceConnectionRoutes(devices))

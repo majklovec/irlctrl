@@ -12,6 +12,11 @@
  *                                  pairs ride with the alert and land in
  *                                  overlay variables when the alert plays
  *                                  (token auth)
+ *   GET  /overlay/:id/files/:fileId?token=…
+ *                                  the bytes of an asset-library file an
+ *                                  image/video element references
+ *                                  (`libraryAssetId`); owner-scoped through
+ *                                  the overlay's token (token auth)
  *   WS   /overlay/:id/ws?token=…   the runtime live feed (token auth);
  *                                  also accepts the runtime page's
  *                                  `overlays.applyAlert` uplink (it writes
@@ -29,6 +34,7 @@ import { APP_VERSION } from "../../../shared/app_version";
 import type { createFrontend } from "../../../shared/frontend";
 import { upgradeRequired } from "../../../shared/http";
 import { socketMessage } from "../../../shared/socket_message";
+import type { Assets } from "../assets/asset_store";
 import type { createAuth } from "../auth/auth";
 import { authenticatedHandler } from "../auth/authenticated";
 import { event } from "../contracts";
@@ -103,9 +109,11 @@ function runtimePage(frontend: Frontend): Response {
     return response;
 }
 
+
 export function overlayRoutes(
     auth: Auth,
     overlays: Overlays,
+    assets: Assets,
     frontend: Frontend,
 ) {
     return new Elysia({ name: "control-overlays" })
@@ -170,6 +178,51 @@ export function overlayRoutes(
                         queryValues(request),
                     );
                 }),
+        )
+        // Media of an image/video element that references the owner's asset
+        // library (`libraryAssetId`). Token-scoped like the rest of the
+        // runtime: the overlay's token names its owner, and only that owner's
+        // files can be served through it. A bad token, unknown overlay, or a
+        // file that is not the owner's all 404 (probes must not leak).
+        .get(
+            "/overlay/:id/files/:fileId",
+            ({ request, params }) => {
+                const feed = overlays.runtimeOverlay(
+                    runtimeToken(request),
+                    decodeURIComponent(params.id),
+                );
+                if (!feed)
+                    return Response.json(
+                        { ok: false, error: "Not found", code: 404 },
+                        { status: 404 },
+                    );
+                let file: { mime: string; data: Uint8Array };
+                try {
+                    const blob = assets.fileBlob(feed.owner, params.fileId);
+                    file = { mime: blob.file.mimeType, data: blob.data };
+                } catch (err: unknown) {
+                    const code = err instanceof ApiError ? err.code : 500;
+                    return Response.json(
+                        {
+                            ok: false,
+                            error:
+                                err instanceof Error
+                                    ? err.message
+                                    : "Internal error",
+                            code,
+                        },
+                        { status: code },
+                    );
+                }
+                return new Response(file.data as BodyInit, {
+                    status: 200,
+                    headers: {
+                        "content-type": file.mime,
+                        "content-length": String(file.data.byteLength),
+                        ...RUNTIME_HEADERS,
+                    },
+                });
+            },
         )
         .get("/overlay/:id", () => runtimePage(frontend))
         .all(

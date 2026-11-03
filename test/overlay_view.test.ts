@@ -89,7 +89,8 @@ describe("overlay runtime auto-reload (headless DOM)", () => {
         const compStub = [
             "Actions", "Badge", "Break", "Button", "Card", "Checkbox",
             "CheckField", "DefinitionList", "Field", "FieldGroup", "Form",
-            "IconButton", "Input", "NumberField", "Options", "Select",
+            "IconButton", "Input", "Modal", "NumberField", "Options",
+            "Select",
         ]
             .map((n) => `export const ${n} = {};`)
             .concat(["export const numberAttrs = () => ({});"])
@@ -267,8 +268,7 @@ describe("overlay runtime auto-reload (headless DOM)", () => {
         expect(reloadCalls).toBe(0);
     });
 
-    test("a slim overlay frame hides the element without wiping its assets", async () => {
-        await loadPage();
+    test("an overlay frame hides the element without dropping its library media", async () => {
         const imageOverlay = (visible: boolean, rev: number) => ({
             schemaVersion: 1,
             name: "t",
@@ -276,19 +276,6 @@ describe("overlay runtime auto-reload (headless DOM)", () => {
             rev,
             canvas: { width: 1920, height: 1080 },
             variables: [],
-            // only the snapshot carries the bytes; live frames are slim
-            assets:
-                rev === 1
-                    ? [
-                          {
-                              id: "a1",
-                              hash: "h1",
-                              mime: "image/png",
-                              filename: "x.png",
-                              dataBase64: "QUJD",
-                          },
-                      ]
-                    : [],
             elements: [
                 {
                     id: "el-img",
@@ -306,7 +293,9 @@ describe("overlay runtime auto-reload (headless DOM)", () => {
                     locked: false,
                     parentId: null,
                     bindings: {},
-                    props: { assetId: "a1" },
+                    // a library file: the runtime resolves it through the
+                    // token-scoped endpoint
+                    props: { libraryAssetId: "a1" },
                 },
             ],
         });
@@ -318,9 +307,11 @@ describe("overlay runtime auto-reload (headless DOM)", () => {
         let img = document.querySelector(
             "#app img.overlay-image",
         ) as HTMLImageElement | null;
-        expect(img?.getAttribute("src")).toContain("data:image/png;base64,QUJD");
+        expect(img?.getAttribute("src")).toBe(
+            "/overlay/scene-1/files/a1?token=tok",
+        );
 
-        // the slim hide frame: `assets: []` must not empty the page's map
+        // a hide frame must not drop the element's media reference
         frame("overlays.overlay", {
             overlayId: "scene-1",
             overlay: imageOverlay(false, 2),
@@ -331,7 +322,7 @@ describe("overlay runtime auto-reload (headless DOM)", () => {
         );
         expect(el?.getAttribute("style")).toContain("visibility: hidden");
 
-        // re-shown, the image renders from the kept bytes (not the
+        // re-shown, the image renders its library file (not the
         // missing-asset placeholder)
         frame("overlays.overlay", {
             overlayId: "scene-1",
@@ -341,6 +332,8 @@ describe("overlay runtime auto-reload (headless DOM)", () => {
         img = document.querySelector(
             "#app img.overlay-image",
         ) as HTMLImageElement | null;
-        expect(img?.getAttribute("src")).toContain("data:image/png;base64,QUJD");
+        expect(img?.getAttribute("src")).toBe(
+            "/overlay/scene-1/files/a1?token=tok",
+        );
     });
 });

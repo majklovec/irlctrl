@@ -12,6 +12,8 @@ services:
         command:
             - "--db"
             - "/config/users.db"
+            - "--storage"
+            - "/config/assets"
         volumes:
             - ./config/server:/config
         ports:

@@ -11,7 +11,6 @@ import {
 	cssFilterString,
 	defaultOverlay,
 	generateOverlayToken,
-	isAcceptedAssetMime,
 	isMimeKind,
 	migrateOverlayBlob,
 	normalizeFilters,
@@ -58,7 +57,6 @@ type RawOverlay = {
 	name: string;
 	canvas: { width: number; height: number };
 	variables: unknown[];
-	assets: unknown[];
 	elements: Record<string, unknown>[];
 } & Record<string, unknown>;
 
@@ -67,7 +65,6 @@ const validV1Overlay = (): RawOverlay => ({
 	name: "Overlay 1",
 	canvas: { width: 1920, height: 1080 },
 	variables: [],
-	assets: [],
 	elements: [textElement()],
 });
 
@@ -324,7 +321,7 @@ describe("overlay schema", () => {
 			...textElement(),
 			type: "video",
 			props: {
-				assetId: "asset-2",
+				libraryAssetId: "lib-9",
 				volume: 0.5,
 				muted: false,
 				loop: false,
@@ -332,18 +329,36 @@ describe("overlay schema", () => {
 			},
 		});
 		expect(el.type).toBe("video");
-		expect(el.props.assetId).toBe("asset-2");
+		expect(el.props.libraryAssetId).toBe("lib-9");
 		expect(el.props.volume).toBe(0.5);
 		expect(el.props.muted).toBe(false);
 		expect(el.props.loop).toBe(false);
 		expect(el.props.autoplay).toBe(false);
 	});
 
+	test("image keeps a libraryAssetId (asset-library file reference)", () => {
+		const el = parseElementInput({
+			...textElement(),
+			type: "image",
+			props: { libraryAssetId: "lib-1" },
+		});
+		expect(el.type).toBe("image");
+		expect(el.props.libraryAssetId).toBe("lib-1");
+
+		// a non-string libraryAssetId falls back to ""
+		const bad = parseElementInput({
+			...textElement(),
+			type: "image",
+			props: { libraryAssetId: 7 },
+		});
+		expect(bad.props.libraryAssetId).toBe("");
+	});
+
 	test("video props fall back to the defaults when missing or invalid", () => {
 		const bare = parseElementInput({
 			...textElement(),
 			type: "video",
-			props: { assetId: "" },
+			props: {},
 		});
 		expect(bare.props.volume).toBe(DEFAULT_VIDEO_PROPS.volume);
 		expect(bare.props.muted).toBe(DEFAULT_VIDEO_PROPS.muted);
@@ -354,14 +369,14 @@ describe("overlay schema", () => {
 			...textElement(),
 			type: "video",
 			props: {
-				assetId: 42,
+				libraryAssetId: 42,
 				volume: 9,
 				muted: "no",
 				loop: 7,
 				autoplay: null,
 			},
 		});
-		expect(bad.props.assetId).toBe("");
+		expect(bad.props.libraryAssetId).toBe("");
 		expect(bad.props.volume).toBe(DEFAULT_VIDEO_PROPS.volume);
 		expect(bad.props.muted).toBe(DEFAULT_VIDEO_PROPS.muted);
 		expect(bad.props.loop).toBe(DEFAULT_VIDEO_PROPS.loop);
@@ -410,88 +425,33 @@ describe("overlay schema", () => {
 		});
 	});
 
-	test("image elements must reference existing assets", () => {
-		const raw = validV1Overlay();
-		raw.elements = [
-			{
-				...textElement({ id: "img-1", type: "image" }),
-				props: { assetId: "missing-asset" },
-			},
-		];
-		expect(() => normalizeOverlay(raw)).toThrow("missing asset");
-		raw.assets = [
-			{
-				id: "a1",
-				hash: "ab",
-				mime: "image/png",
-				filename: "x.png",
-				dataBase64: "AAAA",
-			},
-		];
-		raw.elements = [
-			{
-				...textElement({ id: "img-1", type: "image" }),
-				props: { assetId: "a1" },
-			},
-		];
-		expect(normalizeOverlay(raw).elements[0].props.assetId).toBe("a1");
+	test("legacy embedded assets are dropped on load", () => {
+		const raw: RawOverlay = {
+			...validV1Overlay(),
+			assets: [
+				{
+					id: "a1",
+					hash: "ab",
+					mime: "image/png",
+					filename: "x.png",
+					dataBase64: "AAAA",
+				},
+			],
+		};
+		const ok = normalizeOverlay(raw);
+		expect("assets" in ok).toBe(false);
 	});
 
-	test("image, video and audio asset mimes are accepted", () => {
-		for (const mime of [
-			"image/png",
-			"video/mp4",
-			"audio/mpeg",
-			"audio/wav",
-			"video/webm",
-		] as const) {
-			expect(isAcceptedAssetMime(mime)).toBe(true);
-		}
-		for (const mime of ["text/html", "application/json", "pdf", ""] as const) {
-			expect(isAcceptedAssetMime(mime)).toBe(false);
-		}
+	test("isMimeKind classifies media mimes", () => {
 		expect(isMimeKind("video/mp4", "video")).toBe(true);
 		expect(isMimeKind("audio/mpeg", "audio")).toBe(true);
 		expect(isMimeKind("image/png", "video")).toBe(false);
-	});
-
-	test("normalization keeps video/audio mimes, rejects others", () => {
-		const raw = validV1Overlay();
-		raw.assets = [
-			{
-				id: "vid",
-				hash: "ab",
-				mime: "video/mp4",
-				filename: "x.mp4",
-				dataBase64: "AAAA",
-			},
-			{
-				id: "snd",
-				hash: "cd",
-				mime: "audio/mpeg",
-				filename: "x.mp3",
-				dataBase64: "AAAA",
-			},
-		];
-		const assets = normalizeOverlay(raw).assets;
-		expect(assets.find((a) => a.id === "vid")?.mime).toBe("video/mp4");
-		expect(assets.find((a) => a.id === "snd")?.mime).toBe("audio/mpeg");
-
-		raw.assets.push({
-			id: "bad",
-			hash: "ef",
-			mime: "application/x-msdownload",
-			filename: "x.exe",
-			dataBase64: "AAAA",
-		});
-		expect(() => normalizeOverlay(raw)).toThrow("mime");
 	});
 
 	test("parent elements must exist, be groups, and be acyclic", () => {
 		const base = () => {
 			const raw = validV1Overlay();
 			raw.variables = [];
-			raw.assets = [];
 			return raw;
 		};
 

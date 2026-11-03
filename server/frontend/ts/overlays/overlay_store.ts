@@ -2,8 +2,8 @@ import { apiTry } from "@ui/api_client";
 import { elementDef } from "@ui/overlay/registry";
 import { uuid } from "@ui/util";
 import m from "mithril";
+import { overlayElementSchema } from "../../../../shared/overlay_elements";
 import type {
-    Asset,
     Overlay,
     OverlayElement,
     Transform,
@@ -12,7 +12,7 @@ import type {
 } from "../../../../shared/overlay";
 import { serverLive } from "../services/serverws";
 import type { ElementContext } from "./overlay_render";
-import { assetUrl, resolveElement } from "./overlay_render";
+import { resolveElement } from "./overlay_render";
 
 /** A user's overlay as the list page renders it (no element payload). */
 export interface OverlaySummary {
@@ -121,6 +121,70 @@ export function selElement(): OverlayElement | undefined {
     );
 }
 
+// ── asset library (files reused from the server-side asset manager) ──────
+// Object URLs of the library files the current overlay's elements reference
+// (`libraryAssetId`, resolved through the session: the asset endpoint serves
+// attachments, so the canvas needs a blob URL, not the raw endpoint).
+const libraryUrls = new Map<string, string>();
+const libraryLoads = new Map<string, Promise<void>>();
+// ids that failed to load (e.g. a file removed from the library). Cached so a
+// missing file is fetched once and then shown as missing — re-fetching on every
+// redraw would spam the endpoint with 404s (the `ctx()` runs each frame).
+const libraryMisses = new Set<string>();
+
+/** The library file ids referenced by the overlay's elements. */
+function libraryAssetIds(o: Overlay): string[] {
+    const ids = new Set<string>();
+    for (const e of o.elements)
+        for (const key of overlayElementSchema(e.type)?.serverAssetProps ?? []) {
+            const id = e.props[key];
+            if (typeof id === "string" && id) ids.add(id);
+        }
+    return [...ids];
+}
+
+/** Load every referenced library file once; a redraw on arrival. */
+export function loadLibraryAssets(o: Overlay): void {
+    for (const id of libraryAssetIds(o)) {
+        if (
+            libraryUrls.has(id) ||
+            libraryLoads.has(id) ||
+            libraryMisses.has(id)
+        )
+            continue;
+        const load = (async () => {
+            try {
+                const res = await fetch(
+                    `/api/assets/files/${encodeURIComponent(id)}`,
+                    { credentials: "same-origin" },
+                );
+                if (res.ok)
+                    libraryUrls.set(
+                        id,
+                        URL.createObjectURL(await res.blob()),
+                    );
+                else libraryMisses.add(id);
+            } catch {
+                // a file removed from the library shows as missing, as it
+                // does on the runtime page
+                libraryMisses.add(id);
+            } finally {
+                libraryLoads.delete(id);
+                m.redraw();
+            }
+        })();
+        libraryLoads.set(id, load);
+    }
+}
+
+/** Drop the loaded object URLs (the overlay switched or the page unloads). */
+export function releaseLibraryAssets(): void {
+    for (const url of libraryUrls.values()) URL.revokeObjectURL(url);
+    libraryUrls.clear();
+    libraryLoads.clear();
+    libraryMisses.clear();
+}
+
 export function ctx(): ElementContext {
     const o = state.overlay;
     if (!o)
@@ -131,8 +195,10 @@ export function ctx(): ElementContext {
             token: state.token,
             overlayId: undefined,
         };
+    const assetUrls = new Map(libraryUrls);
+    void loadLibraryAssets(o);
     return {
-        assetUrls: new Map(o.assets.map((a) => [a.id, assetUrl(a)])),
+        assetUrls,
         variables: new Map(
             o.variables.map((v) => [v.id, v.value as VariableValue]),
         ),
@@ -215,9 +281,12 @@ export async function load(overlayId: string | null = null): Promise<void> {
             `/api/overlays/${encodeURIComponent(overlayId)}`,
         );
         if (body?.overlay) {
+            // the previous overlay's library object URLs are stale now
+            releaseLibraryAssets();
             state.overlay = body.overlay;
             state.token = body.token ?? "";
             state.selectedOverlayId = overlayId;
+            void loadLibraryAssets(body.overlay);
         }
     }
     state.past = [];
@@ -492,33 +561,6 @@ export async function deleteVariable(id: string): Promise<void> {
     }
 }
 
-/** Upload a file and return the (deduplicated by hash) asset. */
-export async function uploadAsset(file: File): Promise<Asset | null> {
-    const o = state.overlay;
-    if (!o) return null;
-    const dataBase64 = await new Promise<string>((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => {
-            const s = String(r.result);
-            resolve(s.slice(s.indexOf(",") + 1));
-        };
-        r.onerror = reject;
-        r.readAsDataURL(file);
-    });
-    const res = await apiTry<{ asset?: Asset }>(
-        `/api/overlays/${encodeURIComponent(state.selectedOverlayId ?? "")}/assets`,
-        {
-            method: "POST",
-            body: {
-                filename: file.name,
-                mime: file.type,
-                dataBase64,
-            },
-        },
-    );
-    return res?.asset ?? null;
-}
-
 export async function rotateToken(): Promise<void> {
     if (!state.selectedOverlayId) return;
     const body = await apiTry<{ token: string }>(
@@ -635,18 +677,8 @@ serverLive.rpc.on("overlays.overlay", (data) => {
     syncListFromOverlay(overlayId, o);
     if (overlayId === state.selectedOverlayId && state.overlay) {
         if (overlayIsStale(state.overlay, o)) return;
-        // live frames are slim (no asset bytes) — keep the local list, which
-        // the `overlays.assets` frames (and initial load) keep in sync
-        o.assets = state.overlay.assets;
         state.overlay = o;
     }
-    m.redraw();
-});
-
-serverLive.rpc.on("overlays.assets", (data) => {
-    const assets = (data as { assets?: Asset[] })?.assets;
-    if (!assets || !state.overlay) return;
-    state.overlay.assets = assets;
     m.redraw();
 });
 

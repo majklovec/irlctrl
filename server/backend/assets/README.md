@@ -10,9 +10,16 @@ the files of the selected folder, served from `/assets/` and exposed through
   Each user gets one lazily-created `Root` folder (`parent_id IS NULL`);
   folders nest up to a depth of 16.
 - `asset_files` — `id`, `owner`, `folder_id`, `name`, `size`, `mime_type`,
-  `data` (BLOB), `created_at`, `updated_at` (ms). File bytes live in the
-  database (the `dashboards.widgets` blob precedent); uploads are capped at
-  200 MB each.
+  `data` (BLOB, nullable), `created_at`, `updated_at` (ms). File bytes live on
+  disk in the storage directory — one file per asset, named by its id
+  (`<storage>/<id>`, flat) — and the database keeps only the metadata. The
+  `data` column is the fallback for rows uploaded before the disk migration
+  (they keep serving from the BLOB when no disk file exists). Uploads are
+  capped at 200 MB each.
+
+The storage directory is the `--storage` / `STORAGE_DIR` option (default
+`assets`, created on first upload). Deleting a file or folder also removes
+its disk file.
 
 Every query is scoped by `owner` — a user can only list, create, rename,
 move, delete, download or inspect their own folders and files. Foreign ids
@@ -30,6 +37,7 @@ for the full API surface.
 | PATCH  | `/api/assets/folders/:id`  | `{name}` rename or `{parentId}` move           |
 | DELETE | `/api/assets/folders/:id`  | Delete recursively                             |
 | GET    | `/api/assets/files`        | Files of a folder (`?folderId=<id>`)           |
+| GET    | `/api/assets/browse`       | Media files of the whole tree with folder path (`?kind=image\|video\|audio`; the overlay editor's picker) |
 | POST   | `/api/assets/files`        | Multipart: `folderId` field + `files` parts    |
 | GET    | `/api/assets/file-meta/:id`| File metadata (no bytes)                       |
 | GET    | `/api/assets/files/:id`    | The file bytes (RFC 5987 attachment download)  |

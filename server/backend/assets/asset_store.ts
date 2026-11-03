@@ -4,13 +4,16 @@
  * Every user owns an isolated subtree — all queries are owner-scoped, so a
  * user only ever sees (or mutates) their own folders and files. Each user's
  * tree has a single root folder (created lazily on first access). File bytes
- * live in the database as BLOBs (the `dashboards.widgets` blob precedent).
+ * live on disk in the server's storage directory (one file per asset, keyed
+ * by its id); the database keeps only the metadata.
  *
  * The API is child-oriented (list children of a folder) so the frontend can
  * load the tree lazily as it expands.
  */
 import type { Database } from "bun:sqlite";
 import { randomUUID } from "node:crypto";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { ApiError } from "../../../shared/params";
 
 export const ROOT_NAME = "Root";
@@ -87,9 +90,24 @@ export interface Assets {
     fileMeta(user: string, fileId: string): AssetFile;
     /** The file metadata + raw bytes (owner-checked). */
     fileBlob(user: string, fileId: string): { file: AssetFile; data: Uint8Array };
+    /**
+     * The user's files of one media kind, flattened across the whole tree
+     * with their folder path (the overlay editor's asset picker).
+     */
+    browseFiles(
+        user: string,
+        kind: "image" | "video" | "audio",
+    ): (AssetFile & { path: string })[];
 }
 
-export function createAssets({ db }: { db: Database | null }): Assets {
+export function createAssets({
+    db,
+    storageDir = "assets",
+}: {
+    db: Database | null;
+    /** Directory the asset files are written to (flat, one file per id). */
+    storageDir: string;
+}): Assets {
     if (!db) {
         // `--no-auth` runs without a user database: the asset API stays
         // disabled and answers with empty lists.
@@ -111,11 +129,24 @@ export function createAssets({ db }: { db: Database | null }): Assets {
             deleteFile: unavailable,
             fileMeta: unavailable,
             fileBlob: unavailable,
+            browseFiles: () => [],
         };
     }
     const database: Database = db;
 
     const now = () => Date.now();
+
+    // File bytes live on disk, one file per asset id (ids are server-minted
+    // UUIDs, so a flat layout is collision-free and path-safe).
+    const storagePath = (fileId: string): string => join(storageDir, fileId);
+
+    const removeDiskFile = (fileId: string): void => {
+        try {
+            rmSync(storagePath(fileId), { force: true });
+        } catch {
+            // a missing disk file is not an error
+        }
+    };
 
     /** Validate a folder/file display name and return its trimmed form. */
     function parseName(raw: unknown, what: "folder" | "file"): string {
@@ -350,6 +381,18 @@ export function createAssets({ db }: { db: Database | null }): Assets {
                 }
             }
         }
+        // The disk file names are the file ids — collect them while the rows
+        // still exist.
+        const doomedIds = [...doomed];
+        const doomedFileIds = (
+            database
+                .query<{ id: string }, [string, ...string[]]>(
+                    "SELECT id FROM asset_files WHERE owner = ? AND folder_id IN (" +
+                        doomedIds.map(() => "?").join(",") +
+                        ")",
+                )
+                .all(user, ...doomedIds) ?? []
+        ).map((r) => r.id);
         database.transaction(() => {
             const delFiles = database.query<unknown, [string, string]>(
                 "DELETE FROM asset_files WHERE owner = ? AND folder_id = ?",
@@ -362,6 +405,7 @@ export function createAssets({ db }: { db: Database | null }): Assets {
                 delFolder.run(user, id);
             }
         })();
+        for (const id of doomedFileIds) removeDiskFile(id);
     }
 
     function listFiles(user: string, folderId: string): AssetFile[] {
@@ -414,19 +458,12 @@ export function createAssets({ db }: { db: Database | null }): Assets {
         const finalName = uniqueName(user, folderId, clean);
         const id = randomUUID();
         const ts = now();
-        database.query<unknown, [string, string, string, string, number, string, Uint8Array, number, number]>(
-            "INSERT INTO asset_files (id, owner, folder_id, name, size, mime_type, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        ).run(
-            id,
-            user,
-            folderId,
-            finalName,
-            data.byteLength,
-            mime || "application/octet-stream",
-            data,
-            ts,
-            ts,
-        );
+        // Bytes go to the storage directory; the row keeps only the metadata.
+        mkdirSync(storageDir, { recursive: true });
+        writeFileSync(storagePath(id), data);
+        database.query<unknown, [string, string, string, string, number, string, number, number]>(
+            "INSERT INTO asset_files (id, owner, folder_id, name, size, mime_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        ).run(id, user, folderId, finalName, data.byteLength, mime || "application/octet-stream", ts, ts);
         return getFile(user, id);
     }
 
@@ -465,6 +502,7 @@ export function createAssets({ db }: { db: Database | null }): Assets {
         database.query<unknown, [string, string]>(
             "DELETE FROM asset_files WHERE id = ? AND owner = ?",
         ).run(fileId, user);
+        removeDiskFile(fileId);
     }
 
     function fileBlob(
@@ -472,13 +510,54 @@ export function createAssets({ db }: { db: Database | null }): Assets {
         fileId: string,
     ): { file: AssetFile; data: Uint8Array } {
         const file = getFile(user, fileId);
-        const data = database
-            .query<{ data: Uint8Array }, [string, string]>(
-                "SELECT data FROM asset_files WHERE id = ? AND owner = ?",
-            )
-            .get(fileId, user)?.data;
-        if (!data) throw new ApiError("File not found", 404);
-        return { file, data: new Uint8Array(data) };
+        let data: Uint8Array;
+        try {
+            data = new Uint8Array(readFileSync(storagePath(fileId)));
+        } catch {
+            throw new ApiError("File not found", 404);
+        }
+        return { file, data };
+    }
+
+    function browseFiles(
+        user: string,
+        kind: "image" | "video" | "audio",
+    ): (AssetFile & { path: string })[] {
+        rootFolder(user);
+        const folders = (
+            database
+                .query<FolderRow, [string]>(
+                    "SELECT id, owner, parent_id, name, created_at FROM asset_folders WHERE owner = ?",
+                )
+                .all(user) ?? []
+        );
+        const byId = new Map(folders.map((f) => [f.id, f]));
+        const prefix = `${kind}/`;
+        const out: (AssetFile & { path: string })[] = [];
+        // Walk the tree depth-first; `path` is the folder chain without the
+        // root folder itself (its name is constant).
+        const walk = (folderId: string, trail: string[]): void => {
+            const folder = byId.get(folderId);
+            if (!folder) return;
+            const rows = (
+                database
+                    .query<FileRow, [string, string, string]>(
+                        "SELECT id, folder_id, name, size, mime_type, created_at, updated_at FROM asset_files WHERE owner = ? AND folder_id = ? AND mime_type LIKE ? ORDER BY name COLLATE NOCASE",
+                    )
+                    .all(user, folderId, `${prefix}%`) ?? []
+            );
+            for (const row of rows)
+                out.push({ ...toFile(row), path: trail.join("/") });
+            const children = folders
+                .filter((f) => f.parent_id === folderId)
+                .sort((a, b) => a.name.localeCompare(b.name));
+            for (const child of children)
+                walk(child.id, [...trail, child.name]);
+        };
+        for (const root of folders.filter((f) => f.parent_id === null))
+            walk(root.id, []);
+        out.sort((a, b) => (a.path + a.name).localeCompare(b.path + b.name));
+        return out;
     }
 
     return {
@@ -496,5 +575,6 @@ export function createAssets({ db }: { db: Database | null }): Assets {
         deleteFile,
         fileMeta: getFile,
         fileBlob,
+        browseFiles,
     };
 }

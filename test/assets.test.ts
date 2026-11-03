@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,6 +9,7 @@ const projectRoot = join(import.meta.dir, "..");
 
 let tempDir: string;
 let databasePath: string;
+let storagePath: string;
 let port: number;
 let serverProcess: ReturnType<typeof Bun.spawn> | undefined;
 let baseUrl: string;
@@ -38,6 +40,8 @@ async function startServer(): Promise<void> {
             String(port),
             "--db",
             databasePath,
+            "--storage",
+            storagePath,
         ],
         { cwd: projectRoot, stdout: "ignore", stderr: "ignore" },
     );
@@ -123,6 +127,7 @@ let root: Folder;
 beforeAll(async () => {
     tempDir = await mkdtemp(join(tmpdir(), "irlctrl-assets-"));
     databasePath = join(tempDir, "users.db");
+    storagePath = join(tempDir, "storage");
     port = await availablePort();
     await startServer();
     alice = await login("assets-alice");
@@ -460,6 +465,116 @@ describe("assets files", () => {
             },
         );
         expect(res.status).toBe(400);
+    });
+});
+
+describe("assets storage directory", () => {
+    test("saves uploaded bytes to the storage dir and removes them again", async () => {
+        const up = await upload(alice, root.id, "disk.txt", "on disk", "text/plain");
+        expect(up.status).toBe(200);
+        const fileId = up.body.files![0].id;
+        const diskPath = join(storagePath, fileId);
+        expect(await existsSync(diskPath)).toBe(true);
+        expect(new TextDecoder().decode(await readFile(diskPath))).toBe(
+            "on disk",
+        );
+
+        const del = await fetch(`${baseUrl}/api/assets/files/${fileId}`, {
+            method: "DELETE",
+            headers: { cookie: alice },
+        });
+        expect(del.status).toBe(200);
+        expect(await existsSync(diskPath)).toBe(false);
+    });
+
+    test("removes the disk files when a folder is deleted", async () => {
+        const { body } = await createFolder(alice, root.id, "DiskTrash");
+        const up = await upload(
+            alice,
+            body!.folder!.id,
+            "vanish.bin",
+            new Uint8Array([1, 2, 3]),
+            "application/octet-stream",
+        );
+        expect(up.status).toBe(200);
+        const diskPath = join(storagePath, up.body.files![0].id);
+        expect(await existsSync(diskPath)).toBe(true);
+
+        const del = await fetch(
+            `${baseUrl}/api/assets/folders/${body!.folder!.id}`,
+            { method: "DELETE", headers: { cookie: alice } },
+        );
+        expect(del.status).toBe(200);
+        expect(await existsSync(diskPath)).toBe(false);
+    });
+
+    test("downloads keep serving from the storage dir", async () => {
+        const up = await upload(alice, root.id, "serve.png", "png-bytes", "image/png");
+        expect(up.status).toBe(200);
+        const res = await fetch(
+            `${baseUrl}/api/assets/files/${up.body.files![0].id}`,
+            { headers: { cookie: alice } },
+        );
+        expect(res.status).toBe(200);
+        expect(res.headers.get("content-type")).toBe("image/png");
+        expect(new TextDecoder().decode(await res.arrayBuffer())).toBe("png-bytes");
+        // tidy up so the owner-isolation list stays predictable
+        await fetch(`${baseUrl}/api/assets/files/${up.body.files![0].id}`, {
+            method: "DELETE",
+            headers: { cookie: alice },
+        });
+    });
+
+    test("browse lists the media files of the whole tree with their path", async () => {
+        const { body: imgDir } = await createFolder(alice, root.id, "Browsed");
+        expect(imgDir.folder).toBeTruthy();
+        const { body: imgSub } = await createFolder(
+            alice,
+            imgDir.folder!.id,
+            "Pics",
+        );
+        expect(imgSub.folder).toBeTruthy();
+        const img = await upload(alice, imgSub.folder!.id, "one.png", "img", "image/png");
+        const vid = await upload(alice, imgDir.folder!.id, "clip.mp4", "vid", "video/mp4");
+        const doc = await upload(alice, imgDir.folder!.id, "notes.txt", "doc", "text/plain");
+        expect(img.status).toBe(200);
+        expect(vid.status).toBe(200);
+        expect(doc.status).toBe(200);
+
+        const imagesRes = await fetch(`${baseUrl}/api/assets/browse?kind=image`, {
+            headers: { cookie: alice },
+        });
+        expect(imagesRes.status).toBe(200);
+        const images = (await imagesRes.json()) as {
+            files: (AssetFile & { path: string })[];
+        };
+        const names = images.files
+            .filter((f) => f.id === img.body.files![0].id)
+            .map((f) => f.path);
+        expect(names).toEqual(["Browsed/Pics"]);
+
+        const videos = (
+            (await (
+                await fetch(`${baseUrl}/api/assets/browse?kind=video`, {
+                    headers: { cookie: alice },
+                })
+            ).json()) as { files: (AssetFile & { path: string })[] }
+        ).files;
+        expect(
+            videos.some((f) => f.id === vid.body.files![0].id),
+        ).toBe(true);
+        // text files are never in a media browse
+        expect(
+            images.files.some((f) => f.id === doc.body.files![0].id),
+        ).toBe(false);
+        expect(
+            videos.some((f) => f.id === doc.body.files![0].id),
+        ).toBe(false);
+
+        const badKind = await fetch(`${baseUrl}/api/assets/browse?kind=pdf`, {
+            headers: { cookie: alice },
+        });
+        expect(badKind.status).toBe(400);
     });
 });
 

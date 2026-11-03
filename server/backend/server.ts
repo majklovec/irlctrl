@@ -16,12 +16,14 @@ const PORT = intArgEnv("--port", "SERVER_PORT", 8090, 1, 65535);
 const HOST = argEnv("--host", "SERVER_HOST", "0.0.0.0");
 const NO_AUTH = flagOrEnv("--no-auth", "NO_AUTH");
 const DB_FILE = argEnv("--db", "DB_FILE", "users.db");
+const STORAGE_DIR = argEnv("--storage", "STORAGE_DIR", "assets");
 
 const app = await createControlServer({
     hostname: HOST,
     port: PORT,
     noAuth: NO_AUTH,
     databaseFile: DB_FILE,
+    storageDir: STORAGE_DIR,
 });
 
 const port = app.server?.port;

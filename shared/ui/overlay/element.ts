@@ -13,7 +13,6 @@
  */
 import m from "mithril";
 import type {
-	Asset,
 	OverlayElement,
 	OverlayElementType,
 	Transform,
@@ -57,7 +56,8 @@ export function triggerPhase(
 }
 
 export interface ElementContext {
-	/** asset id -> data: URL */
+	/** asset-LIBRARY file id -> URL: the runtime page resolves them through
+	 * its token-scoped file endpoint, the editor into blob URLs. */
 	assetUrls: Map<string, string>;
 	/** variable id -> current value (for binding resolution) */
 	variables: Map<string, VariableValue>;
@@ -78,10 +78,6 @@ export interface ElementContext {
 
 /** A CSS style object (a subset of mithril's CSSObject). */
 export type CSS = Record<string, string | number | undefined>;
-
-export function assetUrl(asset: Asset): string {
-	return `data:${asset.mime};base64,${asset.dataBase64}`;
-}
 
 export interface ResolvedElement {
 	props: Record<string, unknown>;
@@ -250,17 +246,13 @@ export function drawIframe(element: OverlayElement): Children {
 
 /** What the inspector's per-element edit form receives.
  * `mutate` runs a mutation on the row's element (the core persists it and
- * takes an undo snapshot); `assets`/`variables` back the binding selects;
- * `upload` is the project's asset uploader (used by the image element).
- * An element that needs more (e.g. a list fetched from the server) loads it
- * itself inside its form. */
+ * takes an undo snapshot); `variables` backs the binding selects. An element
+ * that needs more (e.g. the asset library list) loads it itself inside its
+ * form. */
 export interface ElementProps {
 	element: OverlayElement;
 	mutate: (fn: (e: OverlayElement) => void) => void;
-	assets: Asset[];
 	variables: Variable[];
-	/** Upload a file as a new project asset; resolves to its id (or null). */
-	upload: (file: File) => Promise<string | null>;
 }
 
 /** Which editing affordance an element shows when selected on the canvas.

@@ -50,7 +50,7 @@ const ctx = () => ({
 
 const WELL_FORMED: Array<[OverlayElementType, Record<string, unknown>]> = [
     ["text", { text: "hi", fontSize: 48, color: "#ffffff" }],
-    ["image", { assetId: "a1" }],
+    ["image", { libraryAssetId: "a1" }],
     [
         "rectangle",
         { fill: "#3b82f6", stroke: "#000000", strokeWidth: 2, radius: 4 },

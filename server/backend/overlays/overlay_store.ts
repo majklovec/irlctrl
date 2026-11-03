@@ -1,7 +1,9 @@
 /*
  * OBS overlay editor backend: one row per overlay in the `overlays` table,
  * persisted as a JSON blob (the `dashboards.widgets` precedent). An overlay is
- * self-contained — its own canvas, variables, assets, elements and token.
+ * self-contained — its own canvas, variables, elements and token. Media
+ * lives in the server-side asset library (disk), which elements reference
+ * by file id.
  * Mutations go over REST (`/api/overlays…`, handled by `Overlays.api`) and fan
  * out to:
  *   - the editor live feed (the shared `dashboards:<owner>` topic), and
@@ -17,10 +19,8 @@
 import type { Database } from "bun:sqlite";
 import { createHash, randomUUID } from "node:crypto";
 import {
-    type Asset,
     defaultOverlay,
     generateOverlayToken,
-    isAcceptedAssetMime,
     migrateOverlayBlob,
     normalizeOverlay,
     OVERLAY_LIMITS,
@@ -222,7 +222,6 @@ export function createOverlays({
             const variables = Array.isArray(project.variables)
                 ? project.variables
                 : [];
-            const assets = Array.isArray(project.assets) ? project.assets : [];
             const scenes = Array.isArray(project.scenes) ? project.scenes : [];
             const list: Record<string, unknown>[] = scenes.length
                 ? (scenes as Record<string, unknown>[])
@@ -237,7 +236,6 @@ export function createOverlays({
                                 : "Overlay",
                         canvas,
                         variables,
-                        assets,
                         elements: Array.isArray(sc.elements) ? sc.elements : [],
                     });
                     insert.run(
@@ -356,12 +354,9 @@ export function createOverlays({
     /** Push one overlay's state to its editor and its runtime page. The
      * editor feed is a per-owner topic serving every overlay at once, so the
      * frame carries `overlayId` (the runtime topic is already per-overlay, but
-     * keeps the same shape). The overlay is SLIM: asset bytes are stripped —
-     * an overlay with multi-MB base64 assets made every small edit (a
-     * visibility toggle) take seconds to reach the runtime page. The bytes
-     * travel only in the runtime snapshot and the `overlays.assets` frames. */
+     * keeps the same shape). */
     const feedOverlay = (store: Store): void => {
-        const overlay: Overlay = { ...store.overlay, assets: [] };
+        const overlay: Overlay = { ...store.overlay };
         feed(store.owner, "overlays.overlay", {
             overlayId: store.id,
             overlay,
@@ -371,14 +366,6 @@ export function createOverlays({
             overlay,
         });
     };
-    /** After an asset upload/delete: the full asset list (bytes included)
-     * for both feeds — the slim `overlays.overlay` frame can't carry them. */
-    const feedAssets = (store: Store): void => {
-        const assets = store.overlay.assets;
-        feed(store.owner, "overlays.assets", { assets });
-        runtime(store.id, "overlays.assets", { assets });
-    };
-
     // ── REST API ─────────────────────────────────────────────────────────
     const notAllowed = (): Response =>
         Response.json(
@@ -433,7 +420,7 @@ export function createOverlays({
     ): Promise<Response> {
         try {
             const m = url.pathname.match(
-                /^\/api\/overlays(\/([\w.-]{1,64})(?:\/(variables|assets|token|canvas|elements|duplicate)(?:\/([\w.-]{1,64})?)?)?)?$/,
+                /^\/api\/overlays(\/([\w.-]{1,64})(?:\/(variables|token|canvas|elements|duplicate)(?:\/([\w.-]{1,64})?)?)?)?$/,
             );
             if (!m)
                 return Response.json(
@@ -443,7 +430,6 @@ export function createOverlays({
             const id = m[2] as string | undefined;
             const sub = (m[3] as
                 | "variables"
-                | "assets"
                 | "token"
                 | "canvas"
                 | "elements"
@@ -728,83 +714,7 @@ export function createOverlays({
                 return notAllowed();
             }
 
-            if (sub === "assets") {
-                if (req.method === "POST" && !subId) {
-                    const body = (await req.json()) as {
-                        filename?: unknown;
-                        mime?: unknown;
-                        dataBase64?: unknown;
-                    };
-                    const filename =
-                        typeof body.filename === "string" && body.filename
-                            ? body.filename.slice(0, 255)
-                            : "asset";
-                    const mime =
-                        typeof body.mime === "string" &&
-                        isAcceptedAssetMime(body.mime)
-                            ? body.mime
-                            : null;
-                    const dataBase64 =
-                        typeof body.dataBase64 === "string"
-                            ? body.dataBase64
-                            : null;
-                    if (!mime || !dataBase64)
-                        throw new ApiError(
-                            "Asset needs filename, an image/video/audio mime and base64 data",
-                        );
-                    if (dataBase64.length > OVERLAY_LIMITS.assetBase64Max)
-                        throw new ApiError("Asset is too large");
-                    const store = storeWithOwner(user, id);
-                    if (
-                        store.overlay.assets.length >= OVERLAY_LIMITS.assetsMax
-                    )
-                        throw new ApiError("Too many assets");
-                    const hash = createHash("sha256")
-                        .update(Buffer.from(dataBase64, "base64"))
-                        .digest("hex");
-                    let asset = store.overlay.assets.find(
-                        (a) => a.hash === hash,
-                    );
-                    if (!asset) {
-                        asset = {
-                            id: randomUUID(),
-                            hash,
-                            mime,
-                            filename,
-                            dataBase64,
-                        };
-                        store.overlay.assets.push(asset);
-                    }
-                    commit(store);
-                    feedOverlay(store);
-                    feedAssets(store);
-                    return Response.json(
-                        { ok: true, asset },
-                        { status: 201 },
-                    );
-                }
-                if (req.method === "DELETE" && subId) {
-                    const store = storeWithOwner(user, id);
-                    const before = store.overlay.assets.length;
-                    store.overlay.assets = store.overlay.assets.filter(
-                        (a) => a.id !== subId,
-                    );
-                    if (store.overlay.assets.length === before)
-                        throw new ApiError("Unknown asset", 404);
-                    // elements referencing it (their schema's assetProps) fall
-                    // back to an empty box
-                    for (const e of store.overlay.elements)
-                        for (const key of overlayElementSchema(e.type)
-                            ?.assetProps ?? [])
-                            if (e.props[key] === subId) e.props[key] = "";
-                    revalidate(store.overlay);
-                    commit(store);
-                    feedOverlay(store);
-                    feedAssets(store);
-                    return Response.json({ ok: true });
-                }
-                return notAllowed();
-            }
+
 
             if (sub === "token") {
                 if (req.method === "POST" && subId === "rotate") {

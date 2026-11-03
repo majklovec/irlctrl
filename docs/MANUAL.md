@@ -604,6 +604,7 @@ Every flag has an environment-variable counterpart. Resolution order: **CLI flag
 | ------------------ | ---------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `--host`, `--port` | `SERVER_HOST`, `SERVER_PORT` | `0.0.0.0:8090` | Listen address. Run behind a TLS reverse proxy in production (device tokens and the session cookie need `wss://`/`https://`). |
 | `--db`             | `DB_FILE`                    | `users.db`     | SQLite database: users, device tokens, dashboards.                                                                            |
+| `--storage`        | `STORAGE_DIR`                | `assets`       | Directory the asset files are saved to (the database keeps only the metadata).                                               |
 | `--no-auth`        | `NO_AUTH`                    | —              | Local testing only — one shared `local` profile, no tokens needed (no database; dashboards are kept in memory only).          |
 
 ### 12.3 Module-specific settings

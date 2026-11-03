@@ -148,6 +148,7 @@ open http://ctl.example.com/  # redirects to /login; enter the username + passwo
 | ------------------ | ------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `‑‑host`, `‑‑port` | `SERVER_HOST`, `SERVER_PORT` | Default `0.0.0.0:8090`                                                                                              |
 | `‑‑db`             | `DB_FILE`     | SQLite database: users, device tokens, dashboards (default `users.db`)                                              |
+| `‑‑storage`        | `STORAGE_DIR` | Directory the asset files are saved to (default `assets`; metadata stays in the database)                           |
 | `‑‑no‑auth`        | `NO_AUTH`     | Local testing only — one shared `local` profile, no tokens needed (no database; dashboards are kept in memory only) |
 
 > [!IMPORTANT]

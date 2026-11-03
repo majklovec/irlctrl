@@ -13,6 +13,7 @@ import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import { DEFAULT_VIDEO_PROPS } from "../overlay_schema";
+import { libraryAssetField } from "./asset_picker";
 
 /** Defensive read of a boolean prop (the contract has no `boolProp`). */
 const boolProp = (p: Record<string, unknown>, key: string, fb: boolean) =>
@@ -21,9 +22,18 @@ const boolProp = (p: Record<string, unknown>, key: string, fb: boolean) =>
 /** Clamp a volume to the 0–1 range the `<video>` element accepts. */
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
+/** The video's display URL: the asset-library file the element picks
+ * (resolved by the page's context into a browsable URL). */
+function videoUrl(
+	element: OverlayElement,
+	ctx: ElementContext,
+): string | undefined {
+	const libraryId = strProp(element.props, "libraryAssetId", "");
+	return libraryId ? ctx.assetUrls.get(libraryId) : undefined;
+}
+
 function draw(element: OverlayElement, ctx: ElementContext): Vnode {
-	const assetId = strProp(element.props, "assetId", "");
-	const url = assetId ? ctx.assetUrls.get(assetId) : undefined;
+	const url = videoUrl(element, ctx);
 	if (!url)
 		return m(
 			".overlay-shape",
@@ -59,8 +69,6 @@ function editForm({
 	element: e,
 	mutate,
 	variables,
-	assets,
-	upload,
 }: ElementProps): Vnode {
 	const d = DEFAULT_VIDEO_PROPS;
 	const sp = { mutate, variables };
@@ -74,47 +82,7 @@ function editForm({
 		});
 	return (
 		<>
-			{bindField(
-				e,
-				"props.assetId",
-				t("overlay.video_asset"),
-				<select
-					value={String(e.props.assetId ?? "")}
-					onchange={(ev: Event) =>
-						mutate((el) => {
-							el.props.assetId = (ev.target as HTMLSelectElement).value;
-						})
-					}
-				>
-					<option value="">—</option>
-					{assets
-						.filter((a) => a.mime.startsWith("video/"))
-						.map((a) => (
-							<option key={a.id} value={a.id}>
-								{a.filename}
-							</option>
-						))}
-				</select>,
-				{ mutate, variables },
-			)}
-			<span class="ov-field">
-				<span class="ov-upload ov-upload-btn">
-					<input
-						type="file"
-						accept="video/*"
-						onchange={(ev: Event) => {
-							const input = ev.target as HTMLInputElement;
-							const f = input.files?.[0];
-							input.value = "";
-							if (!f) return;
-							void upload(f).then((id) => {
-								if (id) mutate((el) => (el.props.assetId = id));
-							});
-						}}
-					/>
-					{t("overlay.upload_video")}
-				</span>
-			</span>
+			{libraryAssetField(e, mutate, "video")}
 			{bindField(
 				e,
 				"props.volume",
@@ -124,7 +92,7 @@ function editForm({
 					min={0}
 					max={1}
 					step={0.05}
-					value={Number(e.props.volume ?? d.volume)}
+					value={numProp(e.props, "volume", d.volume)}
 					oninput={setNum("volume")}
 				/>,
 				sp,
@@ -168,9 +136,8 @@ function editForm({
 
 function validate(e: OverlayElement): string[] {
 	const problems: string[] = [];
-	if (e.props.assetId === undefined)
+	if (e.props.libraryAssetId === undefined)
 		problems.push("video has no asset selected");
-	// note: asset existence is enforced at the scene level by normalizeProject
 	return problems;
 }
 
@@ -180,7 +147,7 @@ export const videoElement: OverlayElementDef = {
 	icon: () => <Icon name="video" class="role-icon" />,
 	order: 65,
 	defaultProps: { ...DEFAULT_VIDEO_PROPS },
-	propKeys: ["assetId", "volume", "muted", "loop", "autoplay"],
+	propKeys: ["libraryAssetId", "volume", "muted", "loop", "autoplay"],
 	defaultSize: { width: 320, height: 180 },
 	draw,
 	editForm,

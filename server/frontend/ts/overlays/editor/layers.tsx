@@ -19,7 +19,6 @@ import {
 	setElementLocked,
 	state,
 	toggleElementRow,
-	uploadAsset,
 } from "../overlay_store";
 
 /**
@@ -390,9 +389,7 @@ export function elementProps(e: OverlayElement): m.Vnode {
 				? def.editForm({
 						element: e,
 						mutate: (fn) => mutateElementOf(e.id, fn),
-						assets: state.overlay?.assets ?? [],
 						variables: state.overlay?.variables ?? [],
-						upload: (f: File) => uploadAsset(f).then((a) => a?.id ?? null),
 					})
 				: null}
 

@@ -8,6 +8,8 @@
  *   PATCH /api/assets/folders/:id {name} | {parentId} (cookie auth)
  *   DELETE /api/assets/folders/:id (cookie auth)
  *   GET  /api/assets/files        the files of a folder (?folderId=<id>)
+ *   GET  /api/assets/browse       the media files across the whole tree
+ *                                 (?kind=image|video|audio, picker lists)
  *   POST /api/assets/files        multipart upload: `folderId` field plus one
  *                                 or more `files` parts (cookie auth)
  *   GET  /api/assets/file-meta/:id a file's metadata (no bytes)
@@ -182,6 +184,28 @@ export function assetRoutes(
                         files: assets.listFiles(user, folderId),
                     },
                 }));
+            }),
+        )
+        .get(
+            "/api/assets/browse",
+            authenticatedHandler(auth, (request, user) => {
+                // The overlay editor's asset picker: the user's media files
+                // flattened across the whole tree, with their folder path.
+                const kind = new URL(request.url).searchParams.get("kind") ?? "";
+                return run(() => {
+                    if (!["image", "video", "audio"].includes(kind))
+                        throw new ApiError(
+                            "kind must be one of image, video, audio",
+                        );
+                    return {
+                        body: {
+                            files: assets.browseFiles(
+                                user,
+                                kind as "image" | "video" | "audio",
+                            ),
+                        },
+                    };
+                });
             }),
         )
         .post(

@@ -25,6 +25,7 @@ import type {
 } from "@ui/overlay/element";
 import { numProp, strProp, triggerPhase } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
+import { libraryAssetField } from "./asset_picker";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import {
@@ -349,8 +350,6 @@ function editForm({
 	element: e,
 	mutate,
 	variables,
-	assets,
-	upload,
 }: ElementProps): Vnode {
 	const p = e.props;
 	const sp = { mutate, variables };
@@ -369,10 +368,6 @@ function editForm({
 			el.props[key] = (ev.target as HTMLInputElement).checked;
 		});
 
-	const mediaAssets = assets.filter(
-		(a) => a.mime.startsWith("image/") || a.mime.startsWith("video/"),
-	);
-	const audioAssets = assets.filter((a) => a.mime.startsWith("audio/"));
 	const event = str("event", "");
 
 	return (
@@ -431,113 +426,51 @@ function editForm({
 				e,
 				"props.assetType",
 				t("overlay.alert_media_type"),
-				<select value={str("assetType", "image")} onchange={set("assetType")}>
+				<select
+					value={str("assetType", "image")}
+					onchange={set("assetType")}
+				>
 					<option value="image">image</option>
 					<option value="video">video</option>
 				</select>,
 				sp,
 			)}
-			<div class="ov-grid4">
-				<div class="ov-field ov-span3">
-					<span class="ov-lbl">{t("overlay.alert_media")}</span>
-					<div class="ov-field-row">
-						<div class="ov-field-ctl">
-							<select
-								value={str("mediaAssetId", "")}
-								onchange={set("mediaAssetId")}
-							>
-								<option value="">—</option>
-								{mediaAssets.map((a) => (
-									<option key={a.id} value={a.id}>
-										{a.filename}
-									</option>
-								))}
-							</select>
-						</div>
-						<span class="ov-upload ov-upload-btn ov-upload-btn-sm">
-							<input
-								type="file"
-								accept="image/*,video/*"
-								onchange={(ev: Event) => {
-									const input = ev.target as HTMLInputElement;
-									const f = input.files?.[0];
-									input.value = "";
-									if (!f) return;
-									void upload(f).then((id) => {
-										if (id) mutate((el) => (el.props.mediaAssetId = id));
-									});
-								}}
-							/>
-							{t("overlay.alert_upload_media")}
-						</span>
-					</div>
-				</div>
-				{bindField(
-					e,
-					"props.videoVolume",
-					t("overlay.alert_video_volume"),
-					<input
-						type="number"
-						min={0}
-						max={1}
-						step={0.05}
-						value={num("videoVolume", 1)}
-						oninput={setNum("videoVolume")}
-					/>,
-					sp,
-				)}
-			</div>
+			{libraryAssetField(
+				e,
+				mutate,
+				str("assetType", "image") === "video" ? "video" : "image",
+				"mediaAssetId",
+			)}
+			{bindField(
+				e,
+				"props.videoVolume",
+				t("overlay.alert_video_volume"),
+				<input
+					type="number"
+					min={0}
+					max={1}
+					step={0.05}
+					value={num("videoVolume", 1)}
+					oninput={setNum("videoVolume")}
+				/>,
+				sp,
+			)}
 			{/* 3. audio sting */}
-			<div class="ov-grid4">
-				<div class="ov-field ov-span3">
-					<span class="ov-lbl">{t("overlay.alert_audio")}</span>
-					<div class="ov-field-row">
-						<div class="ov-field-ctl">
-							<select
-								value={str("audioAssetId", "")}
-								onchange={set("audioAssetId")}
-							>
-								<option value="">—</option>
-								{audioAssets.map((a) => (
-									<option key={a.id} value={a.id}>
-										{a.filename}
-									</option>
-								))}
-							</select>
-						</div>
-						<span class="ov-upload ov-upload-btn ov-upload-btn-sm">
-							<input
-								type="file"
-								accept="audio/*"
-								onchange={(ev: Event) => {
-									const input = ev.target as HTMLInputElement;
-									const f = input.files?.[0];
-									input.value = "";
-									if (!f) return;
-									void upload(f).then((id) => {
-										if (id) mutate((el) => (el.props.audioAssetId = id));
-									});
-								}}
-							/>
-							{t("overlay.alert_upload_audio")}
-						</span>
-					</div>
-				</div>
-				{bindField(
-					e,
-					"props.audioVolume",
-					t("overlay.alert_audio_volume"),
-					<input
-						type="number"
-						min={0}
-						max={1}
-						step={0.05}
-						value={num("audioVolume", 1)}
-						oninput={setNum("audioVolume")}
-					/>,
-					sp,
-				)}
-			</div>
+			{libraryAssetField(e, mutate, "audio", "audioAssetId")}
+			{bindField(
+				e,
+				"props.audioVolume",
+				t("overlay.alert_audio_volume"),
+				<input
+					type="number"
+					min={0}
+					max={1}
+					step={0.05}
+					value={num("audioVolume", 1)}
+					oninput={setNum("audioVolume")}
+				/>,
+				sp,
+			)}
 			{/* 4. text */}
 			{bindField(
 				e,

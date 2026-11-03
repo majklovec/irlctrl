@@ -985,3 +985,88 @@ instead of truncating */
     font-size: 12px;
     color: var(--muted);
 }
+/* ── asset library picker (image/video elements reuse server assets) ── */
+.ov-lib-field {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+.ov-lib-pick {
+    flex: 1;
+    min-width: 0;
+    padding: 0.1rem 0.4rem;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--accent);
+    background: none;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+}
+.ov-lib-pick:hover {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.ov-lib-clear {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    line-height: 20px;
+    font-size: 13px;
+    color: var(--muted);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+}
+.ov-lib-clear:hover {
+    color: var(--text);
+    border-color: var(--text);
+}
+.ov-lib-hint {
+    margin: 0 0 6px;
+    font-size: 12px;
+}
+.ov-lib-list {
+    max-height: 50vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.ov-lib-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    padding: 6px 8px;
+    text-align: left;
+    font-size: 13px;
+    color: var(--text);
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.ov-lib-row:hover {
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    border-color: var(--border);
+}
+.ov-lib-row-sel {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.ov-lib-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+.ov-lib-path {
+    font-size: 11px;
+    color: var(--muted);
+}
