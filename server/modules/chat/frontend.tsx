@@ -558,9 +558,7 @@ function renderBadges(badges: ChatBadge[] | undefined): m.Children {
 		<span class="chat-badges">
 			{images.map((badge, index) => {
 				const label = badge.text ?? badge.type ?? "";
-				const title = badge.count
-					? `${label} (${badge.count})`
-					: label;
+				const title = badge.count ? `${label} (${badge.count})` : label;
 				return (
 					<img
 						class="chat-badge"
@@ -690,12 +688,15 @@ const ChatFeed: m.Component<ChatFeedAttrs> = {
 						{renderBadges(line.badges)}
 
 						{line.username && (
-							<span
-								class="chat-user"
-								style={line.color ? `color:${line.color}` : undefined}
-							>
-								{line.username}
-							</span>
+							<>
+								<span
+									class="chat-user"
+									style={line.color ? `color:${line.color}` : undefined}
+								>
+									{line.username}
+								</span>
+								<span class="chat-separator">:</span>
+							</>
 						)}
 
 						<span class="chat-text">{lineSegments(line.text ?? "")}</span>
@@ -820,7 +821,9 @@ const LiveChatPreview: m.Component<OverlayPreviewTarget, LivePreviewState> = {
  * query string — the browser WebSocket API cannot set the Authorization
  * header, and the server accepts the token via `?token=` on the upgrade.
  */
-function livePreviewConnect(vnode: m.Vnode<OverlayPreviewTarget, LivePreviewState>): void {
+function livePreviewConnect(
+	vnode: m.Vnode<OverlayPreviewTarget, LivePreviewState>,
+): void {
 	const s = vnode.state;
 	if (s.stopped) return;
 	const { dashboardId, widgetId, token } = vnode.attrs;
@@ -833,7 +836,9 @@ function livePreviewConnect(vnode: m.Vnode<OverlayPreviewTarget, LivePreviewStat
 	const socket = new WebSocket(url);
 	s.socket = socket;
 
-	socket.onopen = () => { s.attempt = 0; };
+	socket.onopen = () => {
+		s.attempt = 0;
+	};
 
 	socket.onmessage = (event) => {
 		let frame: { type?: string; event?: string; data?: unknown };
@@ -885,7 +890,9 @@ function livePreviewConnect(vnode: m.Vnode<OverlayPreviewTarget, LivePreviewStat
 		m.redraw();
 		const delay = Math.min(1_000 * 2 ** s.attempt, 15_000);
 		s.attempt += 1;
-		console.warn(`[chat preview] connection closed (${event.code}), retrying in ${delay} ms`);
+		console.warn(
+			`[chat preview] connection closed (${event.code}), retrying in ${delay} ms`,
+		);
 		s.timer = setTimeout(() => livePreviewConnect(vnode), delay);
 	};
 }

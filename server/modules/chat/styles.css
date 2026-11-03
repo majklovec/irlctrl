@@ -96,7 +96,10 @@
     );
 }
 
-.chat-element.chat-element-fade-top .chat-feed {
+/* The top fade only makes sense once the feed is full enough to overflow
+   upward — mask only when there are at least 3 messages (a 3rd `.chat-line`
+   child, the feed's only child type), so a fresh/short feed stays crisp. */
+.chat-element.chat-element-fade-top .chat-feed:has(.chat-line:nth-child(3)) {
     -webkit-mask-image: linear-gradient(
         0deg,
         var(--ov-chat-fade-opaque) 0,
@@ -129,7 +132,10 @@
 
 .dash-widget-body .chat-line .chat-user {
     font-weight: 600;
-    margin-right: 6px;
+}
+
+.dash-widget-body .chat-line .chat-separator {
+    margin-right: 4px;
 }
 
 /* A line's arrival time (config `timestamps: on`); dimmed so it recedes
