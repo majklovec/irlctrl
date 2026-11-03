@@ -1,3 +1,22 @@
+# [2.6.0](https://github.com/majklovec/irlctrl/compare/v2.5.1...v2.6.0) (2026-11-03)
+
+
+### Bug Fixes
+
+* **assets:** improve file name display and icon alignment in files panel ([6c75c24](https://github.com/majklovec/irlctrl/commit/6c75c24a07ae5e7848190474c75c9d12e7ad7ac6))
+* **video:** restore import of DEFAULT_VIDEO_PROPS and clean up video draw logic ([21cf39d](https://github.com/majklovec/irlctrl/commit/21cf39d97de665267b5eec979ba7288912016664))
+
+
+### Features
+
+* add video overlay element with properties and UI support ([213a913](https://github.com/majklovec/irlctrl/commit/213a9130de59958b69022ba01ac6a3c463890537))
+* **assets:** add localization for "move would cycle" message in multiple languages and enhance trash drop zone UI ([035fa82](https://github.com/majklovec/irlctrl/commit/035fa821a4836135439c748e599ff8b1dd4d07d6))
+* **assets:** implement assets management feature with folder and file operations ([b759f70](https://github.com/majklovec/irlctrl/commit/b759f70bd6dfcc13e62b4eff7286885883196653))
+* **chat:** add inline SVG role badges for Kick and update badge handling ([cbb238f](https://github.com/majklovec/irlctrl/commit/cbb238f4774933a18f95b4efb1b9a84aef9424e7))
+* **chat:** add message spacing, fade direction, fade size, and text alignment properties ([77c93ba](https://github.com/majklovec/irlctrl/commit/77c93ba2686773f9afb449866a17f03b15887352))
+* **chat:** add sender badges rendering and staleness watchdog for chat provider ([e6789d7](https://github.com/majklovec/irlctrl/commit/e6789d79af5c456f75d4b4371217008d0244308e))
+* **filters:** add filter prop for every element ([7e591f5](https://github.com/majklovec/irlctrl/commit/7e591f56d34302f55fa3cceb005ade841901a179))
+
 ## [2.5.1](https://github.com/majklovec/irlctrl/compare/v2.5.0...v2.5.1) (2026-11-02)
 
 
