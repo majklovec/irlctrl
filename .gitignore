@@ -17,3 +17,6 @@ generated/
 dist/*
 users.db
 config/
+
+# Headless-DOM test bundles (normally removed by test teardown)
+.tmp-chat-overlay-reload-*.js

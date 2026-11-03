@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { runInNewContext } from "node:vm";
 import { APP_VERSION } from "../generated/version";
 import { chatOverlayRoutes } from "../server/modules/chat/overlay_server";
@@ -469,5 +469,169 @@ describe("chat overlay websocket", () => {
         await connectRefused(
             `${origin}/api/chat/dashboard/chat/ws?token=${encodeURIComponent("secret +/&?")}`,
         );
+    });
+});
+
+// The standalone page script (`modules/chat/overlay.tsx`) is the real artifact
+// for auto-reload: bundle it the way the server does, run it against a
+// happy-dom window + a fake WebSocket, and feed it snapshot frames the way the
+// server sends them (the websocket tests above prove the server stamps the
+// snapshot with its build version).
+describe("chat overlay auto-reload (headless DOM)", () => {
+    let pageBundleText = "";
+    let loadCount = 0;
+    const pageBundleFiles: URL[] = [];
+    let reloadCalls = 0;
+    let swUpdates = 0;
+    const fakeSockets: {
+        url: string;
+        onopen: (() => void) | undefined;
+        onmessage: ((e: { data: unknown }) => void) | undefined;
+        onclose: (() => void) | undefined;
+    }[] = [];
+
+    beforeAll(async () => {
+        const { Window } = await import("happy-dom");
+        const win = new Window();
+        const g = globalThis as Record<string, unknown>;
+        g.window = win;
+        g.document = win.document;
+        g.navigator = {
+            serviceWorker: {
+                getRegistration: () =>
+                    Promise.resolve({ update: () => (swUpdates += 1) }),
+            },
+        };
+        // Bun provides no `location`; the page script dereferences bare
+        // `location`, so it must exist as an own global property.
+        Object.defineProperty(g, "location", {
+            value: {
+                origin: "http://127.0.0.1:1",
+                protocol: "http:",
+                pathname: "/chat/dashboard/chat",
+                search: "?token=secret",
+                reload: () => (reloadCalls += 1),
+            },
+            configurable: true,
+            writable: true,
+            enumerable: true,
+        });
+        g.requestAnimationFrame = win.requestAnimationFrame;
+        g.cancelAnimationFrame = win.cancelAnimationFrame;
+        g.WebSocket = class {
+            url: string;
+            onopen: (() => void) | undefined;
+            onmessage: ((e: { data: unknown }) => void) | undefined;
+            onclose: (() => void) | undefined;
+            constructor(url: string) {
+                this.url = url;
+                fakeSockets.push(this);
+            }
+        };
+        win.document.body.innerHTML = '<div id="app"></div>';
+
+        const i18nStub =
+            "export const currentLanguage = () => 'en'; export const t = (k) => k; export const i18nReady = Promise.resolve();";
+        const compStub = "export const Badge = {};";
+        const result = await Bun.build({
+            entrypoints: [
+                new URL("../server/modules/chat/overlay.tsx", import.meta.url).pathname,
+            ],
+            target: "browser",
+            // esm: the page script uses a top-level `await i18nReady`;
+            // mithril stays inlined so the bundle needs no bare imports.
+            format: "esm",
+            loader: { ".css": "text" },
+            plugins: [
+                {
+                    name: "chat-overlay-reload-shell",
+                    setup(b: { onLoad(o: { filter: RegExp }, cb: () => { contents: string; loader: string }): void }) {
+                        b.onLoad({ filter: /shared\/ui\/i18n\.tsx$/ }, () => ({ contents: i18nStub, loader: "js" }));
+                        b.onLoad({ filter: /shared\/ui\/components\/index\.tsx$/ }, () => ({ contents: compStub, loader: "js" }));
+                    },
+                },
+            ],
+        });
+        if (!result.success)
+            throw new AggregateError(result.logs, "Overlay reload test bundle failed");
+        // A temp file so the ESM bundle (with its top-level `await
+        // i18nReady`) can be `import`ed; loadPage() uses a fresh file per
+        // load because Bun keys its module cache by URL.
+        pageBundleText = await result.outputs[0].text();
+    });
+
+    afterAll(async () => {
+        for (const file of pageBundleFiles)
+            await Bun.file(file).delete().catch(() => {});
+    });
+
+    /** Import the bundled page script; it mounts the feed and opens its
+     * (fake) websocket after `await i18nReady`, settle for a tick. */
+    async function loadPage(): Promise<void> {
+        reloadCalls = 0;
+        swUpdates = 0;
+        fakeSockets.length = 0;
+        // The page keeps module-level state (e.g. the `reloading` guard);
+        // a distinct URL is a distinct module, so the script reruns from
+        // scratch each call, as a fresh page load would.
+        const file = new URL(
+            `../.tmp-chat-overlay-reload-${++loadCount}.js`,
+            import.meta.url,
+        );
+        pageBundleFiles.push(file);
+        await Bun.write(file, pageBundleText);
+        await import(file.href);
+        await Bun.sleep(10);
+    }
+
+    function snapshotFrame(version?: string) {
+        return {
+            type: "event",
+            event: "chat.overlay.snapshot",
+            data: {
+                widget: { id: "chat", config: { twitch: "alice" } },
+                chat: { "twitch:alice": { connected: true, messages: [] } },
+                ...(version === undefined ? {} : { version }),
+            },
+        };
+    }
+
+    function deliver(frame: unknown): void {
+        fakeSockets[fakeSockets.length - 1].onmessage?.({
+            data: JSON.stringify(frame),
+        });
+    }
+
+    test("reloads the page (and updates the service worker) when the snapshot carries a newer version", async () => {
+        await loadPage();
+        expect(fakeSockets).toHaveLength(1);
+        deliver(snapshotFrame("999.0.0"));
+        await Bun.sleep(40);
+        expect(reloadCalls).toBe(1);
+        expect(swUpdates).toBe(1);
+    });
+
+    test("keeps running when the snapshot carries the page's own version", async () => {
+        await loadPage();
+        deliver(snapshotFrame(APP_VERSION));
+        await Bun.sleep(40);
+        expect(reloadCalls).toBe(0);
+        expect(swUpdates).toBe(0);
+    });
+
+    test("ignores a snapshot without a version (a server older than the page)", async () => {
+        await loadPage();
+        deliver(snapshotFrame());
+        await Bun.sleep(40);
+        expect(reloadCalls).toBe(0);
+        expect(swUpdates).toBe(0);
+    });
+
+    test("reloads exactly once even if more foreign snapshots arrive", async () => {
+        await loadPage();
+        deliver(snapshotFrame("999.0.0"));
+        deliver(snapshotFrame("999.0.1"));
+        await Bun.sleep(40);
+        expect(reloadCalls).toBe(1);
     });
 });
