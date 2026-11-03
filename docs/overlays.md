@@ -160,7 +160,7 @@ Every mutation goes over REST and is fanned out to two WebSocket topics
 
 | Event                 | Payload                    | Fires when                                                        | Editor | Runtime |
 | --------------------- | -------------------------- | ------------------------------------------------------------------ | :----: | :-----: |
-| `overlays.snapshot`   | `{scene, variables, canvas, assets}` | Runtime WS connects, after the token check (full initial state) | –    | ✔ |
+| `overlays.snapshot`   | `{scene, variables, canvas, assets, version}` | Runtime WS connects, after the token check (full initial state; `version` is the server build stamp the page compares to its own bundle to reload after a new deployment) | –    | ✔ |
 | `overlays.scene`      | `{scene}`                  | any scene mutation: rename/slug, add/update/delete elements         | ✔      | ✔ (applied only if it is the loaded scene) |
 | `overlays.sceneDeleted` | `{sceneId}`              | a scene is deleted                                                 | ✔      | – |
 | `overlays.variables`  | `{variables}`              | a variable is created/renamed/retyped/revalued/deleted             | ✔      | ✔ |

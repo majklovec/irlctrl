@@ -1,3 +1,4 @@
+import { APP_VERSION } from "../generated/version";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:net";
@@ -881,6 +882,11 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                 expect(
                     (snapshot.data as { variables: { value: number }[] }).variables,
                 ).toHaveLength(3);
+                // the runtime page compares this to its own bundled version
+                // and reloads when a new deployment replaced the server
+                expect(
+                    (snapshot.data as { version: string }).version,
+                ).toBe(APP_VERSION);
 
                 const patchRes = await fetch(
                     `${baseUrl}/api/overlays/scenes/${sceneBody.scene.id}/elements`,

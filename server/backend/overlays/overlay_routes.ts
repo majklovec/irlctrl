@@ -22,6 +22,7 @@
  * the project token (chat-overlay pattern), a fully transparent body.
  */
 import { Elysia } from "elysia";
+import { APP_VERSION } from "../../../shared/app_version";
 import type { createFrontend } from "../../../shared/frontend";
 import { upgradeRequired } from "../../../shared/http";
 import { socketMessage } from "../../../shared/socket_message";
@@ -207,6 +208,11 @@ export function overlayRoutes(
                         variables: feed.variables,
                         canvas: feed.canvas,
                         assets: feed.assets,
+                        // the runtime page compares this to its own bundled
+                        // version and reloads when a new deployment replaced
+                        // the server (a restart drops the socket, so the
+                        // fresh snapshot on reconnect carries the new stamp)
+                        version: APP_VERSION,
                     }),
                 );
             },

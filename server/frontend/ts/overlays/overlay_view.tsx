@@ -4,6 +4,8 @@
  * Fully transparent, no chrome, no console noise (handoff §7.3, §15).
  * - one project token in the URL query; a bad token just renders an empty page
  * - initial state + live updates over WS /overlay/:slug/ws
+ * - when the snapshot's server version differs from this bundle's, reload
+ *   (a new deployment replaced the server while the page was open)
  * - on disconnect: hold last-known state, reconnect with exponential backoff
  * - an `overlays.alert` frame shows every alert element whose event matches
  *   the frame's name; an element already showing an alert queues the new
@@ -22,6 +24,7 @@ import {
 } from "@ui/overlay/element";
 import { elementDef } from "@ui/overlay/registry";
 import m from "mithril";
+import { APP_VERSION } from "../../../../shared/app_version";
 import type {
 	Asset,
 	Canvas,
@@ -87,6 +90,28 @@ const alertQueues = new Map<string, PendingAlert[]>();
 
 let ws: WebSocket | undefined;
 let delay = 1000;
+let reloading = false;
+
+/**
+ * A new deployment replaced the server while this page was open (a restart
+ * drops the socket, so the fresh snapshot on reconnect carries the new
+ * build's version). Ask a registered service worker to update so its cache
+ * storage drops the previous bundle, then reload: the page is served
+ * `no-store` and the bundles are content-hashed, so the reload loads the
+ * new version from scratch.
+ */
+function reloadOnNewVersion(version: string): void {
+	if (reloading || version === APP_VERSION) return;
+	reloading = true;
+	console.info(
+		`[overlay] new server version v${version} (this page runs v${APP_VERSION}), reloading`,
+	);
+	navigator.serviceWorker
+		?.getRegistration()
+		.then((reg) => reg?.update())
+		.catch(() => {});
+	location.reload();
+}
 
 function variableMap(): Map<string, Variable["value"]> {
 	return new Map(state.variables.map((v) => [v.id, v.value]));
@@ -120,10 +145,13 @@ function handleMessage(raw: MessageEvent, first: { open: boolean }): void {
 	if (!message.event || typeof message.data !== "object") return;
 	const data = message.data as Record<string, unknown>;
 	switch (message.event) {
-		case "overlays.snapshot":
+		case "overlays.snapshot": {
+			const version = data.version;
+			if (typeof version === "string") reloadOnNewVersion(version);
 			applySnapshot(data);
 			first.open = true;
 			break;
+		}
 		case "overlays.scene": {
 			const scene = data.scene as Scene | null | undefined;
 			if (scene && scene.id === state.scene?.id) state.scene = scene;
