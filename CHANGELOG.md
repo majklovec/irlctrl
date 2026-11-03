@@ -1,3 +1,10 @@
+# [2.14.0](https://github.com/majklovec/irlctrl/compare/v2.13.0...v2.14.0) (2026-11-03)
+
+
+### Features
+
+* **overlays:** optimize asset handling in overlay frames and improve performance ([756592b](https://github.com/majklovec/irlctrl/commit/756592bcef212c306d2ff1011b12b0c891f498ed))
+
 # [2.13.0](https://github.com/majklovec/irlctrl/compare/v2.12.0...v2.13.0) (2026-11-03)
 
 
