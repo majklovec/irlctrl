@@ -8,7 +8,6 @@ import { currentLanguage, t } from "@ui/i18n";
 import m from "mithril";
 import type {
 	ChannelWidgetModule,
-	OverlayPreviewTarget,
 	WidgetContext,
 } from "../../../shared/contracts/frontend_module";
 import type { ServerDashboardWidget } from "../../../shared/contracts/wire";
@@ -18,7 +17,6 @@ import {
 	CHAT_PLATFORMS,
 	chatOrderFromConfig,
 	chatPlatformIconsFromConfig,
-	chatSpecsFromConfig,
 	chatTimestampsFromConfig,
 	chatTtsConfig,
 	chatTtsShouldSpeak,
@@ -42,8 +40,8 @@ import {
 	type ChannelLive,
 	type ChatBadge,
 	type ChatLive,
-	type ChatOverlayState,
 	type ChatPlatform,
+	type ChatSnapshot,
 } from "./types";
 import "./styles.css";
 
@@ -260,13 +258,6 @@ const PLATFORM_STATUS_ICONS: Record<ChatPlatform, string> = {
  * connected, red while disconnected. */
 function badge(w: ServerDashboardWidget, _ctx: WidgetContext): m.Vnode {
 	const specs = chatSpecsOf(w);
-	const dashboard = /^\/dashboards\/(?:view|edit)\/([^/]+)\/?$/.exec(
-		location.pathname,
-	);
-	const overlayUrl =
-		dashboard && w.config?.token
-			? `/chat/${dashboard[1]}/${encodeURIComponent(w.id)}?token=${encodeURIComponent(w.config.token)}`
-			: undefined;
 
 	if (!specs.length) {
 		return <Badge text={t("dash.widget_not_configured")} kind="warn" />;
@@ -274,21 +265,6 @@ function badge(w: ServerDashboardWidget, _ctx: WidgetContext): m.Vnode {
 
 	return (
 		<span class="chat-status">
-			{overlayUrl && (
-				<a
-					class="chat-status-icon"
-					href={overlayUrl}
-					target="_blank"
-					rel="noopener noreferrer"
-					title={t("chat.overlay")}
-					aria-label={t("chat.overlay")}
-				>
-					<span class="sr-only">{t("chat.overlay")}</span>
-					<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-						<path d="M12,24C5.383,24,0,18.617,0,12S5.383,0,12,0s12,5.383,12,12S18.617,24,12,24z M12,1.109 C5.995,1.109,1.11,5.995,1.11,12C1.11,18.005,5.995,22.89,12,22.89S22.89,18.005,22.89,12C22.89,5.995,18.005,1.109,12,1.109z M6.182,5.99c0.352-1.698,1.503-3.229,3.05-3.996c-0.269,0.273-0.595,0.483-0.844,0.78c-1.02,1.1-1.48,2.692-1.199,4.156 c0.355,2.235,2.455,4.06,4.732,4.028c1.765,0.079,3.485-0.937,4.348-2.468c1.848,0.063,3.645,1.017,4.7,2.548 c0.54,0.799,0.962,1.736,0.991,2.711c-0.342-1.295-1.202-2.446-2.375-3.095c-1.135-0.639-2.529-0.802-3.772-0.425 c-1.56,0.448-2.849,1.723-3.293,3.293c-0.377,1.25-0.216,2.628,0.377,3.772c-0.825,1.429-2.315,2.449-3.932,2.756 c-1.244,0.261-2.551,0.059-3.709-0.464c1.036,0.302,2.161,0.355,3.191-0.011c1.381-0.457,2.522-1.567,3.024-2.935 c0.556-1.49,0.345-3.261-0.591-4.54c-0.7-1.007-1.803-1.717-3.002-1.969c-0.38-0.068-0.764-0.098-1.148-0.134 c-0.611-1.231-0.834-2.66-0.528-3.996L6.182,5.99z" />
-					</svg>
-				</a>
-			)}
 			{specs.map(({ platform, spec }) => {
 				const connected = live.get(spec)?.connected === true;
 				return (
@@ -588,7 +564,7 @@ const chatAutoScroll = new WeakMap<HTMLElement, boolean>();
 
 /** A message's arrival time (HH:MM:SS, locale-aware) or "" when the platform
  * didn't provide one. The formatter is cached per language. */
-let timestampFormatter: (ts: number) => string;
+let timestampFormatter: Intl.DateTimeFormat | undefined;
 let timestampFormatterLang: string | undefined;
 
 function formatTimestamp(ts: number): string {
@@ -596,16 +572,17 @@ function formatTimestamp(ts: number): string {
 	const lang = currentLanguage();
 
 	if (timestampFormatterLang !== lang) {
+		timestampFormatterLang = lang;
 		timestampFormatter = new Intl.DateTimeFormat(lang, {
 			hour: "2-digit",
 			minute: "2-digit",
 			second: "2-digit",
 			hour12: false,
 		});
-		timestampFormatterLang = lang;
 	}
-
-	return timestampFormatter.format(ts);
+	const fmt = timestampFormatter;
+	if (!fmt) return "";
+	return fmt.format(ts);
 }
 
 type ChatFeedAttrs = {
@@ -750,168 +727,152 @@ export function chatFeed(w: FeedWidget, showEmpty = true): m.Children {
 	});
 }
 
-// ── Inline overlay preview (no iframe) ────────────────────────────────────
-// Chromium with GPU compositing paints every iframe on its own opaque layer,
-// so a chat page in an iframe shows as a solid white box inside a transparent
-// editor canvas — CSS cannot make the layer transparent. Editors therefore
-// render the feed directly in the canvas DOM, fed by the same token-
-// authenticated websocket the standalone overlay page uses.
+// ── Self-contained chat element feed ──────────────────────────────────────
+// The chat overlay element renders its live feed straight into the canvas
+// DOM — no `<iframe>` (Chromium composites every iframe on an opaque white
+// layer a transparent editor canvas can't show through). It is fed by a
+// scene-token WebSocket that streams the hub frames narrowed to the element's
+// own channel list, so it is fully independent of any dashboard chat widget.
 
-/** The token-authenticated chat overlay page URL, parsed back to its target. */
-const OVERLAY_URL = /^\/chat\/([^/]+)\/([^/?#]+)/;
-
-function parseOverlayUrl(url: string): OverlayPreviewTarget | undefined {
-	const path =
-		typeof location !== "undefined" ? url.replace(location.origin, "") : url;
-	const ids = OVERLAY_URL.exec(path);
-	if (!ids) return undefined;
-	const params = new URL(url, location.origin).searchParams;
-	const token = params.get("token");
-	if (!token) return undefined;
-	return {
-		dashboardId: decodeURIComponent(ids[1]),
-		widgetId: decodeURIComponent(ids[2]),
-		token,
-	};
-}
-
-interface LivePreviewState {
-	state?: ChatOverlayState;
-	/** The widget's channel specs, from the snapshot's config. */
-	specs?: Set<string>;
-	error: boolean;
-	stopped: boolean;
-	timer?: ReturnType<typeof setTimeout>;
-	attempt: number;
-	socket?: WebSocket;
-}
-
-/**
- * The live chat feed rendered straight into an editor's canvas DOM — the
- * module owns it (core reaches it only through the registry contract). Fed
- * by the same token-authenticated websocket the standalone overlay page
- * uses; the snapshot frame seeds state, then the hub stream is narrowed to
- * the widget's channel specs.
- */
-const LiveChatPreview: m.Component<OverlayPreviewTarget, LivePreviewState> = {
-	oninit(vnode) {
-		// `state` is pre-initialized by mithril; mutate it, never reassign.
-		vnode.state.error = true;
-		vnode.state.stopped = false;
-		vnode.state.attempt = 0;
-		livePreviewConnect(vnode);
-	},
-	onremove(vnode) {
-		vnode.state.stopped = true;
-		clearTimeout(vnode.state.timer);
-		vnode.state.socket?.close();
-	},
-	view(vnode) {
-		const s = vnode.state;
-		return s.error
-			? m("p.chat-overlay-error", { role: "alert" }, "…")
-			: s.state
-				? chatFeed(s.state.widget, false)
-				: m("p.chat-overlay-error", { role: "alert" }, "…");
-	},
+/** Attributes carrying the element's display config + scene identity. */
+type EmbeddedChatAttrs = {
+    /** Chat-widget-shaped config built from the element's props. */
+    config: Record<string, string>;
+    /** Stable element id (keys the feed). */
+    id: string;
+    /** The OBS scene's project token. */
+    token: string;
+    /** The scene's slug (selects which scene's channels stream). */
+    slug: string;
 };
 
-/**
- * Connect the preview's socket: same origin, ws(s) scheme, token in the
- * query string — the browser WebSocket API cannot set the Authorization
- * header, and the server accepts the token via `?token=` on the upgrade.
- */
-function livePreviewConnect(
-	vnode: m.Vnode<OverlayPreviewTarget, LivePreviewState>,
-): void {
-	const s = vnode.state;
-	if (s.stopped) return;
-	const { dashboardId, widgetId, token } = vnode.attrs;
-	const url = new URL(
-		`/api/chat/${encodeURIComponent(dashboardId)}/${encodeURIComponent(widgetId)}/ws`,
-		location.origin,
-	);
-	url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
-	url.searchParams.set("token", token);
-	const socket = new WebSocket(url);
-	s.socket = socket;
-
-	socket.onopen = () => {
-		s.attempt = 0;
-	};
-
-	socket.onmessage = (event) => {
-		let frame: { type?: string; event?: string; data?: unknown };
-		try {
-			frame = JSON.parse(String(event.data)) as typeof frame;
-		} catch {
-			return;
-		}
-		if (frame.type !== "event" || !frame.event) return;
-		if (frame.event === "chat.overlay.snapshot") {
-			const snap = frame.data as ChatOverlayState;
-			s.state = snap;
-			s.specs = new Set(
-				chatSpecsFromConfig(snap.widget.config).filter(
-					(spec): spec is string => spec !== null,
-				),
-			);
-			onFrame?.("widget.snapshot", { chat: snap.chat });
-			s.error = false;
-			m.redraw();
-			return;
-		}
-		// The hub stream carries every channel — keep only this widget's.
-		if (!frame.event.endsWith(".chat")) return;
-		const channel = (frame.data as { channel?: unknown } | null)?.channel;
-		if (typeof channel !== "string") return;
-		const dot = frame.event.indexOf(".");
-		const spec = `${frame.event.slice(0, dot)}:${channel.toLowerCase()}`;
-		// Before the snapshot arrives we can't filter — drop the frame.
-		if (!s.specs?.has(spec)) return;
-		onFrame?.(frame.event, frame.data);
-		m.redraw();
-	};
-
-	socket.onclose = (event) => {
-		s.socket = undefined;
-		if (s.stopped) return;
-		if (event.code === 1008) {
-			// The token was rotated, removed, or the widget is gone —
-			// reconnecting can never succeed.
-			s.stopped = true;
-			s.state = undefined;
-			s.error = true;
-			m.redraw();
-			return;
-		}
-		s.state = undefined;
-		s.error = true;
-		m.redraw();
-		const delay = Math.min(1_000 * 2 ** s.attempt, 15_000);
-		s.attempt += 1;
-		console.warn(
-			`[chat preview] connection closed (${event.code}), retrying in ${delay} ms`,
-		);
-		s.timer = setTimeout(() => livePreviewConnect(vnode), delay);
-	};
+interface EmbeddedChatState {
+    ready: boolean;
+    stopped: boolean;
+    attempt: number;
+    timer?: ReturnType<typeof setTimeout>;
+    socket?: WebSocket;
+    specs: Set<string>;
 }
 
-function overlayPreview(target: OverlayPreviewTarget): m.Vnode {
-	// `dash-widget-body` is the scoping class styles.css uses for the feed.
-	return m(
-		"div.chat-overlay-live dash-widget-body",
-		{
-			style: {
-				width: "100%",
-				height: "100%",
-				overflow: "hidden",
-				background: "transparent",
-				pointerEvents: "none",
-			},
-		},
-		m(LiveChatPreview, { ...target }),
-	);
+/**
+ * The live chat feed for one chat overlay element. Renders the shared
+ * `chatFeed` (the same merged feed a dashboard widget shows), fed by the
+ * scene-token WebSocket; the snapshot seeds state, then each hub frame is
+ * narrowed to the element's channel specs.
+ */
+export const EmbeddedChat: m.Component<EmbeddedChatAttrs, EmbeddedChatState> = {
+    oninit(vnode) {
+        // `state` is pre-initialized by mithril; mutate it, never reassign.
+        vnode.state.ready = false;
+        vnode.state.stopped = false;
+        vnode.state.attempt = 0;
+        vnode.state.specs = new Set(
+            chatSpecsOf({ config: vnode.attrs.config }).map((c) => c.spec),
+        );
+        embeddedChatConnect(vnode);
+    },
+    onupdate(vnode) {
+        // Channels added/removed in the inspector change the spec set;
+        // refresh it and reconnect so the narrowed stream tracks the config.
+        const wanted = new Set(
+            chatSpecsOf({ config: vnode.attrs.config }).map((c) => c.spec),
+        );
+        if (!sameSpecs(vnode.state.specs, wanted)) {
+            vnode.state.specs = wanted;
+            vnode.state.socket?.close();
+            embeddedChatConnect(vnode);
+        }
+    },
+    onremove(vnode) {
+        vnode.state.stopped = true;
+        clearTimeout(vnode.state.timer);
+        vnode.state.socket?.close();
+    },
+    view(vnode) {
+        const s = vnode.state;
+        return s.ready
+            ? (chatFeed({ id: vnode.attrs.id, config: vnode.attrs.config }, false) ??
+                m("p.chat-overlay-error", { role: "alert" }, "…"))
+            : m("p.chat-overlay-error", { role: "alert" }, "…");
+    },
+};
+
+/** Two spec sets have the same members (order-independent). */
+function sameSpecs(a: Set<string>, b: Set<string>): boolean {
+    if (a.size !== b.size) return false;
+    for (const spec of a) if (!b.has(spec)) return false;
+    return true;
+}
+
+/**
+ * Connect the element's feed socket: same origin, ws(s) scheme, the scene
+ * token in the query string (the browser WebSocket API can't set the
+ * Authorization header). On close, 1008 is fatal (token gone); anything else
+ * retries with exponential backoff.
+ */
+function embeddedChatConnect(
+    vnode: m.Vnode<EmbeddedChatAttrs, EmbeddedChatState>,
+): void {
+    const s = vnode.state;
+    if (s.stopped) return;
+    const { token, slug } = vnode.attrs;
+    if (!token || !slug) return;
+    const url = new URL(
+        `/api/overlay/chat/${encodeURIComponent(slug)}/ws`,
+        location.origin,
+    );
+    url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
+    url.searchParams.set("token", token);
+    const socket = new WebSocket(url);
+    s.socket = socket;
+
+    socket.onopen = () => {
+        s.attempt = 0;
+    };
+
+    socket.onmessage = (event) => {
+        let frame: { type?: string; event?: string; data?: unknown };
+        try {
+            frame = JSON.parse(String(event.data)) as typeof frame;
+        } catch {
+            return;
+        }
+        if (frame.type !== "event" || !frame.event) return;
+        if (frame.event === "chat.overlay.snapshot") {
+            const snap = frame.data as { chat?: ChatSnapshot };
+            onFrame?.("widget.snapshot", { chat: snap.chat ?? {} });
+            s.ready = true;
+            m.redraw();
+            return;
+        }
+        // The hub stream carries every channel — keep only this element's.
+        if (!frame.event.endsWith(".chat")) return;
+        const channel = (frame.data as { channel?: unknown } | null)?.channel;
+        if (typeof channel !== "string") return;
+        const dot = frame.event.indexOf(".");
+        const spec = `${frame.event.slice(0, dot)}:${channel.toLowerCase()}`;
+        if (!s.specs.has(spec)) return;
+        onFrame?.(frame.event, frame.data);
+        m.redraw();
+    };
+
+    socket.onclose = (event) => {
+        s.socket = undefined;
+        if (s.stopped) return;
+        if (event.code === 1008) {
+            // The scene token was rotated/removed — reconnecting can't succeed.
+            s.stopped = true;
+            s.ready = false;
+            m.redraw();
+            return;
+        }
+        s.ready = false;
+        m.redraw();
+        const delay = Math.min(1_000 * 2 ** s.attempt, 15_000);
+        s.attempt += 1;
+        s.timer = setTimeout(() => embeddedChatConnect(vnode), delay);
+    };
 }
 
 const chatModule: ChannelWidgetModule<ServerDashboardWidget> = {
@@ -930,8 +891,6 @@ const chatModule: ChannelWidgetModule<ServerDashboardWidget> = {
 	body,
 	badge,
 	onFrame,
-	parseOverlayUrl,
-	overlayPreview,
 };
 
 export default chatModule;

@@ -16,7 +16,6 @@ export const CHAT_CONFIG_FIELDS = [
     "twitch",
     "tiktok",
     "kick",
-    "token",
     "history",
     { name: "order", type: "select", options: ["top", "bottom"] },
     { name: "bannedMessages", type: "select", options: ["strike", "hide"] },
@@ -103,9 +102,11 @@ export function chatPlatformIconsFromConfig(
     return platformCount > 1;
 }
 
-/** Normalize one platform channel value (lowercased, trimmed; "" when empty). */
+/** Normalize one platform channel value (lowercased, trimmed; "" when empty
+ * or not a string — the channel list is parsed from stored JSON, so guard
+ * against non-string values). */
 const channelPart = (value: string | undefined): string =>
-    (value ?? "").trim().toLowerCase();
+    (typeof value === "string" ? value : "").trim().toLowerCase();
 
 /** The channel for one platform from a widget's config ("" when the platform
  * channel is not filled). */
@@ -126,6 +127,83 @@ export function chatSpecsFromConfig(
         const name = platformChannel(platform, config);
         return name ? `${platform}:${name}` : null;
     });
+}
+
+// ── Standalone overlay element channels ────────────────────────────────────
+// The chat overlay element carries its own channel list (not a per-platform
+// config field) so it is independent of a dashboard chat widget. These pure
+// helpers bridge the element's `channels` prop to the same shapes the feed
+// helpers and the backend hub already consume.
+
+/** One platform channel a chat overlay element can display. */
+export interface ChatChannel {
+    platform: (typeof CHAT_PLATFORMS)[number];
+    channel: string;
+}
+
+/**
+ * Defensively coerce a stored `channels` prop to a clean list: keeps every row
+ * with a known platform, trimming + lowercasing its channel. Rows with an empty
+ * channel are kept — an in-progress editor row the user has not typed a handle
+ * for yet — so the editor's save/push round-trip does not strip them; the feed
+ * boundaries (`runtimeSceneChatSpecs`, `chatSpecsFromChannels`) are what filter
+ * out the empty ones. Non-objects and unknown platforms are dropped.
+ */
+export function normalizeChannels(raw: unknown): ChatChannel[] {
+    if (!Array.isArray(raw)) return [];
+    const out: ChatChannel[] = [];
+    for (const item of raw) {
+        if (typeof item !== "object" || item === null) continue;
+        const platform = (item as { platform?: unknown }).platform;
+        if (typeof platform !== "string") continue;
+        if (!(CHAT_PLATFORMS as readonly string[]).includes(platform)) continue;
+        const channel = channelPart(
+            (item as { channel?: unknown }).channel as string | undefined,
+        );
+        out.push({ platform: platform as ChatChannel["platform"], channel });
+    }
+    return out;
+}
+
+/** The hub specs (`<platform>:<channel>`) for a channel list, one per entry
+ * with a non-empty channel (in-progress rows with an empty handle are skipped). */
+export function chatSpecsFromChannels(channels: ChatChannel[]): string[] {
+    return channels
+        .filter((c) => c.channel)
+        .map((c) => `${c.platform}:${c.channel}`);
+}
+
+/**
+ * Build a chat-widget-shaped config record from a chat overlay element's
+ * props, so the feed helpers (`chatSpecsOf`, `mergedLines`, …) render the
+ * element's channels exactly like a dashboard widget. The `channels` list maps
+ * to the per-platform channel keys; the display options map to the widget's
+ * feed-option keys.
+ */
+export function chatPropsToConfig(
+    props: Record<string, unknown>,
+): Record<string, string> {
+    const config: Record<string, string> = {};
+    for (const c of normalizeChannels(props.channels))
+        if (c.channel) config[c.platform] = c.channel;
+    config.history = String(
+        typeof props.history === "number" && Number.isFinite(props.history)
+            ? props.history
+            : DEFAULT_HISTORY_LINES,
+    );
+    config.order = String(
+        props.order === "bottom" ? "bottom" : "top",
+    );
+    config.bannedMessages = String(
+        props.bannedMessages === "hide" ? "hide" : "strike",
+    );
+    config.timestamps = String(props.timestamps === "on" ? "on" : "off");
+    config.platformIcons = String(
+        props.platformIcons === "on" || props.platformIcons === "off"
+            ? props.platformIcons
+            : "auto",
+    );
+    return config;
 }
 
 // ── Czech TTS (text-to-speech) config parsing and filtering ─────────────────

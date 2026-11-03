@@ -1,415 +1,515 @@
 /** @jsx m */
 /*
- * The chat overlay element: embeds a chat module's live overlay page
- * (`/chat/<dashboardId>/<widgetId>?token=…`) in an OBS overlay scene. The
- * inspector offers the user's chat modules as one-click targets — the list is
- * fetched here, on demand, so the editor core knows nothing about chat.
+ * OBS overlay chat element — a self-contained live chat feed that draws its
+ * platforms and channels directly on the element, independent of any
+ * dashboard chat widget.
+ *   - Channels: a filters-style list — add rows, pick a platform, type the
+ *     handle. No widget to link, no URL to paste.
+ *   - Display: history, new-message order, banned-message handling,
+ *     timestamps and platform icons.
+ *   - Feed text: size, weight, colour, line-height, spacing, fade, alignment.
+ * The live text renders straight into the same DOM the overlay composites, so
+ * a browser tab shows the exact feed OBS sees. It never uses an <iframe> — a
+ * browser-source capture composites iframes opaquely. The feed is fed by the
+ * scene token + slug via `EmbeddedChat` (./frontend.tsx); props are normalized
+ * & clamped by ./overlay_schema.ts, so the form only edits.
  */
 
-import { apiTry } from "@ui/api_client";
 import { Icon } from "@ui/components/icons";
 import { t } from "@ui/i18n";
-import { FRONTS } from "@ui/module_registry";
 import type {
 	ElementContext,
 	ElementProps,
 	OverlayElement,
 	OverlayElementDef,
 } from "@ui/overlay/element";
-import { drawIframe, numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
-import type { Vnode } from "mithril";
+import type { Vnode, Children } from "mithril";
 import m from "mithril";
-import { DEFAULT_CHAT_PROPS } from "./overlay_schema";
+import {
+	CHAT_PLATFORMS,
+	chatPropsToConfig,
+	type ChatChannel,
+} from "./config";
+import { EmbeddedChat } from "./frontend";
+import { type ChatProps, DEFAULT_CHAT_PROPS } from "./overlay_schema";
 
-/** A chat module (a dashboard widget of type "chat") the picker can offer. */
-interface ChatWidgetRef {
-	dashboardId: string;
-	widgetId: string;
-	/** Widget name — the label shown in the picker. */
-	name: string;
-	/** Per-widget auth token; required to load the live chat page. */
-	token: string;
-}
-
-/** Absolute URL of a chat module's live overlay page. The token lives in
- * the query string (no cookies) so OBS can load it in an external browser
- * source. */
-function chatUrl(w: ChatWidgetRef): string {
-	return (
-		location.origin +
-		"/chat/" +
-		encodeURIComponent(w.dashboardId) +
-		"/" +
-		encodeURIComponent(w.widgetId) +
-		"?token=" +
-		encodeURIComponent(w.token)
-	);
-}
-
-/** The user's chat modules; re-read whenever the picker mounts, so a
- * dashboard change shows up on reselect. */
-let widgets: ChatWidgetRef[] = [];
-let loading: Promise<void> | null = null;
-
-function loadWidgets(): Promise<void> {
-	loading ??= apiTry<{
-		dashboards?: Array<{
-			id: string;
-			widgets?: Array<{
-				id: string;
-				type: string;
-				name: string;
-				config?: Record<string, string>;
-			}>;
-		}>;
-	}>("/api/dashboards")
-		.then((body) => {
-			widgets = [];
-			for (const d of body?.dashboards ?? [])
-				for (const w of d.widgets ?? [])
-					if (w.type === "chat")
-						widgets.push({
-							dashboardId: d.id,
-							widgetId: w.id,
-							name: w.name,
-							token: w.config?.token ?? "",
-						});
-			m.redraw();
-		})
-		.finally(() => {
-			loading = null;
-		});
-	return loading;
-}
-
-/** The inline live preview of a chat element's overlay page, resolved through
- * the module registry: the owning module recognizes the URL
- * (`parseOverlayUrl`) and renders its own feed (`overlayPreview`) directly in
- * the canvas DOM — no `<iframe>`, because Chromium composites every iframe on
- * an opaque white layer that a transparent editor canvas cannot show through.
- * URLs no module claims keep the plain iframe fallback. */
-function overlayPreview(url: string): Vnode | undefined {
-	for (const reg of FRONTS) {
-		if (reg.kind !== "widget") continue;
-		const target = reg.parseOverlayUrl?.(url);
-		if (target && reg.overlayPreview) return reg.overlayPreview(target);
-	}
-	return undefined;
-}
-
-/** The element's feed text style. The live preview's `.chat-feed` sets its own
- * font rules, so these ride down as CSS custom properties (see
- * `styles.css`) rather than relying on plain inheritance. */
-function chatTextProps(p: Record<string, unknown>) {
-	return {
-		fontSize: numProp(p, "fontSize", 48),
-		fontFamily: strProp(p, "fontFamily", "Inter, system-ui, sans-serif"),
-		color: strProp(p, "color", "#ffffff"),
-		fontWeight: numProp(p, "fontWeight", 600),
-		lineHeight: numProp(p, "lineHeight", 1.2),
-		messageSpacing: numProp(p, "messageSpacing", 0),
-		fadeDirection: [
-			"off",
-			"top",
-			"bottom",
-		].includes(strProp(p, "fadeDirection", "off"))
-			? (strProp(p, "fadeDirection", "off") as "off" | "top" | "bottom")
-			: "off",
-		fadeSize: numProp(p, "fadeSize", 96),
-		textAlign: [
-			"left",
-			"center",
-			"right",
-			"justify",
-		].includes(strProp(p, "textAlign", "left"))
-			? (strProp(p, "textAlign", "left") as
-					| "left"
-					| "center"
-					| "right"
-					| "justify")
-			: "left",
-	};
-}
-
-function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
-	const url = strProp(element.props, "url", "");
-	const preview = overlayPreview(url);
-	const t = chatTextProps(element.props);
-	return m(
-		`.chat-element${
-			t.fadeDirection !== "off" ? ` chat-element-fade-${t.fadeDirection}` : ""
-		}`,
-		{
-			style: {
-				width: "100%",
-				height: "100%",
-				"--ov-chat-font-size": `${t.fontSize}px`,
-				"--ov-chat-font-family": t.fontFamily,
-				"--ov-chat-color": t.color,
-				"--ov-chat-font-weight": `${t.fontWeight}`,
-				"--ov-chat-line-height": `${t.lineHeight}`,
-				"--ov-chat-message-gap": `${t.messageSpacing}px`,
-				"--ov-chat-fade": `${t.fadeSize}px`,
-				"--ov-chat-text-align": t.textAlign,
-			},
-		},
-		[preview ?? (drawIframe(element) as Vnode)],
-	);
-}
-
-/** The module picker: a closure component so it can trigger the fetch on
- * mount without the editor knowing. */
-const ChatPicker: m.ClosureComponent<ElementProps> = () => {
-	void loadWidgets();
-	return {
-		view: ({ attrs: { element: e, mutate, variables } }) => {
-			const p = e.props;
-			const sp = { mutate, variables };
-			const current = String(p.url ?? "");
-			const matched = widgets.find((w) => chatUrl(w) === current);
-			return (
-				<>
-					{bindField(
-						e,
-						"props.url",
-						t("overlay.chat_module"),
-						<select
-							value={matched ? matched.widgetId : ""}
-							onchange={(ev: Event) => {
-								const id = (ev.target as HTMLSelectElement).value;
-								const w = widgets.find((c) => c.widgetId === id);
-								if (w) mutate((el) => (el.props.url = chatUrl(w)));
-							}}
-						>
-							{[
-								// one flat keyed list: mithril rejects a keyed vnode next to a fragment
-								<option key="" value="">
-									{t("overlay.chat_no_module")}
-								</option>,
-								...widgets.map((w) => (
-									<option key={w.widgetId} value={w.widgetId}>
-										{w.name}
-									</option>
-								)),
-							]}
-						</select>,
-						sp,
-					)}
-					<div class="ov-grid2">
-						{bindField(
-							e,
-							"props.fontSize",
-							t("overlay.font_size"),
-							<input
-								type="number"
-								value={Number(p.fontSize ?? 48)}
-								oninput={(ev: Event) =>
-									mutate((el) => {
-										el.props.fontSize = Number(
-											(ev.target as HTMLInputElement).value,
-										);
-									})
-								}
-							/>,
-							sp,
-						)}
-						{bindField(
-							e,
-							"props.color",
-							t("overlay.color"),
-							<input
-								type="color"
-								value={String(p.color ?? "#ffffff")}
-								oninput={(ev: Event) =>
-									mutate((el) => {
-										el.props.color = (ev.target as HTMLInputElement)
-											.value;
-									})
-								}
-							/>,
-							sp,
-						)}
-					</div>
-					<div class="ov-grid2">
-						{bindField(
-							e,
-							"props.fontWeight",
-							t("overlay.font_weight"),
-							<select
-								value={String(p.fontWeight ?? 600)}
-								onchange={(ev: Event) =>
-									mutate((el) => {
-										el.props.fontWeight = Number(
-											(ev.target as HTMLSelectElement).value,
-										);
-									})
-								}
-							>
-								<option value="400">400</option>
-								<option value="600">600</option>
-								<option value="700">700</option>
-								<option value="900">900</option>
-							</select>,
-							sp,
-						)}
-						{bindField(
-							e,
-							"props.lineHeight",
-							t("overlay.line_height"),
-							<input
-								type="number"
-								value={Number(p.lineHeight ?? 1.2)}
-								oninput={(ev: Event) =>
-									mutate((el) => {
-										el.props.lineHeight = Number(
-											(ev.target as HTMLInputElement).value,
-										);
-									})
-								}
-							/>,
-							sp,
-						)}
-					</div>
-					<div class="ov-grid2">
-						{bindField(
-							e,
-							"props.messageSpacing",
-							t("overlay.message_spacing"),
-							<input
-								type="number"
-								value={Number(p.messageSpacing ?? 0)}
-								oninput={(ev: Event) =>
-									mutate((el) => {
-										el.props.messageSpacing = Number(
-											(ev.target as HTMLInputElement).value,
-										);
-									})
-								}
-							/>,
-							sp,
-						)}
-						{bindField(
-							e,
-							"props.fadeDirection",
-							t("overlay.fade_direction"),
-							<select
-								value={String(p.fadeDirection ?? "off")}
-								onchange={(ev: Event) =>
-									mutate((el) => {
-										el.props.fadeDirection = (
-											ev.target as HTMLSelectElement
-										).value;
-									})
-								}
-							>
-								<option value="off">{t("overlay.fade_direction.off")}</option>
-								<option value="top">{t("overlay.fade_direction.top")}</option>
-								<option value="bottom">
-									{t("overlay.fade_direction.bottom")}
-								</option>
-							</select>,
-							sp,
-						)}
-					</div>
-					{bindField(
-						e,
-						"props.fadeSize",
-						t("overlay.fade_size"),
-						<input
-							type="number"
-							value={Number(p.fadeSize ?? 96)}
-							oninput={(ev: Event) =>
-								mutate((el) => {
-									el.props.fadeSize = Number(
-										(ev.target as HTMLInputElement).value,
-									);
-								})
-							}
-						/>,
-						sp,
-					)}
-					{bindField(
-						e,
-						"props.textAlign",
-						t("overlay.text_align"),
-						<select
-							value={String(p.textAlign ?? "left")}
-							onchange={(ev: Event) =>
-								mutate((el) => {
-									el.props.textAlign = (
-										ev.target as HTMLSelectElement
-									).value;
-								})
-							}
-						>
-							<option value="left">{t("overlay.text_align.left")}</option>
-							<option value="center">
-								{t("overlay.text_align.center")}
-							</option>
-							<option value="right">
-								{t("overlay.text_align.right")}
-							</option>
-							<option value="justify">
-								{t("overlay.text_align.justify")}
-							</option>
-						</select>,
-						sp,
-					)}
-					{bindField(
-						e,
-						"props.fontFamily",
-						t("overlay.font_family"),
-						<input
-							type="text"
-							value={String(p.fontFamily ?? "Inter, system-ui, sans-serif")}
-							oninput={(ev: Event) =>
-								mutate((el) => {
-									el.props.fontFamily = (ev.target as HTMLInputElement)
-										.value;
-								})
-							}
-						/>,
-						sp,
-					)}
-				</>
-			);
-		},
-	};
+/** Platform option label keys — YouTube/Twitch/Kick live in the core catalog
+ * and TikTok in this module's; all resolve once every catalog is registered. */
+const PLATFORM_LABEL_KEY: Record<string, string> = {
+	youtube: "dash.widget_youtube",
+	twitch: "dash.widget_twitch",
+	tiktok: "dash.widget_tiktok",
+	kick: "dash.widget_kick",
 };
+const platformLabel = (p: string): string => t(PLATFORM_LABEL_KEY[p] ?? p);
 
-function editForm(props: ElementProps): Vnode {
-	return m(ChatPicker, props) as unknown as Vnode;
+/** One inspector field wrapping a `<select>` of fixed choices. `bindField`
+ * shows no binding toggle for selects (a fixed choice set can't take a
+ * variable binding), so this is purely presentational. */
+function choiceField(
+	e: OverlayElement,
+	path: string,
+	label: string,
+	value: string,
+	options: { value: string; label: string }[],
+	apply: (v: string) => void,
+	props: ElementProps,
+): Vnode {
+	return bindField(
+		e,
+		path,
+		label,
+		<select
+			value={value}
+			oninput={(ev: Event) =>
+				apply((ev.target as HTMLSelectElement).value)
+			}>
+			{options.map((o) => (
+				<option key={o.value} value={o.value}>{o.label}</option>
+			))}
+		</select>,
+		props,
+	);
 }
 
-function validate(e: OverlayElement): string[] {
-	const problems: string[] = [];
-	if (typeof e.props.url !== "string") problems.push("url is not a string");
-	const size = numProp(e.props, "fontSize", 48);
-	if (!(size >= 1 && size <= 2000))
-		problems.push("font size out of range (1–2000)");
-	return problems;
+/** Filters-style channel list: add rows, pick a platform, type a handle,
+ * remove. Mutates `props.channels` (a normalized `ChatChannel[]`); the schema
+ * normalizes on load so the stored value is always a clean array. */
+function channelsField(props: ElementProps): Children {
+	const element = props.element;
+		const channels = (element.props.channels ?? []) as ChatChannel[];
+		const set = (next: ChatChannel[]): void =>
+			props.mutate((el) => {
+				el.props.channels = next;
+			});
+		return (
+			<div class="ov-field">
+				<span class="ov-lbl">{t("overlay.chat_channels")}</span>
+				<div class="ov-channels">
+					{channels.length === 0
+						? (
+							<div class="ov-channels-empty">
+								{t("overlay.chat_no_channels")}
+							</div>
+						)
+						: channels.map((c, i) => (
+							<div class="ov-channel-row" key={i}>
+								<select
+									value={c.platform}
+									aria-label={t("overlay.chat_platform")}
+									onchange={(ev: Event) => {
+										const platform =
+											(ev.target as HTMLSelectElement)
+												.value as ChatChannel["platform"];
+										set(
+											channels.map((row, j) =>
+												j === i
+													? { ...row, platform }
+													: row,
+											),
+										);
+									}}
+								>
+									{CHAT_PLATFORMS.map((pf) => (
+										<option key={pf} value={pf}>
+											{platformLabel(pf)}
+										</option>
+									))}
+								</select>
+								<input
+									value={c.channel}
+									placeholder={t("overlay.chat_channel_ph")}
+									aria-label={t("overlay.chat_channel")}
+									oninput={(ev: Event) => {
+										const channel = (
+											ev.target as HTMLInputElement
+										).value;
+										set(
+											channels.map((row, j) =>
+												j === i
+													? { ...row, channel }
+													: row,
+											),
+										);
+									}}
+								/>
+								<button
+									class="ov-channel-remove"
+									type="button"
+									aria-label={t("overlay.chat_remove_channel")}
+									onclick={() =>
+										set(
+											channels.filter(
+												(_, j) => j !== i,
+											),
+										)
+									}
+								>
+									<Icon name="close" width="12" height="12" />
+								</button>
+							</div>
+						))}
+					<button
+						class="ov-channel-add"
+						type="button"
+						onclick={() =>
+							set([
+								...channels,
+								{ platform: CHAT_PLATFORMS[0], channel: "" },
+							])
+						}
+					>
+						+ {t("overlay.chat_add_channel")}
+					</button>
+				</div>
+			</div>
+		);
+}
+
+/** Draw the element as a live chat feed in the current DOM. `ctx` carries the
+ * scene token + slug the feed opens its WebSocket with: in the editor those are
+ * the project token and the draft scene's slug; at runtime both come from the
+ * overlay URL. */
+function draw(element: OverlayElement, ctx: ElementContext): Vnode {
+	const p = element.props as unknown as ChatProps;
+	// `--ov-chat-*` custom properties + the fade-<dir> modifier class are the
+	// contract `styles.css` reads (see its `.chat-element` rules).
+	return (
+		<div
+			class={`chat-element${
+				p.fadeDirection !== "off"
+					? ` chat-element-fade-${p.fadeDirection}`
+					: ""
+			}`}
+			style={{
+				"--ov-chat-font-size": `${p.fontSize}px`,
+				"--ov-chat-font-family": p.fontFamily,
+				"--ov-chat-color": p.color,
+				"--ov-chat-font-weight": String(p.fontWeight),
+				"--ov-chat-line-height": String(p.lineHeight),
+				"--ov-chat-message-gap": `${p.messageSpacing}px`,
+				"--ov-chat-fade": `${p.fadeSize}px`,
+				"--ov-chat-text-align": p.textAlign,
+			}}
+		>
+			{m(EmbeddedChat, {
+				id: element.id,
+				config: chatPropsToConfig(element.props),
+				token: ctx.token ?? "",
+				slug: ctx.slug ?? "",
+			})}
+		</div>
+	);
+}
+
+function editForm(props: ElementProps): Children {
+	const e = props.element;
+	const p = e.props as unknown as ChatProps;
+	const mutate = (fn: (el: OverlayElement) => void): void =>
+		props.mutate(fn);
+
+	return (
+		<>
+			{channelsField(props)}
+
+			// Message display.
+			{bindField(
+				e,
+				"props.history",
+				t("dash.widget_history"),
+				<input
+					type="number"
+					min={1}
+					value={p.history}
+					oninput={(ev: Event) =>
+						mutate((el) => {
+							el.props.history =
+								Number((ev.target as HTMLInputElement).value) ||
+								1;
+						})
+					}
+				/>,
+				props,
+			)}
+			{choiceField(
+				e,
+				"props.order",
+				t("dash.widget_order"),
+				p.order,
+				[
+					{ value: "top", label: t("dash.widget_order.top") },
+					{
+						value: "bottom",
+						label: t("dash.widget_order.bottom"),
+					},
+				],
+				(v) =>
+					mutate((el) => {
+						el.props.order = v as ChatProps["order"];
+					}),
+				props,
+			)}
+			{choiceField(
+				e,
+				"props.bannedMessages",
+				t("dash.widget_bannedMessages"),
+				p.bannedMessages,
+				[
+					{
+						value: "strike",
+						label: t("dash.widget_bannedMessages.strike"),
+					},
+					{
+						value: "hide",
+						label: t("dash.widget_bannedMessages.hide"),
+					},
+				],
+				(v) =>
+					mutate((el) => {
+						el.props.bannedMessages =
+							v as ChatProps["bannedMessages"];
+					}),
+				props,
+			)}
+			{choiceField(
+				e,
+				"props.timestamps",
+				t("dash.widget_timestamps"),
+				p.timestamps,
+				[
+					{
+						value: "off",
+						label: t("dash.widget_timestamps.off"),
+					},
+					{ value: "on", label: t("dash.widget_timestamps.on") },
+				],
+				(v) =>
+					mutate((el) => {
+						el.props.timestamps = v as ChatProps["timestamps"];
+					}),
+				props,
+			)}
+			{choiceField(
+				e,
+				"props.platformIcons",
+				t("dash.widget_platformIcons"),
+				p.platformIcons,
+				[
+					{
+						value: "auto",
+						label: t("dash.widget_platformIcons.auto"),
+					},
+					{ value: "on", label: t("dash.widget_platformIcons.on") },
+					{
+						value: "off",
+						label: t("dash.widget_platformIcons.off"),
+					},
+				],
+				(v) =>
+					mutate((el) => {
+						el.props.platformIcons =
+							v as ChatProps["platformIcons"];
+					}),
+				props,
+			)}
+
+			// Feed text.
+			{bindField(
+				e,
+				"props.fontSize",
+				t("overlay.font_size"),
+				<input
+					type="number"
+					min={8}
+					value={p.fontSize}
+					oninput={(ev: Event) =>
+						mutate((el) => {
+							el.props.fontSize =
+								Number((ev.target as HTMLInputElement).value) ||
+								8;
+						})
+					}
+				/>,
+				props,
+			)}
+			{bindField(
+				e,
+				"props.fontWeight",
+				t("overlay.font_weight"),
+				<select
+					value={p.fontWeight}
+					oninput={(ev: Event) =>
+						mutate((el) => {
+							el.props.fontWeight = Number(
+								(ev.target as HTMLSelectElement).value,
+							);
+						})
+					}>
+					<option value={400}>400</option>
+					<option value={500}>500</option>
+					<option value={700}>700</option>
+				</select>,
+				props,
+			)}
+			{bindField(
+				e,
+				"props.color",
+				t("overlay.color"),
+				<input
+					type="color"
+					value={p.color}
+					oninput={(ev: Event) =>
+						mutate((el) => {
+							el.props.color = (
+								ev.target as HTMLInputElement
+							).value;
+						})
+					}
+				/>,
+				props,
+			)}
+			{bindField(
+				e,
+				"props.lineHeight",
+				t("overlay.line_height"),
+				<input
+					type="number"
+					step={0.1}
+					min={0.5}
+					value={p.lineHeight}
+					oninput={(ev: Event) =>
+						mutate((el) => {
+							el.props.lineHeight =
+								Number((ev.target as HTMLInputElement).value) ||
+								1;
+						})
+					}
+				/>,
+				props,
+			)}
+			{bindField(
+				e,
+				"props.messageSpacing",
+				t("overlay.message_spacing"),
+				<input
+					type="number"
+					min={0}
+					value={p.messageSpacing}
+					oninput={(ev: Event) =>
+						mutate((el) => {
+							el.props.messageSpacing =
+								Number((ev.target as HTMLInputElement).value) ||
+								0;
+						})
+					}
+				/>,
+				props,
+			)}
+			{choiceField(
+				e,
+				"props.fadeDirection",
+				t("overlay.fade_direction"),
+				p.fadeDirection,
+				[
+					{
+						value: "off",
+						label: t("overlay.fade_direction.off"),
+					},
+					{
+						value: "top",
+						label: t("overlay.fade_direction.top"),
+					},
+					{
+						value: "bottom",
+						label: t("overlay.fade_direction.bottom"),
+					},
+				],
+				(v) =>
+					mutate((el) => {
+						el.props.fadeDirection =
+							v as ChatProps["fadeDirection"];
+					}),
+				props,
+			)}
+			{bindField(
+				e,
+				"props.fadeSize",
+				t("overlay.fade_size"),
+				<input
+					type="number"
+					min={0}
+					value={p.fadeSize}
+					oninput={(ev: Event) =>
+						mutate((el) => {
+							el.props.fadeSize =
+								Number((ev.target as HTMLInputElement).value) ||
+								0;
+						})
+					}
+				/>,
+				props,
+			)}
+			{choiceField(
+				e,
+				"props.textAlign",
+				t("overlay.text_align"),
+				p.textAlign,
+				[
+					{ value: "left", label: t("overlay.text_align.left") },
+					{
+						value: "center",
+						label: t("overlay.text_align.center"),
+					},
+					{
+						value: "right",
+						label: t("overlay.text_align.right"),
+					},
+					{
+						value: "justify",
+						label: t("overlay.text_align.justify"),
+					},
+				],
+				(v) =>
+					mutate((el) => {
+						el.props.textAlign = v as ChatProps["textAlign"];
+					}),
+				props,
+			)}
+		</>
+	);
+}
+
+function validate(_e: OverlayElement): string[] {
+	// Channels are optional while editing (an empty list just shows nothing),
+	// and there is no URL to point at any more — so there is nothing to check.
+	return [];
 }
 
 export const chatElement: OverlayElementDef = {
 	type: "chat",
 	labelKey: "overlay.add_chat",
 	icon: () => <Icon name="chat" class="role-icon" />,
-	order: 70,
+	order: 10,
 	defaultProps: { ...DEFAULT_CHAT_PROPS },
+	/** The channel rows are one composite control, not a bindField-wrapped
+	 * scalar, so `propKeys` lists only the bindable scalar props. */
 	propKeys: [
-		"url",
+		"history",
+		"order",
+		"bannedMessages",
+		"timestamps",
+		"platformIcons",
 		"fontSize",
-		"fontFamily",
-		"color",
 		"fontWeight",
+		"color",
 		"lineHeight",
 		"messageSpacing",
 		"fadeDirection",
 		"fadeSize",
 		"textAlign",
 	],
-	defaultSize: { width: 360, height: 480 },
+	defaultSize: { width: 420, height: 380 },
 	draw,
 	editForm,
 	validate,

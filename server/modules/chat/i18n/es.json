@@ -3,9 +3,6 @@
     "dash.widget_platformIcons.auto": "Automático (varias plataformas)",
     "dash.widget_platformIcons.on": "Mostrar",
     "dash.widget_platformIcons.off": "Ocultar",
-    "dash.widget_token": "Token de superposición OBS (vacío desactiva el acceso)",
-    "chat.overlay": "Abrir chat sin interfaz para OBS",
-    "chat.overlay_error": "Chat no disponible. Comprueba la URL y el token.",
     "chat.empty": "Todavía no hay mensajes",
     "wtype.chat": "Chat",
     "dash.widget_tiktok": "Canal de TikTok",
@@ -34,6 +31,11 @@
     "chat.tts.off": "TTS desactivado",
     "chat.tts.waiting": "Esperando una voz checa…",
     "overlay.add_chat": "Chat",
-    "overlay.chat_module": "Módulo de chat",
-    "overlay.chat_no_module": "Sin módulo de chat"
+    "overlay.chat_channels": "Canales",
+    "overlay.chat_add_channel": "Añadir canal",
+    "overlay.chat_remove_channel": "Quitar canal",
+    "overlay.chat_no_channels": "Sin canales",
+    "overlay.chat_platform": "Plataforma",
+    "overlay.chat_channel": "Canal",
+    "overlay.chat_channel_ph": "canal"
 }

@@ -3,9 +3,6 @@
     "dash.widget_platformIcons.auto": "Автоматически (несколько платформ)",
     "dash.widget_platformIcons.on": "Показать",
     "dash.widget_platformIcons.off": "Скрыть",
-    "dash.widget_token": "Токен слоя OBS (пустое поле отключает доступ)",
-    "chat.overlay": "Открыть только чат для OBS",
-    "chat.overlay_error": "Чат недоступен. Проверьте URL и токен.",
     "chat.empty": "Сообщений пока нет",
     "wtype.chat": "Чат",
     "dash.widget_tiktok": "TikTok-канал",
@@ -34,6 +31,11 @@
     "chat.tts.off": "TTS выключен",
     "chat.tts.waiting": "Ожидание чешского голоса…",
     "overlay.add_chat": "Чат",
-    "overlay.chat_module": "Модуль чата",
-    "overlay.chat_no_module": "Нет модуля чата"
+    "overlay.chat_channels": "Каналы",
+    "overlay.chat_add_channel": "Добавить канал",
+    "overlay.chat_remove_channel": "Удалить канал",
+    "overlay.chat_no_channels": "Нет каналов",
+    "overlay.chat_platform": "Платформа",
+    "overlay.chat_channel": "Канал",
+    "overlay.chat_channel_ph": "канал"
 }

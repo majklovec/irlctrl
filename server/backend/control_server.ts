@@ -7,7 +7,12 @@ import { createFrontend } from "../../shared/frontend";
 import { notFound } from "../../shared/http";
 import { i18nReady } from "../../shared/i18n";
 import { pwaRoutes } from "../../shared/pwa";
-import { ALL_MODULES, widgetHubSnapshot } from "../../shared/registry";
+import {
+    acquireWidgetChannels,
+    ALL_MODULES,
+    releaseWidgetChannels,
+    widgetHubSnapshot,
+} from "../../shared/registry";
 import { assetRoutes } from "./assets/asset_routes";
 import { createAssets } from "./assets/asset_store";
 import { accountRoutes } from "./auth/account_routes";
@@ -72,6 +77,12 @@ export async function createControlServer(options: ControlServerOptions) {
                     htmlResponse: frontend.htmlResponse,
                     widgetHubSnapshot,
                     widgetHubTopic: () => WIDGET_HUB_TOPIC,
+                    acquireChatChannels: (specs) =>
+                        acquireWidgetChannels("chat", specs),
+                    releaseChatChannels: (specs) =>
+                        releaseWidgetChannels("chat", specs),
+                    overlayChatSceneSpecs: (token, slug) =>
+                        overlays.runtimeSceneChatSpecs(token, slug),
                 }),
             );
     }

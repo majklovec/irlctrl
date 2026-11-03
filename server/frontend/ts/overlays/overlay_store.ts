@@ -127,6 +127,8 @@ export function ctx(): ElementContext {
         variableNames: new Map(
             project.variables.map((v) => [v.name, v.value as VariableValue]),
         ),
+        token: state.token,
+        slug: scene()?.slug,
     };
 }
 

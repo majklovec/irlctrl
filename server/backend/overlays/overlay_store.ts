@@ -78,6 +78,13 @@ export interface Overlays {
      */
     runtimeScene(token: string, slug: string): RuntimeScene | null;
     /**
+     * The chat channel specs an OBS scene's chat elements display, resolved
+     * from the scene's project token + slug; `null` when the token is
+     * unknown or does not own a scene with that slug. Used by the standalone
+     * chat overlay WebSocket to know which providers to keep attached.
+     */
+    runtimeSceneChatSpecs(token: string, slug: string): string[] | null;
+    /**
     * Token-authenticated batch revalue for the variables endpoint
     * (`GET /overlay/variables?token=…&<name>=<value>…` and
     * `POST /overlay/variables?token=…` with a JSON
@@ -897,6 +904,32 @@ export function createOverlays({
                 canvas: store.project.canvas,
                 assets: store.project.assets,
             };
+        },
+        runtimeSceneChatSpecs: (token: string, slug: string): string[] | null => {
+            const hit = runtimeStore(token);
+            if (!hit) return null;
+            const scene = hit[1].project.scenes.find((s) => s.slug === slug);
+            if (!scene) return null;
+            const specs = new Set<string>();
+            for (const el of scene.elements) {
+                if (el.type !== "chat") continue;
+                // `props.channels` is already normalized by the chat schema
+                // (a clean `{platform, channel}[]`), so it can be mapped to
+                // specs without re-importing the chat module.
+                const channels = el.props?.channels;
+                if (!Array.isArray(channels)) continue;
+                for (const c of channels) {
+                    if (
+                        typeof c === "object" &&
+                        c !== null &&
+                        typeof c.platform === "string" &&
+                        typeof c.channel === "string" &&
+                        c.channel
+                    )
+                        specs.add(`${c.platform}:${c.channel}`);
+                }
+            }
+            return [...specs];
         },
         setVariablesByToken,
         triggerAlertByToken,

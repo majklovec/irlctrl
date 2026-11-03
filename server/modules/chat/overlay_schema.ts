@@ -1,17 +1,25 @@
 /*
- * Schema of the chat overlay element: embeds a chat module's live overlay
- * page in an OBS overlay scene. The browser half is in overlay_elements.tsx.
+ * Schema of the chat overlay element: a self-contained live chat in an OBS
+ * overlay scene, fed by its own channel list + display options (no dashboard
+ * chat widget, no embedded page URL). The browser half is in
+ * overlay_elements.tsx.
  */
 import type { OverlayElementSchema } from "../../../shared/contracts/overlay_element";
+import { normalizeChannels, type ChatChannel } from "./config";
 
 export interface ChatProps {
-    /**
-     * The chat module's live overlay URL
-     * (`/chat/<dashboardId>/<widgetId>?token=…`), set by the inspector's
-     * module picker; no free-form URL (a generic page goes in an iframe
-     * element). `""` renders a placeholder box.
-     */
-    url: string;
+    /** The platform channels to display (a dynamic list; empty = nothing). */
+    channels: ChatChannel[];
+    /** How many merged messages are shown. */
+    history: number;
+    /** Where new messages enter the feed: "top" (newest first) or "bottom". */
+    order: "top" | "bottom";
+    /** How moderated (removed) messages present: "strike-through" or "hide". */
+    bannedMessages: "strike" | "hide";
+    /** Show each message's arrival time. */
+    timestamps: "off" | "on";
+    /** Platform icons: "auto" (only when >1 channel), forced "on", or "off". */
+    platformIcons: "auto" | "on" | "off";
     /** Feed text size in px. */
     fontSize: number;
     /** Feed text font stack. */
@@ -33,7 +41,12 @@ export interface ChatProps {
 }
 
 export const DEFAULT_CHAT_PROPS: Required<ChatProps> = {
-    url: "",
+    channels: [],
+    history: 500,
+    order: "top",
+    bannedMessages: "strike",
+    timestamps: "off",
+    platformIcons: "auto",
     fontSize: 48,
     fontFamily: "Inter, system-ui, sans-serif",
     color: "#ffffff",
@@ -49,12 +62,29 @@ export const DEFAULT_CHAT_PROPS: Required<ChatProps> = {
 export const chatSchema: OverlayElementSchema = {
     type: "chat",
     defaultProps: DEFAULT_CHAT_PROPS,
-    // The picker always writes the chat overlay URL (`?token=…`), which
-    // already contains percent-safe characters as-is.
-    normalizeProps(_props, read) {
+    normalizeProps(props, read) {
         const d = DEFAULT_CHAT_PROPS;
         return {
-            url: read.str("url", ""),
+            // `channels` is an object array, so it is normalized directly from
+            // the raw record (the scalar `read` helpers can't touch it).
+            channels: normalizeChannels(props.channels),
+            history: read.num("history", d.history, 1, 10_000),
+            order: read.oneOf("order", ["top", "bottom"] as const, d.order),
+            bannedMessages: read.oneOf(
+                "bannedMessages",
+                ["strike", "hide"] as const,
+                d.bannedMessages,
+            ),
+            timestamps: read.oneOf(
+                "timestamps",
+                ["off", "on"] as const,
+                d.timestamps,
+            ),
+            platformIcons: read.oneOf(
+                "platformIcons",
+                ["auto", "on", "off"] as const,
+                d.platformIcons,
+            ),
             fontSize: read.num("fontSize", d.fontSize, 1, 2000),
             fontFamily: read.str("fontFamily", d.fontFamily, 300),
             color: read.hex("color", d.color),

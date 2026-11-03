@@ -244,26 +244,36 @@ describe("overlay schema", () => {
 		expect(el.props.radius).toBe(DEFAULT_PROGRESS_PROPS.radius);
 	});
 
-	test("chat element normalizes its url prop and preserves unknown keys", () => {
+	test("chat element normalizes its channels prop and preserves unknown keys", () => {
 		const el = parseElementInput({
 			...textElement(),
 			type: "chat",
 			props: {
-				url: "https://example.com/chat/a/b?token=t",
+				channels: [
+					{ platform: "twitch", channel: "Some Streamer" },
+					{ platform: "kick", channel: "handle" },
+					// dropped: unknown platform; empty channel kept (an in-progress row)
+					{ platform: "hulu", channel: "nope" },
+					{ platform: "youtube", channel: "   " },
+				],
 				customEffect: "glow",
 			},
 		});
 		expect(el.type).toBe("chat");
-		expect(el.props.url).toBe("https://example.com/chat/a/b?token=t");
+		expect(el.props.channels).toEqual([
+			{ platform: "twitch", channel: "some streamer" },
+			{ platform: "kick", channel: "handle" },
+			{ platform: "youtube", channel: "" },
+		]);
 		expect(el.props.customEffect).toBe("glow");
 
-		// a missing url falls back to ""
+		// a missing channels list falls back to []
 		const bare = parseElementInput({
 			...textElement(),
 			type: "chat",
 			props: {},
 		});
-		expect(bare.props.url).toBe("");
+		expect(bare.props.channels).toEqual([]);
 	});
 
 	test("chat element normalizes its spacing and fade-out props", () => {

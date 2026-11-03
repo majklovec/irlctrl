@@ -3,9 +3,6 @@
     "dash.widget_platformIcons.auto": "自動（複数のプラットフォーム）",
     "dash.widget_platformIcons.on": "表示",
     "dash.widget_platformIcons.off": "非表示",
-    "dash.widget_token": "OBSオーバーレイトークン（空欄でアクセス無効）",
-    "chat.overlay": "OBS用のチャットのみの画面を開く",
-    "chat.overlay_error": "チャットを利用できません。URLとトークンを確認してください。",
     "chat.empty": "メッセージはまだありません",
     "wtype.chat": "チャット",
     "dash.widget_tiktok": "TikTokチャンネル",
@@ -34,6 +31,11 @@
     "chat.tts.off": "TTS オフ",
     "chat.tts.waiting": "チェコ語の音声中…",
     "overlay.add_chat": "チャット",
-    "overlay.chat_module": "チャットモジュール",
-    "overlay.chat_no_module": "チャットモジュールなし"
+    "overlay.chat_channels": "チャンネル",
+    "overlay.chat_add_channel": "チャンネルを追加",
+    "overlay.chat_remove_channel": "チャンネルを削除",
+    "overlay.chat_no_channels": "チャンネルなし",
+    "overlay.chat_platform": "プラットフォーム",
+    "overlay.chat_channel": "チャンネル",
+    "overlay.chat_channel_ph": "チャンネル"
 }

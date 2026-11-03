@@ -62,6 +62,17 @@
     opacity: 1;
 }
 
+/* The in-scene feed (no overlay page): the element wrapper carries the
+ * `--ov-chat-*` props, so the feed's text style reads them here — the old
+ * `.dash-widget-body.chat-overlay-live` rules above only reach the iframe page. */
+.chat-element .chat-feed {
+    font-size: var(--ov-chat-font-size, 24px);
+    font-family: var(--ov-chat-font-family, inherit);
+    color: var(--ov-chat-color, inherit);
+    font-weight: var(--ov-chat-font-weight, inherit);
+    line-height: var(--ov-chat-line-height, inherit);
+}
+
 /* Overlay-element feed presentation (element props, set on the `.chat-element`
  * wrapper by overlay_elements.tsx). Scoped to the element so the dashboard
  * widget's own feed is unaffected. A mask is used for the fade instead of
@@ -72,6 +83,10 @@
 .chat-element .chat-feed .chat-line {
     margin-bottom: var(--ov-chat-message-gap, 0);
     text-align: var(--ov-chat-text-align, left);
+}
+
+.chat-element .chat-feed .chat-line img {
+    height: 1em;
 }
 
 /* Fade-mask colour stops (a mask only sees alpha, so a white gradient works
@@ -207,4 +222,11 @@
 .dash-widget-body .chat-line-banned .chat-text,
 .dash-widget-body .chat-line-banned .chat-text * {
     text-decoration: line-through;
+}
+
+/* The self-contained chat element's connecting/fatal state (rendered inside
+ * the `.chat-element` wrapper while its token-scoped stream is open). */
+.chat-overlay-error {
+    font: 16px sans-serif;
+    text-shadow: 0 1px 3px var(--ink);
 }

@@ -482,6 +482,22 @@ export function widgetHubSnapshot(): Record<string, unknown> {
     return out;
 }
 
+/** A viewer started needing a channel-widget type's channels (refcounted). */
+export function acquireWidgetChannels(
+    type: string,
+    specs: string[],
+): void {
+    WIDGETS.find((w) => w.type === type)?.hub?.acquire?.(specs);
+}
+
+/** A viewer stopped needing a channel-widget type's channels. */
+export function releaseWidgetChannels(
+    type: string,
+    specs: string[],
+): void {
+    WIDGETS.find((w) => w.type === type)?.hub?.release?.(specs);
+}
+
 /** Stop the widget hub (server shutdown). */
 export function destroyWidgetHub(): void {
     for (const w of WIDGETS) {

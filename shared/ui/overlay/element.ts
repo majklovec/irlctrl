@@ -67,6 +67,13 @@ export interface ElementContext {
 	 * the editor has none, so trigger-driven elements always render their
 	 * design state there. Absent/missing = the element is not active. */
 	activeTriggers?: Map<string, TriggerState>;
+	/** The project token that authenticates token-scoped feeds (a self-
+	 * contained chat element). The editor uses the project's token; the
+	 * runtime page the one its URL carries. Absent = not live. */
+	token?: string;
+	/** The slug of the scene being rendered. The runtime page's scene is
+	 * fixed; the editor's is its selected scene. */
+	slug?: string;
 }
 
 /** A CSS style object (a subset of mithril's CSSObject). */

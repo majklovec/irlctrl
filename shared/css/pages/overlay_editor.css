@@ -656,6 +656,50 @@ identically here and on the runtime page */
     color: var(--text);
     border-color: var(--text);
 }
+/* chat channel list: a row per channel (platform select + handle + remove)
+   above an "add" control, sharing the compact inspector look */
+.ov-channels {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.ov-channels-empty {
+    font-size: 12px;
+    font-style: italic;
+    opacity: 0.7;
+}
+.ov-channel-row {
+    display: grid;
+    grid-template-columns: 0.9fr 1.4fr auto;
+    gap: 4px;
+    align-items: center;
+}
+.ov-channel-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+}
+.ov-channel-remove:hover {
+    color: var(--bad);
+}
+.ov-channel-add {
+    align-self: flex-start;
+    padding: 2px 8px;
+    font-size: 12px;
+    background: none;
+    border: 1px dashed var(--border);
+    color: var(--muted);
+    cursor: pointer;
+}
+.ov-channel-add:hover {
+    color: var(--text);
+    border-color: var(--text);
+}
 .ov-danger {
     margin-top: 6px;
 }

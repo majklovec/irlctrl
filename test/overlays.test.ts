@@ -931,7 +931,7 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                             w: 3,
                             h: 8,
                             visible: true,
-                            config: { twitch: "alice", token: "embed-token" },
+                            config: { twitch: "alice" },
                         },
                     ],
                 }),

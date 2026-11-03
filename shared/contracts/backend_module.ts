@@ -97,6 +97,20 @@ export interface ControlRouteContext {
     widgetHubSnapshot(): Record<string, unknown>;
     /** The topic the channel widget hubs publish their live frames to. */
     widgetHubTopic(): string;
+    /**
+     * A standalone chat overlay element started needing these channel specs;
+     * keep the providers attached for as long as a viewer holds them. No-op
+     * when the chat hub is not up.
+     */
+    acquireChatChannels(specs: string[]): void;
+    /** The matching release of `acquireChatChannels`. */
+    releaseChatChannels(specs: string[]): void;
+    /**
+     * The channel specs an OBS scene's chat elements display, resolved from
+     * the scene's project token + slug; `null` when the token is unknown or
+     * does not own a scene with that slug.
+     */
+    overlayChatSceneSpecs(token: string, slug: string): string[] | null;
 }
 
 /** What a device widget's server-side `validateConfig` can look at. */
@@ -153,6 +167,13 @@ export interface ChannelHub {
     startedChannels(): string[];
     snapshot(): Record<string, unknown>;
     destroy(): void;
+    /**
+     * Refcounted keep-attached for viewers (e.g. a standalone overlay chat
+     * element) that need these channels even when no dashboard widget does.
+     * Optional — only hubs whose channels can be viewer-attached implement it.
+     */
+    acquire?(specs: string[]): void;
+    release?(specs: string[]): void;
 }
 
 /** A module's persisted settings slice: `enabled` plus module-defined fields. */

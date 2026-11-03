@@ -65,12 +65,19 @@ function providerFor(spec: string, publish: PublishFn): ChatProvider | null {
 }
 
 /**
- * State manager for chat channels across all platforms. `sync(specs)` starts
- * providers for specs not yet attached and stops removed ones.
+ * State manager for chat channels across all platforms. A provider stays
+ * attached while it is needed by either source: the dashboard widgets'
+ * `sync(specs)` (the `#synced` set) or a refcounted `acquire(specs)` (the
+ * `#refs` map — the standalone overlay chat elements start it for as long as a
+ * viewer is connected). `reconcile()` starts what is needed and stops the rest.
  */
 export class ChatChannelManager {
     #providers = new Map<string, ChatProvider>();
     #publish: PublishFn;
+    /** Specs kept attached by the dashboard widgets (last `sync`). */
+    #synced = new Set<string>();
+    /** Per-spec viewer reference counts (standalone overlay chat). */
+    #refs = new Map<string, number>();
 
     constructor(publish: PublishFn) {
         this.#publish = publish;
@@ -94,13 +101,43 @@ export class ChatChannelManager {
         provider.stop();
     }
 
+    /** The union of specs still needed by dashboard widgets or a viewer. */
+    #needed(): Set<string> {
+        const out = new Set(this.#synced);
+        for (const [spec, n] of this.#refs) if (n > 0) out.add(spec);
+        return out;
+    }
+
+    /** Start the needed specs and stop the ones no longer needed. */
+    #reconcile(): void {
+        const needed = this.#needed();
+        for (const spec of needed) this.start(spec);
+        for (const spec of [...this.#providers.keys()])
+            if (!needed.has(spec)) this.stop(spec);
+    }
+
     sync(specs: ChannelSpecs): void {
-        for (const spec of specs) {
-            if (spec && !this.#providers.has(spec)) this.start(spec);
+        this.#synced = new Set(
+            [...specs].filter((spec): spec is string => spec !== null && spec !== ""),
+        );
+        this.#reconcile();
+    }
+
+    /** A viewer (standalone overlay chat) started needing these specs. */
+    acquire(specs: string[]): void {
+        for (const spec of new Set(specs))
+            this.#refs.set(spec, (this.#refs.get(spec) ?? 0) + 1);
+        this.#reconcile();
+    }
+
+    /** A viewer stopped needing these specs. */
+    release(specs: string[]): void {
+        for (const spec of new Set(specs)) {
+            const n = (this.#refs.get(spec) ?? 0) - 1;
+            if (n <= 0) this.#refs.delete(spec);
+            else this.#refs.set(spec, n);
         }
-        for (const spec of [...this.#providers.keys()]) {
-            if (!specs.has(spec)) this.stop(spec);
-        }
+        this.#reconcile();
     }
 
     startedChannels(): string[] {
@@ -116,6 +153,8 @@ export class ChatChannelManager {
     }
 
     destroy(): void {
+        this.#synced = new Set();
+        this.#refs = new Map();
         for (const spec of this.startedChannels()) this.stop(spec);
     }
 }

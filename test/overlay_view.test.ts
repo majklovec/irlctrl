@@ -2,11 +2,12 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 /**
  * The runtime page script (`server/frontend/ts/overlays/overlay_view.tsx`) is
- * the real artifact for the channel-change auto-reload: bundle it the way the
- * server does, run it against a happy-dom window + a fake WebSocket, and feed
- * it frames the way the server sends them (the websocket e2e in
- * overlays.test.ts proves the server publishes `overlays.channelsChanged`
- * when a channel widget's channels change).
+ * bundled the way the server does and run against a happy-dom window + a fake
+ * WebSocket, fed frames the way the server sends them. The chat overlay element
+ * is now self-contained (its own token-scoped stream), so the runtime no longer
+ * reloads when the dashboard publishes `overlays.channelsChanged` — those frames
+ * are ignored here. (The websocket e2e in overlays.test.ts proves the server
+ * still publishes the frame to dashboards.)
  */
 describe("overlay runtime auto-reload (headless DOM)", () => {
     let pageBundleText = "";
@@ -83,10 +84,8 @@ describe("overlay runtime auto-reload (headless DOM)", () => {
 
         const i18nStub =
             "export const currentLanguage = () => 'en'; export const t = (k) => k; export const i18nReady = Promise.resolve();";
-        // Minimal stand-ins for the shared UI components the module fronts
-        // (bundled through the real registry) reference. None are rendered
-        // in these tests — the fronts are imported for their
-        // `parseOverlayUrl` contract only.
+        // Minimal stand-ins for shared UI components, in case the runtime
+        // bundle references them. None are rendered in these tests.
         const compStub = [
             "Actions", "Badge", "Break", "Button", "Card", "Checkbox",
             "CheckField", "DefinitionList", "Field", "FieldGroup", "Form",
@@ -206,7 +205,7 @@ describe("overlay runtime auto-reload (headless DOM)", () => {
     const chatPage = (dashboardId: string, widgetId: string) =>
         `http://127.0.0.1:1/chat/${dashboardId}/${widgetId}?token=ctok`;
 
-    test("reloads when the scene embeds the changed widget's page", async () => {
+    test("does not reload when a chat channel changes (self-contained element)", async () => {
         await loadPage();
         expect(fakeSockets).toHaveLength(1);
         snapshot([chatPage("dash1", "chat1")]);
@@ -215,8 +214,10 @@ describe("overlay runtime auto-reload (headless DOM)", () => {
             widgetId: "chat1",
         });
         await Bun.sleep(40);
-        expect(reloadCalls).toBe(1);
-        expect(swUpdates).toBe(1);
+        // The chat element streams its own channels; no iframe to refresh, so
+        // the dashboard's channel-change frame no longer reloads the runtime.
+        expect(reloadCalls).toBe(0);
+        expect(swUpdates).toBe(0);
     });
 
     test("stays put when a different widget changed", async () => {
@@ -251,7 +252,7 @@ describe("overlay runtime auto-reload (headless DOM)", () => {
         expect(reloadCalls).toBe(0);
     });
 
-    test("reloads exactly once even if more frames arrive", async () => {
+    test("does not reload even if more channel frames arrive", async () => {
         await loadPage();
         snapshot([chatPage("dash1", "chat1")]);
         frame("overlays.channelsChanged", {
@@ -263,6 +264,6 @@ describe("overlay runtime auto-reload (headless DOM)", () => {
             widgetId: "chat1",
         });
         await Bun.sleep(40);
-        expect(reloadCalls).toBe(1);
+        expect(reloadCalls).toBe(0);
     });
 });

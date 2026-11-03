@@ -1,12 +1,8 @@
-import { Buffer } from "node:buffer";
-import { timingSafeEqual } from "node:crypto";
 import { Elysia } from "elysia";
 import { APP_VERSION } from "../../../shared/app_version";
 import type { ControlRouteContext } from "../../../shared/contracts/backend_module";
-import type { ServerDashboardWidget } from "../../../shared/contracts/wire";
 import { upgradeRequired } from "../../../shared/http";
-import { chatSpecsFromConfig } from "./config";
-import type { ChatOverlayState, ChatSnapshot } from "./types";
+import type { ChatSnapshot } from "./types";
 
 const headers = {
     "cache-control": "no-store",
@@ -14,107 +10,82 @@ const headers = {
     "x-content-type-options": "nosniff",
 };
 
-/** The WebSocket route path — parsed from the upgrade request URL in `open`. */
-const WS_PATH_RE = /^\/api\/chat\/([^/]+)\/([^/]+)\/ws$/;
-
-function tokenMatches(
-    expected: string | undefined,
-    presented: string,
-): boolean {
-    if (!expected || !presented) return false;
-    const a = Buffer.from(expected);
-    const b = Buffer.from(presented);
-    return a.length === b.length && timingSafeEqual(a, b);
-}
-
 export function chatOverlayRoutes(context: ControlRouteContext) {
-    function authorizedWidget(
-        dashboardId: string,
-        widgetId: string,
-        request: Request,
-    ): ServerDashboardWidget | undefined {
-        const widget = context
-            .dashboardById(dashboardId)
-            ?.widgets.find((w) => w.id === widgetId && w.type === "chat");
-        const authorization = request.headers.get("authorization");
-        const token =
-            authorization === null
-                ? new URL(request.url).searchParams.get("token") ?? ""
-                : authorization.startsWith("Bearer ")
-                  ? authorization.slice(7)
-                  : "";
-        return tokenMatches(widget?.config?.token, token) ? widget : undefined;
-    }
-
     const denied = () =>
         new Response("Invalid chat token", { status: 401, headers });
 
-    /**
-     * The widget's overlay state: its config (sans token) plus the rolling
-     * chat, narrowed to the channels the widget displays. Shared by the
-     * polling endpoint and the WebSocket snapshot frame.
-     */
-    function overlayState(widget: ServerDashboardWidget): ChatOverlayState {
-        const { token, ...config } = widget.config ?? {};
-        const all = context.widgetHubSnapshot().chat as ChatSnapshot;
-        const chat: ChatSnapshot = {};
-        for (const spec of chatSpecsFromConfig(config)) {
-            if (spec && all[spec]) chat[spec] = all[spec];
-        }
-        return {
-            widget: { id: widget.id, config },
-            chat,
-            version: APP_VERSION,
-        };
+    /** The scene's chat channel specs, `null` when the token is unknown. */
+    function sceneSpecs(slug: string, request: Request): string[] | null {
+        return context.overlayChatSceneSpecs(
+            new URL(request.url).searchParams.get("token") ?? "",
+            slug,
+        );
     }
 
-    return new Elysia({ name: "chat-overlay" })
-        .get("/chat/:dashboardId/:widgetId", ({ params, request }) => {
-            if (!authorizedWidget(params.dashboardId, params.widgetId, request))
-                return denied();
-            const response = context.htmlResponse("chatoverlay");
-            for (const [key, value] of Object.entries(headers))
-                response.headers.set(key, value);
-            return response;
-        })
-        .get("/api/chat/:dashboardId/:widgetId", ({ params, request }) => {
-            const widget = authorizedWidget(
-                params.dashboardId,
-                params.widgetId,
-                request,
+    /** The hub's rolling chat, narrowed to the given channel specs. */
+    function sceneChatSnapshot(specs: string[]): ChatSnapshot {
+        const all = context.widgetHubSnapshot().chat as ChatSnapshot;
+        const chat: ChatSnapshot = {};
+        for (const spec of specs) if (all[spec]) chat[spec] = all[spec];
+        return chat;
+    }
+
+    /** The scene slug from a URL's path: the last non-empty segment, minus a
+     * trailing `/ws` (the WebSocket route sits under the scene path). */
+    const slugFrom = (url: URL): string => {
+        const parts = url.pathname.split("/").filter(Boolean);
+        if (parts[parts.length - 1] === "ws") parts.pop();
+        return decodeURIComponent(parts.pop() ?? "");
+    };
+
+    // The chat overlay element is self-contained: it carries its own channel
+    // list and authenticates with the OBS scene's project token (no dashboard
+    // chat widget). The endpoint resolves the scene's chat channels, keeps
+    // their providers attached for the connection, and streams the hub frames
+    // narrowed to those channels.
+    return new Elysia({ name: "chat-overlay" }).get(
+        "/api/overlay/chat/:slug",
+        ({ request }) => {
+            const specs = sceneSpecs(slugFrom(new URL(request.url)), request);
+            if (specs === null) return denied();
+            return Response.json(
+                { chat: sceneChatSnapshot(specs), version: APP_VERSION },
+                { headers },
             );
-            if (!widget) return denied();
-            return Response.json(overlayState(widget), { headers });
         })
-        .get("/api/chat/:dashboardId/:widgetId/ws", ({ params, request }) => {
-            if (!authorizedWidget(params.dashboardId, params.widgetId, request))
+        .get("/api/overlay/chat/:slug/ws", ({ request }) => {
+            if (sceneSpecs(slugFrom(new URL(request.url)), request) === null)
                 return denied();
             return upgradeRequired();
         })
-        .ws("/api/chat/:dashboardId/:widgetId/ws", {
+        .ws("/api/overlay/chat/:slug/ws", {
             open(ws) {
-                const m = WS_PATH_RE.exec(
-                    new URL(ws.data.request.url).pathname,
-                );
-                if (!m) return ws.close(1008, "Unknown chat route");
-                const widget = authorizedWidget(
-                    decodeURIComponent(m[1]),
-                    decodeURIComponent(m[2]),
-                    ws.data.request,
-                );
-                if (!widget) return ws.close(1008, "Invalid chat token");
-                // Snapshot first, then the hub's live frames (topic messages
-                // reach this socket from the next tick on). The stream carries
-                // every channel, just like the dashboard websocket — the
-                // overlay client renders only this widget's configured specs.
+                const url = new URL(ws.data.request.url);
+                const specs = sceneSpecs(slugFrom(url), ws.data.request);
+                if (specs === null) return ws.close(1008, "Invalid chat token");
+                // Keep the scene's providers attached for exactly this viewer;
+                // the `close` handler releases them. `ws.data` (the upgrade
+                // request) is the one per-connection object that persists
+                // across the open/close handlers, so the specs ride on it.
+                context.acquireChatChannels(specs);
+                (ws.data as { sceneSpecs?: string[] }).sceneSpecs = specs;
+                // Snapshot first (narrowed to the scene's channels, which are
+                // already up in the hub), then the hub's live frames.
                 ws.subscribe(context.widgetHubTopic());
                 ws.send(
                     JSON.stringify({
                         type: "event",
                         event: "chat.overlay.snapshot",
-                        data: overlayState(widget),
+                        data: {
+                            chat: sceneChatSnapshot(specs),
+                            version: APP_VERSION,
+                        },
                     }),
                 );
+            },
+            close(ws) {
+                const specs = (ws.data as { sceneSpecs?: string[] }).sceneSpecs;
+                if (specs) context.releaseChatChannels(specs);
             },
         });
 }

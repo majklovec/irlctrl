@@ -3,9 +3,6 @@
     "dash.widget_platformIcons.auto": "Automaticky (viac platforiem)",
     "dash.widget_platformIcons.on": "Zobraziť",
     "dash.widget_platformIcons.off": "Skryť",
-    "dash.widget_token": "Token OBS vrstvy (prázdny zakáže prístup)",
-    "chat.overlay": "Otvoriť samostatný chat pre OBS",
-    "chat.overlay_error": "Chat nie je dostupný. Skontrolujte URL vrstvy a token.",
     "chat.empty": "Zatiaľ žiadne správy",
     "wtype.chat": "Chat",
     "dash.widget_tiktok": "TikTok kanál",
@@ -34,6 +31,11 @@
     "chat.tts.off": "TTS vypnuté",
     "chat.tts.waiting": "Čaká sa na český hlas…",
     "overlay.add_chat": "Chat",
-    "overlay.chat_module": "Chatovací modul",
-    "overlay.chat_no_module": "Žiadny chatovací modul"
+    "overlay.chat_channels": "Kanály",
+    "overlay.chat_add_channel": "Pridať kanál",
+    "overlay.chat_remove_channel": "Odstrániť kanál",
+    "overlay.chat_no_channels": "Žiadne kanály",
+    "overlay.chat_platform": "Platforma",
+    "overlay.chat_channel": "Kanál",
+    "overlay.chat_channel_ph": "kanál"
 }

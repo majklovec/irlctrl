@@ -60,16 +60,6 @@ export interface ChannelLive {
     chat?: ChatLive[];
 }
 
-/** Read-only, widget-scoped state for the token-authenticated OBS overlay. */
-export interface ChatOverlayState {
-    widget: { id: string; config: Record<string, string> };
-    chat: ChatSnapshot;
-    /** Build version the server is running (`generated/version`). A page that
-     * loaded an older build compares this to its own bundled version and
-     * reloads, so a long-lived OBS overlay picks up a new deployment. */
-    version: string;
-}
-
 /** Per-channel transport state and rolling messages, newest first. */
 export type ChatSnapshot = Record<
     string,
