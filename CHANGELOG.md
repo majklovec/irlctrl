@@ -1,3 +1,10 @@
+# [2.9.0](https://github.com/majklovec/irlctrl/compare/v2.8.0...v2.9.0) (2026-11-03)
+
+
+### Features
+
+* **overlays:** implement channel change detection for embedded chat widgets and auto-reload functionality ([705d91d](https://github.com/majklovec/irlctrl/commit/705d91d651aea3a1e92a481de6a38a8c70a3ad84))
+
 # [2.8.0](https://github.com/majklovec/irlctrl/compare/v2.7.0...v2.8.0) (2026-11-03)
 
 
