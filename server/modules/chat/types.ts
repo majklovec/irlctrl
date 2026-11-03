@@ -12,6 +12,18 @@
  * `kick.chat`) so the dashboard websocket carries the frames unchanged.
  */
 
+/** A sender badge (e.g. Kick subscriber / moderator / verified / channel badge).
+ * `type` is the platform's identifier, `text` a human label, `count` an
+ * optional number (e.g. subscription months), and `url` an icon image when the
+ * platform provides one (Kick's own payloads carry no url — the icon is
+ * derived from `type`). */
+export interface ChatBadge {
+    type?: string;
+    text?: string;
+    count?: number;
+    url?: string;
+}
+
 /** One chat message (platform message id used for deduplication). */
 export interface ChatLive {
     id: string | number;
@@ -19,6 +31,8 @@ export interface ChatLive {
     /** The sender's platform color (hex), for username display. */
     color?: string;
     text?: string;
+    /** Sender badges, rendered before the username in the feed. */
+    badges?: ChatBadge[];
     /** The message's classification; `banned` marks a message removed by the
      * platform's moderation (shown struck-through or hidden per widget config). */
     type?: string;

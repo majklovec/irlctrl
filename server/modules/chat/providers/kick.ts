@@ -9,7 +9,7 @@
  * channel is offline (`livestream.is_live` is not true) the provider reports
  * `disconnected` and re-polls until the stream goes live.
  */
-import type { ChatLive, PublishFn } from "../types";
+import type { ChatBadge, ChatLive, PublishFn } from "../types";
 import { ChatProvider } from "./base";
 
 /** Channel slug -> chatroom id lookup. */
@@ -17,6 +17,16 @@ const KICK_CHANNEL_API = "https://kick.com/api/v2/channels";
 const RESOLVE_TIMEOUT_MS = 10_000;
 /** Give up on the subscribe handshake when it does not complete in time. */
 const SUBSCRIBE_TIMEOUT_MS = 10_000;
+/** Rejoin the chatroom after this long without a single chat message. Pusher's
+ * `pusher:ping` keeps a half-open socket alive, so a silently-lost chatroom
+ * subscription would otherwise freeze forever (the feed shows the last
+ * messages and a "connected" state, updating only on a manual reconnect).
+ * Bounding the no-message window turns that into an automatic, transparent
+ * rejoin — the same reset that switching channels performs by hand. The timer
+ * is re-armed on every chat message, so it only fires after a full window of
+ * silence. Overridable (e.g. for tests) via the environment. */
+const KICK_CHAT_STALE_MS =
+    Number(process.env.SRTLA_KICK_CHAT_STALE_MS) || 3 * 60_000;
 
 /** Kick's public Pusher chat app (protocol 7, anonymous join). The app key
  * rotates over time: a stale key ends up on no cluster and Pusher answers
@@ -61,6 +71,7 @@ export class KickChatProvider extends ChatProvider {
     #ws: WebSocket | null = null;
     #subscribed = false;
     #subscribeTimer: ReturnType<typeof setTimeout> | null = null;
+    #staleTimer: ReturnType<typeof setTimeout> | null = null;
     #pusher: { key: string; cluster: string } = PUSHER_DEFAULT;
     #staleKey = "";
 
@@ -113,6 +124,7 @@ export class KickChatProvider extends ChatProvider {
 
     protected teardown(): void {
         this.#disarmSubscribeTimer();
+        this.#disarmStaleTimer();
         this.#ws?.close();
         this.#ws = null;
     }
@@ -166,6 +178,8 @@ export class KickChatProvider extends ChatProvider {
             case "pusher_internal:subscription_succeeded":
                 this.#disarmSubscribeTimer();
                 this.#subscribed = true;
+                // Watch for a silently-lost subscription (see KICK_CHAT_STALE_MS).
+                this.#armStaleTimer();
                 // Re-deliver the rolling buffer so a fresh viewer can top up.
                 this.setConnected(true);
                 break;
@@ -182,6 +196,8 @@ export class KickChatProvider extends ChatProvider {
                 const line = asChatMessage(payload);
                 if (!line) return;
                 this.deliver(line);
+                // Any chat traffic proves the subscription is alive.
+                this.#armStaleTimer();
                 break;
             }
             case "App\\Events\\UserBannedEvent": {
@@ -216,6 +232,7 @@ export class KickChatProvider extends ChatProvider {
 
     #onPusherClose(): void {
         this.#disarmSubscribeTimer();
+        this.#disarmStaleTimer();
         if (this.#subscribed) {
             this.#subscribed = false;
             this.setConnected(false);
@@ -235,6 +252,30 @@ export class KickChatProvider extends ChatProvider {
         if (this.#subscribeTimer) {
             clearTimeout(this.#subscribeTimer);
             this.#subscribeTimer = null;
+        }
+    }
+
+    /** Arm the staleness watchdog: if no chat message arrives within
+     * `KICK_CHAT_STALE_MS`, drop the socket so it reconnects (rejoin). The
+     * close handler then marks the channel disconnected and schedules the
+     * retry — the self-healing path a silent subscription death would not
+     * take on its own. */
+    #armStaleTimer(): void {
+        this.#disarmStaleTimer();
+        this.#staleTimer = setTimeout(() => {
+            this.#staleTimer = null;
+            this.log(
+                "stale",
+                `no chat for ${KICK_CHAT_STALE_MS / 1000}s — rejoining`,
+            );
+            this.#ws?.close();
+        }, KICK_CHAT_STALE_MS);
+    }
+
+    #disarmStaleTimer(): void {
+        if (this.#staleTimer) {
+            clearTimeout(this.#staleTimer);
+            this.#staleTimer = null;
         }
     }
 }
@@ -276,6 +317,7 @@ function asChatMessage(raw: unknown): ChatLive | null {
         /^#[0-9a-fA-F]{3,8}$/.test(identity.color)
             ? identity.color
             : undefined;
+    const badges = parseIdentityBadges(identity.badges);
 
     let text =
         typeof msg.content === "string" && msg.content !== ""
@@ -302,10 +344,41 @@ function asChatMessage(raw: unknown): ChatLive | null {
     };
     if (username) out.username = username;
     if (color) out.color = color;
+    if (badges.length) out.badges = badges;
     if (text) out.text = text;
     if (typeof msg.created_at === "string") {
         const ts = Date.parse(msg.created_at);
         if (Number.isFinite(ts)) out.ts = ts;
+    }
+    return out;
+}
+
+/** Map a Kick `sender.identity.badges` array (objects with `type`, `text`,
+ * optional `count`, and sometimes a `url`) to the wire `ChatBadge` shape,
+ * dropping entries that yield no usable label or icon. */
+function parseIdentityBadges(raw: unknown): ChatBadge[] {
+    if (!Array.isArray(raw)) return [];
+    const out: ChatBadge[] = [];
+    for (const item of raw) {
+        if (!item || typeof item !== "object") continue;
+        const b = item as Record<string, unknown>;
+        const type = typeof b.type === "string" && b.type ? b.type : undefined;
+        const text = typeof b.text === "string" && b.text ? b.text : undefined;
+        const count =
+            typeof b.count === "number" && Number.isFinite(b.count)
+                ? b.count
+                : undefined;
+        const url =
+            typeof b.url === "string" && /^https?:\/\//.test(b.url)
+                ? b.url
+                : undefined;
+        if (!type && !text && !url) continue;
+        const badge: ChatBadge = {};
+        if (type) badge.type = type;
+        if (text) badge.text = text;
+        if (count !== undefined) badge.count = count;
+        if (url) badge.url = url;
+        out.push(badge);
     }
     return out;
 }

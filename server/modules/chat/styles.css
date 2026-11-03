@@ -154,6 +154,47 @@
     margin: 0 1px;
 }
 
+/* Sender badges (e.g. Kick subscriber / moderator) rendered before the
+   username. Scoped to `.chat-feed` (not `.dash-widget-body`) so the same
+   rules serve the dashboard widget, the overlay canvas element, and the
+   standalone overlay page. Sizes are `em`-relative so they track the feed
+   font in both the 0.7rem widget and the larger overlay element. */
+.chat-feed .chat-badges {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-right: 4px;
+    vertical-align: -0.15em;
+}
+
+/* Image badge (the badge payload carried a `url`). */
+.chat-feed .chat-badge {
+    display: inline-block;
+    height: 1em;
+    width: auto;
+}
+
+/* Text chip badge (no image): a compact pill beside the name. `currentColor`
+   + opacity keep it reading against any feed colour. */
+.chat-feed .chat-badge--chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 0.35em;
+    font-size: 0.85em;
+    font-weight: 600;
+    line-height: 1.1;
+    border: 1px solid currentColor;
+    border-radius: 0.3em;
+    opacity: 0.85;
+    white-space: nowrap;
+}
+
+.chat-feed .chat-badge-count {
+    font-weight: 700;
+    font-size: 0.9em;
+}
+
 .dash-widget-body .chat-line .chat-text {
     word-break: break-word;
 }

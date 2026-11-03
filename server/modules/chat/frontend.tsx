@@ -40,6 +40,7 @@ import {
 import {
 	CHAT_BANNED_TYPE,
 	type ChannelLive,
+	type ChatBadge,
 	type ChatLive,
 	type ChatOverlayState,
 	type ChatPlatform,
@@ -543,6 +544,49 @@ function lineSegments(text: string): m.Children {
 	});
 }
 
+/** Render a sender's badges before the username. A badge with a `url` is
+ * shown as an image; otherwise it's a compact text chip labelled by its
+ * `text` (or `type` fallback). `count` (e.g. subscription months) is folded
+ * into the chip and its tooltip. */
+function renderBadges(badges: ChatBadge[] | undefined): m.Children {
+	if (!badges?.length) return null;
+	return (
+		<span class="chat-badges">
+			{badges.map((badge, index) => {
+				const label = badge.text ?? badge.type ?? "";
+				const title = badge.count ? `${label} (${badge.count})` : label;
+				if (badge.url) {
+					return (
+						<img
+							class="chat-badge"
+							key={index}
+							src={badge.url}
+							alt={label}
+							title={title}
+							loading="lazy"
+						/>
+					);
+				}
+				return (
+					<span
+						class={
+							"chat-badge chat-badge--chip" +
+							(badge.type ? ` chat-badge--${badge.type}` : "")
+						}
+						key={index}
+						title={title}
+					>
+						{label}
+						{badge.count ? (
+							<span class="chat-badge-count">{badge.count}</span>
+						) : null}
+					</span>
+				);
+			})}
+		</span>
+	);
+}
+
 /**
  * Reusable feed component.
  *
@@ -653,6 +697,8 @@ const ChatFeed: m.Component<ChatFeedAttrs> = {
 								{formatTimestamp(line.ts)}
 							</span>
 						)}
+
+						{renderBadges(line.badges)}
 
 						{line.username && (
 							<span
