@@ -1,0 +1,85 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="overlay-template:name" content="overlay.tpl.brb" />
+    <meta name="overlay-template:uses" content="title,subtitle,vars" />
+    <style>
+		/*
+		 * brb — fills the element's box (no design canvas, no scaling). A full-screen "be right back"
+		 * break screen: a big title and a subtitle beneath, framed by an accent
+		 * rule. ;
+		 * the doc renderer overrides them.
+		 */
+		:root {
+		    --accent: #6c5ce7;
+		    --bg: rgba(15, 15, 25, 0.96);
+		    --text: #ffffff;
+		    --padding: 80px;
+		}
+		
+		*,
+		*::before,
+		*::after {
+		    box-sizing: border-box;
+		}
+		
+		section {
+		    position: absolute;
+		    inset: 0;
+		    width: 100%;
+		    height: 100%;
+		    background: transparent;
+		}
+		
+		.screen {
+		    position: absolute;
+		    inset: 0;
+		    display: flex;
+		    flex-direction: column;
+		    align-items: center;
+		    justify-content: center;
+		    gap: 26px;
+		    padding: var(--padding);
+		    background: var(--bg);
+		}
+		
+		.rule {
+		    width: 160px;
+		    height: 6px;
+		    background: var(--accent);
+		    border-radius: 3px;
+		}
+		
+		.title {
+		    color: var(--text);
+		    font-size: 120px;
+		    font-weight: 800;
+		    letter-spacing: 0.02em;
+		    line-height: 1;
+		    text-align: center;
+		}
+		
+		.subtitle {
+		    color: var(--text);
+		    font-size: 44px;
+		    font-weight: 500;
+		    letter-spacing: 0.1em;
+		    text-transform: uppercase;
+		    opacity: 0.7;
+		    text-align: center;
+		}
+		
+    </style>
+  </head>
+  <body>
+	<section>
+	    <div class="screen">
+	        <div class="rule"></div>
+	        <div class="title" data-bind="title">Be right back</div>
+	        <div class="subtitle" data-bind="subtitle">Back in a few</div>
+	    </div>
+	</section>
+	
+  </body>
+</html>

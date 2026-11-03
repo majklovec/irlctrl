@@ -1,0 +1,102 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="overlay-template:name" content="overlay.tpl.ticker" />
+    <meta name="overlay-template:uses" content="title,vars" />
+    <style>
+		/*
+		 * ticker — fills the element's box (no design canvas, no scaling). A label pinned left and a
+		 * line of text that scrolls across. `:root` declares a fallback for every
+		 * prop in template.json `uses`; the doc renderer overrides them. The
+		 * keyframes name is renamed + its references patched by css_scope.
+		 */
+		:root {
+			--accent: #6c5ce7;
+			--bg: rgba(15, 15, 25, 0.9);
+			--text: #ffffff;
+			--label-text: #ffffff;
+			--padding: 12px;
+		}
+		
+		*,
+		*::before,
+		*::after {
+			box-sizing: border-box;
+		}
+		
+		section {
+			position: absolute;
+			inset: 0;
+			width: 100%;
+			height: 100%;
+		    background:transparent;
+		}
+		
+		.bar {
+			position: absolute;
+			inset: 0;
+			display: flex;
+			align-items: stretch;
+			background: var(--bg);
+			overflow: hidden;
+		}
+		
+		.label {
+			flex: none;
+			display: flex;
+			align-items: center;
+			padding: 0 var(--padding);
+			background: var(--accent);
+			color: var(--label-text);
+			font-size: 18px;
+			font-weight: 800;
+			letter-spacing: 0.16em;
+		}
+		
+		.viewport {
+			flex: 1;
+			display: flex;
+			align-items: center;
+			overflow: hidden;
+		}
+		
+		/* The track is sized to its content and glides across the viewport. */
+		.track {
+			display: inline-flex;
+			align-items: center;
+			white-space: nowrap;
+			padding-left: 100%;
+			animation: ticker-scroll 18s linear infinite;
+		}
+		
+		.track span {
+			color: var(--text);
+			font-size: 22px;
+			font-weight: 600;
+			padding-right: 100px;
+		}
+		
+		@keyframes ticker-scroll {
+			from {
+				transform: translateX(0);
+			}
+			to {
+				transform: translateX(-100%);
+			}
+		}
+		
+    </style>
+  </head>
+  <body>
+	<section>
+	    <div class="bar">
+	        <span class="label">LIVE</span>
+	        <div class="viewport">
+	            <div class="track"><span data-bind="title">Your scrolling text goes here</span></div>
+	        </div>
+	    </div>
+	</section>
+	
+  </body>
+</html>

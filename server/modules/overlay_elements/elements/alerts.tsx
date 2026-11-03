@@ -25,7 +25,7 @@ import type {
 } from "@ui/overlay/element";
 import { numProp, strProp, triggerPhase } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
-import { libraryAssetField } from "./asset_picker";
+import { libraryAssetField } from "@ui/overlay/asset_picker";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import {
@@ -116,41 +116,19 @@ function unlockTts(): boolean {
 }
 
 // ── template parser ──────────────────────────────────────────────────────
-
-export interface TemplateSegment {
-	text: string;
-	/** true = a `{token}` segment (renders in the accent colour) */
-	token: boolean;
-}
-
-/** Split a `{token}` template into plain/token segments (token boundaries
- * kept so the renderer can accent them; adjacent same-kind runs merge). */
-export function parseTemplate(template: string): TemplateSegment[] {
-	const segments: TemplateSegment[] = [];
-	for (const match of template.matchAll(/([^{}]+)|\{([^{}]*)\}/g)) {
-		const text = match[1] ?? match[2];
-		const token = match[1] === undefined;
-		if (!text) continue;
-		const last = segments[segments.length - 1];
-		if (last && last.token === token) last.text += text;
-		else segments.push({ text, token });
-	}
-	return segments;
-}
-
-/** One token's value: a project variable of that name first, then a key of
- * the trigger payload; a missing value renders as "". */
-export function tokenValue(
-	name: string,
-	ctx: ElementContext,
-	payload: Record<string, unknown>,
-): string {
-	const variable = ctx.variableNames.get(name);
-	if (variable !== undefined) return String(variable);
-	const value = payload[name];
-	if (value === undefined || value === null) return "";
-	return typeof value === "object" ? JSON.stringify(value) : String(value);
-}
+// Lives in the overlay_templates module (shared with the html_template
+// element); re-exported here so existing importers keep working.
+import {
+	parseTemplate,
+	templateText,
+	tokenValue,
+} from "@ui/overlay/template_tokens";
+export {
+	parseTemplate,
+	tokenValue,
+	templateText,
+	type TemplateSegment,
+} from "@ui/overlay/template_tokens";
 
 function renderTemplate(
 	template: string,
@@ -167,17 +145,6 @@ function renderTemplate(
 				)
 			: m("span", { key: i }, seg.text),
 	);
-}
-
-/** The template with tokens resolved to plain text (the TTS line). */
-export function templateText(
-	template: string,
-	ctx: ElementContext,
-	payload: Record<string, unknown>,
-): string {
-	return parseTemplate(template)
-		.map((seg) => (seg.token ? tokenValue(seg.text, ctx, payload) : seg.text))
-		.join("");
 }
 
 /** The `amount` an amount-based rule compares: a variable named `amount`

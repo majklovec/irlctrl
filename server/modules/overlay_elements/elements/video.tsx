@@ -13,7 +13,7 @@ import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import { DEFAULT_VIDEO_PROPS } from "../overlay_schema";
-import { libraryAssetField } from "./asset_picker";
+import { libraryAssetField } from "@ui/overlay/asset_picker";
 
 /** Defensive read of a boolean prop (the contract has no `boolProp`). */
 const boolProp = (p: Record<string, unknown>, key: string, fb: boolean) =>

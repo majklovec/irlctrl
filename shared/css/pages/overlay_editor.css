@@ -539,6 +539,20 @@ identically here and on the runtime page */
     accent-color: var(--accent);
     padding: 0.15rem 0;
 }
+/* colour + alpha slider share one row (the picker has no alpha channel) */
+.ov-colora {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    gap: 6px;
+}
+.ov-colora .ov-colora-c {
+    flex: 0 0 auto;
+    width: 40px;
+}
+.ov-colora .ov-colora-a {
+    flex: 1 1 auto;
+}
 .ov-grid2,
 .ov-grid3,
 .ov-grid4 {

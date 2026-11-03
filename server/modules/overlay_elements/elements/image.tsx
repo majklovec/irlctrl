@@ -11,7 +11,7 @@ import type {
 import { strProp } from "@ui/overlay/element";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { libraryAssetField } from "./asset_picker";
+import { libraryAssetField } from "@ui/overlay/asset_picker";
 
 /** The image's display URL: the asset-library file the element picks
  * (resolved by the page's context into a browsable URL). */

@@ -43,7 +43,16 @@ beforeAll(() => {
 	// a copy of the sources without generated/ (node_modules is shared by symlink)
 	tree = mkdtempSync(join(tmpdir(), "irlctrl-nogen-"));
 	expect(existsSync(join(tree, "generated"))).toBe(false);
-	for (const dir of ["client", "server", "shared", "scripts", "i18n"])
+	for (const dir of [
+		"client",
+		"server",
+		"shared",
+		"scripts",
+		"i18n",
+		// the control server statically serves public/ (e.g. the
+		// overlay_templates documents); the mount crashes at boot without it.
+		"public",
+	])
 		cpSync(join(projectRoot, dir), join(tree, dir), { recursive: true });
 	for (const file of [
 		"package.json",

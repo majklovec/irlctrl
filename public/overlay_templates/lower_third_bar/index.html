@@ -1,0 +1,95 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="overlay-template:name" content="overlay.tpl.lower_third_bar" />
+    <meta name="overlay-template:uses" content="title,subtitle,vars" />
+    <style>
+		/*
+		 * lower_third_bar — fills the element's box (no design canvas, no scaling;
+		 * the bar's offsets are percentages of the box).
+		 * `:root` MUST declare a fallback for every prop in template.json `uses`;
+		 * the doc builder overrides them from the element's (normalized) props.
+		 */
+		:root {
+			--accent: #6c5ce7;
+			--bg: rgba(15, 15, 25, 0.92);
+			--text: #ffffff;
+			--font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+			--font-size: 32px;
+			--radius: 12px;
+			--padding: 24px;
+		}
+		
+		*,
+		*::before,
+		*::after {
+			box-sizing: border-box;
+		}
+		
+		
+		body {
+			font-family: var(--font);
+		}
+		
+		section {
+			position: absolute;
+			inset: 0;
+			width: 100%;
+			height: 100%;
+		    background:transparent;
+		}
+		
+		.bar {
+			position: absolute;
+			left: 5%;
+			bottom: 12%;
+			display: flex;
+			align-items: stretch;
+			max-width: 73%;
+			background: var(--bg);
+			border-radius: var(--radius);
+			overflow: hidden;
+		}
+		
+		.accent {
+			flex: none;
+			width: 10px;
+			background: var(--accent);
+		}
+		
+		.content {
+			padding: var(--padding);
+			min-width: 0;
+		}
+		
+		.title {
+			color: var(--text);
+			font-size: var(--font-size);
+			font-weight: 700;
+			line-height: 1.2;
+		}
+		
+		.subtitle {
+			margin-top: 8px;
+			color: var(--text);
+			opacity: 0.72;
+			font-size: calc(var(--font-size) * 0.6);
+			line-height: 1.3;
+		}
+		
+    </style>
+  </head>
+  <body>
+	<section>
+	    <div class="bar">
+	        <div class="accent"></div>
+	        <div class="content">
+	            <div class="title" data-bind="title">Name</div>
+	            <div class="subtitle" data-bind="subtitle">Role — topic</div>
+	        </div>
+	    </div>
+	</section>
+	
+  </body>
+</html>
