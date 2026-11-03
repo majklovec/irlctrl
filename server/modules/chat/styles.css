@@ -64,8 +64,13 @@
 
 /* The in-scene feed (no overlay page): the element wrapper carries the
  * `--ov-chat-*` props, so the feed's text style reads them here — the old
- * `.dash-widget-body.chat-overlay-live` rules above only reach the iframe page. */
+ * `.dash-widget-body.chat-overlay-live` rules above only reach the iframe page.
+ * `height: 100%` + `overflow: hidden` clip the feed to the element box (no
+ * scrollbar, matching the overlay page); in bottom order the newest line then
+ * sits exactly on the box's bottom edge instead of overflowing past it. */
 .chat-element .chat-feed {
+    height: 100%;
+    overflow: hidden;
     font-size: var(--ov-chat-font-size, 24px);
     font-family: var(--ov-chat-font-family, inherit);
     color: var(--ov-chat-color, inherit);
@@ -92,6 +97,11 @@
 /* Fade-mask colour stops (a mask only sees alpha, so a white gradient works
    for any per-line colour). */
 .chat-element {
+    /* Fill the element box so the feed's `height: 100%` resolves to the box
+     * height (`.overlay-element` carries the explicit width/height); clip so
+     * the feed never draws past the box edges. */
+    height: 100%;
+    overflow: hidden;
     --ov-chat-fade-opaque: #fff;
     --ov-chat-fade-clear: #fff0;
 }
