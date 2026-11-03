@@ -59,7 +59,7 @@ function row(
 	return (
 		<tr key={d.id}>
 			<td>
-				<a class="device" href={`d/${encodeURIComponent(d.id)}/`} title={d.id}>
+				<a class="device" href={`/d/${encodeURIComponent(d.id)}/`} title={d.id}>
 					<span
 						class={["device-dot", d.online ? "online" : ""]
 							.filter(Boolean)

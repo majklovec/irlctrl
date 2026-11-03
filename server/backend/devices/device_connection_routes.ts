@@ -1,8 +1,8 @@
 import { Elysia } from "elysia";
 import { upgradeRequired } from "../../../shared/http";
 import { socketMessage } from "../../../shared/socket_message";
-import type { createDevices } from "./device_registry";
 import { socketAdapter } from "../socket";
+import type { createDevices } from "./device_registry";
 
 type Devices = ReturnType<typeof createDevices>;
 
