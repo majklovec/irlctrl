@@ -10,8 +10,6 @@ import { normalizeChannels, type ChatChannel } from "./config";
 export interface ChatProps {
     /** The platform channels to display (a dynamic list; empty = nothing). */
     channels: ChatChannel[];
-    /** How many merged messages are shown. */
-    history: number;
     /** Where new messages enter the feed: "top" (newest first) or "bottom". */
     order: "top" | "bottom";
     /** How moderated (removed) messages present: "strike-through" or "hide". */
@@ -42,7 +40,6 @@ export interface ChatProps {
 
 export const DEFAULT_CHAT_PROPS: Required<ChatProps> = {
     channels: [],
-    history: 500,
     order: "top",
     bannedMessages: "strike",
     timestamps: "off",
@@ -68,7 +65,6 @@ export const chatSchema: OverlayElementSchema = {
             // `channels` is an object array, so it is normalized directly from
             // the raw record (the scalar `read` helpers can't touch it).
             channels: normalizeChannels(props.channels),
-            history: read.num("history", d.history, 1, 10_000),
             order: read.oneOf("order", ["top", "bottom"] as const, d.order),
             bannedMessages: read.oneOf(
                 "bannedMessages",

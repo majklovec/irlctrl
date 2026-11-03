@@ -76,7 +76,6 @@ describe("chat element channel list", () => {
     test("chatPropsToConfig rebuilds a widget-shaped config from element props", () => {
         const config = chatPropsToConfig({
             channels: [{ platform: "twitch", channel: " Alice " }],
-            history: 75,
             order: "bottom",
             bannedMessages: "hide",
             timestamps: "on",
@@ -84,7 +83,6 @@ describe("chat element channel list", () => {
         });
         expect(config).toEqual({
             twitch: "alice",
-            history: "75",
             order: "bottom",
             bannedMessages: "hide",
             timestamps: "on",
@@ -95,7 +93,6 @@ describe("chat element channel list", () => {
     test("chatPropsToConfig falls back to defaults for missing/invalid props", () => {
         const config = chatPropsToConfig({ channels: [] });
         expect(config).toEqual({
-            history: "500",
             order: "top",
             bannedMessages: "strike",
             timestamps: "off",

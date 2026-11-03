@@ -94,7 +94,8 @@
     text-align: var(--ov-chat-text-align, left);
 }
 
-.chat-element .chat-feed .chat-line img {
+.chat-element .chat-feed .chat-line img,
+.chat-element .chat-feed .chat-line svg {
     height: 1em;
 }
 
@@ -103,6 +104,20 @@
  * strings (URLs, long handles) wrap too. */
 .chat-element .chat-feed .chat-text {
     word-break: break-word;
+}
+
+/* A flex column so the lines pin to the edge new messages enter: bottom
+ * order sits flush on the box's bottom edge (any excess overflows — and is
+ * clipped — at the top), top order on the top edge (excess clipped at the
+ * bottom). The feed is a few lines short of the box when it has few
+ * messages, and pinning is what keeps the newest line on the entry edge. */
+.chat-element .chat-feed {
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-element .chat-feed.chat-feed-bottom {
+    justify-content: flex-end;
 }
 
 /* Fade-mask colour stops (a mask only sees alpha, so a white gradient works

@@ -5,8 +5,9 @@
  * dashboard chat widget.
  *   - Channels: a filters-style list — add rows, pick a platform, type the
  *     handle. No widget to link, no URL to paste.
- *   - Display: history, new-message order, banned-message handling,
- *     timestamps and platform icons.
+ *   - Display: new-message order, banned-message handling, timestamps and
+ *     platform icons. The visible history is not a prop — the feed sizes
+ *     itself to the element's box.
  *   - Feed text: size, weight, colour, line-height, spacing, fade, alignment.
  * The live text renders straight into the same DOM the overlay composites, so
  * a browser tab shows the exact feed OBS sees. It never uses an <iframe> — a
@@ -189,23 +190,6 @@ function editForm(props: ElementProps): Children {
 		<>
 			{channelsField(props)}
 
-			{bindField(
-				e,
-				"props.history",
-				t("dash.widget_history"),
-				<input
-					type="number"
-					min={1}
-					value={p.history}
-					oninput={(ev: Event) =>
-						mutate((el) => {
-							el.props.history =
-								Number((ev.target as HTMLInputElement).value) || 1;
-						})
-					}
-				/>,
-				props,
-			)}
 			{choiceField(
 				e,
 				"props.order",
@@ -460,7 +444,6 @@ export const chatElement: OverlayElementDef = {
 	/** The channel rows are one composite control, not a bindField-wrapped
 	 * scalar, so `propKeys` lists only the bindable scalar props. */
 	propKeys: [
-		"history",
 		"order",
 		"bannedMessages",
 		"timestamps",

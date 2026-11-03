@@ -186,11 +186,8 @@ export function chatPropsToConfig(
     const config: Record<string, string> = {};
     for (const c of normalizeChannels(props.channels))
         if (c.channel) config[c.platform] = c.channel;
-    config.history = String(
-        typeof props.history === "number" && Number.isFinite(props.history)
-            ? props.history
-            : DEFAULT_HISTORY_LINES,
-    );
+    // No `history`: the element sizes its feed to its own box (the frontend
+    // measures it), so there is no history prop to translate.
     config.order = String(
         props.order === "bottom" ? "bottom" : "top",
     );
