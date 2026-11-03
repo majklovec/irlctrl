@@ -303,5 +303,19 @@
     "ui.save": "Uložiť",
     "ui.start": "Spustiť",
     "ui.stop": "Zastaviť",
-    "ui.title_suffix": "- IRLCTRL"
+    "ui.title_suffix": "- IRLCTRL",
+    "overlay.filters": "Filtry",
+    "overlay.add_filter": "Pridať filter",
+    "overlay.remove_filter": "Odstrániť filter",
+    "overlay.no_filters": "Žiadne filtre",
+    "overlay.filter_type": "Typ filtra",
+    "overlay.filter_value": "Hodnota filtra",
+    "overlay.filter.blur": "Rozmazanie",
+    "overlay.filter.brightness": "Jasnosť",
+    "overlay.filter.contrast": "Kontrast",
+    "overlay.filter.grayscale": "Stupne šedi",
+    "overlay.filter.hue-rotate": "Rotácia odtieňa",
+    "overlay.filter.invert": "Inverzia",
+    "overlay.filter.saturate": "Sytosť",
+    "overlay.filter.sepia": "Sépia"
 }

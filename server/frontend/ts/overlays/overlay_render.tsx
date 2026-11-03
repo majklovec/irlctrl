@@ -18,7 +18,10 @@ import {
 } from "@ui/overlay/element";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import type { OverlayElement } from "../../../../shared/overlay";
+import {
+	cssFilterString,
+	type OverlayElement,
+} from "../../../../shared/overlay";
 import { overlayElementSchema } from "../../../../shared/overlay_elements";
 
 export type {
@@ -53,12 +56,17 @@ export function overlayElementView(
 		ctx.activeTriggers === undefined ||
 		ctx.activeTriggers.has(element.id);
 	const content = shown && def ? def.draw(resolved, ctx) : null;
+	// Filter is applied here (not in elementStyle) so the editor's selection
+	// box and inline-edit wrapper — which reuse elementStyle — are untouched.
+	const filter = cssFilterString(resolved.props.filters);
 	return m(
 		".overlay-element",
 		{
 			key: element.id,
 			"data-element": element.id,
-			style: elementStyle(resolved),
+			style: filter
+				? { ...elementStyle(resolved), filter }
+				: elementStyle(resolved),
 		},
 		content,
 	);

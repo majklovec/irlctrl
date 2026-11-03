@@ -303,5 +303,19 @@
     "ui.save": "保存",
     "ui.start": "启动",
     "ui.stop": "停止",
-    "ui.title_suffix": "- IRLCTRL"
+    "ui.title_suffix": "- IRLCTRL",
+    "overlay.filters": "滤镜",
+    "overlay.add_filter": "添加滤镜",
+    "overlay.remove_filter": "移除滤镜",
+    "overlay.no_filters": "无滤镜",
+    "overlay.filter_type": "滤镜类型",
+    "overlay.filter_value": "滤镜值",
+    "overlay.filter.blur": "模糊",
+    "overlay.filter.brightness": "亮度",
+    "overlay.filter.contrast": "对比度",
+    "overlay.filter.grayscale": "灰度",
+    "overlay.filter.hue-rotate": "色相旋转",
+    "overlay.filter.invert": "反色",
+    "overlay.filter.saturate": "饱和度",
+    "overlay.filter.sepia": "深褐色"
 }

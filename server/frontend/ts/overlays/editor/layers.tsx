@@ -4,7 +4,13 @@ import { t } from "@ui/i18n";
 import { bindField, lbl } from "@ui/overlay/fields";
 import { elementDef } from "@ui/overlay/registry";
 import m from "mithril";
-import type { OverlayElement, Transform } from "../../../../../shared/overlay";
+import {
+	OVERLAY_FILTERS,
+	type OverlayElement,
+	type OverlayFilter,
+	type OverlayFilterType,
+	type Transform,
+} from "../../../../../shared/overlay";
 import {
 	deleteElement,
 	mutateElementOf,
@@ -171,6 +177,106 @@ export function inspector(): m.Vnode {
 	return <div class="ov-inspect">{layersPanel()}</div>;
 }
 
+/** Stacked CSS filters for one element (common to every type): a row per
+ * filter (type + value + remove) above an "add" control. Values are clamped
+ * to the type's range; reassigning `props.filters` keeps undo snapshots clean.
+ * Not bindable to a variable (a structured array, like the other non-scalar
+ * fields). */
+function filtersField(e: OverlayElement): m.Vnode {
+	const filters: OverlayFilter[] = Array.isArray(e.props.filters)
+		? (e.props.filters as OverlayFilter[])
+		: [];
+	const setFilters = (fn: (list: OverlayFilter[]) => void): void =>
+		mutateElementOf(e.id, (el) => {
+			const list: OverlayFilter[] = (
+				Array.isArray(el.props.filters)
+					? (el.props.filters as OverlayFilter[])
+					: []
+			).map((f) => ({ ...f }));
+			fn(list);
+			el.props.filters = list;
+		});
+
+	const options = Object.keys(OVERLAY_FILTERS) as OverlayFilterType[];
+
+	return (
+		<div class="ov-filters">
+			<span class="ov-lbl">{t("overlay.filters")}</span>
+			{filters.length === 0 ? (
+				<span class="ov-filters-empty">{t("overlay.no_filters")}</span>
+			) : (
+				filters.map((f, i) => {
+					const spec = OVERLAY_FILTERS[f.type];
+					return (
+						<div class="ov-filter-row" key={i}>
+							<select
+								aria-label={t("overlay.filter_type")}
+								value={f.type}
+								onchange={(ev: Event) => {
+									const type = (ev.target as HTMLSelectElement)
+										.value as OverlayFilterType;
+									setFilters((list) => {
+										// switching type resets to that type's value
+										list[i] = { type, value: OVERLAY_FILTERS[type].default };
+									});
+								}}
+							>
+								{options.map((opt) => (
+									<option key={opt} value={opt}>
+										{t(`overlay.filter.${opt}`)}
+									</option>
+								))}
+							</select>
+							<input
+								type="number"
+								min={spec.min}
+								max={spec.max}
+								step="1"
+								value={f.value}
+								aria-label={t("overlay.filter_value")}
+								oninput={(ev: Event) => {
+									const n = Number((ev.target as HTMLInputElement).value);
+									if (!Number.isFinite(n)) return;
+									setFilters((list) => {
+										list[i] = {
+											...list[i],
+											value: Math.min(spec.max, Math.max(spec.min, n)),
+										};
+									});
+								}}
+							/>
+							<button
+								type="button"
+								class="ov-filter-remove"
+								title={t("overlay.remove_filter")}
+								aria-label={t("overlay.remove_filter")}
+								onclick={() =>
+									setFilters((list) => {
+										list.splice(i, 1);
+									})
+								}
+							>
+								<Icon name="close" class="role-icon" width="12" height="12" />
+							</button>
+						</div>
+					);
+				})
+			)}
+			<button
+				type="button"
+				class="ov-filter-add"
+				onclick={() =>
+					setFilters((list) => {
+						list.push({ type: "blur", value: OVERLAY_FILTERS.blur.default });
+					})
+				}
+			>
+				+ {t("overlay.add_filter")}
+			</button>
+		</div>
+	);
+}
+
 /** Property fields for one element, rendered inside its expanded list row. */
 export function elementProps(e: OverlayElement): m.Vnode {
 	const tm = e.transform;
@@ -279,6 +385,7 @@ export function elementProps(e: OverlayElement): m.Vnode {
 					)}
 				</div>
 			</div>
+			{filtersField(e)}
 			{def
 				? def.editForm({
 						element: e,

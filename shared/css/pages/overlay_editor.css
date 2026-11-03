@@ -609,6 +609,53 @@ identically here and on the runtime page */
     gap: 8px;
     font-size: 13px;
 }
+/* stacked CSS filters: a row per filter (type select + value + remove) above
+   an "add" control, sharing the compact inspector look */
+.ov-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.ov-filters-empty {
+    font-size: 12px;
+    font-style: italic;
+    opacity: 0.7;
+}
+.ov-filter-row {
+    display: grid;
+    grid-template-columns: 1fr 64px auto;
+    gap: 4px;
+    align-items: center;
+}
+.ov-filter-row input[type="number"] {
+    width: 100%;
+}
+.ov-filter-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+}
+.ov-filter-remove:hover {
+    color: var(--bad);
+}
+.ov-filter-add {
+    align-self: flex-start;
+    padding: 2px 8px;
+    font-size: 12px;
+    background: none;
+    border: 1px dashed var(--border);
+    color: var(--muted);
+    cursor: pointer;
+}
+.ov-filter-add:hover {
+    color: var(--text);
+    border-color: var(--text);
+}
 .ov-danger {
     margin-top: 6px;
 }

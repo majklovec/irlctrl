@@ -303,5 +303,19 @@
     "ui.save": "Speichern",
     "ui.start": "Starten",
     "ui.stop": "Stoppen",
-    "ui.title_suffix": "- IRLCTRL"
+    "ui.title_suffix": "- IRLCTRL",
+    "overlay.filters": "Filter",
+    "overlay.add_filter": "Filter hinzufügen",
+    "overlay.remove_filter": "Filter entfernen",
+    "overlay.no_filters": "Keine Filter",
+    "overlay.filter_type": "Filtertyp",
+    "overlay.filter_value": "Filterwert",
+    "overlay.filter.blur": "Weichzeichnen",
+    "overlay.filter.brightness": "Helligkeit",
+    "overlay.filter.contrast": "Kontrast",
+    "overlay.filter.grayscale": "Graustufen",
+    "overlay.filter.hue-rotate": "Farbton drehen",
+    "overlay.filter.invert": "Invertieren",
+    "overlay.filter.saturate": "Sättigung",
+    "overlay.filter.sepia": "Sepia"
 }

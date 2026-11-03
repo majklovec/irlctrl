@@ -303,5 +303,19 @@
     "ui.save": "Сохранить",
     "ui.start": "Запустить",
     "ui.stop": "Остановить",
-    "ui.title_suffix": "- IRLCTRL"
+    "ui.title_suffix": "- IRLCTRL",
+    "overlay.filters": "Фильтры",
+    "overlay.add_filter": "Добавить фильтр",
+    "overlay.remove_filter": "Удалить фильтр",
+    "overlay.no_filters": "Нет фильтров",
+    "overlay.filter_type": "Тип фильтра",
+    "overlay.filter_value": "Значение фильтра",
+    "overlay.filter.blur": "Размытие",
+    "overlay.filter.brightness": "Яркость",
+    "overlay.filter.contrast": "Контраст",
+    "overlay.filter.grayscale": "Чёрно-белый",
+    "overlay.filter.hue-rotate": "Поворот тона",
+    "overlay.filter.invert": "Инверсия",
+    "overlay.filter.saturate": "Насыщенность",
+    "overlay.filter.sepia": "Сепия"
 }

@@ -303,5 +303,19 @@
     "ui.save": "Save",
     "ui.start": "Start",
     "ui.stop": "Stop",
-    "ui.title_suffix": "- IRLCTRL"
+    "ui.title_suffix": "- IRLCTRL",
+    "overlay.filters": "Filters",
+    "overlay.add_filter": "Add filter",
+    "overlay.remove_filter": "Remove filter",
+    "overlay.no_filters": "No filters",
+    "overlay.filter_type": "Filter type",
+    "overlay.filter_value": "Filter value",
+    "overlay.filter.blur": "Blur",
+    "overlay.filter.brightness": "Brightness",
+    "overlay.filter.contrast": "Contrast",
+    "overlay.filter.grayscale": "Grayscale",
+    "overlay.filter.hue-rotate": "Hue rotate",
+    "overlay.filter.invert": "Invert",
+    "overlay.filter.saturate": "Saturate",
+    "overlay.filter.sepia": "Sepia"
 }
