@@ -71,6 +71,10 @@
 .chat-element .chat-feed {
     height: 100%;
     overflow: hidden;
+    /* The `.overlay-element` wrapper sets `white-space: pre` (overlay text
+     * elements keep verbatim whitespace) — the chat feed must reset it or
+     * long messages never wrap. */
+    white-space: normal;
     font-size: var(--ov-chat-font-size, 24px);
     font-family: var(--ov-chat-font-family, inherit);
     color: var(--ov-chat-color, inherit);
@@ -92,6 +96,13 @@
 
 .chat-element .chat-feed .chat-line img {
     height: 1em;
+}
+
+/* The word-break rule for message text is scoped under `.dash-widget-body`
+ * (dashboard + iframe page) — the in-scene element needs its own so unbroken
+ * strings (URLs, long handles) wrap too. */
+.chat-element .chat-feed .chat-text {
+    word-break: break-word;
 }
 
 /* Fade-mask colour stops (a mask only sees alpha, so a white gradient works
