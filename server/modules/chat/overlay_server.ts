@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 import { timingSafeEqual } from "node:crypto";
 import { Elysia } from "elysia";
+import { APP_VERSION } from "../../../shared/app_version";
 import type { ControlRouteContext } from "../../../shared/contracts/backend_module";
 import type { ServerDashboardWidget } from "../../../shared/contracts/wire";
 import { upgradeRequired } from "../../../shared/http";
@@ -16,7 +17,10 @@ const headers = {
 /** The WebSocket route path — parsed from the upgrade request URL in `open`. */
 const WS_PATH_RE = /^\/api\/chat\/([^/]+)\/([^/]+)\/ws$/;
 
-function tokenMatches(expected: string | undefined, presented: string): boolean {
+function tokenMatches(
+    expected: string | undefined,
+    presented: string,
+): boolean {
     if (!expected || !presented) return false;
     const a = Buffer.from(expected);
     const b = Buffer.from(presented);
@@ -29,17 +33,21 @@ export function chatOverlayRoutes(context: ControlRouteContext) {
         widgetId: string,
         request: Request,
     ): ServerDashboardWidget | undefined {
-        const widget = context.dashboardById(dashboardId)?.widgets.find(
-            (w) => w.id === widgetId && w.type === "chat",
-        );
+        const widget = context
+            .dashboardById(dashboardId)
+            ?.widgets.find((w) => w.id === widgetId && w.type === "chat");
         const authorization = request.headers.get("authorization");
-        const token = authorization === null
-            ? new URL(request.url).searchParams.get("token") ?? ""
-            : authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+        const token =
+            authorization === null
+                ? new URL(request.url).searchParams.get("token") ?? ""
+                : authorization.startsWith("Bearer ")
+                  ? authorization.slice(7)
+                  : "";
         return tokenMatches(widget?.config?.token, token) ? widget : undefined;
     }
 
-    const denied = () => new Response("Invalid chat token", { status: 401, headers });
+    const denied = () =>
+        new Response("Invalid chat token", { status: 401, headers });
 
     /**
      * The widget's overlay state: its config (sans token) plus the rolling
@@ -56,6 +64,7 @@ export function chatOverlayRoutes(context: ControlRouteContext) {
         return {
             widget: { id: widget.id, config },
             chat,
+            version: APP_VERSION,
         };
     }
 
@@ -69,7 +78,11 @@ export function chatOverlayRoutes(context: ControlRouteContext) {
             return response;
         })
         .get("/api/chat/:dashboardId/:widgetId", ({ params, request }) => {
-            const widget = authorizedWidget(params.dashboardId, params.widgetId, request);
+            const widget = authorizedWidget(
+                params.dashboardId,
+                params.widgetId,
+                request,
+            );
             if (!widget) return denied();
             return Response.json(overlayState(widget), { headers });
         })
@@ -80,7 +93,9 @@ export function chatOverlayRoutes(context: ControlRouteContext) {
         })
         .ws("/api/chat/:dashboardId/:widgetId/ws", {
             open(ws) {
-                const m = WS_PATH_RE.exec(new URL(ws.data.request.url).pathname);
+                const m = WS_PATH_RE.exec(
+                    new URL(ws.data.request.url).pathname,
+                );
                 if (!m) return ws.close(1008, "Unknown chat route");
                 const widget = authorizedWidget(
                     decodeURIComponent(m[1]),
@@ -93,11 +108,13 @@ export function chatOverlayRoutes(context: ControlRouteContext) {
                 // every channel, just like the dashboard websocket — the
                 // overlay client renders only this widget's configured specs.
                 ws.subscribe(context.widgetHubTopic());
-                ws.send(JSON.stringify({
-                    type: "event",
-                    event: "chat.overlay.snapshot",
-                    data: overlayState(widget),
-                }));
+                ws.send(
+                    JSON.stringify({
+                        type: "event",
+                        event: "chat.overlay.snapshot",
+                        data: overlayState(widget),
+                    }),
+                );
             },
         });
 }

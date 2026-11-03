@@ -2,8 +2,9 @@
 
 import { i18nReady, t } from "@ui/i18n";
 import m from "mithril";
-import chatModule, { chatFeed } from "./frontend";
+import { APP_VERSION } from "../../../shared/app_version";
 import { chatSpecsFromConfig } from "./config";
+import chatModule, { chatFeed } from "./frontend";
 import type { ChatOverlayState } from "./types";
 import "./overlay.css";
 
@@ -21,6 +22,28 @@ let socket: WebSocket | undefined;
 /** This widget's channel specs; the hub stream carries every channel, so the
  * snapshot's config decides which live frames are relevant to this overlay. */
 let specs = new Set<string>();
+let reloading = false;
+
+/**
+ * A new deployment replaced the server while this page was open (a restart
+ * drops the connection, so the fresh snapshot on reconnect carries the new
+ * build's version). Ask a registered service worker to update so its cache
+ * storage drops the previous bundle, then reload: the page is served
+ * `no-store` and the bundles are content-hashed, so the reload loads the new
+ * version from scratch.
+ */
+function reloadOnNewVersion(version: string): void {
+	if (reloading || version === APP_VERSION) return;
+	reloading = true;
+	console.info(
+		`[chat overlay] new server version v${version} (this page runs v${APP_VERSION}), reloading`,
+	);
+	navigator.serviceWorker
+		?.getRegistration()
+		.then((reg) => reg?.update())
+		.catch(() => {});
+	location.reload();
+}
 
 /**
  * The overlay's socket: same origin as the page, ws(s) scheme, token in the
@@ -52,10 +75,15 @@ function connect(): void {
 		}
 		if (frame.type !== "event" || !frame.event) return;
 		if (frame.event === "chat.overlay.snapshot") {
-			state = frame.data as ChatOverlayState;
-			specs = new Set(chatSpecsFromConfig(state.widget.config)
-				.filter((s): s is string => s !== null));
-			chatModule.onFrame?.("widget.snapshot", { chat: state.chat });
+			const snap = frame.data as ChatOverlayState;
+			if (typeof snap.version === "string") reloadOnNewVersion(snap.version);
+			state = snap;
+			specs = new Set(
+				chatSpecsFromConfig(snap.widget.config).filter(
+					(s): s is string => s !== null,
+				),
+			);
+			chatModule.onFrame?.("widget.snapshot", { chat: snap.chat });
 			error = false;
 			m.redraw();
 			return;
@@ -88,7 +116,9 @@ function connect(): void {
 		m.redraw();
 		const delay = Math.min(1_000 * 2 ** attempt, 15_000);
 		attempt += 1;
-		console.warn(`[chat overlay] connection closed (${event.code}), retrying in ${delay} ms`);
+		console.warn(
+			`[chat overlay] connection closed (${event.code}), retrying in ${delay} ms`,
+		);
 		timer = setTimeout(connect, delay);
 	};
 }

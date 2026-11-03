@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { runInNewContext } from "node:vm";
+import { APP_VERSION } from "../generated/version";
 import { chatOverlayRoutes } from "../server/modules/chat/overlay_server";
 import type { ChatSnapshot } from "../server/modules/chat/types";
 import type { ServerDashboard } from "../shared/contracts/wire";
@@ -86,7 +87,8 @@ function nextFrame(
     const queue = frameQueues.get(socket);
     if (queue) {
         for (let i = 0; i < queue.length; i++) {
-            if (matches(queue[i])) return Promise.resolve(queue.splice(i, 1)[0]);
+            if (matches(queue[i]))
+                return Promise.resolve(queue.splice(i, 1)[0]);
         }
     }
     return new Promise((resolve, reject) => {
@@ -128,7 +130,10 @@ function fixture() {
                 deviceId: "",
                 type: "chat",
                 name: "Chat",
-                x: 0, y: 0, w: 3, h: 8,
+                x: 0,
+                y: 0,
+                w: 3,
+                h: 8,
                 visible: true,
                 config,
             },
@@ -137,7 +142,10 @@ function fixture() {
                 deviceId: "",
                 type: "chat",
                 name: "Other",
-                x: 3, y: 0, w: 3, h: 8,
+                x: 3,
+                y: 0,
+                w: 3,
+                h: 8,
                 visible: true,
                 config: { twitch: "bob", token: "other-secret" },
             },
@@ -156,16 +164,31 @@ function fixture() {
     };
     let exists = true;
     const app = chatOverlayRoutes({
-        dashboardById: (id) => exists && id === dashboard.id ? dashboard : undefined,
+        dashboardById: (id) =>
+            exists && id === dashboard.id ? dashboard : undefined,
         htmlResponse: (page) => new Response(`<html>${page}</html>`),
         widgetHubSnapshot: () => ({ chat: snapshot }),
         widgetHubTopic: () => "widgets:hub",
     });
-    const get = (path: string, token?: string) => app.handle(new Request(
-        `http://localhost${path}`,
-        token === undefined ? undefined : { headers: { authorization: `Bearer ${token}` } },
-    ));
-    return { app, config, dashboard, snapshot, get, remove: () => { exists = false; } };
+    const get = (path: string, token?: string) =>
+        app.handle(
+            new Request(
+                `http://localhost${path}`,
+                token === undefined
+                    ? undefined
+                    : { headers: { authorization: `Bearer ${token}` } },
+            ),
+        );
+    return {
+        app,
+        config,
+        dashboard,
+        snapshot,
+        get,
+        remove: () => {
+            exists = false;
+        },
+    };
 }
 
 describe("token-authenticated chat overlay", () => {
@@ -175,15 +198,23 @@ describe("token-authenticated chat overlay", () => {
             respondWith(): void;
         };
         let onFetch: ((event: Navigation) => void) | undefined;
-        runInNewContext(await Bun.file(new URL("../shared/assets/pwa/sw.js", import.meta.url)).text(), {
-            self: {
-                location: { origin: "http://localhost" },
-                addEventListener(name: string, handler: (event: Navigation) => void) {
-                    if (name === "fetch") onFetch = handler;
+        runInNewContext(
+            await Bun.file(
+                new URL("../shared/assets/pwa/sw.js", import.meta.url),
+            ).text(),
+            {
+                self: {
+                    location: { origin: "http://localhost" },
+                    addEventListener(
+                        name: string,
+                        handler: (event: Navigation) => void,
+                    ) {
+                        if (name === "fetch") onFetch = handler;
+                    },
                 },
+                URL,
             },
-            URL,
-        });
+        );
         if (!onFetch) throw new Error("Missing service worker fetch listener");
         let intercepted = false;
         onFetch({
@@ -192,14 +223,18 @@ describe("token-authenticated chat overlay", () => {
                 method: "GET",
                 mode: "navigate",
             },
-            respondWith() { intercepted = true; },
+            respondWith() {
+                intercepted = true;
+            },
         });
         expect(intercepted).toBe(false);
     });
 
     test("serves plain chat without a session and prevents caching and referrer leaks", async () => {
         const { get } = fixture();
-        const response = await get(`/chat/dashboard/chat?token=${encodeURIComponent("secret +/&?")}`);
+        const response = await get(
+            `/chat/dashboard/chat?token=${encodeURIComponent("secret +/&?")}`,
+        );
         expect(response.status).toBe(200);
         expect(await response.text()).toContain("chatoverlay");
         expect(response.headers.get("cache-control")).toBe("no-store");
@@ -219,7 +254,9 @@ describe("token-authenticated chat overlay", () => {
                 expect((await get(prefix + suffix)).status).toBe(401);
             }
             config.token = "";
-            expect((await get(`${prefix}/dashboard/chat?token=`)).status).toBe(401);
+            expect((await get(`${prefix}/dashboard/chat?token=`)).status).toBe(
+                401,
+            );
             config.token = "secret +/&?";
         }
     });
@@ -236,42 +273,60 @@ describe("token-authenticated chat overlay", () => {
                 "twitch:alice": snapshot["twitch:alice"],
                 "youtube:creator": snapshot["youtube:creator"],
             },
+            version: APP_VERSION,
         });
     });
 
     test("revokes access after token rotation, removal, widget removal or dashboard removal", async () => {
         const { get, config, dashboard, remove } = fixture();
         config.token = "rotated";
-        expect((await get("/api/chat/dashboard/chat", "secret +/&?")).status).toBe(401);
-        expect((await get("/api/chat/dashboard/chat", "rotated")).status).toBe(200);
+        expect(
+            (await get("/api/chat/dashboard/chat", "secret +/&?")).status,
+        ).toBe(401);
+        expect((await get("/api/chat/dashboard/chat", "rotated")).status).toBe(
+            200,
+        );
         delete config.token;
-        expect((await get("/api/chat/dashboard/chat", "rotated")).status).toBe(401);
+        expect((await get("/api/chat/dashboard/chat", "rotated")).status).toBe(
+            401,
+        );
         config.token = "rotated";
         dashboard.widgets.splice(0, 1);
-        expect((await get("/api/chat/dashboard/chat", "rotated")).status).toBe(401);
+        expect((await get("/api/chat/dashboard/chat", "rotated")).status).toBe(
+            401,
+        );
         remove();
-        expect((await get("/api/chat/dashboard/other", "other-secret")).status).toBe(401);
+        expect(
+            (await get("/api/chat/dashboard/other", "other-secret")).status,
+        ).toBe(401);
     });
 
     test("does not grant access to non-chat widgets", async () => {
         const { get, dashboard } = fixture();
         dashboard.widgets[0].type = "stats";
-        expect((await get("/api/chat/dashboard/chat", "secret +/&?")).status).toBe(401);
+        expect(
+            (await get("/api/chat/dashboard/chat", "secret +/&?")).status,
+        ).toBe(401);
     });
 
     test("requires a Bearer scheme when an authorization header is provided", async () => {
         const { app } = fixture();
         for (const authorization of ["secret +/&?", "Basic secret +/&?"]) {
-            const response = await app.handle(new Request("http://localhost/api/chat/dashboard/chat", {
-                headers: { authorization },
-            }));
+            const response = await app.handle(
+                new Request("http://localhost/api/chat/dashboard/chat", {
+                    headers: { authorization },
+                }),
+            );
             expect(response.status).toBe(401);
         }
     });
 
     test("returns fresh messages and configuration on each refresh", async () => {
         const { get, config, snapshot } = fixture();
-        snapshot["twitch:alice"].messages.unshift({ id: "2", text: "New message" });
+        snapshot["twitch:alice"].messages.unshift({
+            id: "2",
+            text: "New message",
+        });
         config.history = "2";
         config.youtube = "";
         const response = await get("/api/chat/dashboard/chat", "secret +/&?");
@@ -296,10 +351,16 @@ describe("chat overlay websocket", () => {
     test("answers a plain GET on the ws route with 426 (valid token) or 401 (bad token)", async () => {
         const { get } = fixture();
         const valid = encodeURIComponent("secret +/&?");
-        expect((await get(`/api/chat/dashboard/chat/ws?token=${valid}`)).status).toBe(426);
+        expect(
+            (await get(`/api/chat/dashboard/chat/ws?token=${valid}`)).status,
+        ).toBe(426);
         expect((await get("/api/chat/dashboard/chat/ws")).status).toBe(401);
-        expect((await get(`/api/chat/dashboard/chat/ws?token=wrong`)).status).toBe(401);
-        const serverResponse = await get(`/api/chat/dashboard/chat/ws?token=${valid}`);
+        expect(
+            (await get(`/api/chat/dashboard/chat/ws?token=wrong`)).status,
+        ).toBe(401);
+        const serverResponse = await get(
+            `/api/chat/dashboard/chat/ws?token=${valid}`,
+        );
         expect(serverResponse.headers.get("upgrade")).toBe("websocket");
     });
 
@@ -326,23 +387,35 @@ describe("chat overlay websocket", () => {
                     "twitch:alice": snapshot["twitch:alice"],
                     "youtube:creator": snapshot["youtube:creator"],
                 },
+                version: APP_VERSION,
             });
 
-            const publish = (event: string, channel: string, extra: Record<string, unknown> = {}) =>
+            const publish = (
+                event: string,
+                channel: string,
+                extra: Record<string, unknown> = {},
+            ) =>
                 app.server?.publish(
                     "widgets:hub",
                     JSON.stringify({
                         type: "event",
                         event,
-                        data: { channel, text: `hello from ${channel}`, ...extra },
+                        data: {
+                            channel,
+                            text: `hello from ${channel}`,
+                            ...extra,
+                        },
                     }),
                 );
 
             // a frame for each configured channel is forwarded verbatim
             publish("twitch.chat", "alice");
-            const alice = await nextFrame(socket, (f) =>
-                f.event === "twitch.chat"
-                && (f.data as { channel?: string }).channel === "alice");
+            const alice = await nextFrame(
+                socket,
+                (f) =>
+                    f.event === "twitch.chat" &&
+                    (f.data as { channel?: string }).channel === "alice",
+            );
             expect(alice).toEqual({
                 type: "event",
                 event: "twitch.chat",
@@ -350,10 +423,14 @@ describe("chat overlay websocket", () => {
             });
 
             publish("youtube.chat", "creator", { id: "y1" });
-            expect(await nextFrame(socket, (f) =>
-                f.event === "youtube.chat"
-                && (f.data as { channel?: string }).channel === "creator"))
-                .toMatchObject({ event: "youtube.chat" });
+            expect(
+                await nextFrame(
+                    socket,
+                    (f) =>
+                        f.event === "youtube.chat" &&
+                        (f.data as { channel?: string }).channel === "creator",
+                ),
+            ).toMatchObject({ event: "youtube.chat" });
 
             // like the dashboard websocket, the socket subscribes to the
             // whole hub topic — every frame is delivered verbatim and the
