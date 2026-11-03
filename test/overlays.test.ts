@@ -402,6 +402,40 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                 (overlayEvent.data as { overlay: Overlay }).overlay.elements
                     .length,
             ).toBe(1);
+            // live frames are slim: even a fresh `overlays.overlay` frame
+            // carries no asset bytes
+            expect(overlayOf(overlayEvent).assets).toEqual([]);
+
+            // assets travel in their own frame (bytes included) plus the
+            // slim overlay frame for the rest of the state
+            const assetRes = await fetch(
+                `${baseUrl}/api/overlays/${overlayId}/assets`,
+                {
+                    method: "POST",
+                    headers: { cookie, "content-type": "application/json" },
+                    body: JSON.stringify({
+                        filename: "dot.png",
+                        mime: "image/png",
+                        dataBase64: Buffer.from("png-bytes").toString(
+                            "base64",
+                        ),
+                    }),
+                },
+            );
+            expect(assetRes.status).toBe(201);
+            const assetsEvent = await nextFrame(
+                editorSocket,
+                (f) =>
+                    f.event === "overlays.assets" &&
+                    (f.data as { assets?: unknown[] })?.assets?.length === 1,
+            );
+            const pushedAsset = (
+                (assetsEvent.data as { assets: unknown[] }).assets
+            )[0] as Record<string, unknown>;
+            expect(pushedAsset.filename).toBe("dot.png");
+            expect(pushedAsset.dataBase64).toBe(
+                Buffer.from("png-bytes").toString("base64"),
+            );
 
             // a duplicate clones the overlay's elements under a fresh id,
             // name and token
@@ -1047,6 +1081,11 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
                     live.data as { overlay: Overlay }
                 ).overlay.elements[0] as OverlayElement;
                 expect(liveEl.props?.text).toBe("Updated");
+                // the live frame stays slim: asset bytes ride only in the
+                // snapshot and in `overlays.assets` frames
+                expect(
+                    (live.data as { overlay: Overlay }).overlay.assets,
+                ).toEqual([]);
             } finally {
                 runtimeSocket.close();
             }

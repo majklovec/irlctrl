@@ -133,6 +133,8 @@ function assetMap(): Map<string, string> {
 	return new Map(state.assets.map((a) => [a.id, assetUrl(a)]));
 }
 
+/** The initial `overlays.snapshot`: the complete state — overlay, canvas,
+ * variables and the asset bytes (the only frame that carries them). */
 function applySnapshot(data: Record<string, unknown>): void {
 	const overlay = data.overlay as Overlay | null | undefined;
 	if (overlay) {
@@ -144,8 +146,10 @@ function applySnapshot(data: Record<string, unknown>): void {
 	m.redraw();
 }
 
-/** A full `overlays.overlay` frame (element/canvas/variable change): apply the
- * whole overlay, dropping a stale push (lower rev) that lags a fresher one. */
+/** An `overlays.overlay` frame (element/canvas/variable change): apply the
+ * whole overlay, dropping a stale push (lower rev) that lags a fresher one.
+ * The frame is slim — its `assets` never carries bytes — so the page's asset
+ * list (snapshot + `overlays.assets` frames) is left untouched. */
 function applyOverlayFrame(overlay: Overlay): void {
 	const local = state.overlay;
 	if (
@@ -155,7 +159,10 @@ function applyOverlayFrame(overlay: Overlay): void {
 		overlay.rev < local.rev
 	)
 		return;
-	applySnapshot({ overlay });
+	state.overlay = overlay;
+	if (overlay.canvas) state.canvas = overlay.canvas;
+	if (Array.isArray(overlay.variables)) state.variables = overlay.variables;
+	m.redraw();
 }
 
 function handleMessage(raw: MessageEvent, first: { open: boolean }): void {

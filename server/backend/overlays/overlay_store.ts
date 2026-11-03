@@ -353,19 +353,30 @@ export function createOverlays({
     const feedList = (owner: string): void => {
         feed(owner, "overlays.overlays", { overlays: overlaysFor(owner) });
     };
-    /** Push one overlay's full state to its editor and its runtime page. The
+    /** Push one overlay's state to its editor and its runtime page. The
      * editor feed is a per-owner topic serving every overlay at once, so the
      * frame carries `overlayId` (the runtime topic is already per-overlay, but
-     * keeps the same shape). */
+     * keeps the same shape). The overlay is SLIM: asset bytes are stripped —
+     * an overlay with multi-MB base64 assets made every small edit (a
+     * visibility toggle) take seconds to reach the runtime page. The bytes
+     * travel only in the runtime snapshot and the `overlays.assets` frames. */
     const feedOverlay = (store: Store): void => {
+        const overlay: Overlay = { ...store.overlay, assets: [] };
         feed(store.owner, "overlays.overlay", {
             overlayId: store.id,
-            overlay: store.overlay,
+            overlay,
         });
         runtime(store.id, "overlays.overlay", {
             overlayId: store.id,
-            overlay: store.overlay,
+            overlay,
         });
+    };
+    /** After an asset upload/delete: the full asset list (bytes included)
+     * for both feeds — the slim `overlays.overlay` frame can't carry them. */
+    const feedAssets = (store: Store): void => {
+        const assets = store.overlay.assets;
+        feed(store.owner, "overlays.assets", { assets });
+        runtime(store.id, "overlays.assets", { assets });
     };
 
     // ── REST API ─────────────────────────────────────────────────────────
@@ -766,6 +777,7 @@ export function createOverlays({
                     }
                     commit(store);
                     feedOverlay(store);
+                    feedAssets(store);
                     return Response.json(
                         { ok: true, asset },
                         { status: 201 },
@@ -788,6 +800,7 @@ export function createOverlays({
                     revalidate(store.overlay);
                     commit(store);
                     feedOverlay(store);
+                    feedAssets(store);
                     return Response.json({ ok: true });
                 }
                 return notAllowed();

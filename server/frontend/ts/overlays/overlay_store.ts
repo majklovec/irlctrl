@@ -635,8 +635,18 @@ serverLive.rpc.on("overlays.overlay", (data) => {
     syncListFromOverlay(overlayId, o);
     if (overlayId === state.selectedOverlayId && state.overlay) {
         if (overlayIsStale(state.overlay, o)) return;
+        // live frames are slim (no asset bytes) — keep the local list, which
+        // the `overlays.assets` frames (and initial load) keep in sync
+        o.assets = state.overlay.assets;
         state.overlay = o;
     }
+    m.redraw();
+});
+
+serverLive.rpc.on("overlays.assets", (data) => {
+    const assets = (data as { assets?: Asset[] })?.assets;
+    if (!assets || !state.overlay) return;
+    state.overlay.assets = assets;
     m.redraw();
 });
 

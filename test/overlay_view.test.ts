@@ -266,4 +266,81 @@ describe("overlay runtime auto-reload (headless DOM)", () => {
         await Bun.sleep(40);
         expect(reloadCalls).toBe(0);
     });
+
+    test("a slim overlay frame hides the element without wiping its assets", async () => {
+        await loadPage();
+        const imageOverlay = (visible: boolean, rev: number) => ({
+            schemaVersion: 1,
+            name: "t",
+            token: "tok",
+            rev,
+            canvas: { width: 1920, height: 1080 },
+            variables: [],
+            // only the snapshot carries the bytes; live frames are slim
+            assets:
+                rev === 1
+                    ? [
+                          {
+                              id: "a1",
+                              hash: "h1",
+                              mime: "image/png",
+                              filename: "x.png",
+                              dataBase64: "QUJD",
+                          },
+                      ]
+                    : [],
+            elements: [
+                {
+                    id: "el-img",
+                    name: "img",
+                    type: "image",
+                    transform: {
+                        x: 0,
+                        y: 0,
+                        width: 100,
+                        height: 100,
+                        rotation: 0,
+                        opacity: 1,
+                    },
+                    visible,
+                    locked: false,
+                    parentId: null,
+                    bindings: {},
+                    props: { assetId: "a1" },
+                },
+            ],
+        });
+        frame("overlays.snapshot", {
+            overlay: imageOverlay(true, 1),
+            version: APP_VERSION,
+        });
+        await Bun.sleep(20);
+        let img = document.querySelector(
+            "#app img.overlay-image",
+        ) as HTMLImageElement | null;
+        expect(img?.getAttribute("src")).toContain("data:image/png;base64,QUJD");
+
+        // the slim hide frame: `assets: []` must not empty the page's map
+        frame("overlays.overlay", {
+            overlayId: "scene-1",
+            overlay: imageOverlay(false, 2),
+        });
+        await Bun.sleep(20);
+        const el = document.querySelector(
+            "#app .overlay-element[data-element='el-img']",
+        );
+        expect(el?.getAttribute("style")).toContain("visibility: hidden");
+
+        // re-shown, the image renders from the kept bytes (not the
+        // missing-asset placeholder)
+        frame("overlays.overlay", {
+            overlayId: "scene-1",
+            overlay: imageOverlay(true, 3),
+        });
+        await Bun.sleep(20);
+        img = document.querySelector(
+            "#app img.overlay-image",
+        ) as HTMLImageElement | null;
+        expect(img?.getAttribute("src")).toContain("data:image/png;base64,QUJD");
+    });
 });
