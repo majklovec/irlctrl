@@ -16,15 +16,19 @@
  * happens in render_doc.ts, the only place the config meets markup.
  */
 
-import type { TemplateMeta, TemplateParam } from "./templates/template_meta";
+import {
+	type TemplateMeta,
+	type TemplateParam,
+	isTextSlot,
+} from "./templates/template_meta";
 
 /** One normalized `uses` member → its CSS custom property. A var is emitted
- * only when the template uses it (keeps unrelated edits out of the doc). */
+ * only when the template uses it (keeps unrelated edits out of the doc).
+ * Text slots are not here — they are `data-bind` names (isTextSlot), not
+ * fixed `PARAMS`, so they have no writer. */
 type VarWriter = (props: Record<string, unknown>) => string;
 
 const VAR_WRITERS: Readonly<Record<TemplateParam, VarWriter | null>> = {
-	title: null, // text, not a var
-	subtitle: null, // text, not a var
 	accentColor: (p) => hex(p.accentColor),
 	bgColor: (p) => {
 		// hex has no alpha channel — bgAlpha carries it as a percent
@@ -56,10 +60,10 @@ const VAR_NAMES: Readonly<Record<string, string>> = {
 	padding: "--padding",
 };
 
-/** Props that render as bound TEXT (baked into the markup's
- * `[data-bind]` slots; tokens already interpolated by the caller —
- * see TemplateDocInput.text). */
-const TEXT_PARAMS: readonly TemplateParam[] = ["title", "subtitle"];
+// Text params are not a frozen list: every `data-bind="<slot>"` the template
+// declares is a text param (derived in template_doc.ts::deriveUses). doc.ts
+// only knows a slot is text when the template's `uses` carries it as a
+// non-fixed entry (isTextSlot) — there is no `data-bind`/text writer table.
 
 /** Resolve ONE props record through every named style writer (no
  * uses-gate, no text/asset/countdown). The schema's legacy migration uses
@@ -91,9 +95,11 @@ export interface TemplateDocInput {
 	meta: TemplateMeta;
 	/** Normalized element props (the schema's normalizeProps output). */
 	props: Record<string, unknown>;
-	/** title/subtitle with `{token}` interpolation already applied
+	/** The text slots with `{token}` interpolation already applied
 	 * (templateText, shared with the alert element); doc.ts never resolves
-	 * tokens itself, so it stays free of ElementContext/browser types. */
+	 * tokens itself, so it stays free of ElementContext/browser types. Keys
+	 * are the template's `data-bind` slot names (title/subtitle are the usual
+	 * ones, plus any template-specific slots like `label`). */
 	text?: Record<string, string>;
 	/** Resolved asset-library URL(s), absolute (the page's ctx.assetUrls). */
 	assets?: { logo?: string };
@@ -124,8 +130,8 @@ export function buildTemplateConfig(input: TemplateDocInput): TemplateConfig {
 	}
 
 	const outText: Record<string, string> = {};
-	for (const key of TEXT_PARAMS)
-		if (uses.has(key) && typeof text?.[key] === "string")
+	for (const key of meta.uses)
+		if (isTextSlot(key) && typeof text?.[key] === "string")
 			outText[key] = text[key];
 
 	const outAssets: Record<string, string> = {};

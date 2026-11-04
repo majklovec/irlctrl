@@ -3,20 +3,22 @@
  * document into its parts.
  *
  * A template is ONE browser-viewable HTML file
- * (`public/overlay_templates/<id>/index.html`) carrying:
+ * (`public/overlay_templates/<id>.html`) carrying:
  *   - `<meta name="overlay-template:name">`  — the i18n name key,
  *   - one `<style>` block — the template's CSS,
- *   - one `<section>` — the document body, whose hooks (`data-bind`,
+ *   - one `<section>` — the document body, whose hooks (`data-bind="<slot>"`,
  *     `data-asset="logo"`, `data-countdown`) + the `<style>`'s `:root`
  *     vars DECLARE which params the template consumes (`uses` is derived
- *     from them, not hand-listed — see deriveUses).
+ *     from them, not hand-listed — see deriveUses). Every `data-bind` slot
+ *     name is a text param: `title`/`subtitle` are the conventional ones,
+ *     but a template may bind any name (ticker binds `label`).
  *
  * No `<script>` is allowed: the doc is inert markup + style, rendered
  * server-side (render_doc.ts). Pure — no DOM, no Bun, testable anywhere.
  */
 
 import { parseRootVars } from "./root_vars";
-import { type TemplateMeta, type TemplateParam } from "./template_meta";
+import type { TemplateMeta } from "./template_meta";
 
 /** A parsed template document. */
 export interface ParsedTemplateDoc {
@@ -83,19 +85,27 @@ export function parseTemplateDoc(
  * Derive the params a template consumes from the document ITSELF — no
  * hand-maintained list, so a hook added to the markup is picked up
  * automatically:
- *   - `data-bind="title"` / `data-bind="subtitle"` in the body → the bound
- *     text params,
+ *   - every `data-bind="<slot>"` in the body → a text param named `<slot>`
+ *     (in document order; `title`/`subtitle` are just the usual ones),
  *   - a non-empty `:root` block → `vars` (the inspector's knobs),
  *   - `data-asset="logo"` in the body → `logoAssetId`,
  *   - a `data-countdown` hook in the body → `mode` + `targetIso`.
  *
- * Emission order is fixed (title, subtitle, vars, logoAssetId, mode,
- * targetIso) and is the edit-form field order + the doc-cache key order.
+ * Emission order is text slots (document order), vars, logoAssetId, mode,
+ * targetIso — it is the edit-form field order + the doc-cache key order.
  */
-function deriveUses(css: string, body: string): TemplateParam[] {
-	const uses: TemplateParam[] = [];
-	if (/\bdata-bind="title"/.test(body)) uses.push("title");
-	if (/\bdata-bind="subtitle"/.test(body)) uses.push("subtitle");
+function deriveUses(css: string, body: string): string[] {
+	const uses: string[] = [];
+	// every `data-bind="<name>"` slot is a text param, first-seen order,
+	// deduplicated (a slot used twice binds once)
+	const seen = new Set<string>();
+	for (const m of body.matchAll(/\bdata-bind="([^"]+)"/g)) {
+		const slot = m[1];
+		if (!seen.has(slot)) {
+			seen.add(slot);
+			uses.push(slot);
+		}
+	}
 	if (parseRootVars(css).length > 0) uses.push("vars");
 	if (/\bdata-asset="logo"/.test(body)) uses.push("logoAssetId");
 	if (/\bdata-countdown\b/.test(body)) {

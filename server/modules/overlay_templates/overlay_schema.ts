@@ -20,9 +20,9 @@ import type { OverlayElementSchema } from "../../../shared/contracts/overlay_ele
 import { namedStyleVars } from "./doc";
 
 export interface HtmlTemplateProps {
-	/** Folder id under `public/overlay_templates` (one self-contained
-	 * index.html per template; the server auto-discovers the ids from the
-	 * folders). */
+	/** File id under `public/overlay_templates` (one self-contained
+	 * `<id>.html` per template; the server auto-discovers the ids from the
+	 * files). */
 	templateId: string;
 	/** `{token}`-templated, rendered via textContent (never innerHTML). */
 	title: string;
@@ -125,12 +125,12 @@ export const htmlTemplateSchema: OverlayElementSchema = {
 	},
 };
 
-/** The template id is a folder slug under `public/overlay_templates`
+/** The template id is a file slug under `public/overlay_templates`
  * (the server's runtime `_catalog.json` route enumerates the live ones by
- * listing the folders). Only the shape is validated here — a missing folder
- * 404s at render time and the element's validator flags it — because modules
- * may not import `public/`, so a frozen id vocabulary would have to be kept
- * in sync by hand. */
+ * listing the `*.html` files). Only the shape is validated here — a missing
+ * file 404s at render time and the element's validator flags it — because
+ * modules may not import `public/`, so a frozen id vocabulary would have to
+ * be kept in sync by hand. */
 const TEMPLATE_ID_RE = /^[a-z0-9][a-z0-9_]*$/;
 function readTemplateId(raw: unknown, fallback: string): string {
 	if (

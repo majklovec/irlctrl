@@ -30,7 +30,7 @@ import type { TemplateMeta } from "../server/modules/overlay_templates/templates
 import { parseElementInput } from "../shared/overlay";
 
 // A template is one self-contained HTML document on disk
-// (`public/overlay_templates/<id>/index.html`), served at runtime by the
+// (`public/overlay_templates/<id>.html`), served at runtime by the
 // control server's `/overlay_templates/*` route. These tests read the same
 // bytes straight from disk, keyed by template id.
 const PUBLIC_TEMPLATES = new URL(
@@ -39,7 +39,7 @@ const PUBLIC_TEMPLATES = new URL(
 );
 function readTemplateRaw(templateId: string): string {
 	return readFileSync(
-		fileURLToPath(PUBLIC_TEMPLATES + templateId + "/index.html"),
+		fileURLToPath(PUBLIC_TEMPLATES + templateId + ".html"),
 		"utf8",
 	);
 }
@@ -47,15 +47,15 @@ function readTemplateDoc(templateId: string): ParsedTemplateDoc {
 	return parseTemplateDoc(templateId, readTemplateRaw(templateId));
 }
 // The id vocabulary is what the server's `_catalog.json` route discovers:
-// one folder per template under `public/overlay_templates` (nothing is
+// one `*.html` file per template under `public/overlay_templates` (nothing is
 // maintained by hand). The schema validates ids as slugs, not against a
 // frozen list.
 function discoverTemplateIds(): string[] {
 	return readdirSync(fileURLToPath(PUBLIC_TEMPLATES), {
 		withFileTypes: true,
 	})
-		.filter((e) => e.isDirectory())
-		.map((e) => e.name)
+		.filter((e) => e.isFile() && e.name.endsWith(".html"))
+		.map((e) => e.name.slice(0, -".html".length))
 		.sort();
 }
 const TEMPLATE_IDS: string[] = discoverTemplateIds();
@@ -64,7 +64,7 @@ const TEMPLATE_FILES: Readonly<Record<string, ParsedTemplateDoc>> =
 // The static route's URL builder must agree with the on-disk layout the test
 // reads from (both derive from the same `<id>` slug).
 expect(templateDocUrl("lower_third_bar")).toBe(
-	"/overlay_templates/lower_third_bar/index.html",
+	"/overlay_templates/lower_third_bar.html",
 );
 
 const TARGET_ID = "lower_third_bar";
@@ -82,8 +82,8 @@ const doc = (props: Record<string, unknown>, text?: Record<string, string>) =>
 	});
 
 describe("overlay_templates: catalog", () => {
-	test("the auto-discovered catalog is the on-disk folders", () => {
-		// TEMPLATE_IDS is the discovery itself (folders under
+	test("the auto-discovered catalog is the on-disk template files", () => {
+		// TEMPLATE_IDS is the discovery itself (`*.html` files under
 		// public/overlay_templates, exactly what the server's
 		// _catalog.json route computes) — it must name every advertised
 		// template.

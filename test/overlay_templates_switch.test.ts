@@ -47,14 +47,14 @@ const publicTemplatesDir = appPath("public/overlay_templates");
 const servedTemplateFiles: Record<string, string> = {};
 for (const id of ["lower_third_bar", "header", "brb"]) {
   servedTemplateFiles[id] = readFileSync(
-    `${publicTemplatesDir}/${id}/index.html`,
+    `${publicTemplatesDir}/${id}.html`,
     "utf-8",
   );
 }
 const originalFetch = globalThis.fetch;
 globalThis.fetch = ((input: RequestInfo | URL) => {
   const url = typeof input === "string" ? input : input.toString();
-  const m = /overlay_templates\/([a-z0-9_]+)\/index\.html/.exec(url);
+  const m = /overlay_templates\/([a-z0-9_]+)\.html/.exec(url);
   const body = m ? servedTemplateFiles[m[1]] : null;
   return Promise.resolve(
     new Response(body, {

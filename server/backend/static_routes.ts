@@ -3,8 +3,8 @@
  * logo, favicon), `/overlay_templates/*` (public/overlay_templates: the
  * OBS html_template documents, fetched at runtime by the runtime page) plus
  * `/overlay_templates/_catalog.json` (the auto-discovered id list — any
- * subfolder holding an `index.html` is a template, no index file is
- * maintained), and `/i18n/*` from the in-memory merged catalogs (core +
+ * `<id>.html` file is a template, no index file is maintained), and
+ * `/i18n/*` from the in-memory merged catalogs (core +
  * every module's; see shared/i18n.ts).
  *
  * @elysia/static reads files from a directory on disk; a compiled binary is a
@@ -35,23 +35,26 @@ const STATIC_OPTIONS = {
 };
 
 /**
- * The runtime template catalog: every subfolder of
- * `public/overlay_templates/` that holds an `index.html` is a template.
- * Discovered on each request so a new folder is served with no other change.
+ * The runtime template catalog: every `*.html` file in
+ * `public/overlay_templates/` is a template (its id is the filename minus the
+ * `.html`). Discovered on each request so a new file is served with no other
+ * change.
  */
 async function templateCatalog() {
 	const dir = appPath(OVERLAY_TEMPLATES_DIR);
-	const entries = (await readdir(dir, { withFileTypes: true })).filter((e) =>
-		e.isDirectory(),
+	const entries = (await readdir(dir, { withFileTypes: true })).filter(
+		(e) => e.isFile() && e.name.endsWith(".html"),
 	);
 	const withDoc = (
 		await Promise.all(
 			entries.map(async (e) =>
-				(await stat(join(dir, e.name, "index.html"))).isFile() ? e.name : null,
+				(await stat(join(dir, e.name))).isFile() ? e.name : null,
 			),
 		)
 	).filter((id): id is string => id !== null);
-	return JSON.stringify(withDoc.sort());
+	return JSON.stringify(
+		withDoc.map((name) => name.slice(0, -".html".length)).sort(),
+	);
 }
 
 export async function staticRoutes() {

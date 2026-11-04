@@ -5,11 +5,11 @@ template into the overlay (a `m.trust()` node, no iframe). The browser half
 renders the element (`element.tsx`), the environment-free half builds the
 document (`templates/render_doc.ts`) and validates the scene props
 (`overlay_schema.ts`). Each template is ONE self-contained HTML document —
-`public/overlay_templates/<id>/index.html` (metadata meta tags +
+`public/overlay_templates/<id>.html` (metadata meta tags +
 `<style>` + `<section>` body) — served statically under
 `/overlay_templates/*` and read **at runtime** (not precompiled). The
 runtime catalog fetches `/overlay_templates/_catalog.json`, which the
-control server computes by listing the template folders — there is no
+control server computes by listing the `*.html` files — there is no
 index file to maintain.
 
 ## 1. How a document is built
@@ -41,8 +41,9 @@ into a handler and never emitted as a `<script>`.**
 
 ## 2. The element and its cache
 
-`element.tsx` resolves `{token}` display strings in `title`/`subtitle`
-via the shared `templateText` (`shared/ui/overlay/template_tokens.ts`),
+`element.tsx` resolves the `{token}` display strings of the template's text
+slots (`title`/`subtitle` plus any free-form `data-bind` name) via the shared
+`templateText` (`shared/ui/overlay/template_tokens.ts`),
 fetches the bytes once per template id (a module-scope memo over
 `loadTemplateDoc`), and caches the rendered doc wrapper in a module LRU
 (capped) keyed by `(templateId, resolved config)`. `draw` returns a childless
@@ -58,16 +59,26 @@ DOM only entity-escaped through the baked wrapper — it is never concatenated
 raw into a handler. The host carries no `transform`/`opacity` (CEF promotes
 transformed ancestors to opaque layers in OBS) and `pointer-events: none`.
 
-## 3. The prop vocabulary (frozen)
+## 3. The prop vocabulary
 
-`HtmlTemplateProps` (`overlay_schema.ts`) + `TemplateParam`
-(`templates/template_meta.ts`). No per-template free-form params: the binding
-system is one level deep (`props.<field>`), so a new knob = schema
+Two kinds of param.
+
+**Style / asset / countdown params** are a frozen vocabulary — `TemplateParam`
+(`templates/template_meta.ts`), the named fields of `HtmlTemplateProps`
+(`overlay_schema.ts`): `vars`, `accentColor`, `bgColor`, `bgAlpha`,
+`textColor`, `fontFamily`, `fontSize`, `radius`, `padding`, `logoAssetId`,
+`mode` (`static` | `countdown`), `targetIso`. A new one of **these** = schema
 field + `normalizeProps` + `VAR_WRITERS`/`VAR_NAMES` in `doc.ts`
 + `TemplateParam` + an `uses` entry in the template that consumes it.
-Current vocabulary: `title`, `subtitle`, `vars`, `accentColor`,
-`bgColor`, `bgAlpha`, `textColor`, `fontFamily`, `fontSize`, `radius`,
-`padding`, `logoAssetId`, `mode` (`static` | `countdown`), `targetIso`.
+
+**Text slots are not frozen.** Every `data-bind="<slot>"` the template's body
+declares is a text param named `<slot>` — `title`/`subtitle` are just the
+conventional ones, a template binds whatever it needs (the ticker binds
+`label`). No schema change for a new slot: it rides `props.<slot>` (the
+binding system handles `props.<anyField>` generically), carries a
+`{token}`-templated string, and resolves through `templateText`.
+`isTextSlot` (`template_meta.ts`) is what tells a `data-bind` slot apart from
+a frozen param.
 
 **`vars` is the style-knob channel.** A template declares its own knobs in
 the `:root` block of its `<style>` (each `--name: value` is a knob with a
@@ -95,7 +106,7 @@ the fold.
 ## 4. Authoring a template
 
 A template is ONE self-contained HTML document
-(`public/overlay_templates/<id>/index.html`, snake_case folder id), served
+(`public/overlay_templates/<id>.html`, snake_case file id), served
 + read at runtime — editable on disk with no rebuild. Structure:
 
 ```html
@@ -118,21 +129,23 @@ A template is ONE self-contained HTML document
 </html>
 ```
 
-- The **id** is the folder name — dropping the folder is the whole act of
-  adding a template (the server's `_catalog.json` route discovers it, and
-  the schema validates ids as slugs, not against a frozen list). The test
-  `the auto-discovered catalog is the on-disk folders` pins the set.
+- The **id** is the filename (minus `.html`) — dropping the file is the
+  whole act of adding a template (the server's `_catalog.json` route
+  discovers it, and the schema validates ids as slugs, not against a
+  frozen list). The test
+  `the auto-discovered catalog is the on-disk template files` pins the set.
 - **`overlay-template:name`** — the i18n key of the human name
   (`overlay.tpl.<id>`; add it to all module languages).
 - **`uses`** — not written in the document: the parser derives it from
-  what the document contains, in fixed order — `title`/`subtitle` when a
-  `data-bind` slot references them, `vars` when `:root` declares any
-  variable, `logoAssetId` for a `data-asset="logo"` element,
+  what the document contains, in fixed order — every `data-bind="<slot>"`
+  name (a text param, in document order), then `vars` when `:root` declares
+  any variable, `logoAssetId` for a `data-asset="logo"` element,
   `mode, targetIso` for a `data-countdown` element. `buildTemplateConfig`
   only reads a prop when it is derived here, and the doc cache is keyed
   on exactly the derived subset — an edit to a prop the template does not
-  use cannot change the document. Every derived value is one of the frozen
-  vocabulary (`templates/template_meta.ts`).
+  use cannot change the document. The text-slot entries are free-form names
+  (the `data-bind` slots); the rest are the frozen vocabulary
+  (`templates/template_meta.ts`).
 - The **`<style>`** holds the template's styles. `:root` declares the
   template's KNOBS: every `--name: value` entry there becomes an editable
   inspector field (label = the name without `--`, separators as spaces,
@@ -153,7 +166,7 @@ A template is ONE self-contained HTML document
   template picker.
 
 The document is fetched by `catalog.ts` (`loadTemplateDoc`) at runtime from
-`/overlay_templates/<id>/index.html` and parsed by
+`/overlay_templates/<id>.html` and parsed by
 `templates/template_doc.ts`; nothing is imported as build-time text. Add the
 `overlay.tpl.<id>` i18n key to all module languages.
 
@@ -162,7 +175,7 @@ The document is fetched by `catalog.ts` (`loadTemplateDoc`) at runtime from
 | Hook | Where | Meaning |
 |---|---|---|
 | `overlay-template:name` | `<head>` meta tag | the template's i18n name (the only meta tag written by hand) |
-| `data-bind="title"` / `data-bind="subtitle"` | elements in the `<section>` body | text baked in entity-escaped (tokens pre-resolved) |
+| `data-bind="<slot>"` | elements in the `<section>` body | a text param named `<slot>`, baked in entity-escaped (tokens pre-resolved); `title`/`subtitle` are just the conventional slots, any name works |
 | `data-asset="logo"` | an `<img>` | `src` set from `logoAssetId` → the page's asset URL |
 | `data-countdown` | one element | H:MM:SS ticking toward `targetIso` (`mode: "countdown"`) |
 | CSS vars | the `<style>`'s `:root` | every `--name: value` knob of the template (`--accent`, `--bg`, …), overridden per element through `props.vars` |

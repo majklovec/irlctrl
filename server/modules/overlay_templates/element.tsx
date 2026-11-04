@@ -59,7 +59,7 @@ import {
 	rootVarLabel,
 } from "./templates/root_vars";
 import type { ParsedTemplateDoc } from "./templates/template_doc";
-import type { TemplateMeta } from "./templates/template_meta";
+import { isTextSlot, type TemplateMeta } from "./templates/template_meta";
 
 // ── in-page style injection ──────────────────────────────────────────────
 // One <style> per template id, scoped to that template's wrapper class. It
@@ -265,6 +265,30 @@ function cachedDoc(input: DocInput): string {
 const paintState = new WeakMap<HTMLElement, string>();
 
 /**
+ * Resolve the template's text slots (its data-bind names) to concrete values:
+ * each slot's prop value, with `{token}` tokens resolved against the
+ * variables + an empty trigger payload. Only slots the template declares
+ * (per meta.uses) are emitted, so the config carries exactly this template's
+ * slots (title/subtitle plus any free-form slot like `label`).
+ */
+function resolveTextSlots(
+	meta: TemplateMeta,
+	props: HtmlTemplateProps,
+	ctx: ElementContext,
+): Record<string, string> {
+	const text: Record<string, string> = {};
+	for (const slot of meta.uses) {
+		if (!isTextSlot(slot)) continue;
+		text[slot] = templateText(
+			String((props as unknown as Record<string, unknown>)[slot] ?? ""),
+			ctx,
+			{},
+		);
+	}
+	return text;
+}
+
+/**
  * Populate a host element with its template doc, async. Fetches the template
  * bytes (memoized per template id), scopes + bakes the doc, injects the
  * one-per-template <style>, and writes the markup into the host. A redraw
@@ -274,20 +298,23 @@ const paintState = new WeakMap<HTMLElement, string>();
 async function paintHost(
 	host: HTMLElement,
 	p: HtmlTemplateProps,
-	title: string,
-	subtitle: string,
-	logo: string | undefined,
-	targetIso: string | undefined,
+	ctx: ElementContext,
 ): Promise<void> {
 	try {
 		const files = await loadFiles(p.templateId);
 		// The metadata (uses) is part of the fetched document, so the
 		// config is built HERE, after the fetch — uses-gating needs the
-		// parsed meta.
+		// parsed meta. Text slots (the template's data-bind names) are
+		// resolved from the element's props + {token} tokens, so the config
+		// carries exactly the slots THIS template binds (title/subtitle plus
+		// any free-form slot like `label`).
+		const text = resolveTextSlots(files.meta, p, ctx);
+		const logo = p.logoAssetId ? ctx.assetUrls.get(p.logoAssetId) : undefined;
+		const targetIso = typeof p.targetIso === "string" ? p.targetIso : undefined;
 		const config = buildTemplateConfig({
 			meta: files.meta,
 			props: p as unknown as Record<string, unknown>,
-			text: { title, subtitle },
+			text,
 			assets: { logo },
 		});
 		// Identity of everything the in-page doc depends on (the fetched
@@ -328,13 +355,9 @@ async function paintHost(
 function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	// `element` is already resolved by the renderer — props carry binding
 	// values. The template's metadata (uses) rides the fetched document, so
-	// the config is built in `paintHost` (post-fetch) — draw only resolves
-	// the display-side values and hands them over.
+	// the config is built in `paintHost` (post-fetch); draw just hands the
+	// props + context over and the text slots get resolved there.
 	const p = element.props as unknown as HtmlTemplateProps;
-	const title = templateText(p.title ?? "", ctx, {});
-	const subtitle = templateText(p.subtitle ?? "", ctx, {});
-	const logo = p.logoAssetId ? ctx.assetUrls.get(p.logoAssetId) : undefined;
-	const targetIso = typeof p.targetIso === "string" ? p.targetIso : undefined;
 
 	return m(
 		"div.ov-tpl-host",
@@ -354,26 +377,12 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 			// one unstyled until a page refresh.
 			key: p.templateId,
 			oncreate: (vnode: VnodeDOM) => {
-				void paintHost(
-					vnode.dom as HTMLElement,
-					p,
-					title,
-					subtitle,
-					logo,
-					targetIso,
-				);
+				void paintHost(vnode.dom as HTMLElement, p, ctx);
 			},
 			onupdate: (vnode: VnodeDOM) => {
 				// A config edit re-runs the paint (the key is recomputed
 				// post-fetch; an unchanged key is a no-op).
-				void paintHost(
-					vnode.dom as HTMLElement,
-					p,
-					title,
-					subtitle,
-					logo,
-					targetIso,
-				);
+				void paintHost(vnode.dom as HTMLElement, p, ctx);
 			},
 			onremove: (vnode: VnodeDOM) => {
 				countdowns.delete(vnode.dom as HTMLElement);
@@ -400,34 +409,37 @@ function propControl(
 		mutate((el) => {
 			el.props[propKey] = v;
 		});
-	switch (propKey) {
-		case "title":
-			return (
-				<input
-					type="text"
-					value={p.title ?? ""}
-					oninput={(ev: Event) => set((ev.target as HTMLInputElement).value)}
-				/>
-			);
-		case "subtitle":
-			return (
-				<input
-					type="text"
-					value={p.subtitle ?? ""}
-					oninput={(ev: Event) => set((ev.target as HTMLInputElement).value)}
-				/>
-			);
-		// the style knobs render via varsFields (handled in editForm's
-		// uses.map) — a named prop has no control of its own
-		default:
-			return <></>;
+	// Text slots (the template's data-bind names — title/subtitle plus any
+	// free-form slot like `label`) are plain text fields; the value carries
+	// the {token} template. Style knobs render via varsFields instead.
+	if (isTextSlot(propKey)) {
+		return (
+			<input
+				type="text"
+				value={String(
+					(p as unknown as Record<string, unknown>)[propKey] ?? "",
+				)}
+				oninput={(ev: Event) => set((ev.target as HTMLInputElement).value)}
+			/>
+		);
 	}
+	return <></>;
 }
 
 const PROP_LABELS: Record<string, string> = {
 	title: "overlay.html_template.title",
 	subtitle: "overlay.html_template.subtitle",
 };
+
+/** Human label for a free-form text slot: cap the words (`label` → `Label`,
+ * `station_name` → `Station Name`). title/subtitle keep their i18n keys via
+ * PROP_LABELS; every other data-bind slot is labelled from its name so no
+ * i18n entry is needed for a template's bespoke slot. */
+function textSlotLabel(slot: string): string {
+	return slot
+		.replace(/[_-]+/g, " ")
+		.replace(/\b[a-z]/g, (c) => c.toUpperCase());
+}
 
 /** One inspector field for a single `:root` custom property. Control shape
  * follows the fallback's: 6-digit hex → color picker, a colour WITH alpha
@@ -612,10 +624,12 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 					/>,
 					sp,
 				);
+			// Text slots: title/subtitle keep their i18n labels, any other
+			// data-bind slot is labelled from its name (no i18n entry needed).
 			return bindField(
 				e,
 				`props.${propKey}`,
-				t(PROP_LABELS[propKey] ?? `overlay.html_template.${propKey}`),
+				PROP_LABELS[propKey] ? t(PROP_LABELS[propKey]) : textSlotLabel(propKey),
 				propControl(propKey, p, mutate),
 				sp,
 			);

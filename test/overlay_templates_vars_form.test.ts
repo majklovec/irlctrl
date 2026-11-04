@@ -76,12 +76,12 @@ const PUBLIC_TEMPLATES = new URL(
 const fetchBytes = (url: string): string => {
 	const path = new URL(url, "http://x/").pathname;
 	// the server's auto-discovery route, not a static file: one entry per
-	// on-disk template folder
+	// on-disk `*.html` template file (id = filename minus the extension)
 	if (path === "/overlay_templates/_catalog.json")
 		return JSON.stringify(
 			readdirSync(fileURLToPath(PUBLIC_TEMPLATES), { withFileTypes: true })
-				.filter((e) => e.isDirectory())
-				.map((e) => e.name)
+				.filter((e) => e.isFile() && e.name.endsWith(".html"))
+				.map((e) => e.name.slice(0, -".html".length))
 				.sort(),
 		);
 	return readFileSync(

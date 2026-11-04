@@ -3,14 +3,14 @@
  * precompiled.
  *
  * Each template is ONE self-contained HTML document
- * (`public/overlay_templates/<id>/index.html`): metadata meta tags
+ * (`public/overlay_templates/<id>.html`): metadata meta tags
  * (`overlay-template:name`), its `<style>`, and
  * its hooks + `:root` (which the parser derives the `uses` params from), and
  * `<section>` body. The documents are served by the control server's
  * `/overlay_templates/*` static route (see server/backend/static_routes.ts),
  * whose `_catalog.json` route auto-discovers the ids by enumerating the
- * folders — there is no index file to maintain; dropping a new
- * `<id>/index.html` folder is the whole act of adding a template. The
+ * `*.html` files — there is no index file to maintain; dropping a new
+ * `<id>.html` file is the whole act of adding a template. The
  * runtime page fetches a template's file at load time and parses it
  * (template_doc.ts) — no bundler text imports — so editing a template on
  * disk takes effect on the next page load, no rebuild.
@@ -37,7 +37,7 @@ const DEFAULT_FETCH: FetchText = (url) => fetch(url).then((r) => r.text());
 
 /** The URL of one template's document, relative to the control server. */
 export function templateDocUrl(templateId: string): string {
-	return `/overlay_templates/${templateId}/index.html`;
+	return `/overlay_templates/${templateId}.html`;
 }
 
 /**
