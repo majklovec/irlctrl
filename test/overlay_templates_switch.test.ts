@@ -40,10 +40,10 @@ let getHead: () => HTMLHeadElement;
 let getRoot: () => HTMLElement;
 
 // Each template is ONE self-contained HTML document in the statically-served
-// "public/overlay_templates/" directory. Stub globalThis.fetch to serve those
+// "assets/overlay_templates/" directory. Stub globalThis.fetch to serve those
 // bytes so the *real* draw -> paintHost -> loadFiles path works in happy-dom
 // with no live server.
-const publicTemplatesDir = appPath("public/overlay_templates");
+const publicTemplatesDir = appPath("assets/overlay_templates");
 const servedTemplateFiles: Record<string, string> = {};
 for (const id of ["lower_third_bar", "header", "brb"]) {
   servedTemplateFiles[id] = readFileSync(

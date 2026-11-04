@@ -20,7 +20,7 @@ import type { OverlayElementSchema } from "../../../../core/overlay_element";
 import { namedStyleVars } from "./doc";
 
 export interface HtmlTemplateProps {
-	/** File id under `public/overlay_templates` (one self-contained
+	/** File id under `assets/overlay_templates` (one self-contained
 	 * `<id>.html` per template; the server auto-discovers the ids from the
 	 * files). */
 	templateId: string;
@@ -125,7 +125,7 @@ export const htmlTemplateSchema: OverlayElementSchema = {
 	},
 };
 
-/** The template id is a file slug under `public/overlay_templates`
+/** The template id is a file slug under `assets/overlay_templates`
  * (the server's runtime `_catalog.json` route enumerates the live ones by
  * listing the `*.html` files). Only the shape is validated here — a missing
  * file 404s at render time and the element's validator flags it — because

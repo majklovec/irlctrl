@@ -19,7 +19,7 @@ and the element's template picker is built from that list.
 ## File layout
 
 ```
-public/overlay_templates/
+assets/overlay_templates/
 ├── brb.html
 ├── countdown.html
 ├── header.html
@@ -214,7 +214,7 @@ stylesheet so it can only affect this element's wrapper:
 
 ## How to add a template
 
-1. **Create the file.** Write `public/overlay_templates/<id>.html` following the
+1. **Create the file.** Write `assets/overlay_templates/<id>.html` following the
    anatomy above. Keep it self-contained (inline everything; no external assets).
 
 2. **Add the display-name i18n key.** Add

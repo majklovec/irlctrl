@@ -1,9 +1,10 @@
 /*
  * Static assets for the control server: `/img/*` (shared/assets/img: brand
- * logo, favicon), `/overlay_templates/*` (public/overlay_templates: the
- * OBS html_template documents, fetched at runtime by the runtime page) plus
- * `/overlay_templates/_catalog.json` (the auto-discovered id list — any
- * `<id>.html` file is a template, no index file is maintained), and
+ * logo, favicon), `/overlay_templates/*` (assets/overlay_templates: the
+ * OBS html_template documents, fetched at runtime by the runtime page; the
+ * templates live in the storage dir so the templates page can edit them)
+ * plus `/overlay_templates/_catalog.json` (the auto-discovered id list —
+ * any `<id>.html` file is a template, no index file is maintained), and
  * `/i18n/*` from the in-memory merged catalogs (core +
  * every module's; see shared/i18n.ts).
  *
@@ -12,6 +13,7 @@
  * were never embedded).
  */
 
+import { existsSync, mkdirSync } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import staticPlugin from "@elysia/static";
@@ -22,7 +24,7 @@ import { ASSETS_DIR, appPath } from "../../shared/paths";
 import { isCompiledBinary } from "../../shared/util";
 
 /** Repo-relative directory of the OBS html_template documents. */
-const OVERLAY_TEMPLATES_DIR = "public/overlay_templates";
+const OVERLAY_TEMPLATES_DIR = "assets/overlay_templates";
 
 // These assets are tiny and path-stable, so revalidate on every request to
 // match the previous hand-rolled `no-cache` behavior.
@@ -36,15 +38,20 @@ const STATIC_OPTIONS = {
 
 /**
  * The runtime template catalog: every `*.html` file in
- * `public/overlay_templates/` is a template (its id is the filename minus the
+ * `assets/overlay_templates/` is a template (its id is the filename minus the
  * `.html`). Discovered on each request so a new file is served with no other
- * change.
+ * change; a missing directory (a fresh storage dir) is an empty catalog.
  */
 async function templateCatalog() {
 	const dir = appPath(OVERLAY_TEMPLATES_DIR);
-	const entries = (await readdir(dir, { withFileTypes: true })).filter(
-		(e) => e.isFile() && e.name.endsWith(".html"),
-	);
+	let entries;
+	try {
+		entries = (await readdir(dir, { withFileTypes: true })).filter(
+			(e) => e.isFile() && e.name.endsWith(".html"),
+		);
+	} catch {
+		return "[]";
+	}
 	const withDoc = (
 		await Promise.all(
 			entries.map(async (e) =>
@@ -73,12 +80,18 @@ export async function staticRoutes() {
 			...STATIC_OPTIONS,
 		}),
 	);
-	app.use(
-		await staticPlugin({
-			assets: appPath(OVERLAY_TEMPLATES_DIR),
-			prefix: "/overlay_templates",
-			...STATIC_OPTIONS,
-		}),
-	);
+	// The templates live in the storage dir (user-editable by the templates
+	// page); a fresh deployment has no directory yet — create it, and mount
+	// the static route only when it exists.
+	const templatesDir = appPath(OVERLAY_TEMPLATES_DIR);
+	mkdirSync(templatesDir, { recursive: true });
+	if (existsSync(templatesDir))
+		app.use(
+			await staticPlugin({
+				assets: templatesDir,
+				prefix: "/overlay_templates",
+				...STATIC_OPTIONS,
+			}),
+		);
 	return app;
 }

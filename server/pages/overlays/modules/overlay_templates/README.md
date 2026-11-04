@@ -5,7 +5,7 @@ template into the overlay (a `m.trust()` node, no iframe). The browser half
 renders the element (`element.tsx`), the environment-free half builds the
 document (`templates/render_doc.ts`) and validates the scene props
 (`overlay_schema.ts`). Each template is ONE self-contained HTML document —
-`public/overlay_templates/<id>.html` (metadata meta tags +
+`assets/overlay_templates/<id>.html` (metadata meta tags +
 `<style>` + `<section>` body) — served statically under
 `/overlay_templates/*` and read **at runtime** (not precompiled). The
 runtime catalog fetches `/overlay_templates/_catalog.json`, which the
@@ -106,7 +106,7 @@ the fold.
 ## 4. Authoring a template
 
 A template is ONE self-contained HTML document
-(`public/overlay_templates/<id>.html`, snake_case file id), served
+(`assets/overlay_templates/<id>.html`, snake_case file id), served
 + read at runtime — editable on disk with no rebuild. Structure:
 
 ```html

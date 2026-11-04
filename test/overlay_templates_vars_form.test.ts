@@ -70,7 +70,7 @@ afterAll(() => {
 
 // Serve the template bytes the way the control server's static route does.
 const PUBLIC_TEMPLATES = new URL(
-	"../public/overlay_templates/",
+	"../assets/overlay_templates/",
 	import.meta.url,
 );
 const fetchBytes = (url: string): string => {

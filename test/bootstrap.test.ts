@@ -49,9 +49,9 @@ beforeAll(() => {
 		"shared",
 		"scripts",
 		"i18n",
-		// the control server statically serves public/ (e.g. the
-		// overlay_templates documents); the mount crashes at boot without it.
-		"public",
+		// the control server statically serves the overlay_templates
+		// documents from the storage dir; the mount crashes at boot without it.
+		"assets",
 	])
 		cpSync(join(projectRoot, dir), join(tree, dir), { recursive: true });
 	for (const file of [

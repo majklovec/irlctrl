@@ -3,7 +3,7 @@
  * may consume.
  *
  * The metadata lives IN each template's document
- * (`public/overlay_templates/<id>.html`): the name as an
+ * (`assets/overlay_templates/<id>.html`): the name as an
  * `<meta name="name">` tag, and the consumed params
  * (`uses`) DERIVED from the document's own hooks + `:root` vars by
  * `template_doc.ts::parseTemplateDoc` (deriveUses) — nothing is
@@ -42,7 +42,7 @@ export function isTextSlot(param: string): boolean {
 
 /** Parsed metadata of one template (from its HTML document). */
 export interface TemplateMeta {
-	/** The file/URL id (`<id>.html` under public/overlay_templates). */
+	/** The file/URL id (`<id>.html` under assets/overlay_templates). */
 	id: string;
 	/** i18n key of the human name. */
 	name: string;

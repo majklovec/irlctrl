@@ -21,5 +21,7 @@ config/
 # Headless-DOM test bundles (normally removed by test teardown)
 .tmp-chat-overlay-reload-*.js
 assets/*
+# the seed overlay templates live in the storage dir but are part of the app
+!assets/overlay_templates/
 
 .tmp*.js

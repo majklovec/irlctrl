@@ -3,7 +3,7 @@
  * document into its parts.
  *
  * A template is ONE browser-viewable HTML file
- * (`public/overlay_templates/<id>.html`) carrying:
+ * (`assets/overlay_templates/<id>.html`) carrying:
  *   - `<meta name="name">`  — the i18n name key,
  *   - one `<style>` block — the template's CSS,
  *   - one `<section>` — the document body, whose hooks (`data-bind="<slot>"`,
