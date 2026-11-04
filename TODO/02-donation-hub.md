@@ -1,4 +1,4 @@
-# Donation Hub Page — Implementation Handoff (post-refactor architecture)
+# Donation Hub Page
 
 ## 0. Context
 
@@ -37,7 +37,7 @@ No edits to files outside `server/pages/donations/` except the three additive co
 | **Routing**                  | `server.routes` is an Elysia plugin. Mounted by `server/core/registry.ts → mountRoutes(app)`. Paths must be unique across pages.                                                                                                                                       |
 | **Bus & WS**                 | `services.publish(topic, payload)` publishes to the topic's WS broadcast. Dashboard topic: `dashboards` on `/dashboards/ws`. Overlay topic: `overlay-runtime` on `/overlay/:id/ws?token=…`.                                                                            |
 | **Overlay alert trigger**    | `GET /overlay/alert/<eventName>?token=…` is the existing entry point for on-air alerts. The new page contributes the `donation-alert` element, and the pipeline calls this endpoint with `eventName=donation`.                                                         |
-| **Overlay element contract** | Schema half: `server/core/overlay_element.ts`. Browser half: `shared/ui/overlay/element.ts`. Both are reusable as-is; the page contributes them through `PageModule.overlayElements`.                                                                             |
+| **Overlay element contract** | Schema half: `server/core/overlay_element.ts`. Browser half: `shared/ui/overlay/element.ts`. Both are reusable as-is; the page contributes them through `PageModule.overlayElements`.                                                                                  |
 | **Discovery**                | Runtime `readdirSync` in `server/core/registry.ts`. Browser side imports `server/core/generated/pages.ts` (from `scripts/gen_pages.ts`). Adding `server/pages/donations/` and running `bun run gen:pages` (auto-invoked from `predev`/`pretest`) is all that's needed. |
 | **Auth**                     | Webhook routes under `/webhook/*` are unauthenticated (see §6 and §9 Q1). `/donations/*` management routes require the normal session middleware.                                                                                                                      |
 | **Tests**                    | `bun test`. Boundary test `test/pages_boundaries.test.ts` enforces the import rule. Page-local tests under `server/pages/donations/test/`.                                                                                                                             |
