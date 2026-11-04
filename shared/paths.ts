@@ -5,7 +5,8 @@
  * spelling the directories out, so a directory move touches only this file.
  *
  *   client/   the device process: backend, its web UI and the device modules
- *   server/   the control server: backend, its web UI and the widget modules
+ *   server/   the control server: core, its page slices, its shell UI and
+ *             the widget modules
  *   shared/   dependency-free helpers, contracts and the UI design system
  *             (components, CSS, static assets) both sides and all modules use
  */
@@ -20,8 +21,11 @@ export const MODULE_ROOTS = ["client/modules", "server/modules"] as const;
 /** Page entry points (`<dir>/<name>.html`) of each side's web UI. */
 export const PAGE_DIRS = {
     client: "client/frontend/pages",
-    server: "server/frontend/pages",
+    server: "server/shell/pages",
 } as const;
+
+/** The control server's page slices (`server/pages/<id>/…`, 01-refactor). */
+export const PAGES_ROOT = "server/pages";
 
 /** The core translation catalogs (`i18n/<lang>.json`). */
 export const CORE_I18N_DIR = "i18n";

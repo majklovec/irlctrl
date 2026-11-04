@@ -12,4 +12,5 @@ import { isCompiledBinary } from "./util";
 export async function ensureGeneratedManifests(): Promise<void> {
 	if (isCompiledBinary()) return;
 	await Bun.$`bun ${appPath("scripts/gen_modules.ts")}`.quiet();
+	await Bun.$`bun ${appPath("scripts/gen_pages.ts")}`.quiet();
 }

@@ -1,5 +1,5 @@
 /*
- * PWA routes shared by the control server (server/backend) and the device API
+ * PWA routes shared by the control server (server/core) and the device API
  * (client/backend): the service worker and the home-screen icons. The service
  * worker must answer at the origin root (`/sw.js`, scope `/`) to control the
  * whole UI, and the manifest names the icons by fixed path, so these are

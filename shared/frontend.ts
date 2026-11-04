@@ -1,8 +1,8 @@
 import { Buffer } from "node:buffer";
-import { readdirSync } from "node:fs";
+import { readdirSync, type Dirent } from "node:fs";
 import { join } from "node:path";
 import { CLIENT_PAGES, SERVER_PAGES } from "./frontend_pages";
-import { appPath, MODULE_ROOTS, PAGE_DIRS } from "./paths";
+import { appPath, MODULE_ROOTS, PAGE_DIRS, PAGES_ROOT } from "./paths";
 import { isCompiledBinary } from "./util";
 
 export interface FrontendPageEntry {
@@ -58,11 +58,61 @@ export function frontendPageEntries(): FrontendPageEntry[] {
         }
     }
 
+    // Page-slice pages: server/pages/<id>/pages/*.html.
+    for (const page of serverSlicePages())
+        entries.push(page);
+
     const names = new Set<string>();
     for (const entry of entries) {
         if (names.has(entry.name))
             throw new Error(`Duplicate frontend page: ${entry.name}`);
         names.add(entry.name);
+    }
+    return entries;
+}
+
+/** The slice-scoped pages: server/pages/<id>/pages/*.html. */
+function serverSlicePages(): FrontendPageEntry[] {
+    const root = appPath(PAGES_ROOT);
+    const entries: FrontendPageEntry[] = [];
+    let slices: Dirent[];
+    try {
+        slices = readdirSync(root, { withFileTypes: true });
+    } catch (error) {
+        if (
+            error instanceof Error &&
+            "code" in error &&
+            error.code === "ENOENT"
+        )
+            return entries;
+        throw error;
+    }
+    for (const slice of slices.sort((left, right) =>
+        left.name.localeCompare(right.name),
+    )) {
+        if (!slice.isDirectory()) continue;
+        const pagesDirectory = join(root, slice.name, "pages");
+        let pages: Dirent[];
+        try {
+            pages = readdirSync(pagesDirectory, {
+                withFileTypes: true,
+            }).sort((left, right) => left.name.localeCompare(right.name));
+        } catch (error) {
+            if (
+                error instanceof Error &&
+                "code" in error &&
+                error.code === "ENOENT"
+            )
+                continue;
+            throw error;
+        }
+        for (const page of pages) {
+            if (!page.isFile() || !page.name.endsWith(".html")) continue;
+            entries.push({
+                name: page.name.slice(0, -".html".length),
+                path: join(pagesDirectory, page.name),
+            });
+        }
     }
     return entries;
 }
@@ -86,6 +136,7 @@ export async function createFrontend() {
         }
     } else {
         await Bun.$`bun scripts/gen_modules.ts`.quiet();
+        await Bun.$`bun scripts/gen_pages.ts`.quiet();
         const entries = frontendPageEntries();
         const result = await Bun.build({
             entrypoints: entries.map((entry) => entry.path),

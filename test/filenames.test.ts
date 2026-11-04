@@ -16,7 +16,15 @@ const SOURCE_RE = /\.(ts|tsx|css|html)$/;
 const FILE_RE = /^[a-z0-9_]+(\.test|\.d)?\.(ts|tsx|css|html)$/;
 const DIR_RE = /^[a-z0-9_]+$/;
 /** Directories whose contents are not source code (assets, translations). */
-const SKIP = new Set(["node_modules", "img", "pwa", "i18n", "defaults"]);
+const SKIP = new Set([
+    "node_modules",
+    "img",
+    "pwa",
+    "i18n",
+    "defaults",
+    // build-time generated manifests (gitignored, not hand-written)
+    "generated",
+]);
 
 function walk(dir: string, out: { files: string[]; dirs: string[] }) {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {

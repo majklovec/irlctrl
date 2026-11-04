@@ -79,7 +79,7 @@ describe("source runs without generated/", () => {
 		const proc = Bun.spawn(
 			[
 				process.execPath,
-				"server/backend/server.ts",
+				"server/main.ts",
 				"--host",
 				"127.0.0.1",
 				"--port",

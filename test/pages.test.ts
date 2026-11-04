@@ -72,7 +72,7 @@ describe("entity pages", () => {
 
     test("every server page is served by a route", () => {
         const served = new Set<string>();
-        for (const file of walk(join(ROOT, "server/backend")))
+        for (const file of walk(join(ROOT, "server/core")))
             for (const m of readFileSync(file, "utf8").matchAll(
                 /htmlResponse\(\s*"([a-z_]+)"\s*\)/g,
             ))

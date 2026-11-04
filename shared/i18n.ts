@@ -10,7 +10,7 @@
 // first time it is requested and cached.
 //
 // The catalogs are resolved in two ways:
-//   * unbundled (bun server/backend/server.ts, dev, tests): read from disk —
+//   * unbundled (bun server/main.ts, dev, tests): read from disk —
 //     the core file plus a scan of modules/*/i18n/;
 //   * compiled binaries (bun build --compile): the build-time manifest
 //     generated/i18n.ts (scripts/gen_modules.ts) inlines every catalog, as a

@@ -4,7 +4,7 @@
  * Every modules/<id>/backend.ts default-exports a BackendModule registration
  * (shared/contracts/backend_module.ts). Discovery has two modes:
  *
- *  - unbundled (bun server/backend/server.ts, bun test): a runtime directory
+ *  - unbundled (bun server/main.ts, bun test): a runtime directory
  *    scan anchored on import.meta.url — adding a module needs no edit here.
  *  - compiled binaries (bun build --compile): the build-time manifest
  *    generated/modules.backend.ts (scripts/gen_modules.ts); a compiled process

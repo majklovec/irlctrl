@@ -276,9 +276,19 @@ describe("module registries", () => {
         const readPage = (side: "client" | "server", name: string) =>
             readFileSync(join(appDir, side, "frontend", "ts", name), "utf8");
         const app = readPage("client", "device_page.tsx");
-        const dashboard = readPage("server", "dashboards/dashboard_widgets.tsx");
+        /* The dashboard widgets page is a page-slice page now (01-refactor).
+         * readPage points at the slice location. */
+        const dashboard = readFileSync(
+            join(appDir, "server", "pages", "dashboards", "client", "dashboard_widgets.tsx"),
+            "utf8",
+        );
         const setup = readPage("client", "setup.tsx");
-        const devices = readPage("server", "devices/device_list.tsx");
+        /* The device list page is a page-slice page now (01-refactor):
+         * server/pages/devices/client/device_list.tsx. */
+        const devices = readFileSync(
+            join(appDir, "server", "pages", "devices", "client", "device_list.tsx"),
+            "utf8",
+        );
 
         expect(app).not.toMatch(
             /moduleCard\(["'](encoder|relay|obs)/,

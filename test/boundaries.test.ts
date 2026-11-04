@@ -54,12 +54,13 @@ const LAYOUT: Layout = {
 	coreRoots: [
 		"client/backend",
 		"client/frontend",
-		"server/backend",
-		"server/frontend",
+		"server/core",
+		"server/shell",
+		"server/pages",
 		"shared",
 	],
-	browserRoots: ["client/frontend", "server/frontend", "shared/ui"],
-	backendRoots: ["client/backend", "server/backend"],
+	browserRoots: ["client/frontend", "server/shell", "shared/ui"],
+	backendRoots: ["client/backend", "server/core"],
 	generatedDir: "generated",
 	moduleApi: "shared",
 	sides: [
