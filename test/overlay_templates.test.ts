@@ -109,9 +109,9 @@ describe("overlay_templates: catalog", () => {
 			expect(raw.trimStart().toLowerCase().startsWith("<!doctype html>")).toBe(
 				true,
 			);
-			expect(raw).toContain('<meta name="overlay-template:name"');
+			expect(raw).toContain('<meta name="name"');
 			// there is NO hand-listed uses meta — the parser derives it
-			expect(raw).not.toContain("overlay-template:uses");
+			expect(raw).not.toContain('name="uses"');
 			expect(raw).not.toMatch(/<script/i);
 			const f = TEMPLATE_FILES[id];
 			expect(f.meta.id).toBe(id);
@@ -155,7 +155,7 @@ describe("overlay_templates: doc parser", () => {
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta name="overlay-template:name" content="overlay.tpl.t" />
+    <meta name="name" content="overlay.tpl.t" />
     <style>
 		:root {
 			--a: 1px;
@@ -226,7 +226,7 @@ ${body}
 		expect(() =>
 			parseTemplateDoc(
 				"t",
-				doc().replace(/<meta name="overlay-template:name"[^>]*\/>\n/, ""),
+				doc().replace(/<meta name="name"[^>]*\/>\n/, ""),
 			),
 		).toThrow("name");
 	});

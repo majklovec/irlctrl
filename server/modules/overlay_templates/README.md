@@ -114,7 +114,7 @@ A template is ONE self-contained HTML document
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta name="overlay-template:name" content="overlay.tpl.<id>" />
+    <meta name="name" content="overlay.tpl.<id>" />
     <style>
       :root { --accent: #6c5ce7; /* …the template's knobs… */ }
       section { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -134,7 +134,7 @@ A template is ONE self-contained HTML document
   discovers it, and the schema validates ids as slugs, not against a
   frozen list). The test
   `the auto-discovered catalog is the on-disk template files` pins the set.
-- **`overlay-template:name`** — the i18n key of the human name
+- **`name`** — the i18n key of the human name
   (`overlay.tpl.<id>`; add it to all module languages).
 - **`uses`** — not written in the document: the parser derives it from
   what the document contains, in fixed order — every `data-bind="<slot>"`
@@ -174,7 +174,7 @@ The document is fetched by `catalog.ts` (`loadTemplateDoc`) at runtime from
 
 | Hook | Where | Meaning |
 |---|---|---|
-| `overlay-template:name` | `<head>` meta tag | the template's i18n name (the only meta tag written by hand) |
+| `name` | `<head>` meta tag | the template's i18n name (the only meta tag written by hand) |
 | `data-bind="<slot>"` | elements in the `<section>` body | a text param named `<slot>`, baked in entity-escaped (tokens pre-resolved); `title`/`subtitle` are just the conventional slots, any name works |
 | `data-asset="logo"` | an `<img>` | `src` set from `logoAssetId` → the page's asset URL |
 | `data-countdown` | one element | H:MM:SS ticking toward `targetIso` (`mode: "countdown"`) |

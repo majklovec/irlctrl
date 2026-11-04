@@ -4,7 +4,7 @@
  *
  * A template is ONE browser-viewable HTML file
  * (`public/overlay_templates/<id>.html`) carrying:
- *   - `<meta name="overlay-template:name">`  — the i18n name key,
+ *   - `<meta name="name">`  — the i18n name key,
  *   - one `<style>` block — the template's CSS,
  *   - one `<section>` — the document body, whose hooks (`data-bind="<slot>"`,
  *     `data-asset="logo"`, `data-countdown`) + the `<style>`'s `:root`
@@ -32,18 +32,18 @@ export interface ParsedTemplateDoc {
 
 function readMetaTag(rawHtml: string, name: string, id: string): string {
 	const re = new RegExp(
-		`<meta\\s+name="overlay-template:${name}"\\s+content="([^"]*)"\\s*/?>`,
+		`<meta\\s+name="${name}"\\s+content="([^"]*)"\\s*/?>`,
 	);
 	const found = re.exec(rawHtml);
 	if (!found) {
 		throw new Error(
-			`template ${id} document missing <meta name="overlay-template:${name}">`,
+			`template ${id} document missing <meta name="${name}">`,
 		);
 	}
 	const value = found[1].trim();
 	if (!value) {
 		throw new Error(
-			`template ${id} document has an empty overlay-template:${name} meta`,
+			`template ${id} document has an empty ${name} meta`,
 		);
 	}
 	return value;

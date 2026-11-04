@@ -3,14 +3,17 @@
 
 <head>
     <meta charset="utf-8" />
-    <meta name="overlay-template:name" content="overlay.tpl.ticker" />
+    <meta name="name" content="overlay.tpl.ticker" />
     <style>
         :root {
             --accent: #6c5ce7;
             --bg: rgba(15, 15, 25, 0.9);
             --text: #ffffff;
             --label-text: #ffffff;
-            --padding: 12px;
+            --label-width: 12px;
+            --font: "Inter", sans-serif;
+            --font-size: 22px;
+            --scroll: 22s;
         }
 
         *,
@@ -40,12 +43,13 @@
             flex: none;
             display: flex;
             align-items: center;
-            padding: 0 var(--padding);
+            padding: 0 var(--label-width);
             background:
                 linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(0, 0, 0, 0.16)),
                 var(--accent);
             color: var(--label-text);
-            font-size: 18px;
+            font-family: var(--font);
+            font-size: var(--font-size);
             font-weight: 800;
             letter-spacing: 0.16em;
         }
@@ -81,18 +85,19 @@
 
         .track {
             position: absolute;
-            left: 100%;
+            left: 0;
             top: 50%;
             display: inline-flex;
             align-items: center;
             white-space: nowrap;
-            animation: ticker-scroll 22s linear infinite;
+            animation: ticker-scroll var(--scroll) linear infinite;
             will-change: transform;
         }
 
-        .track>span[data-bind="title"] {
+        .track>span {
             color: var(--text);
-            font-size: 22px;
+            font-family: var(--font);
+            font-size: var(--font-size);
             font-weight: 600;
         }
 
@@ -120,6 +125,22 @@
             <span class="label" data-bind="label">LIVE</span>
             <div class="viewport">
                 <div class="track">
+                    <span data-bind="title">Your scrolling text goes here</span>
+                    <span class="sep">•</span>
+                    <span data-bind="title">Your scrolling text goes here</span>
+                    <span class="sep">•</span>
+                    <span data-bind="title">Your scrolling text goes here</span>
+                    <span class="sep">•</span>
+                    <span data-bind="title">Your scrolling text goes here</span>
+                    <span class="sep">•</span>
+                    <span data-bind="title">Your scrolling text goes here</span>
+                    <span class="sep">•</span>
+                    <span data-bind="title">Your scrolling text goes here</span>
+                    <span class="sep">•</span>
+                    <span data-bind="title">Your scrolling text goes here</span>
+                    <span class="sep">•</span>
+                    <span data-bind="title">Your scrolling text goes here</span>
+                    <span class="sep">•</span>
                     <span data-bind="title">Your scrolling text goes here</span>
                     <span class="sep">•</span>
                     <span data-bind="title">Your scrolling text goes here</span>

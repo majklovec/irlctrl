@@ -4,7 +4,7 @@
  *
  * The metadata lives IN each template's document
  * (`public/overlay_templates/<id>.html`): the name as an
- * `<meta name="overlay-template:name">` tag, and the consumed params
+ * `<meta name="name">` tag, and the consumed params
  * (`uses`) DERIVED from the document's own hooks + `:root` vars by
  * `template_doc.ts::parseTemplateDoc` (deriveUses) — nothing is
  * hand-listed.

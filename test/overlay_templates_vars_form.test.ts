@@ -271,4 +271,66 @@ describe("overlay_templates: the :root-driven inspector", () => {
 		expect(el.props.vars).not.toHaveProperty("--corner-glow");
 		expect(el.props.vars).toEqual({ "--padding": "40px" });
 	});
+
+	test("ticker's font knobs: --font-size is a number field, --font is text", async () => {
+		const el: FakeEl = {
+			id: "el-ticker",
+			type: "html_template",
+			visible: true,
+			transform: {
+				x: 0,
+				y: 0,
+				width: 800,
+				height: 60,
+				rotation: 0,
+				opacity: 1,
+			},
+			bindings: {},
+			props: { templateId: "ticker", vars: {} },
+		};
+		const mutate: Mutate = (fn) => {
+			fn(el);
+			mithril.redraw();
+		};
+		const { root } = formFor(el, mutate);
+
+		// --font-size → "Font size" (number), --font → "Font" (text)
+		await until(() =>
+			fields(root).some((f) => f.label === "Font size"),
+		);
+		const byLabel = Object.fromEntries(
+			fields(root)
+				.filter((f) => f.label === "Font size" || f.label === "Font")
+				.map((f) => [f.label, f.input]),
+		);
+		expect(Object.keys(byLabel).sort()).toEqual(["Font", "Font size"]);
+
+		// --font-size: 22px → number input holding 22 (the px unit is shown
+		// beside it, not part of the value)
+		expect(byLabel["Font size"]?.type).toBe("number");
+		expect(byLabel["Font size"]?.value).toBe("22");
+		// --font: "Inter", sans-serif → free-text input holding the stack
+		expect(byLabel["Font"]?.type).toBe("text");
+		expect(byLabel["Font"]?.value).toBe('"Inter", sans-serif');
+
+		// editing writes the raw --name override into props.vars
+		const step = async (inp: HTMLInputElement, v: string) => {
+			input(inp, v);
+			await new Promise((r) => setTimeout(r, 0));
+		};
+		await step(byLabel["Font size"]!, "30");
+		expect(el.props.vars).toEqual({ "--font-size": "30px" });
+		await step(byLabel["Font"]!, "Georgia, serif");
+		expect(el.props.vars).toEqual({
+			"--font": "Georgia, serif",
+			"--font-size": "30px",
+		});
+
+		// editing back to the :root default DROPS the override
+		await step(byLabel["Font size"]!, "22");
+		expect(el.props.vars).not.toHaveProperty("--font-size");
+		await step(byLabel["Font"]!, '"Inter", sans-serif');
+		expect(el.props.vars).not.toHaveProperty("--font");
+		expect(el.props.vars).toEqual({});
+	});
 });

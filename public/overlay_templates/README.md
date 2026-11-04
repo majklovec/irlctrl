@@ -51,7 +51,7 @@ A template is a complete HTML document with **exactly these parts**:
   <head>
     <meta charset="utf-8" />
     <!-- REQUIRED: i18n key of the display name. Must match <id>. -->
-    <meta name="overlay-template:name" content="overlay.tpl.my_template" />
+    <meta name="name" content="overlay.tpl.my_template" />
     <style>
       /* ── KNOBS: every --name becomes an editable inspector field ── */
       :root {
@@ -104,7 +104,7 @@ attributes; the parser derives the element's editable `uses` list **from them**
 
 | Hook | Where | What it does |
 |---|---|---|
-| `overlay-template:name` | `<head>` `<meta>` | The template's display-name i18n key (the only tag you write by hand). |
+| `name` | `<head>` `<meta>` | The template's display-name i18n key (the only tag you write by hand). |
 | `data-bind="<slot>"` | any element in the `<section>` | A **text slot** named `<slot>`. Its text content is replaced at render with the element's value (entity-escaped). |
 | `data-asset="logo"` | an `<img>` | Its `src` is set from the element's chosen **logo** asset (from the page's asset library). |
 | `data-countdown` | one element | The renderer ticks this node live with a `HH:MM:SS` countdown to the element's target time. |
@@ -196,7 +196,7 @@ broken template never renders half-baked:
 - **Exactly one** `<section>` in the body.
 - **No `<script>`** anywhere (the doc is inert; the parser and the renderer both
   reject it).
-- The required `overlay-template:name` meta tag is present.
+- The required `name` meta tag is present.
 - Exactly one `<style>` block.
 
 CSS is additionally scoped by `templates/css_scope.ts`, which rewrites the
