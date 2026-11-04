@@ -13,6 +13,8 @@ import {
 import type { Drag } from "../overlay_store";
 import {
 	ctx,
+	flushLiveSave,
+	liveSaveOverlayElements,
 	overlay,
 	resolvedTransform,
 	saveOverlayElements,
@@ -118,8 +120,9 @@ export function startDrag(
 export function onDrag(ev: MouseEvent): void {
 	const d = state.drag;
 	if (!d) return;
-	const e = overlay()?.elements.find((x) => x.id === d.elementId);
-	if (!e) return;
+	const o = overlay();
+	const e = o?.elements.find((x) => x.id === d.elementId);
+	if (!o || !e) return;
 	const ev2 = toScenePoint(ev);
 	const dx = ev2.x - d.startX;
 	const dy = ev2.y - d.startY;
@@ -130,6 +133,9 @@ export function onDrag(ev: MouseEvent): void {
 		const { gx, gy } = applySnap(e, e.transform);
 		state.snapX = gx;
 		state.snapY = gy;
+		// push the in-progress position so the OBS runtime page tracks the
+		// drag live (throttled; the mouseup flush is authoritative)
+		liveSaveOverlayElements();
 		m.redraw();
 		return;
 	}
@@ -184,6 +190,7 @@ export function onDrag(ev: MouseEvent): void {
 			width: Math.round(nw),
 			height: Math.round(nh),
 		};
+		liveSaveOverlayElements();
 		m.redraw();
 		return;
 	}
@@ -225,13 +232,15 @@ export function onDrag(ev: MouseEvent): void {
 	};
 	state.snapX = null;
 	state.snapY = null;
+	liveSaveOverlayElements();
 	m.redraw();
 }
 
 export function endDrag(): void {
 	if (state.drag?.moved) {
 		const s = overlay();
-		if (s) void saveOverlayElements(s);
+		// cancel the pending in-drag save and persist the final position
+		if (s) flushLiveSave(s);
 	}
 	state.drag = null;
 	state.snapX = null;

@@ -397,10 +397,55 @@ export async function duplicateOverlay(id: string): Promise<void> {
 
 export async function saveOverlayElements(o: Overlay): Promise<void> {
     if (!state.selectedOverlayId) return;
-    await apiTry(`/api/overlays/${encodeURIComponent(state.selectedOverlayId)}`, {
+    const overlayId = state.selectedOverlayId;
+    await apiTry(`/api/overlays/${encodeURIComponent(overlayId)}`, {
         method: "PUT",
         body: { elements: o.elements },
     });
+}
+
+// ── live (throttled) save ─────────────────────────────────────────────────
+// Drag/resize gestures push the in-progress transform to the server at most
+// once per interval (one trailing save per pause: the timer reads the
+// CURRENT state when it fires, so it always carries the latest position).
+// The server's `overlays.overlay` frame is what the OBS runtime page renders
+// live. `flushLiveSave` cancels the pending timer and persists immediately at
+// gesture end, so the final position is authoritative and no duplicate PUT
+// follows.
+const LIVE_SAVE_INTERVAL_MS = 100;
+let liveSave: { overlayId: string; t: ReturnType<typeof setTimeout> } | null =
+    null;
+
+/** Schedule the trailing save (a pending one for the same overlay is kept —
+ * it saves the state that is CURRENT when it fires, since the editor feed
+ * can replace `state.overlay` mid-drag and any captured reference would go
+ * stale). Skipped off an editor page (no selected overlay yet). */
+export function liveSaveOverlayElements(): void {
+    if (!state.selectedOverlayId) return;
+    if (liveSave?.overlayId === state.selectedOverlayId) return;
+    if (liveSave) clearTimeout(liveSave.t);
+    const overlayId = state.selectedOverlayId;
+    liveSave = {
+        overlayId,
+        t: setTimeout(() => {
+            liveSave = null;
+            // the PUT URL is state-keyed: a page switch in the meantime
+            // (different editor) must not write this overlay's elements
+            // into another overlay
+            const cur = state.overlay;
+            if (overlayId === state.selectedOverlayId && cur)
+                void saveOverlayElements(cur);
+        }, LIVE_SAVE_INTERVAL_MS),
+    };
+}
+
+/** Cancel a pending live save and persist `o` immediately (drag end). */
+export function flushLiveSave(o: Overlay): void {
+    if (liveSave) {
+        clearTimeout(liveSave.t);
+        liveSave = null;
+    }
+    void saveOverlayElements(o);
 }
 
 export function mutateElement(fn: (e: OverlayElement) => void): void {

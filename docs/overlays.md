@@ -181,6 +181,11 @@ Notes:
 - Every overlay mutation bumps `overlay.rev` (server-managed monotonic counter).
   The editor and the runtime page drop out-of-order pushes carrying a lower
   `rev` so a late broadcast can never clobber a newer local state.
+- Dragging/resizing an element in the editor pushes the in-progress transform
+  to the server **live** (a throttled save, at most one per 100 ms with a
+  trailing edge; mouseup flushes the final position immediately), so the
+  runtime page tracks the gesture in real time instead of jumping when it
+  ends.
 - The runtime page holds its last known state on disconnect and reconnects
   with exponential backoff (1 s → 30 s); a bad token keeps it blank (the
   server closes the WS with 1008).
