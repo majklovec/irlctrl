@@ -62,25 +62,16 @@
             overflow: hidden;
         }
 
-        .viewport::before,
+        /* Single overlay, generated after .track, so it paints on top
+           without needing a z-index. */
         .viewport::after {
             content: "";
             position: absolute;
-            top: 0;
-            bottom: 0;
-            width: 60px;
+            inset: 0;
             pointer-events: none;
-            z-index: 1;
-        }
-
-        .viewport::before {
-            left: 0;
-            background: linear-gradient(90deg, var(--bg), transparent);
-        }
-
-        .viewport::after {
-            right: 0;
-            background: linear-gradient(270deg, var(--bg), transparent);
+            background:
+                linear-gradient(90deg, var(--bg), transparent) left / 60px 100% no-repeat,
+                linear-gradient(270deg, var(--bg), transparent) right / 60px 100% no-repeat;
         }
 
         .track {
