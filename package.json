@@ -1,6 +1,6 @@
 {
     "name": "irlctrl",
-    "version": "2.15.1",
+    "version": "2.16.0",
     "description": "IRL control application",
     "author": "Michal Vondráček",
     "scripts": {

@@ -1,3 +1,14 @@
+# [2.16.0](https://github.com/majklovec/irlctrl/compare/v2.15.1...v2.16.0) (2026-11-04)
+
+
+### Features
+
+* add new overlay templates for alerts, breaking banners, chat boxes, goal bars, and music visualizers ([f30659d](https://github.com/majklovec/irlctrl/commit/f30659d62a3858087e689d5a205ce21cdb7eb738))
+* add new overlay templates for starting soon, ticker, and webcam frame ([74b3fb2](https://github.com/majklovec/irlctrl/commit/74b3fb2830a2a5cbec014c5873f8b1d4bd137b59))
+* enhance number input handling with unit display in overlay editor ([e3f8337](https://github.com/majklovec/irlctrl/commit/e3f8337713ae7db7aea10ee8431e3f322e5190a2))
+* implement live saving of overlay element positions during drag and resize ([0b11b62](https://github.com/majklovec/irlctrl/commit/0b11b62fcc1a9ead4bfcfd394df8d7e4b1da7a92))
+* **templates:** switching templates and variable forms ([679757b](https://github.com/majklovec/irlctrl/commit/679757b0b0ea64c15dd3b3b7e6f83edd7e34f7fa))
+
 ## [2.15.1](https://github.com/majklovec/irlctrl/compare/v2.15.0...v2.15.1) (2026-11-03)
 
 
