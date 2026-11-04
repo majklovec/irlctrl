@@ -22,7 +22,7 @@ import {
 	parseVariableValueInput,
 	type Transform,
 	type Variable,
-} from "../shared/overlay";
+} from "../server/pages/overlays/overlay";
 import { ApiError } from "../shared/params";
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;

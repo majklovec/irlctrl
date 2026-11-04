@@ -2,7 +2,7 @@ import { Button, Modal } from "@ui/components/";
 import { Icon } from "@ui/components/icons";
 import { t } from "@ui/i18n";
 import m from "mithril";
-import type { Variable } from "../../../../../shared/overlay";
+import type { Variable } from "../../overlay";
 import {
 	copyVariableUrl,
 	createVariable,

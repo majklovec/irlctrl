@@ -8,7 +8,7 @@
  * editor and the runtime page only talk to the registry — they contain no
  * element-specific code. The environment-free half (type, default props,
  * validation) is the `OverlayElementSchema` in
- * shared/contracts/overlay_element.ts, contributed from
+ * server/core/overlay_element.ts, contributed from
  * `<module>/overlay_schema.ts`.
  */
 import m from "mithril";
@@ -18,10 +18,10 @@ import type {
 	Transform,
 	Variable,
 	VariableValue,
-} from "../../overlay";
+} from "../../../server/pages/overlays/overlay";
 import type { Children, Vnode } from "mithril";
 import { t } from "../i18n";
-export type { OverlayElement, OverlayElementType } from "../../overlay";
+export type { OverlayElement, OverlayElementType } from "../../../server/pages/overlays/overlay";
 
 /** Runtime trigger state of one active trigger-driven element (alerts).
  * The payload is the last trigger that fired the element — template tokens

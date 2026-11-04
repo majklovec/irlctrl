@@ -3,7 +3,7 @@
  * control server's scene validator and the browser editor). The rendering
  * and inspector halves live next to each one in elements/*.tsx.
  */
-import type { OverlayElementSchema } from "../../../../../shared/contracts/overlay_element";
+import type { OverlayElementSchema } from "../../../../core/overlay_element";
 
 export interface TextProps {
     text: string;

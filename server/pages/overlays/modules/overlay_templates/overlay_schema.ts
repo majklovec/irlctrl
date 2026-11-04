@@ -16,7 +16,7 @@
  * doc builder's var/text/asset map + TemplateParam + README (not a record).
  */
 
-import type { OverlayElementSchema } from "../../../../../shared/contracts/overlay_element";
+import type { OverlayElementSchema } from "../../../../core/overlay_element";
 import { namedStyleVars } from "./doc";
 
 export interface HtmlTemplateProps {

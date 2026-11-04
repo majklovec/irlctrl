@@ -37,7 +37,7 @@ No edits to files outside `server/pages/donations/` except the three additive co
 | **Routing**                  | `server.routes` is an Elysia plugin. Mounted by `server/core/registry.ts → mountRoutes(app)`. Paths must be unique across pages.                                                                                                                                       |
 | **Bus & WS**                 | `services.publish(topic, payload)` publishes to the topic's WS broadcast. Dashboard topic: `dashboards` on `/dashboards/ws`. Overlay topic: `overlay-runtime` on `/overlay/:id/ws?token=…`.                                                                            |
 | **Overlay alert trigger**    | `GET /overlay/alert/<eventName>?token=…` is the existing entry point for on-air alerts. The new page contributes the `donation-alert` element, and the pipeline calls this endpoint with `eventName=donation`.                                                         |
-| **Overlay element contract** | Schema half: `shared/contracts/overlay_element.ts`. Browser half: `shared/ui/overlay/element.ts`. Both are reusable as-is; the page contributes them through `PageModule.overlayElements`.                                                                             |
+| **Overlay element contract** | Schema half: `server/core/overlay_element.ts`. Browser half: `shared/ui/overlay/element.ts`. Both are reusable as-is; the page contributes them through `PageModule.overlayElements`.                                                                             |
 | **Discovery**                | Runtime `readdirSync` in `server/core/registry.ts`. Browser side imports `server/core/generated/pages.ts` (from `scripts/gen_pages.ts`). Adding `server/pages/donations/` and running `bun run gen:pages` (auto-invoked from `predev`/`pretest`) is all that's needed. |
 | **Auth**                     | Webhook routes under `/webhook/*` are unauthenticated (see §6 and §9 Q1). `/donations/*` management routes require the normal session middleware.                                                                                                                      |
 | **Tests**                    | `bun test`. Boundary test `test/pages_boundaries.test.ts` enforces the import rule. Page-local tests under `server/pages/donations/test/`.                                                                                                                             |
@@ -104,7 +104,7 @@ The refactor intentionally leaves these out until a page actually needs them. Do
 Extend `server/core/contracts.ts`:
 
 ```ts
-import type { OverlayElementSchema } from "../../shared/contracts/overlay_element";
+import type { OverlayElementSchema } from "../../server/core/overlay_element";
 import type { OverlayElementDef } from "../../shared/ui/overlay/element";
 
 export interface OverlayElementContribution {
@@ -469,8 +469,8 @@ Contributes the `"donation-alert"` element type through `PageModule.overlayEleme
 
 ```ts
 // server/pages/donations/overlay/schema.ts
-import type { OverlayElementSchema } from "../../../../shared/contracts/overlay_element";
-import { read } from "../../../../shared/contracts/overlay_element_helpers"; // helpers used by existing elements
+import type { OverlayElementSchema } from "../../../../server/core/overlay_element";
+import { read } from "../../../../server/core/overlay_element_helpers"; // helpers used by existing elements
 
 export const schema: OverlayElementSchema = {
 	type: "donation-alert",

@@ -5,8 +5,8 @@
  * The scene normaliser in shared/overlay.ts validates element types and
  * props through this map — the core names no element type.
  */
-import type { OverlayElementSchema } from "./contracts/overlay_element";
-import SCHEMA_MANIFEST from "../generated/overlay_schemas";
+import type { OverlayElementSchema } from "../../core/overlay_element";
+import SCHEMA_MANIFEST from "../../../generated/overlay_schemas";
 
 function isSchema(value: unknown): value is OverlayElementSchema {
     if (typeof value !== "object" || value === null) return false;

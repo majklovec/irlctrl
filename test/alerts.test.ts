@@ -16,7 +16,7 @@ const { DEFAULT_ALERT_PROPS } = await import(
 );
 const { triggerPhase } = await import("../shared/ui/overlay/element");
 
-import type { VariableValue } from "../shared/overlay";
+import type { VariableValue } from "../server/pages/overlays/overlay";
 import type {
     ElementContext,
     OverlayElement,

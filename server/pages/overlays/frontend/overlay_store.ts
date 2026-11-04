@@ -1,15 +1,15 @@
 import { apiTry } from "@ui/api_client";
-import { elementDef } from "@ui/overlay/registry";
+import { elementDef } from "./registry";
 import { uuid } from "@ui/util";
 import m from "mithril";
-import { overlayElementSchema } from "../../../../shared/overlay_elements";
+import { overlayElementSchema } from "../overlay_elements";
 import type {
     Overlay,
     OverlayElement,
     Transform,
     Variable,
     VariableValue,
-} from "../../../../shared/overlay";
+} from "../overlay";
 import { serverLive } from "../../../shell/live";
 import type { ElementContext } from "./overlay_render";
 import { resolveElement } from "./overlay_render";

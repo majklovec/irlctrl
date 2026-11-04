@@ -13,8 +13,8 @@ runtime page through its token-scoped file endpoint.
 
 - Overlay list: `/overlays/`, overlay editor: `/overlays/edit/<overlay id>/` (logged-in users only)
 - Runtime: `/overlay/<overlay id>?token=<token>` (no session, token-gated)
-- Schema, limits and normalization: [`shared/overlay.ts`](../shared/overlay.ts)
-- Element plugin contract: [`shared/contracts/overlay_element.ts`](../shared/contracts/overlay_element.ts)
+- Schema, limits and normalization: [`server/pages/overlays/overlay.ts`](../server/pages/overlays/overlay.ts)
+- Element plugin contract: [`server/core/overlay_element.ts`](../server/core/overlay_element.ts)
   (schema half) and [`shared/ui/overlay/element.ts`](../shared/ui/overlay/element.ts)
   (browser half)
 - Built-in elements: [`server/pages/overlays/modules/overlay_elements/`](../server/pages/overlays/modules/overlay_elements/);
@@ -42,7 +42,7 @@ control server restarts; OBS should not need to re-add the source.
 
 Each element is one row of an overlay (`Overlay.elements`); the array order is
 the z-order, index 0 renders at the back. Every element shares the same base
-shape (see `ElementBase` in [`shared/overlay.ts`](../shared/overlay.ts)):
+shape (see `ElementBase` in [`server/pages/overlays/overlay.ts`](../server/pages/overlays/overlay.ts)):
 
 | Field         | Meaning                                                                             |
 | ------------- | ----------------------------------------------------------------------------------- |
@@ -252,11 +252,11 @@ overlay, so the runtime URLs never carry an overlay id.
 Element types are module plugins: the core (schema validator, renderer,
 editor, runtime) resolves them through two generated registries and never
 names one. Any module — under `client/modules/` or `server/pages/<page>/modules/` — can
-contribute elements; a new type never touches `shared/overlay.ts`,
+contribute elements; a new type never touches `server/pages/overlays/overlay.ts`,
 `overlays/overlay_render.tsx`, the editor (`overlays/overlay_update.tsx`, `overlays/editor/*`) or the runtime page (`overlays/overlay_view.tsx`).
 
 1. **Schema** — add (or extend) `<module>/overlay_schema.ts`, default-exporting
-   an array of `OverlayElementSchema` ([contract](../shared/contracts/overlay_element.ts)):
+   an array of `OverlayElementSchema` ([contract](../server/core/overlay_element.ts)):
    `type`, `defaultProps`, `normalizeProps(props, read)` (coerce the known
    props with the `read.num/hex/str/oneOf/bool` helpers; unknown keys are
    preserved by the core for forward compatibility), optional `container`
@@ -282,4 +282,4 @@ contribute elements; a new type never touches `shared/overlay.ts`,
    `generated/overlay_elements.ts`.
 4. Bump `OVERLAY_SCHEMA_VERSION` **only** if the change breaks existing
    stored overlays, and add a migration step to `MIGRATIONS` in
-   `shared/overlay.ts`.
+   `server/pages/overlays/overlay.ts`.

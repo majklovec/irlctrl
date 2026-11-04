@@ -22,7 +22,7 @@ import {
 	TRIGGER_OUTRO_MS,
 	type TriggerState,
 } from "@ui/overlay/element";
-import { elementDef } from "@ui/overlay/registry";
+import { elementDef } from "./registry";
 import m from "mithril";
 import { APP_VERSION } from "../../../../shared/app_version";
 import type {
@@ -31,8 +31,8 @@ import type {
 	OverlayElement,
 	Variable,
 	VariableValue,
-} from "../../../../shared/overlay";
-import { overlayElementSchema } from "../../../../shared/overlay_elements";
+} from "../overlay";
+import { overlayElementSchema } from "../overlay_elements";
 import { sceneElementsView } from "./overlay_render";
 import "./overlay.css";
 

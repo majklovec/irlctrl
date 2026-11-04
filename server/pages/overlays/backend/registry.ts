@@ -33,8 +33,8 @@ import {
     parseOverlayInput,
     parseVariableValueInput,
     type Variable,
-} from "../../../../shared/overlay";
-import { overlayElementSchema } from "../../../../shared/overlay_elements";
+} from "../overlay";
+import { overlayElementSchema } from "../overlay_elements";
 import { event, overlayRuntimeTopic, type Publish } from "../../../core/runtime";
 export { overlayRuntimeTopic };
 

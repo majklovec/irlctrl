@@ -9,7 +9,7 @@ import { describe, expect, test } from "bun:test";
 };
 
 const { elementRegistry, elementDef } = await import(
-    "../shared/ui/overlay/registry"
+    "../server/pages/overlays/frontend/registry"
 );
 const { lineFlipFromDelta } = await import(
     "../server/pages/overlays/modules/overlay_elements/elements/line"
@@ -25,7 +25,7 @@ import {
     type OverlayElement,
     type OverlayElementType,
     type VariableValue,
-} from "../shared/overlay";
+} from "../server/pages/overlays/overlay";
 
 const baseElement = (
     type: OverlayElementType,
@@ -70,7 +70,7 @@ const WELL_FORMED: Array<[OverlayElementType, Record<string, unknown>]> = [
 describe("element registry contract", () => {
     test("the browser registry and the schema registry cover the same module-contributed types", async () => {
         const { overlayElementSchemas } = await import(
-            "../shared/overlay_elements"
+            "../server/pages/overlays/overlay_elements"
         );
         const defTypes = [...elementRegistry.keys()].sort();
         expect(defTypes).toEqual([...overlayElementSchemas.keys()].sort());

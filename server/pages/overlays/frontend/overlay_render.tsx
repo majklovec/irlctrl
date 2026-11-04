@@ -20,8 +20,8 @@ import m from "mithril";
 import {
 	cssFilterString,
 	type OverlayElement,
-} from "../../../../shared/overlay";
-import { overlayElementSchema } from "../../../../shared/overlay_elements";
+} from "../overlay";
+import { overlayElementSchema } from "../overlay_elements";
 
 export type {
 	CSS,
@@ -30,7 +30,7 @@ export type {
 export { elementStyle, resolveElement, resolveElementProps };
 
 import type { ElementContext } from "@ui/overlay/element";
-import { elementDef } from "@ui/overlay/registry";
+import { elementDef } from "./registry";
 
 /** Render one element (content + positioning) for editor and runtime.
  * Each element is resolved against its variable bindings ONCE here; both the

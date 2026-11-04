@@ -1,7 +1,7 @@
 import { IconButton, Toolbar } from "@ui/components/";
 import { Icon } from "@ui/components/icons";
 import { t } from "@ui/i18n";
-import { addableElements } from "@ui/overlay/registry";
+import { addableElements } from "../registry";
 import m from "mithril";
 import {
 	addElement,

@@ -15,9 +15,9 @@
 import type {
 	OverlayElementSchema,
 	PropReaders,
-} from "./contracts/overlay_element";
+} from "../../core/overlay_element";
 import { overlayElementSchema } from "./overlay_elements";
-import { ApiError } from "./params";
+import { ApiError } from "../../../shared/params";
 
 export const OVERLAY_SCHEMA_VERSION = 1;
 
@@ -122,7 +122,7 @@ export function cssFilterString(raw: unknown): string {
 export type Binding = { kind: "variable"; variableId: string };
 
 /** An element type id. The set of valid types is whatever the modules
- * contribute (`shared/overlay_elements.ts`); the core never names one. */
+ * contribute (see `overlay_elements.ts` in this page); the core never names one. */
 export type OverlayElementType = string;
 
 export type ElementBase = {

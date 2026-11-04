@@ -25,7 +25,7 @@ shared/ui/
 │   ├── confirm.tsx       confirmDialog (promise-based, replaces window.confirm)
 │   ├── icons.tsx         Icon (the built-in 24×24 outline set), OutlineIcon
 │   └── role_tag.tsx      RoleTag (pictogram from the module that owns the role)
-├── overlay/              overlay element SDK (element contract, fields, registry)
+├── overlay/              overlay element SDK (element contract, fields, tokens, asset picker)
 ├── api_client.ts         apiJson / apiTry / ApiError — the only way to call /api
 ├── i18n.tsx              t(), LanguageSelect, i18nReady
 ├── module_registry.ts    the frontend module registry (manifest-fed)

@@ -12,7 +12,7 @@
 
 import type { Vnode, VnodeDOM } from "mithril";
 import m from "mithril";
-import type { Variable } from "../../overlay";
+import type { Variable } from "../../../server/pages/overlays/overlay";
 import { Icon } from "../components/icons";
 import { t } from "../i18n";
 import type { ElementProps, OverlayElement } from "./element";

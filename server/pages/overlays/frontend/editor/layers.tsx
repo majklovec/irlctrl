@@ -2,7 +2,7 @@ import { Button } from "@ui/components/";
 import { Icon, type IconName } from "@ui/components/icons";
 import { t } from "@ui/i18n";
 import { bindField, lbl } from "@ui/overlay/fields";
-import { elementDef } from "@ui/overlay/registry";
+import { elementDef } from "../registry";
 import m from "mithril";
 import {
 	OVERLAY_FILTERS,
@@ -10,7 +10,7 @@ import {
 	type OverlayFilter,
 	type OverlayFilterType,
 	type Transform,
-} from "../../../../../shared/overlay";
+} from "../../overlay";
 import {
 	deleteElement,
 	mutateElementOf,

@@ -27,7 +27,7 @@ import {
 	parseTemplateDoc,
 } from "../server/pages/overlays/modules/overlay_templates/templates/template_doc";
 import type { TemplateMeta } from "../server/pages/overlays/modules/overlay_templates/templates/template_meta";
-import { parseElementInput } from "../shared/overlay";
+import { parseElementInput } from "../server/pages/overlays/overlay";
 
 // A template is one self-contained HTML document on disk
 // (`public/overlay_templates/<id>.html`), served at runtime by the

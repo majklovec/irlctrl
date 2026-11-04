@@ -1,10 +1,10 @@
-import { elementDef } from "@ui/overlay/registry";
+import { elementDef } from "../registry";
 import m from "mithril";
 import type {
 	Overlay,
 	OverlayElement,
 	Transform,
-} from "../../../../../shared/overlay";
+} from "../../overlay";
 import {
 	elementStyle,
 	resolveElement,
