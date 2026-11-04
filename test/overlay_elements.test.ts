@@ -12,13 +12,13 @@ const { elementRegistry, elementDef } = await import(
     "../shared/ui/overlay/registry"
 );
 const { lineFlipFromDelta } = await import(
-    "../server/modules/overlay_elements/elements/line"
+    "../server/pages/overlays/modules/overlay_elements/elements/line"
 );
 const { resolveElement, resolveElementProps, elementStyle } = await import(
     "../shared/ui/overlay/element"
 );
 const { DEFAULT_ALERT_PROPS } = await import(
-    "../server/modules/overlay_elements/overlay_schema"
+    "../server/pages/overlays/modules/overlay_elements/overlay_schema"
 );
 
 import {

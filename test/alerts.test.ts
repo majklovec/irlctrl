@@ -9,10 +9,10 @@ import { describe, expect, test } from "bun:test";
 };
 
 const alerts = await import(
-    "../server/modules/overlay_elements/elements/alerts"
+    "../server/pages/overlays/modules/overlay_elements/elements/alerts"
 );
 const { DEFAULT_ALERT_PROPS } = await import(
-    "../server/modules/overlay_elements/overlay_schema"
+    "../server/pages/overlays/modules/overlay_elements/overlay_schema"
 );
 const { triggerPhase } = await import("../shared/ui/overlay/element");
 

@@ -24,7 +24,6 @@ export {
 	Select,
 } from "./form";
 export { Modal } from "./modal";
-export { ServerNav } from "./nav";
 export { Footer, Page, TitleWithBack } from "./page";
 export { RowActions, Table, type TableColumn } from "./table";
 export { Toast, type ToastSlot, useToast } from "./toast";

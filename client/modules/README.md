@@ -92,7 +92,7 @@ A module ships:
     plugins for the OBS overlay editor (the environment-free schema and the
     browser half); see [docs/overlays.md](../../docs/overlays.md#adding-a-new-element-type).
     A directory may contribute only these (no `backend.ts`), like
-    `server/modules/overlay_elements/`.
+    `server/pages/overlays/modules/overlay_elements/`.
 -   any number of private helpers (`switcher_engine.ts`, `routing.ts`, …).
 
 Modules may import the dependency-free helpers in `shared/` (`args`, `params`,
@@ -191,7 +191,7 @@ each other through the per-connection `DeviceCard` capability API
 
 ## Dashboard actions
 
-The **Buttons** widget (`server/modules/deck/`) is a virtual StreamDeck: a grid of
+The **Buttons** widget (`server/pages/dashboards/modules/deck/`) is a virtual StreamDeck: a grid of
 buttons on the dashboard, each firing one RPC method of one module on the
 device it names — one widget (offered once per dashboard) can drive any number
 of the user's devices. The widget never names a module — it reads each

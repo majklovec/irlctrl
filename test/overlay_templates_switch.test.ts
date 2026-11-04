@@ -89,7 +89,7 @@ beforeAll(async () => {
 	const result = await Bun.build({
 		entrypoints: [
 			new URL(
-				"../server/modules/overlay_templates/element.tsx",
+				"../server/pages/overlays/modules/overlay_templates/element.tsx",
 				import.meta.url,
 			).pathname,
 		],

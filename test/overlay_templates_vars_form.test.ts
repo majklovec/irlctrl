@@ -28,7 +28,7 @@ import type m from "mithril";
 // transform leaks into them, quietly dropping their test registrations.
 
 type Def =
-	typeof import("../server/modules/overlay_templates/overlay_elements")[number];
+	typeof import("../server/pages/overlays/modules/overlay_templates/overlay_elements")[number];
 
 type Mutate = (fn: (el: { props: Record<string, unknown> }) => void) => void;
 
@@ -121,7 +121,7 @@ beforeAll(async () => {
 	};
 
 	const { default: elements } = await import(
-		"../server/modules/overlay_templates/overlay_elements"
+		"../server/pages/overlays/modules/overlay_templates/overlay_elements"
 	);
 	mithril = (await import("mithril")) as typeof mithril;
 	getRoot = () => {

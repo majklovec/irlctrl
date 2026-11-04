@@ -87,5 +87,5 @@ provides.
 ## Adding a component
 
 One file per component under `components/`, exported from `ui.tsx`, styled in
-`shared/css/components/<name>.css` (imported from `style.css`) using tokens
+`components/<name>.css` (imported from `shared/css/style.css`) using tokens
 only. Add a row to the table above.

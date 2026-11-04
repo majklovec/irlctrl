@@ -54,4 +54,4 @@ updatedAt }` (timestamps in epoch ms). Uploads auto-suffix name collisions as
 `server/pages/assets/client/` — `assets_store.ts` (lazy tree state, per-folder
 file cache, all mutations) and `assets_list.tsx` (keyboard-navigable tree,
 file table, drag-and-drop upload and move, modals). Styles:
-`shared/css/pages/assets.css`. i18n: `assets.*` keys in `i18n/*.json`.
+`client/assets.css`. i18n: `assets.*` keys in `i18n/*.json`.

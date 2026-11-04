@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
-import { APP_VERSION } from "../../../shared/app_version";
-import type { ControlRouteContext } from "../../../shared/contracts/backend_module";
-import { upgradeRequired } from "../../../shared/http";
+import { APP_VERSION } from "../../../../../shared/app_version";
+import type { ControlRouteContext } from "../../../../../shared/contracts/backend_module";
+import { upgradeRequired } from "../../../../../shared/http";
 import type { ChatSnapshot } from "./types";
 
 const headers = {

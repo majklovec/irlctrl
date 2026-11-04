@@ -25,7 +25,8 @@ WORKDIR /app
 
 # Copy only what is needed to run the server. The server runs unbundled
 # (`bun server/main.ts`): modules are discovered by a runtime scan
-# of client/modules + server/modules and dynamically imported (the server
+# of client/modules + the page slices' server/pages/<page>/modules and
+# dynamically imported (the server
 # validates dashboards against the device modules too), and the web UI is
 # bundled at startup via scripts/gen_modules.ts + Bun.build.
 COPY --from=builder /app/package.json /app/bun.lock ./

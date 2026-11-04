@@ -99,7 +99,8 @@ WORKDIR /app
 
 # Copy only what is needed to run the device. The client runs unbundled
 # (`bun client/backend/client.ts`): modules are discovered by a runtime scan of
-# client/modules + server/modules and dynamically imported, and the web UI is
+# client/modules + the page slices' server/pages/<page>/modules and dynamically
+# imported, and the web UI is
 # bundled at startup on the fly.
 COPY --from=builder /app/package.json /app/bun.lock ./
 COPY --from=builder /app/node_modules ./node_modules

@@ -7,7 +7,7 @@ import {
     chatPropsToConfig,
     chatSpecsFromChannels,
     normalizeChannels,
-} from "../server/modules/chat/config";
+} from "../server/pages/dashboards/modules/chat/config";
 
 describe("chat platform icons", () => {
     test("declares automatic, show and hide choices", () => {

@@ -6,7 +6,7 @@
  * these are the shapes the server-side validation (backend.ts) and the
  * widget (frontend.tsx) share.
  */
-import type { DashboardActionEntry } from "../../../shared/contracts/wire";
+import type { DashboardActionEntry } from "../../../../../shared/contracts/wire";
 
 export type { DashboardActionEntry };
 

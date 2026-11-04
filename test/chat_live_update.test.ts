@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, test } from "bun:test";
 import { createRequire } from "node:module";
 import type m from "mithril";
 
-type ChatModule = typeof import("../server/modules/chat/frontend");
+type ChatModule = typeof import("../server/pages/dashboards/modules/chat/frontend");
 
 let chat: ChatModule;
 let chatFeed: (w: { id: string; config: Record<string, string> }, showEmpty?: boolean) => m.Children;
@@ -29,7 +29,7 @@ beforeAll(async () => {
 	const compStub = "export const Badge = {};";
 
 	const result = await Bun.build({
-		entrypoints: [new URL("../server/modules/chat/frontend.tsx", import.meta.url).pathname],
+		entrypoints: [new URL("../server/pages/dashboards/modules/chat/frontend.tsx", import.meta.url).pathname],
 		target: "browser",
 		format: "cjs",
 		external: ["mithril"],

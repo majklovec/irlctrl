@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { DEFAULT_CHAT_PROPS } from "../server/modules/chat/overlay_schema";
+import { DEFAULT_CHAT_PROPS } from "../server/pages/dashboards/modules/chat/overlay_schema";
 import {
 	DEFAULT_LINE_PROPS,
 	DEFAULT_PROGRESS_PROPS,
 	DEFAULT_RECTANGLE_PROPS,
 	DEFAULT_TEXT_PROPS,
 	DEFAULT_VIDEO_PROPS,
-} from "../server/modules/overlay_elements/overlay_schema";
+} from "../server/pages/overlays/modules/overlay_elements/overlay_schema";
 import {
 	cssFilterString,
 	defaultOverlay,

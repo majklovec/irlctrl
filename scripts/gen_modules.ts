@@ -6,7 +6,8 @@
 // cannot break the generator:
 //
 // Modules live under the roots listed in shared/paths.ts (MODULE_ROOTS:
-// client/modules and server/modules); every manifest spans all of them.
+// client/modules plus the page slices' server/pages/<page>/modules); every
+// manifest spans all of them.
 //
 //   generated/modules.frontend.ts — one import per <root>/<id>/frontend.tsx;
 //   the browser bundle statically resolves every import (no runtime Glob).

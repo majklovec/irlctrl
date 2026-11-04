@@ -15,8 +15,20 @@ import { fileURLToPath } from "node:url";
 /** Absolute `file:` URL of the application root (the directory holding package.json). */
 export const APP_ROOT = new URL("../", import.meta.url);
 
-/** Directories whose immediate children are modules (`<root>/<id>/backend.ts`). */
-export const MODULE_ROOTS = ["client/modules", "server/modules"] as const;
+/**
+ * Directories whose immediate children are modules (`<root>/<id>/backend.ts`).
+ *
+ * The control server's widget/overlay modules live inside the page slices that
+ * consume them (01-refactor): the dashboards widgets under
+ * `server/pages/dashboards/modules` and the overlays element/template modules
+ * under `server/pages/overlays/modules`. A page that ships its own module adds
+ * its `server/pages/<id>/modules` directory here.
+ */
+export const MODULE_ROOTS = [
+    "client/modules",
+    "server/pages/dashboards/modules",
+    "server/pages/overlays/modules",
+] as const;
 
 /** Page entry points (`<dir>/<name>.html`) of each side's web UI. */
 export const PAGE_DIRS = {

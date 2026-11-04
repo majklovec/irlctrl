@@ -12,9 +12,9 @@ import {
 	IconButton,
 	Input,
 	Page,
-	ServerNav,
 } from "@ui/components/";
 import { Icon } from "@ui/components/icons";
+import { ServerNav } from "./nav";
 import { i18nReady, t } from "@ui/i18n";
 import { mountPage } from "@ui/util";
 import m from "mithril";

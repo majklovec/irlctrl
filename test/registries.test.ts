@@ -44,7 +44,7 @@ const WIDGET_IDS = ["stats", "chat"];
  * default-exporting an array of them — the registry flattens it.
  */
 const appDir = join(import.meta.dir, "..");
-/** Every module directory across the module roots (client/modules, server/modules). */
+/** Every module directory across the module roots (client/modules, server/pages/<page>/modules). */
 const moduleDirs = (): { id: string; path: string }[] =>
     MODULE_ROOTS.flatMap((root) =>
         readdirSync(join(appDir, root), { withFileTypes: true })

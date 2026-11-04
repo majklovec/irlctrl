@@ -3,11 +3,11 @@ import type {
     Action,
     AuthorBadge,
 } from "youtube-chat-next/dist/types/yt-response";
-import type { ChatLive } from "../server/modules/chat/types";
+import type { ChatLive } from "../server/pages/dashboards/modules/chat/types";
 import {
     badgesByItemId,
     parseYtBadges,
-} from "../server/modules/chat/providers/youtube_badges";
+} from "../server/pages/dashboards/modules/chat/providers/youtube_badges";
 
 const originalFetch = globalThis.fetch;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -200,7 +200,7 @@ describe("YouTube provider badge wiring", () => {
 
     test("a poll message carries member + moderator badges on the wire", async () => {
         const { YoutubeChatProvider } = await import(
-            "../server/modules/chat/providers/youtube"
+            "../server/pages/dashboards/modules/chat/providers/youtube"
         );
         const frames: string[] = [];
         const provider = new YoutubeChatProvider("channel", (msg) =>

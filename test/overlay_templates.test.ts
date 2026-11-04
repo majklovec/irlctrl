@@ -1,32 +1,32 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { templateDocUrl } from "../server/modules/overlay_templates/catalog";
+import { templateDocUrl } from "../server/pages/overlays/modules/overlay_templates/catalog";
 import {
 	buildTemplateConfig,
 	namedStyleVars,
-} from "../server/modules/overlay_templates/doc";
-import { DEFAULT_HTML_TEMPLATE_PROPS } from "../server/modules/overlay_templates/overlay_schema";
+} from "../server/pages/overlays/modules/overlay_templates/doc";
+import { DEFAULT_HTML_TEMPLATE_PROPS } from "../server/pages/overlays/modules/overlay_templates/overlay_schema";
 import {
 	readColorAlpha,
 	writeColorAlpha,
-} from "../server/modules/overlay_templates/templates/color_value";
-import { scopeTemplateCss } from "../server/modules/overlay_templates/templates/css_scope";
+} from "../server/pages/overlays/modules/overlay_templates/templates/color_value";
+import { scopeTemplateCss } from "../server/pages/overlays/modules/overlay_templates/templates/css_scope";
 import {
 	escapeAttr,
 	escapeHtml,
 	renderTemplateDoc,
 	templateBody,
-} from "../server/modules/overlay_templates/templates/render_doc";
+} from "../server/pages/overlays/modules/overlay_templates/templates/render_doc";
 import {
 	parseRootVars,
 	rootVarLabel,
-} from "../server/modules/overlay_templates/templates/root_vars";
+} from "../server/pages/overlays/modules/overlay_templates/templates/root_vars";
 import {
 	type ParsedTemplateDoc,
 	parseTemplateDoc,
-} from "../server/modules/overlay_templates/templates/template_doc";
-import type { TemplateMeta } from "../server/modules/overlay_templates/templates/template_meta";
+} from "../server/pages/overlays/modules/overlay_templates/templates/template_doc";
+import type { TemplateMeta } from "../server/pages/overlays/modules/overlay_templates/templates/template_meta";
 import { parseElementInput } from "../shared/overlay";
 
 // A template is one self-contained HTML document on disk

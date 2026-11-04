@@ -3,11 +3,11 @@ import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import type m from "mithril";
 
-let chat: typeof import("../server/modules/chat/frontend");
+let chat: typeof import("../server/pages/dashboards/modules/chat/frontend");
 
 beforeAll(async () => {
     const result = await Bun.build({
-        entrypoints: [new URL("../server/modules/chat/frontend.tsx", import.meta.url).pathname],
+        entrypoints: [new URL("../server/pages/dashboards/modules/chat/frontend.tsx", import.meta.url).pathname],
         target: "browser",
         format: "cjs",
         external: ["mithril"],

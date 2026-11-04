@@ -4,7 +4,7 @@
  * chat widget, no embedded page URL). The browser half is in
  * overlay_elements.tsx.
  */
-import type { OverlayElementSchema } from "../../../shared/contracts/overlay_element";
+import type { OverlayElementSchema } from "../../../../../shared/contracts/overlay_element";
 import { normalizeChannels, type ChatChannel } from "./config";
 
 export interface ChatProps {

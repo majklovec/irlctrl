@@ -17,9 +17,9 @@ runtime page through its token-scoped file endpoint.
 - Element plugin contract: [`shared/contracts/overlay_element.ts`](../shared/contracts/overlay_element.ts)
   (schema half) and [`shared/ui/overlay/element.ts`](../shared/ui/overlay/element.ts)
   (browser half)
-- Built-in elements: [`server/modules/overlay_elements/`](../server/modules/overlay_elements/);
+- Built-in elements: [`server/pages/overlays/modules/overlay_elements/`](../server/pages/overlays/modules/overlay_elements/);
   the chat element lives in the chat module
-  ([`server/modules/chat/overlay_elements.tsx`](../server/modules/chat/overlay_elements.tsx))
+  ([`server/pages/dashboards/modules/chat/overlay_elements.tsx`](../server/pages/dashboards/modules/chat/overlay_elements.tsx))
 - Server: [`server/backend/overlays/`](../server/backend/overlays/)
 
 ## OBS setup
@@ -251,7 +251,7 @@ overlay, so the runtime URLs never carry an overlay id.
 
 Element types are module plugins: the core (schema validator, renderer,
 editor, runtime) resolves them through two generated registries and never
-names one. Any module — under `client/modules/` or `server/modules/` — can
+names one. Any module — under `client/modules/` or `server/pages/<page>/modules/` — can
 contribute elements; a new type never touches `shared/overlay.ts`,
 `overlays/overlay_render.tsx`, the editor (`overlays/overlay_update.tsx`, `overlays/editor/*`) or the runtime page (`overlays/overlay_view.tsx`).
 

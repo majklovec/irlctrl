@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { kickRoleBadgeUrl } from "../server/modules/chat/providers/kick_badges";
-import type { ChatLive } from "../server/modules/chat/types";
+import { kickRoleBadgeUrl } from "../server/pages/dashboards/modules/chat/providers/kick_badges";
+import type { ChatLive } from "../server/pages/dashboards/modules/chat/types";
 
 // Shorten the staleness window before the provider module is evaluated so the
 // test does not block on a real 3-minute silence.
@@ -91,11 +91,11 @@ afterEach(() => {
 });
 
 async function startSubscribedProvider(): Promise<{
-    provider: import("../server/modules/chat/providers/kick").KickChatProvider;
+    provider: import("../server/pages/dashboards/modules/chat/providers/kick").KickChatProvider;
     ws: FakeWebSocket;
 }> {
     const { KickChatProvider } = await import(
-        "../server/modules/chat/providers/kick"
+        "../server/pages/dashboards/modules/chat/providers/kick"
     );
     const provider = new KickChatProvider("example", () => {});
     provider.start();
@@ -163,12 +163,12 @@ describe("Kick chat provider staleness watchdog", () => {
 
 describe("Kick chat provider badge extraction", () => {
     async function startProvider(): Promise<{
-        provider: import("../server/modules/chat/providers/kick").KickChatProvider;
+        provider: import("../server/pages/dashboards/modules/chat/providers/kick").KickChatProvider;
         ws: FakeWebSocket;
         frames: string[];
     }> {
         const { KickChatProvider } = await import(
-            "../server/modules/chat/providers/kick"
+            "../server/pages/dashboards/modules/chat/providers/kick"
         );
         const frames: string[] = [];
         const provider = new KickChatProvider("example", (msg) =>

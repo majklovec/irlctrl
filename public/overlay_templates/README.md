@@ -11,7 +11,7 @@ the whole act of adding a template** — the server's
 and the element's template picker is built from that list.
 
 > For the renderer's internal contract (scoping, escaping, caching) see
-> [`server/modules/overlay_templates/README.md`](../../server/modules/overlay_templates/README.md).
+> [`server/pages/overlays/modules/overlay_templates/README.md`](../../server/pages/overlays/modules/overlay_templates/README.md).
 > This file is the *authoring* guide.
 
 ---
@@ -219,7 +219,7 @@ stylesheet so it can only affect this element's wrapper:
 
 2. **Add the display-name i18n key.** Add
    `"overlay.tpl.<id>": "Display name"` to **every** locale file in
-   [`server/modules/overlay_templates/i18n/`](../../server/modules/overlay_templates/i18n)
+   [`server/pages/overlays/modules/overlay_templates/i18n/`](../../server/pages/overlays/modules/overlay_templates/i18n)
    — `en, de, es, fr, it, ja, pl, pt, ru, cs, sk, zh` (12 files). The i18n
    test asserts every locale has *exactly* the same keys as `en.json`, so a key
    missing in even one locale fails the build. (The meta tag's `content` value

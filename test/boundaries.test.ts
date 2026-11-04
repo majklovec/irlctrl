@@ -50,7 +50,14 @@ interface Layout {
 }
 
 const LAYOUT: Layout = {
-	moduleRoots: ["client/modules", "server/modules"],
+	// The control server's widget/overlay modules now live inside the page
+	// slices that consume them (01-refactor); the device modules stay in
+	// client/modules. Same list as shared/paths.ts MODULE_ROOTS.
+	moduleRoots: [
+		"client/modules",
+		"server/pages/dashboards/modules",
+		"server/pages/overlays/modules",
+	],
 	coreRoots: [
 		"client/backend",
 		"client/frontend",

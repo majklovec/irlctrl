@@ -246,7 +246,7 @@ Nastavení streamu (pipeline, datový tok, zvuk, cíle a plánovač) se ukládaj
 
 ## Moduly
 
-Každá funkce je implementována jako **samostatný modul** v adresáři [`client/modules/`](client/modules/README.md) (moduly zařízení) nebo `server/modules/` (moduly widgetů nástěnky). Modul obsahuje registraci backendu, kartu frontendového rozhraní, vlastní typy a styly.
+Každá funkce je implementována jako **samostatný modul** v adresáři [`client/modules/`](client/modules/README.md) (moduly zařízení) nebo `server/pages/<page>/modules/` (moduly widgetů nástěnky). Modul obsahuje registraci backendu, kartu frontendového rozhraní, vlastní typy a styly.
 
 Jádro aplikace (`client/`, `server/` a `shared/` mimo adresáře modulů) nikdy nenačítá modul přímo podle jeho identifikátoru. Moduly vyhledává, směruje a vykresluje prostřednictvím registrů a sběrnice schopností. Toto oddělení ověřuje test [`test/registries.test.ts`](test/registries.test.ts).
 
@@ -270,7 +270,7 @@ Jsou určeny pouze pro nástěnky a běží na řídicím serveru nezávisle na 
 | Widget  | Zdroj a funkce                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `stats` | Umožňuje samostatně nastavit kanály YouTube (ID kanálu nebo handle), Twitch a Kick. Každých 30 sekund načítá počty diváků a zobrazuje každou platformu i jejich součet v grafu za poslední hodinu.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `chat`  | Jeden widget zobrazuje sloučený chat ze všech nakonfigurovaných platforem. Konfigurace obsahuje kanál pro každou platformu (`youtube`, `twitch`, `tiktok`, `kick`) a všechny vyplněné kanály se připojí; jejich zprávy se slučují do jednoho zobrazení. Komunikační mechanismy jednotlivých platforem jsou v `server/modules/chat/providers/`: Kick se připojuje k veřejné chatovací místnosti Pusher bez autentizace, Twitch používá jedno spojení IRC přes WebSocket pro každý kanál (anonymní přezdívka `justinfan`, značky IRCv3), YouTube dotazuje endpoint živého chatu pro každý identifikátor tvůrce přibližně každou sekundu pomocí [`youtube-chat-next`](https://www.npmjs.com/package/youtube-chat-next) a TikTok používá jedno WebSocket spojení prostřednictvím [`tiktok-live-connector`](https://www.npmjs.com/package/tiktok-live-connector), přičemž opětovné připojování zajišťuje samotný modul. |
+| `chat`  | Jeden widget zobrazuje sloučený chat ze všech nakonfigurovaných platforem. Konfigurace obsahuje kanál pro každou platformu (`youtube`, `twitch`, `tiktok`, `kick`) a všechny vyplněné kanály se připojí; jejich zprávy se slučují do jednoho zobrazení. Komunikační mechanismy jednotlivých platforem jsou v `server/pages/dashboards/modules/chat/providers/`: Kick se připojuje k veřejné chatovací místnosti Pusher bez autentizace, Twitch používá jedno spojení IRC přes WebSocket pro každý kanál (anonymní přezdívka `justinfan`, značky IRCv3), YouTube dotazuje endpoint živého chatu pro každý identifikátor tvůrce přibližně každou sekundu pomocí [`youtube-chat-next`](https://www.npmjs.com/package/youtube-chat-next) a TikTok používá jedno WebSocket spojení prostřednictvím [`tiktok-live-connector`](https://www.npmjs.com/package/tiktok-live-connector), přičemž opětovné připojování zajišťuje samotný modul. |
 
 Widgety chatu uchovávají průběžnou historii zpráv, aby se při opětovném připojení neposílaly znovu, a používají množinu `seen` k odstranění duplicit podle ID zpráv i po opětovném připojení.
 
@@ -292,7 +292,7 @@ dosavadní přístup pouze přes přihlášenou relaci.
 
 ### Jak funguje systém modulů
 
-Každý adresář `client/modules/<id>/` nebo `server/modules/<id>/` obsahuje přesně čtyři soubory:
+Každý adresář `client/modules/<id>/` nebo `server/pages/<page>/modules/<id>/` obsahuje přesně čtyři soubory:
 -   `backend.ts` — registrace backendu (běží v Bun na hostiteli, bez DOM).
 -   `frontend.tsx` — registrace frontendu (komponenty Mithril, bez importů z backendu).
 -   `types.ts` — pouze lokální typy daného modulu (může importovat typy jádra, nikdy však typy jiného modulu).
@@ -310,7 +310,7 @@ Každý modul načítá svůj soubor `styles.css` jako vedlejší efekt importu,
 
 **Pořadí modulů** — funkce `resolveOrder` řadí moduly topologicky podle jejich `dependencies`. Je bezpečná i při výskytu cyklů a moduly bez vzájemných závislostí řadí podle ID. Funkce `startModules`, `stopModules` a `buildStatus` toto pořadí vždy respektují; nepoužívají ručně udržovaný seznam.
 
-**Přidání modulu** — vytvořte `client/modules/<id>/` (nebo `server/modules/<id>/` pro widget nástěnky) se čtyřmi uvedenými soubory, zaregistrujte `cardBody` pro zařízení nebo `component` a `createHub` pro widget a případně nastavte `dependencies`. Jádro není nutné upravovat — modul se objeví díky automatickému procházení adresářů a kroku `predev`.
+**Přidání modulu** — vytvořte `client/modules/<id>/` (nebo `server/pages/<page>/modules/<id>/` pro widget nástěnky) se čtyřmi uvedenými soubory, zaregistrujte `cardBody` pro zařízení nebo `component` a `createHub` pro widget a případně nastavte `dependencies`. Jádro není nutné upravovat — modul se objeví díky automatickému procházení adresářů a kroku `predev`.
 
 Názvy metod a událostí jsou pevně dané. Jejich přejmenování představuje nekompatibilní změnu API.
 
@@ -334,7 +334,7 @@ bun run build:client     # → dist/client
 bun run build:server     # → dist/server
 ```
 
-Moduly se vyhledávají za běhu procházením adresářů `client/modules/` a `server/modules/`. Generované manifesty v `generated/` vytváří `scripts/gen_modules.ts`; tento krok je zapojen do `predev`, `pretest` a `prebuild:*`.
+Moduly se vyhledávají za běhu procházením adresářů `client/modules/` a `server/pages/<page>/modules/`. Generované manifesty v `generated/` vytváří `scripts/gen_modules.ts`; tento krok je zapojen do `predev`, `pretest` a `prebuild:*`.
 
 Uživatelské rozhraní podporuje více jazyků prostřednictvím JSON katalogů v `i18n/` (12 jazyků). Překlady se podle potřeby poskytují prohlížeči z adresy `/i18n/<lang>.json`. Jazyk se nastavuje při prvním spuštění a lze jej kdykoli změnit pomocí výběru v záhlaví. Zařízení si volbu ukládá do konfiguračního souboru.
 

@@ -1,5 +1,5 @@
 /*
- * HTTP helpers shared by the device API (client/backend/api.ts) and the control server (server/backend/server.ts).
+ * HTTP helpers shared by the device API (client/backend/api.ts) and the control server (server/main.ts).
  */
 import { appPath, ASSETS_DIR } from "./paths";
 

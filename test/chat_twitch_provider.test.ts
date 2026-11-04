@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import type { ChatLive } from "../server/modules/chat/types";
-import { parseTwitchBadges } from "../server/modules/chat/providers/twitch_badges";
+import type { ChatLive } from "../server/pages/dashboards/modules/chat/types";
+import { parseTwitchBadges } from "../server/pages/dashboards/modules/chat/providers/twitch_badges";
 
 type WsListener = { event: string; fn: (ev?: unknown) => void };
 class FakeWebSocket {
@@ -46,12 +46,12 @@ const PRIVMSG = (overrides: Record<string, string>): string => {
 };
 
 async function startProvider(): Promise<{
-    provider: import("../server/modules/chat/providers/twitch").TwitchChatProvider;
+    provider: import("../server/pages/dashboards/modules/chat/providers/twitch").TwitchChatProvider;
     ws: FakeWebSocket;
     frames: string[];
 }> {
     const { TwitchChatProvider } = await import(
-        "../server/modules/chat/providers/twitch"
+        "../server/pages/dashboards/modules/chat/providers/twitch"
     );
     const frames: string[] = [];
     const provider = new TwitchChatProvider("channel", (msg) => frames.push(msg));

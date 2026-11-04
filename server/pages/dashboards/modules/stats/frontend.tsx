@@ -7,8 +7,8 @@ import m from "mithril";
 import type {
 	ChannelWidgetModule,
 	WidgetContext,
-} from "../../../shared/contracts/frontend_module";
-import type { ServerDashboardWidget } from "../../../shared/contracts/wire";
+} from "../../../../../shared/contracts/frontend_module";
+import type { ServerDashboardWidget } from "../../../../../shared/contracts/wire";
 import {
 	parseStatsSpec,
 	STATS_EDITOR_FIELDS,

@@ -9,8 +9,8 @@ import m from "mithril";
 import type {
 	ChannelWidgetModule,
 	WidgetContext,
-} from "../../../shared/contracts/frontend_module";
-import type { ServerDashboardWidget } from "../../../shared/contracts/wire";
+} from "../../../../../shared/contracts/frontend_module";
+import type { ServerDashboardWidget } from "../../../../../shared/contracts/wire";
 import {
 	bannedMessagesFromConfig,
 	CHAT_CONFIG_FIELDS,
