@@ -530,6 +530,33 @@ describe("overlay_templates: doc renderer", () => {
 		expect(s).toContain(escapeHtml(hostile));
 	});
 
+	test("every occurrence of a repeated data-bind slot is filled (ticker marquee)", () => {
+		// a template may bind the same slot more than once — the ticker repeats
+		// `title` in its scrolling track for a seamless marquee. Every
+		// occurrence must be baked, not just the first.
+		const body =
+			`<section>` +
+			`<span data-bind="title">placeholder one</span><span class="sep">•</span>` +
+			`<span data-bind="title">placeholder two</span>` +
+			`</section>`;
+		const s = renderTemplateDoc({
+			meta,
+			body,
+			config: { text: { title: "Now Playing" } },
+		});
+		// both occurrences are baked, in original order, separator intact
+		expect(s).toBe(
+			`<div class="ov-tpl-${meta.id}" style="">` +
+				`<section>` +
+				`<span data-bind="title">Now Playing</span><span class="sep">•</span>` +
+				`<span data-bind="title">Now Playing</span>` +
+				`</section>` +
+				`</div>`,
+		);
+		expect(s).not.toContain("placeholder one");
+		expect(s).not.toContain("placeholder two");
+	});
+
 	test("a changed config yields a changed string; the same input is stable", () => {
 		expect(doc({}, { title: "a" })).not.toBe(doc({}, { title: "b" }));
 		expect(doc({}, { title: "a" })).toBe(doc({}, { title: "a" }));

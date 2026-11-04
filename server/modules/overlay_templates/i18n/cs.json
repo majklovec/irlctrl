@@ -25,5 +25,11 @@
     "overlay.tpl.now_playing": "Právě hraje",
     "overlay.tpl.starting_soon": "Za chvíli",
     "overlay.tpl.ticker": "Běžící pás",
-    "overlay.tpl.webcam_frame": "Rámeček webkamery"
+    "overlay.tpl.webcam_frame": "Rámeček webkamery",
+    "overlay.tpl.alert": "Alert",
+    "overlay.tpl.breaking_banner": "Breaking banner",
+    "overlay.tpl.chat_box": "Chat box",
+    "overlay.tpl.goal_bar": "Goal bar",
+    "overlay.tpl.music_viz": "Music visualizer",
+    "overlay.tpl.question_card": "Question card"
 }

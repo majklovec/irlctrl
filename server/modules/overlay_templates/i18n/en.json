@@ -25,5 +25,11 @@
     "overlay.tpl.now_playing": "Now playing",
     "overlay.tpl.starting_soon": "Starting soon",
     "overlay.tpl.ticker": "Ticker",
-    "overlay.tpl.webcam_frame": "Webcam frame"
+    "overlay.tpl.webcam_frame": "Webcam frame",
+    "overlay.tpl.alert": "Alert",
+    "overlay.tpl.breaking_banner": "Breaking banner",
+    "overlay.tpl.chat_box": "Chat box",
+    "overlay.tpl.goal_bar": "Goal bar",
+    "overlay.tpl.music_viz": "Music visualizer",
+    "overlay.tpl.question_card": "Question card"
 }

@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="overlay-template:name" content="overlay.tpl.breaking_banner" />
+    <style>
+      :root {
+        --accent: #ff2d55;
+        --bg: rgba(15, 15, 25, 0.95);
+        --text: #ffffff;
+        --label-text: #ffffff;
+        --padding: 14px;
+      }
+
+      *, *::before, *::after { box-sizing: border-box; }
+
+      section {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        background: transparent;
+      }
+
+      .bar {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: stretch;
+        background: var(--bg);
+        overflow: hidden;
+      }
+
+      .label {
+        flex: none;
+        display: flex;
+        align-items: center;
+        padding: 0 18px;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.18), rgba(0,0,0,0.14)),
+          var(--accent);
+        color: var(--label-text);
+        font-size: 18px;
+        font-weight: 900;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        box-shadow: 0 0 24px var(--accent);
+        animation: brk-pulse 1.4s ease-in-out infinite;
+      }
+
+      .viewport {
+        position: relative;
+        flex: 1;
+        display: flex;
+        align-items: center;
+        overflow: hidden;
+      }
+
+      .viewport::before,
+      .viewport::after {
+        content: "";
+        position: absolute;
+        top: 0; bottom: 0;
+        width: 48px;
+        pointer-events: none;
+        z-index: 1;
+      }
+
+      .viewport::before {
+        left: 0;
+        background: linear-gradient(90deg, var(--bg), transparent);
+      }
+
+      .viewport::after {
+        right: 0;
+        background: linear-gradient(270deg, var(--bg), transparent);
+      }
+
+      .track {
+        position: absolute;
+        left: 100%;
+        top: 50%;
+        display: inline-flex;
+        align-items: center;
+        white-space: nowrap;
+        animation: brk-scroll 20s linear infinite;
+        will-change: transform;
+      }
+
+      .track > span[data-bind="title"] {
+        color: var(--text);
+        font-size: 20px;
+        font-weight: 600;
+        padding-right: 100px;
+      }
+
+      @keyframes brk-scroll {
+        from { transform: translate(0, -50%); }
+        to   { transform: translate(-100%, -50%); }
+      }
+
+      @keyframes brk-pulse {
+        0%, 100% { opacity: 1; }
+        50%      { opacity: 0.65; }
+      }
+    </style>
+  </head>
+  <body>
+    <section>
+      <div class="bar">
+        <span class="label" data-bind="label">Breaking</span>
+        <div class="viewport">
+          <div class="track">
+            <span data-bind="title">Breaking news text goes here — details will scroll across</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

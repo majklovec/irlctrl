@@ -4,124 +4,142 @@
     <meta charset="utf-8" />
     <meta name="overlay-template:name" content="overlay.tpl.now_playing" />
     <style>
-		/*
-		 * now_playing — fills the element's box (no design canvas, no scaling). A "now playing" chip:
-		 * cover art (logo) left, two-line track info right, an accent spine between.
-		 * ; the
-		 * doc renderer overrides them.
-		 */
-		:root {
-		    --accent: #6c5ce7;
-		    --bg: rgba(15, 15, 25, 0.92);
-		    --text: #ffffff;
-		    --radius: 12px;
-		    --padding: 14px;
-		}
-		
-		*,
-		*::before,
-		*::after {
-		    box-sizing: border-box;
-		}
-		
-		section {
-		    position: absolute;
-		    inset: 0;
-		    width: 100%;
-		    height: 100%;
-		    background: transparent;
-		}
-		
-		.card {
-		    position: absolute;
-		    inset: 0;
-		    display: flex;
-		    align-items: center;
-		    gap: 16px;
-		    padding: var(--padding);
-		    background: var(--bg);
-		    border-radius: var(--radius);
-		    overflow: hidden;
-		}
-		
-		.art {
-		    flex: none;
-		    position: relative;
-		    width: 88px;
-		    height: 88px;
-		    border-radius: calc(var(--radius) * 0.7);
-		    overflow: hidden;
-		}
-		
-		/* Cover art fills the tile; a faint accent block stands in when none is set. */
-		.art img {
-		    width: 100%;
-		    height: 100%;
-		    object-fit: cover;
-		}
-		
-		.art-empty {
-		    position: absolute;
-		    inset: 0;
-		    background: var(--accent);
-		    opacity: 0.28;
-		}
-		
-		.art:has(img[src]) .art-empty {
-		    display: none;
-		}
-		
-		.spine {
-		    flex: none;
-		    width: 4px;
-		    align-self: stretch;
-		    background: var(--accent);
-		    border-radius: 2px;
-		}
-		
-		.info {
-		    display: flex;
-		    flex-direction: column;
-		    gap: 4px;
-		    min-width: 0;
-		}
-		
-		.title {
-		    color: var(--text);
-		    font-size: 26px;
-		    font-weight: 700;
-		    line-height: 1.15;
-		    white-space: nowrap;
-		    overflow: hidden;
-		    text-overflow: ellipsis;
-		}
-		
-		.subtitle {
-		    color: var(--text);
-		    opacity: 0.7;
-		    font-size: 18px;
-		    line-height: 1.2;
-		    white-space: nowrap;
-		    overflow: hidden;
-		    text-overflow: ellipsis;
-		}
-		
+      :root {
+        --accent: #6c5ce7;
+        --bg: rgba(15, 15, 25, 0.92);
+        --text: #ffffff;
+        --radius: 12px;
+        --padding: 14px;
+      }
+
+      *, *::before, *::after { box-sizing: border-box; }
+
+      section {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        background: transparent;
+      }
+
+      .card {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: var(--padding);
+        background: var(--bg);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+
+      .art {
+        flex: none;
+        position: relative;
+        width: 88px;
+        height: 88px;
+        border-radius: calc(var(--radius) * 0.7);
+        overflow: hidden;
+      }
+
+      .art img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      .art-empty {
+        position: absolute;
+        inset: 0;
+        background: var(--accent);
+        opacity: 0.28;
+      }
+
+      .art:has(img[src]) .art-empty { display: none; }
+
+      .spine {
+        flex: none;
+        width: 4px;
+        align-self: stretch;
+        background: var(--accent);
+        border-radius: 2px;
+        animation: np-spine-pulse 2.6s ease-in-out infinite;
+      }
+
+      .info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+      }
+
+      .title {
+        color: var(--text);
+        font-size: 26px;
+        font-weight: 700;
+        line-height: 1.15;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .subtitle {
+        color: var(--text);
+        opacity: 0.7;
+        font-size: 18px;
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .bars {
+        display: flex;
+        align-items: flex-end;
+        gap: 3px;
+        height: 18px;
+        margin-top: 2px;
+      }
+
+      .bars span {
+        width: 3px;
+        background: var(--accent);
+        border-radius: 2px;
+        animation: np-bar 1.1s ease-in-out infinite;
+      }
+
+      .bars span:nth-child(1) { height: 40%; animation-delay: -0.2s; }
+      .bars span:nth-child(2) { height: 90%; animation-delay: -0.5s; }
+      .bars span:nth-child(3) { height: 60%; animation-delay: -0.8s; }
+      .bars span:nth-child(4) { height: 80%; animation-delay: -1.0s; }
+
+      @keyframes np-spine-pulse {
+        0%, 100% { opacity: 1; }
+        50%      { opacity: 0.55; }
+      }
+
+      @keyframes np-bar {
+        0%, 100% { transform: scaleY(0.45); }
+        50%      { transform: scaleY(1); }
+      }
     </style>
   </head>
   <body>
-	<section>
-	    <div class="card">
-	        <div class="art">
-	            <img data-asset="logo" src="data:image/svg+xml,%3Csvg%20xmlns='http%3A//www.w3.org/2000/svg'width='84'%20height='84'%3E%3C/svg%3E"/>
-	            <div class="art-empty"></div>
-	        </div>
-	        <div class="spine"></div>
-	        <div class="info">
-	            <div class="title" data-bind="title">Track title</div>
-	            <div class="subtitle" data-bind="subtitle">Artist</div>
-	        </div>
-	    </div>
-	</section>
-	
+    <section>
+      <div class="card">
+        <div class="art">
+          <img data-asset="logo" src="data:image/svg+xml,%3Csvg%20xmlns='http%3A//www.w3.org/2000/svg'width='84'%20height='84'%3E%3C/svg%3E"/>
+          <div class="art-empty"></div>
+        </div>
+        <div class="spine"></div>
+        <div class="info">
+          <div class="title" data-bind="title">Track title</div>
+          <div class="subtitle" data-bind="subtitle">Artist</div>
+          <div class="bars"><span></span><span></span><span></span><span></span></div>
+        </div>
+      </div>
+    </section>
   </body>
 </html>

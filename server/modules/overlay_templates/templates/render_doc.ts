@@ -57,10 +57,15 @@ function bindSlot(body: string, key: string, value: string): string {
 	);
 	if (!re.test(body))
 		throw new Error(`render_doc: no data-bind="${key}" slot in template`);
-	// attribute order doesn't matter, so match the tag generically
+	// attribute order doesn't matter, so match the tag generically. The
+	// replace is /g so EVERY element carrying the slot is filled — a template
+	// may bind the same slot more than once (the ticker repeats `title` for a
+	// seamless marquee), so only replacing the first would leave the rest as
+	// placeholder text.
 	return body.replace(
 		new RegExp(
 			`(\\bdata-bind="${key}"[^>]*>)([\\s\\S]*?)(</[a-zA-Z][a-zA-Z0-9]*>)`,
+			"g",
 		),
 		`$1${escapeHtml(value)}$3`,
 	);
