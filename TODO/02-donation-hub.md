@@ -131,7 +131,7 @@ export function getOverlayElements(): OverlayElementContribution[] {
 
 And have the existing overlay element aggregation (in `shared/ui/overlay/` or wherever it lives today — locate it via `grep -R "OverlayElementDef" shared/ server/`) call `getOverlayElements()` in addition to the legacy module-sourced elements.
 
-Browser side: `scripts/gen_pages.ts` already imports each page's `client/page.tsx` and `client/menu.ts`. Extend it to also import `overlay/schema.ts` and `overlay/element.tsx` **if present** (existence check, so pages without overlay elements still work). It writes them into `server/core/generated/pages.ts` for the browser bundle.
+Browser side: `scripts/gen_pages.ts` already imports each page's `frontend/page.tsx` and `frontend/menu.ts`. Extend it to also import `overlay/schema.ts` and `overlay/element.tsx` **if present** (existence check, so pages without overlay elements still work). It writes them into `server/core/generated/pages.ts` for the browser bundle.
 
 ### 4.2 `init` must support cleanup (WebSocket listener)
 
@@ -199,7 +199,7 @@ export default donations;
 ```
 
 ```ts
-// server/pages/donations/client/menu.ts
+// server/pages/donations/frontend/menu.ts
 import type { MenuContribution } from "../../../core/contracts";
 
 export const menu: MenuContribution = {
@@ -215,12 +215,12 @@ export const menu: MenuContribution = {
 
 ## 6. Server side
 
-### 6.1 HTTP routes (`server/routes.ts`)
+### 6.1 HTTP routes (`backend/routes.ts`)
 
 One Elysia plugin, one prefix, all routes owned by the slice.
 
 ```ts
-// server/pages/donations/server/routes.ts
+// server/pages/donations/backend/routes.ts
 import { Elysia } from "elysia";
 import { handleKofi } from "./plugins/kofi";
 import { handleStripe } from "./plugins/stripe";
@@ -514,7 +514,7 @@ export const element: OverlayElementDef = {
 
 The element binds the overlay variables written by the dispatcher (§6.5): `donation_donor`, `donation_amount`, `donation_message`, `donation_platform`, `donation_level`. This is what makes templates react to thresholds without any extra machinery.
 
-**Browser bundling.** `scripts/gen_pages.ts` must include `overlay/element.tsx` in the browser bundle when it exists — the same static import trick it already uses for `client/page.tsx` and `client/menu.ts`.
+**Browser bundling.** `scripts/gen_pages.ts` must include `overlay/element.tsx` in the browser bundle when it exists — the same static import trick it already uses for `frontend/page.tsx` and `frontend/menu.ts`.
 
 ---
 
@@ -523,7 +523,7 @@ The element binds the overlay variables written by the dispatcher (§6.5): `dona
 A single Mithril page that replaces the "optional dashboard widget" from the original brief. It is the primary UI surface for this slice.
 
 ```tsx
-// server/pages/donations/client/page.tsx
+// server/pages/donations/frontend/page.tsx
 export const DonationsPage = {
 	oninit: () => store.load(), // GET /donations/config + /recent + /status
 	view: () =>
@@ -591,13 +591,13 @@ Run `bun test` (which runs `pretest`, which runs `bun run gen:pages`). Then run 
 ## 13. Deliverables checklist
 
 - [ ] `server/pages/donations/index.ts` — `PageModule` export.
-- [ ] `server/pages/donations/server/routes.ts` — Elysia plugin.
-- [ ] `server/pages/donations/server/init.ts` — plugin lifecycle + WS start/stop.
-- [ ] `server/pages/donations/server/store.ts` — `bun:sqlite` schema + config store + `closeDb`.
-- [ ] `server/pages/donations/server/dispatcher.ts` — persist → translate → publish → overlay trigger.
-- [ ] `server/pages/donations/server/alert_translator.ts`.
-- [ ] `server/pages/donations/server/plugins/{kofi,stripe,comgate,streamelements}.ts`.
-- [ ] `server/pages/donations/client/{page.tsx,menu.ts,store.ts,components/*}`.
+- [ ] `server/pages/donations/backend/routes.ts` — Elysia plugin.
+- [ ] `server/pages/donations/backend/init.ts` — plugin lifecycle + WS start/stop.
+- [ ] `server/pages/donations/backend/store.ts` — `bun:sqlite` schema + config store + `closeDb`.
+- [ ] `server/pages/donations/backend/dispatcher.ts` — persist → translate → publish → overlay trigger.
+- [ ] `server/pages/donations/backend/alert_translator.ts`.
+- [ ] `server/pages/donations/backend/plugins/{kofi,stripe,comgate,streamelements}.ts`.
+- [ ] `server/pages/donations/frontend/{page.tsx,menu.ts,store.ts,components/*}`.
 - [ ] `server/pages/donations/overlay/{schema.ts,element.tsx}`.
 - [ ] `server/pages/donations/shared/{types.ts,config.ts}`.
 - [ ] `server/pages/donations/i18n/{en,cs}.json`.
@@ -635,4 +635,4 @@ These are the questions that remain **after** the refactor. Resolve each before 
 
 5. **`gen:pages` overlay imports.** Extend the manifest generator to import `overlay/schema.ts` and `overlay/element.tsx` when the file exists. Confirm the generated `PageModule` shape (`server` stubbed) still type-checks with the new `overlayElements` field.
 
-Resolve these five before writing `server/routes.ts`. All plugin logic (§7), the alert translator (§6.4) and the overlay element contract (§8) can be implemented independently of the answers, so start there in parallel.
+Resolve these five before writing `backend/routes.ts`. All plugin logic (§7), the alert translator (§6.4) and the overlay element contract (§8) can be implemented independently of the answers, so start there in parallel.

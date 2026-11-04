@@ -2,11 +2,11 @@
  * OBS overlay editor: shared schema, validation and migrations.
  *
  * The control server persists one overlay per row in the `overlays` table as a
- * JSON blob (see server/pages/overlays/server/registry.ts). An overlay is
+ * JSON blob (see server/pages/overlays/backend/registry.ts). An overlay is
  * self-contained: its own canvas, variables and elements, plus (in the DB)
  * the token. Media lives in the server-side asset library (disk). The
  * runtime page renders an overlay from the same types
- * (server/pages/overlays/client/overlay_render.tsx). Validation is hand-rolled
+ * (server/pages/overlays/frontend/overlay_render.tsx). Validation is hand-rolled
  * `ApiError` style like the rest of the server (no Zod in this repo).
  *
  * Round-trip rule: unknown fields on every object are preserved so newer

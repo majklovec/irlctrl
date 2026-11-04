@@ -6,16 +6,16 @@
  */
 import { Elysia } from "elysia";
 import type { PageModule, PageServices } from "../../../core/contracts";
-import { createAssets } from "./server/registry";
-import { mountAssetRoutes } from "./server/routes";
-import menu from "./client/menu";
+import { createAssets } from "./backend/registry";
+import { mountAssetRoutes } from "./backend/routes";
+import menu from "./frontend/menu";
 
 const routes = new Elysia({ name: "page-assets" });
 
 export default {
     id: "assets",
     menu,
-    server: {
+    backend: {
         routes,
         init: async (s: PageServices) => {
             const assets = createAssets({
@@ -26,7 +26,7 @@ export default {
             mountAssetRoutes(routes, s, assets);
         },
     },
-    client: {
+    frontend: {
         pages: ["assets_list"],
     },
 } satisfies PageModule;

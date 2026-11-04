@@ -23,7 +23,7 @@ its disk file.
 
 Every query is scoped by `owner` — a user can only list, create, rename,
 move, delete, download or inspect their own folders and files. Foreign ids
-come back as 404 (no existence leaks). See `server/pages/assets/server/registry.ts`
+come back as 404 (no existence leaks). See `server/pages/assets/backend/registry.ts`
 for the full API surface.
 
 ## Endpoints
@@ -51,7 +51,7 @@ updatedAt }` (timestamps in epoch ms). Uploads auto-suffix name collisions as
 
 ## Frontend
 
-`server/pages/assets/client/` — `assets_store.ts` (lazy tree state, per-folder
+`server/pages/assets/frontend/` — `assets_store.ts` (lazy tree state, per-folder
 file cache, all mutations) and `assets_list.tsx` (keyboard-navigable tree,
 file table, drag-and-drop upload and move, modals). Styles:
 `client/assets.css`. i18n: `assets.*` keys in `i18n/*.json`.

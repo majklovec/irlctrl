@@ -71,14 +71,15 @@ export function assertPageModule(page: unknown, id: string): asserts page is Pag
         fail("menu.order must be a finite number");
     if (m.dependencies !== undefined && !isStringArray(m.dependencies))
         fail("dependencies must be a string array of page ids");
-    if (!m.server || typeof m.server !== "object") fail("missing server half");
-    if (!(m.server.routes instanceof Elysia))
-        fail("server.routes must be an Elysia plugin");
-    if (m.server.init !== undefined && typeof m.server.init !== "function")
-        fail("server.init must be a function");
-    if (!m.client || typeof m.client !== "object") fail("missing client half");
-    if (!isStringArray(m.client.pages))
-        fail("client.pages must be a string array of HTML entry names");
+    if (!m.backend || typeof m.backend !== "object") fail("missing backend half");
+    if (!(m.backend.routes instanceof Elysia))
+        fail("backend.routes must be an Elysia plugin");
+    if (m.backend.init !== undefined && typeof m.backend.init !== "function")
+        fail("backend.init must be a function");
+    if (!m.frontend || typeof m.frontend !== "object")
+        fail("missing frontend half");
+    if (!isStringArray(m.frontend.pages))
+        fail("frontend.pages must be a string array of HTML entry names");
 }
 
 /**
@@ -155,7 +156,7 @@ export async function discoverPages(
         : await scanPages();
     for (const page of found) assertPageModule(page, page.id);
     const ordered = resolveInitOrder(found);
-    for (const page of ordered) await page.server.init?.(services);
+    for (const page of ordered) await page.backend.init?.(services);
     pages = [...ordered].sort(
         (a, b) => (a.menu.order ?? 100) - (b.menu.order ?? 100),
     );
@@ -174,7 +175,7 @@ export function getMenu(): MenuContribution[] {
 }
 
 export function mountRoutes(app: Elysia): void {
-    for (const page of getPages()) app.use(page.server.routes);
+    for (const page of getPages()) app.use(page.backend.routes);
 }
 
 /** Reset the cached discovery (test hook: each test process gets a fresh registry). */

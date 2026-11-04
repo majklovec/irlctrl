@@ -1,5 +1,5 @@
 /* GridStack ↔ Mithril bridge for the Buttons widget's internal grid. Like the
- * dashboard's bridge (server/pages/dashboards/client/dashboard_grid.tsx) GridStack owns the
+ * dashboard's bridge (server/pages/dashboards/frontend/dashboard_grid.tsx) GridStack owns the
  * `.grid-stack-item` DOM (position, drag/resize) and Mithril owns the inner
  * cell content, mounted into each item's `.grid-stack-item-content`. Unlike the
  * dashboard (one grid per page) several grids can be alive at once (a widget's

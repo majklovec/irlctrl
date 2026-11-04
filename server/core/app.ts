@@ -27,8 +27,8 @@ import {
 } from "./registry";
 import { liveFeedRoutes } from "./live_routes";
 import { createServices, type Services } from "./services";
-import type { createDashboards } from "../pages/dashboards/server/registry";
-import type { createOverlays } from "../pages/overlays/server/registry";
+import type { createDashboards } from "../pages/dashboards/backend/registry";
+import type { createOverlays } from "../pages/overlays/backend/registry";
 import { accountRoutes } from "./auth/account_routes";
 import { authenticatedHandler } from "./auth/authenticated";
 import { publicRoutes } from "./auth/public_routes";
@@ -118,7 +118,7 @@ export async function createControlServer(options: ControlServerOptions) {
      * devices page runs its maintenance sweep).
      */
     for (const page of getPages())
-        await page.server.start?.(services);
+        await page.backend.start?.(services);
 
     return app;
 }

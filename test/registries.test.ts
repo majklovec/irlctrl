@@ -279,14 +279,14 @@ describe("module registries", () => {
         /* The dashboard widgets page is a page-slice page now (01-refactor).
          * readPage points at the slice location. */
         const dashboard = readFileSync(
-            join(appDir, "server", "pages", "dashboards", "client", "dashboard_widgets.tsx"),
+            join(appDir, "server", "pages", "dashboards", "frontend", "dashboard_widgets.tsx"),
             "utf8",
         );
         const setup = readPage("client", "setup.tsx");
         /* The device list page is a page-slice page now (01-refactor):
-         * server/pages/devices/client/device_list.tsx. */
+         * server/pages/devices/frontend/device_list.tsx. */
         const devices = readFileSync(
-            join(appDir, "server", "pages", "devices", "client", "device_list.tsx"),
+            join(appDir, "server", "pages", "devices", "frontend", "device_list.tsx"),
             "utf8",
         );
 

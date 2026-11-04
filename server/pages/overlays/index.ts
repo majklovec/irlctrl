@@ -6,10 +6,10 @@
  */
 import { Elysia } from "elysia";
 import type { PageModule, PageServices } from "../../../core/contracts";
-import type { Assets } from "../assets/server/registry";
-import { createOverlays } from "./server/registry";
-import { mountOverlayRoutes } from "./server/routes";
-import menu from "./client/menu";
+import type { Assets } from "../assets/backend/registry";
+import { createOverlays } from "./backend/registry";
+import { mountOverlayRoutes } from "./backend/routes";
+import menu from "./frontend/menu";
 
 const routes = new Elysia({ name: "page-overlays" });
 
@@ -17,7 +17,7 @@ export default {
     id: "overlays",
     dependencies: ["assets"],
     menu,
-    server: {
+    backend: {
         routes,
         init: async (s: PageServices) => {
             const assets = s.capabilities.require<Assets>("assets");
@@ -30,7 +30,7 @@ export default {
             mountOverlayRoutes(routes, s, overlays, assets);
         },
     },
-    client: {
+    frontend: {
         pages: ["overlay_list", "overlay_update", "overlay_view"],
     },
 } satisfies PageModule;

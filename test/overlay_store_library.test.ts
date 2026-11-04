@@ -84,7 +84,7 @@ describe("editor library asset loading (headless DOM)", () => {
         const result = await Bun.build({
             entrypoints: [
                 new URL(
-                    "../server/pages/overlays/client/overlay_store.ts",
+                    "../server/pages/overlays/frontend/overlay_store.ts",
                     import.meta.url,
                 ).pathname,
             ],

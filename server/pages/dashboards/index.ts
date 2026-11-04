@@ -5,10 +5,10 @@
  */
 import { Elysia } from "elysia";
 import type { PageModule, PageServices } from "../../../core/contracts";
-import type { createDevices } from "../devices/server/registry";
-import { createDashboards } from "./server/registry";
-import { mountDashboardRoutes } from "./server/routes";
-import menu from "./client/menu";
+import type { createDevices } from "../devices/backend/registry";
+import { createDashboards } from "./backend/registry";
+import { mountDashboardRoutes } from "./backend/routes";
+import menu from "./frontend/menu";
 
 type Devices = ReturnType<typeof createDevices>;
 
@@ -18,7 +18,7 @@ export default {
     id: "dashboards",
     dependencies: ["devices"],
     menu,
-    server: {
+    backend: {
         routes,
         init: async (s: PageServices) => {
             const devices = s.capabilities.require<Devices>("devices");
@@ -34,7 +34,7 @@ export default {
             mountDashboardRoutes(routes, s, dashboards);
         },
     },
-    client: {
+    frontend: {
         pages: [
             "dashboard_list",
             "dashboard_add",

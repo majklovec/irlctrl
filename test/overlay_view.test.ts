@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { APP_VERSION } from "../generated/version";
 
 /**
- * The runtime page script (`server/pages/overlays/client/overlay_view.tsx`) is
+ * The runtime page script (`server/pages/overlays/frontend/overlay_view.tsx`) is
  * bundled the way the server does and run against a happy-dom window + a fake
  * WebSocket, fed frames the way the server sends them. The snapshot carries the
  * full overlay (`{ overlay, version }`); a frame whose `version` differs from
@@ -98,7 +98,7 @@ describe("overlay runtime auto-reload (headless DOM)", () => {
         const result = await Bun.build({
             entrypoints: [
                 new URL(
-                    "../server/pages/overlays/client/overlay_view.tsx",
+                    "../server/pages/overlays/frontend/overlay_view.tsx",
                     import.meta.url,
                 ).pathname,
             ],

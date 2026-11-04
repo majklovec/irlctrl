@@ -16,8 +16,8 @@
 @import "../ui/components/icons.css";
 @import "../ui/components/fieldset.css";
 @import "../../client/frontend/setup.css";
-@import "../../server/pages/dashboards/client/dashboard.css";
+@import "../../server/pages/dashboards/frontend/dashboard.css";
 @import "../ui/components/scrollbar.css";
-@import "../../server/pages/overlays/client/overlay_editor.css";
+@import "../../server/pages/overlays/frontend/overlay_editor.css";
 @import "../ui/components/modal.css";
-@import "../../server/pages/assets/client/assets.css";
+@import "../../server/pages/assets/frontend/assets.css";

@@ -75,7 +75,7 @@ export interface PageModule {
     /** ids of pages whose capabilities this page's `init` consumes; init runs after them */
     dependencies?: string[];
     menu: MenuContribution;
-    server: {
+    backend: {
         /** Elysia plugin mounted by the core; owns the page's routes and WS. */
         routes: Elysia;
         /** Receive the shared services once, before the routes are mounted. */
@@ -83,11 +83,11 @@ export interface PageModule {
         /** Called once the app is listening: page-local maintenance timers. */
         start?: (s: PageServices) => void | Promise<void>;
     };
-    client: {
+    frontend: {
         /**
          * The HTML entry names this slice serves (pages/*.html). The browser
          * components themselves are referenced only by the generated browser
-         * manifest, so the server process never loads client code.
+         * manifest, so the server process never loads frontend code.
          */
         pages: string[];
     };

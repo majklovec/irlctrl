@@ -27,11 +27,16 @@ server/
 │  ├─ {login,register,profile}.tsx
 │  └─ pages/{login,register,profile}.html
 └─ pages/                      # the pluggable vertical slices
-   ├─ devices/     index.ts, server/{registry,routes}.ts, client/{menu,device_list}.tsx, pages/device_list.html
-   ├─ dashboards/ index.ts, server/{registry,routes}.ts, client/*, pages/dashboard_*.html
-   ├─ overlays/   index.ts, server/{registry,routes}.ts, client/* (+overlay.css), pages/overlay_*.html
-   └─ assets/     index.ts, server/{registry,routes}.ts, client/*, pages/assets_list.html
+   ├─ devices/     index.ts, backend/{registry,routes}.ts, frontend/{menu,device_list}.tsx, pages/device_list.html
+   ├─ dashboards/ index.ts, backend/{registry,routes}.ts, frontend/*, pages/dashboard_*.html
+   ├─ overlays/   index.ts, backend/{registry,routes}.ts, frontend/* (+overlay.css), pages/overlay_*.html
+   └─ assets/     index.ts, backend/{registry,routes}.ts, frontend/*, pages/assets_list.html
 ```
+
+Within each slice the two halves are named `backend/` (Elysia routes +
+registry) and `frontend/` (browser components). The `PageModule` contract
+mirrors this: the `server`/`client` fields were renamed to `backend`/
+`frontend` (see `core/contracts.ts`).
 
 `shared/ui/` stays the UI atom layer; the module system
 (`shared/registry.ts`, `scripts/gen_modules.ts`, `client/modules/`,
@@ -52,7 +57,7 @@ server/
 
 ## Manifests
 
-`scripts/gen_pages.ts` scans `server/pages/*/client/menu.ts` →
+`scripts/gen_pages.ts` scans `server/pages/*/frontend/menu.ts` →
 `generated/pages.ts` (browser menu manifest) and `server/pages/*/index.ts`
 → `generated/pages.server.ts` (compiled-binary module list). Wired into
 `predev`/`pretest`/`prebuild:*`; dev bootstrapping and `createFrontend`
@@ -71,17 +76,17 @@ door as the module manifests).
 | `server/backend/static_routes.ts` | `server/core/static_routes.ts` |
 | `server/backend/auth/` | `server/core/auth/` |
 | `server/backend/migrations/` | `server/core/migrations/` |
-| `server/backend/devices/device_registry.ts` | `server/pages/devices/server/registry.ts` |
-| `server/backend/devices/device_{list,connection,page,viewer}_routes.ts` | `server/pages/devices/server/routes.ts` |
-| `server/backend/dashboards/dashboard_store.ts` | `server/pages/dashboards/server/registry.ts` |
-| `server/backend/dashboards/dashboard_routes.ts` | `server/pages/dashboards/server/routes.ts` (+ `core/live_routes.ts`) |
-| `server/backend/overlays/overlay_store.ts` | `server/pages/overlays/server/registry.ts` |
-| `server/backend/overlays/overlay_routes.ts` | `server/pages/overlays/server/routes.ts` |
-| `server/backend/assets/{asset_store,asset_routes,README}.ts` | `server/pages/assets/server/{registry,routes}.ts` (+README) |
-| `server/frontend/ts/devices/device_list.tsx` | `server/pages/devices/client/device_list.tsx` |
-| `server/frontend/ts/dashboards/*` | `server/pages/dashboards/client/*` |
-| `server/frontend/ts/overlays/*` | `server/pages/overlays/client/*` |
-| `server/frontend/ts/assets/*` | `server/pages/assets/client/*` |
+| `server/backend/devices/device_registry.ts` | `server/pages/devices/backend/registry.ts` |
+| `server/backend/devices/device_{list,connection,page,viewer}_routes.ts` | `server/pages/devices/backend/routes.ts` |
+| `server/backend/dashboards/dashboard_store.ts` | `server/pages/dashboards/backend/registry.ts` |
+| `server/backend/dashboards/dashboard_routes.ts` | `server/pages/dashboards/backend/routes.ts` (+ `core/live_routes.ts`) |
+| `server/backend/overlays/overlay_store.ts` | `server/pages/overlays/backend/registry.ts` |
+| `server/backend/overlays/overlay_routes.ts` | `server/pages/overlays/backend/routes.ts` |
+| `server/backend/assets/{asset_store,asset_routes,README}.ts` | `server/pages/assets/backend/{registry,routes}.ts` (+README) |
+| `server/frontend/ts/devices/device_list.tsx` | `server/pages/devices/frontend/device_list.tsx` |
+| `server/frontend/ts/dashboards/*` | `server/pages/dashboards/frontend/*` |
+| `server/frontend/ts/overlays/*` | `server/pages/overlays/frontend/*` |
+| `server/frontend/ts/assets/*` | `server/pages/assets/frontend/*` |
 | `server/frontend/ts/{login,register,profile}.tsx` | `server/shell/{login,register,profile}.tsx` |
 | `server/frontend/ts/services/serverws.ts` | `server/shell/live.ts` |
 | `server/frontend/pages/device_list.html` | `server/pages/devices/pages/device_list.html` |
@@ -89,7 +94,7 @@ door as the module manifests).
 | `server/frontend/pages/overlay_*.html` | `server/pages/overlays/pages/*.html` |
 | `server/frontend/pages/assets_list.html` | `server/pages/assets/pages/assets_list.html` |
 | `server/frontend/pages/{login,register,profile}.html` | `server/shell/pages/*.html` |
-| `server/frontend/css/overlay.css` | `server/pages/overlays/client/overlay.css` |
+| `server/frontend/css/overlay.css` | `server/pages/overlays/frontend/overlay.css` |
 | `shared/ui/components/nav.tsx` (ServerNav) | `server/shell/nav.tsx` (deleted from shared/ui) |
 | — (new) | `server/core/{contracts,registry,services}.ts`, `scripts/gen_pages.ts`, `test/pages_boundaries.test.ts` |
 
@@ -128,11 +133,22 @@ Mechanics:
   `MODULE_ROOTS` (one line) — the scan, i18n merge, and generators all pick
   it up.
 
+## Subdirectory naming
+
+Within a page slice the two halves are named after their runtime, not the old
+top-level tree layout: `server/pages/<id>/server/` → `server/pages/<id>/backend/`
+and `server/pages/<id>/client/` → `server/pages/<id>/frontend/` (devices,
+dashboards, overlays, assets). The `PageModule` contract fields mirror it:
+`server` → `backend`, `client` → `frontend` (`core/contracts.ts`, the
+`registry.ts` validator, `core/app.ts`, the four slice `index.ts` files).
+HTML `script`/`link` refs and the `style.css` page-CSS `@import`s follow the
+new names. The top-level `client/` app tree and `server/core/` are untouched.
+
 ## CSS relocation
 
 CSS now sits next to the code that uses it. `shared/css/` keeps only the shared
 foundation (tokens, base, layout, `style.css`); the component CSS moved into the
-UI kit and each page's CSS into the slice/shell/client that uses it.
+UI kit and each page's CSS into the slice/shell/frontend that uses it.
 `shared/css/style.css` is the single `<link>`ed entry every page loads — it
 `@import`s the shared files, the UI component CSS, and the relocated page files
 in the same cascade order as before (only the paths changed). Module CSS
@@ -141,9 +157,9 @@ in the same cascade order as before (only the paths changed). Module CSS
 | Old | New |
 | --- | --- |
 | `shared/css/components/*.css` (11 files) | `shared/ui/components/*.css` |
-| `shared/css/pages/dashboard.css` | `server/pages/dashboards/client/dashboard.css` |
-| `shared/css/pages/overlay_editor.css` | `server/pages/overlays/client/overlay_editor.css` |
-| `shared/css/pages/assets.css` | `server/pages/assets/client/assets.css` |
+| `shared/css/pages/dashboard.css` | `server/pages/dashboards/frontend/dashboard.css` |
+| `shared/css/pages/overlay_editor.css` | `server/pages/overlays/frontend/overlay_editor.css` |
+| `shared/css/pages/assets.css` | `server/pages/assets/frontend/assets.css` |
 | `shared/css/pages/auth.css` | `server/shell/auth.css` |
 | `shared/css/pages/profile.css` | `server/shell/profile.css` |
 | `shared/css/pages/setup.css` | `client/frontend/setup.css` |

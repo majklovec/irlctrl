@@ -7,9 +7,9 @@
  */
 import { Elysia } from "elysia";
 import type { PageModule, PageServices } from "../../../core/contracts";
-import { createDevices } from "./server/registry";
-import { mountDeviceRoutes } from "./server/routes";
-import menu from "./client/menu";
+import { createDevices } from "./backend/registry";
+import { mountDeviceRoutes } from "./backend/routes";
+import menu from "./frontend/menu";
 
 const routes = new Elysia({ name: "page-devices" });
 let devices: ReturnType<typeof createDevices> | undefined;
@@ -17,7 +17,7 @@ let devices: ReturnType<typeof createDevices> | undefined;
 export default {
     id: "devices",
     menu,
-    server: {
+    backend: {
         routes,
         init: async (s: PageServices) => {
             devices = createDevices({
@@ -31,7 +31,7 @@ export default {
             devices?.startMaintenance();
         },
     },
-    client: {
+    frontend: {
         pages: ["device_list"],
     },
 } satisfies PageModule;
