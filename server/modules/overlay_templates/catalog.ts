@@ -4,7 +4,8 @@
  *
  * Each template is ONE self-contained HTML document
  * (`public/overlay_templates/<id>/index.html`): metadata meta tags
- * (`overlay-template:name` / `overlay-template:uses`), its `<style>`, and its
+ * (`overlay-template:name`), its `<style>`, and
+ * its hooks + `:root` (which the parser derives the `uses` params from), and
  * `<section>` body. The documents are served by the control server's
  * `/overlay_templates/*` static route (see server/backend/static_routes.ts),
  * whose `_catalog.json` route auto-discovers the ids by enumerating the

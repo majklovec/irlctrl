@@ -5,15 +5,18 @@
  * A template is ONE browser-viewable HTML file
  * (`public/overlay_templates/<id>/index.html`) carrying:
  *   - `<meta name="overlay-template:name">`  — the i18n name key,
- *   - `<meta name="overlay-template:uses">`  — comma-separated params
- *     (a subset of the PARAMS vocabulary, see template_meta.ts),
  *   - one `<style>` block — the template's CSS,
- *   - one `<section>` — the document body.
+ *   - one `<section>` — the document body, whose hooks (`data-bind`,
+ *     `data-asset="logo"`, `data-countdown`) + the `<style>`'s `:root`
+ *     vars DECLARE which params the template consumes (`uses` is derived
+ *     from them, not hand-listed — see deriveUses).
  *
  * No `<script>` is allowed: the doc is inert markup + style, rendered
  * server-side (render_doc.ts). Pure — no DOM, no Bun, testable anywhere.
  */
-import { PARAMS, type TemplateMeta, type TemplateParam } from "./template_meta";
+
+import { parseRootVars } from "./root_vars";
+import { type TemplateMeta, type TemplateParam } from "./template_meta";
 
 /** A parsed template document. */
 export interface ParsedTemplateDoc {
@@ -57,18 +60,6 @@ export function parseTemplateDoc(
 	}
 
 	const name = readMetaTag(rawHtml, "name", id);
-	const uses: TemplateParam[] = readMetaTag(rawHtml, "uses", id)
-		.split(",")
-		.map((s) => s.trim())
-		.filter(Boolean)
-		.map((u) => {
-			if (!(PARAMS as readonly string[]).includes(u)) {
-				throw new Error(
-					`template ${id} declares unknown param "${u}" (vocabulary: ${PARAMS.join(", ")})`,
-				);
-			}
-			return u as TemplateParam;
-		});
 
 	const styleMatch = /<style>([\s\S]*?)<\/style>/.exec(rawHtml);
 	if (!styleMatch) {
@@ -84,6 +75,32 @@ export function parseTemplateDoc(
 	}
 	const body = sections[0][0];
 
-	const meta: TemplateMeta = { id, name, uses };
+	const meta: TemplateMeta = { id, name, uses: deriveUses(css, body) };
 	return { meta, css, body };
+}
+
+/**
+ * Derive the params a template consumes from the document ITSELF — no
+ * hand-maintained list, so a hook added to the markup is picked up
+ * automatically:
+ *   - `data-bind="title"` / `data-bind="subtitle"` in the body → the bound
+ *     text params,
+ *   - a non-empty `:root` block → `vars` (the inspector's knobs),
+ *   - `data-asset="logo"` in the body → `logoAssetId`,
+ *   - a `data-countdown` hook in the body → `mode` + `targetIso`.
+ *
+ * Emission order is fixed (title, subtitle, vars, logoAssetId, mode,
+ * targetIso) and is the edit-form field order + the doc-cache key order.
+ */
+function deriveUses(css: string, body: string): TemplateParam[] {
+	const uses: TemplateParam[] = [];
+	if (/\bdata-bind="title"/.test(body)) uses.push("title");
+	if (/\bdata-bind="subtitle"/.test(body)) uses.push("subtitle");
+	if (parseRootVars(css).length > 0) uses.push("vars");
+	if (/\bdata-asset="logo"/.test(body)) uses.push("logoAssetId");
+	if (/\bdata-countdown\b/.test(body)) {
+		uses.push("mode");
+		uses.push("targetIso");
+	}
+	return uses;
 }

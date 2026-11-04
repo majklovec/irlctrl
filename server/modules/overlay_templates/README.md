@@ -20,9 +20,10 @@ same string must come out of the bun test, the editor and a future server
 route. The builder:
 
 1. filters the element's **normalized** props through the template's
-   `uses` list (the document's `overlay-template:uses` meta tag) — an
-   edit to a prop the template does not use cannot change the document
-   (the caching contract);
+   `uses` list (derived by the parser from the document's own
+   `data-bind` / `data-asset` / `data-countdown` hooks + `:root` vars —
+   nothing is hand-listed) — an edit to a prop the template does not use
+   cannot change the document (the caching contract);
 2. resolves them to a CSS-variable set (accent/bg/text/font/radius/
    padding, `bgAlpha` folded into `--bg` as the rgba alpha);
 3. takes the template's parsed `<section>` body (the parser,
@@ -103,7 +104,6 @@ A template is ONE self-contained HTML document
   <head>
     <meta charset="utf-8" />
     <meta name="overlay-template:name" content="overlay.tpl.<id>" />
-    <meta name="overlay-template:uses" content="title,subtitle,vars,…" />
     <style>
       :root { --accent: #6c5ce7; /* …the template's knobs… */ }
       section { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -124,9 +124,15 @@ A template is ONE self-contained HTML document
   `the auto-discovered catalog is the on-disk folders` pins the set.
 - **`overlay-template:name`** — the i18n key of the human name
   (`overlay.tpl.<id>`; add it to all module languages).
-- **`overlay-template:uses`** — comma-separated subset of the frozen
-  vocabulary (`templates/template_meta.ts` — the parser throws on a
-  breach).
+- **`uses`** — not written in the document: the parser derives it from
+  what the document contains, in fixed order — `title`/`subtitle` when a
+  `data-bind` slot references them, `vars` when `:root` declares any
+  variable, `logoAssetId` for a `data-asset="logo"` element,
+  `mode, targetIso` for a `data-countdown` element. `buildTemplateConfig`
+  only reads a prop when it is derived here, and the doc cache is keyed
+  on exactly the derived subset — an edit to a prop the template does not
+  use cannot change the document. Every derived value is one of the frozen
+  vocabulary (`templates/template_meta.ts`).
 - The **`<style>`** holds the template's styles. `:root` declares the
   template's KNOBS: every `--name: value` entry there becomes an editable
   inspector field (label = the name without `--`, separators as spaces,
@@ -155,7 +161,7 @@ The document is fetched by `catalog.ts` (`loadTemplateDoc`) at runtime from
 
 | Hook | Where | Meaning |
 |---|---|---|
-| `overlay-template:name` / `overlay-template:uses` | `<head>` meta tags | the template's i18n name + declared params (the runtime metadata) |
+| `overlay-template:name` | `<head>` meta tag | the template's i18n name (the only meta tag written by hand) |
 | `data-bind="title"` / `data-bind="subtitle"` | elements in the `<section>` body | text baked in entity-escaped (tokens pre-resolved) |
 | `data-asset="logo"` | an `<img>` | `src` set from `logoAssetId` → the page's asset URL |
 | `data-countdown` | one element | H:MM:SS ticking toward `targetIso` (`mode: "countdown"`) |

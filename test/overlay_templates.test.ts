@@ -7,6 +7,10 @@ import {
 	namedStyleVars,
 } from "../server/modules/overlay_templates/doc";
 import { DEFAULT_HTML_TEMPLATE_PROPS } from "../server/modules/overlay_templates/overlay_schema";
+import {
+	readColorAlpha,
+	writeColorAlpha,
+} from "../server/modules/overlay_templates/templates/color_value";
 import { scopeTemplateCss } from "../server/modules/overlay_templates/templates/css_scope";
 import {
 	escapeAttr,
@@ -14,10 +18,6 @@ import {
 	renderTemplateDoc,
 	templateBody,
 } from "../server/modules/overlay_templates/templates/render_doc";
-import {
-	readColorAlpha,
-	writeColorAlpha,
-} from "../server/modules/overlay_templates/templates/color_value";
 import {
 	parseRootVars,
 	rootVarLabel,
@@ -52,8 +52,8 @@ function readTemplateDoc(templateId: string): ParsedTemplateDoc {
 // frozen list.
 function discoverTemplateIds(): string[] {
 	return readdirSync(fileURLToPath(PUBLIC_TEMPLATES), {
-			withFileTypes: true,
-		})
+		withFileTypes: true,
+	})
 		.filter((e) => e.isDirectory())
 		.map((e) => e.name)
 		.sort();
@@ -110,7 +110,8 @@ describe("overlay_templates: catalog", () => {
 				true,
 			);
 			expect(raw).toContain('<meta name="overlay-template:name"');
-			expect(raw).toContain('<meta name="overlay-template:uses"');
+			// there is NO hand-listed uses meta — the parser derives it
+			expect(raw).not.toContain("overlay-template:uses");
 			expect(raw).not.toMatch(/<script/i);
 			const f = TEMPLATE_FILES[id];
 			expect(f.meta.id).toBe(id);
@@ -150,12 +151,11 @@ describe("overlay_templates: catalog", () => {
 });
 
 describe("overlay_templates: doc parser", () => {
-	const doc = (extra: string) => `<!doctype html>
+	const doc = (body = '<span data-bind="title">x</span>') => `<!doctype html>
 <html>
   <head>
     <meta charset="utf-8" />
     <meta name="overlay-template:name" content="overlay.tpl.t" />
-    <meta name="overlay-template:uses" content="${extra}" />
     <style>
 		:root {
 			--a: 1px;
@@ -164,14 +164,15 @@ describe("overlay_templates: doc parser", () => {
   </head>
   <body>
 	<section>
-	    <span data-bind="title">x</span>
+${body}
 	</section>
   </body>
 </html>
 `;
 
-	test("a well-formed document parses to meta + css + body", () => {
-		const p = parseTemplateDoc("t", doc("title,vars"));
+	test("a well-formed document parses to meta + css + body (uses derived)", () => {
+		// data-bind="title" → title, the :root --a → vars
+		const p = parseTemplateDoc("t", doc());
 		expect(p.meta).toEqual({
 			id: "t",
 			name: "overlay.tpl.t",
@@ -182,61 +183,69 @@ describe("overlay_templates: doc parser", () => {
 		expect(p.body).not.toContain("<style");
 	});
 
+	test("uses is derived from the body hooks + :root vars", () => {
+		expect(
+			parseTemplateDoc(
+				"t",
+				doc(
+					'<span data-bind="title"/> <span data-bind="subtitle"/>' +
+						'<img data-asset="logo"/> <div data-countdown/>',
+				),
+			).meta.uses,
+		).toEqual([
+			"title",
+			"subtitle",
+			"vars",
+			"logoAssetId",
+			"mode",
+			"targetIso",
+		]);
+		// no hooks, no :root → no uses
+		expect(
+			parseTemplateDoc("t", doc("").replace(":root {", ":rootx {")).meta.uses,
+		).toEqual([]);
+		// a bare countdown hook is still derived (mode + targetIso)
+		expect(
+			parseTemplateDoc(
+				"t",
+				doc("<div data-countdown/>").replace(":root {", ":rootx {"),
+			).meta.uses,
+		).toEqual(["mode", "targetIso"]);
+	});
+
 	test("a <script> anywhere is a breach", () => {
 		expect(() =>
 			parseTemplateDoc(
 				"t",
-				doc("title").replace("</head>", "<script>evil()</script></head>"),
+				doc().replace("</head>", "<script>evil()</script></head>"),
 			),
 		).toThrow("<script>");
 	});
 
-	test("missing meta tags are a breach", () => {
+	test("a missing name meta is a breach", () => {
 		expect(() =>
 			parseTemplateDoc(
 				"t",
-				doc("title").replace(
-					/<meta name="overlay-template:name"[^>]*\/>\n/,
-					"",
-				),
+				doc().replace(/<meta name="overlay-template:name"[^>]*\/>\n/, ""),
 			),
 		).toThrow("name");
-		expect(() =>
-			parseTemplateDoc(
-				"t",
-				doc("title").replace(
-					/<meta name="overlay-template:uses"[^>]*\/>\n/,
-					"",
-				),
-			),
-		).toThrow("uses");
-	});
-
-	test("an out-of-vocabulary uses entry is a breach", () => {
-		expect(() => parseTemplateDoc("t", doc("title,bogus"))).toThrow("bogus");
 	});
 
 	test("zero or two sections are a breach", () => {
 		expect(() =>
-			parseTemplateDoc(
-				"t",
-				doc("title").replace(/<section>[\s\S]*<\/section>/, ""),
-			),
+			parseTemplateDoc("t", doc().replace(/<section>[\s\S]*<\/section>/, "")),
 		).toThrow("exactly one <section>");
 		expect(() =>
 			parseTemplateDoc(
 				"t",
-				doc("title").replace("</section>", "</section><section></section>"),
+				doc().replace("</section>", "</section><section></section>"),
 			),
 		).toThrow("exactly one <section>");
 	});
 
 	test("a missing <style> block is a breach", () => {
 		expect(() =>
-			parseTemplateDoc(
-				"t",
-				doc("title").replace(/<style>[\s\S]*<\/style>/, ""),
-			),
+			parseTemplateDoc("t", doc().replace(/<style>[\s\S]*<\/style>/, "")),
 		).toThrow("<style>");
 	});
 });

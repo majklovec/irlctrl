@@ -417,8 +417,8 @@ function propControl(
 					oninput={(ev: Event) => set((ev.target as HTMLInputElement).value)}
 				/>
 			);
-		// the style knobs live in the template's `:root` block now — one
-		// field per declared variable (varsFields below), not per named prop
+		// the style knobs render via varsFields (handled in editForm's
+		// uses.map) — a named prop has no control of its own
 		default:
 			return <></>;
 	}
@@ -568,61 +568,58 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 	const catalogMissing = catalogMetas !== undefined && template === undefined;
 
 	const body = template ? (
-		<>
-			{template.uses.map((propKey) => {
-				if (propKey === "logoAssetId")
-					return libraryAssetField(e, mutate, "image");
-				if (propKey === "mode")
-					return bindField(
-						e,
-						"props.mode",
-						t("overlay.html_template.mode"),
-						<select
-							value={p.mode ?? "static"}
-							onchange={(ev: Event) =>
-								mutate((el) => {
-									el.props.mode = (ev.target as HTMLSelectElement).value;
-								})
-							}
-						>
-							<option value="static">
-								{t("overlay.html_template.mode_static")}
-							</option>
-							<option value="countdown">
-								{t("overlay.html_template.mode_countdown")}
-							</option>
-						</select>,
-						sp,
-					);
-				if (propKey === "targetIso")
-					return bindField(
-						e,
-						"props.targetIso",
-						t("overlay.html_template.target"),
-						<input
-							type="datetime-local"
-							value={(p.targetIso ?? "").slice(0, 16)}
-							oninput={(ev: Event) =>
-								mutate((el) => {
-									el.props.targetIso = (ev.target as HTMLInputElement).value;
-								})
-							}
-						/>,
-						sp,
-					);
+		template.uses.map((propKey) => {
+			// the style knobs: one field per `:root` variable the template
+			// declares (rendered inline, at the "vars" position)
+			if (propKey === "vars") return varsFields(template.id, p, mutate);
+			if (propKey === "logoAssetId")
+				return libraryAssetField(e, mutate, "image");
+			if (propKey === "mode")
 				return bindField(
 					e,
-					`props.${propKey}`,
-					t(PROP_LABELS[propKey] ?? `overlay.html_template.${propKey}`),
-					propControl(propKey, p, mutate),
+					"props.mode",
+					t("overlay.html_template.mode"),
+					<select
+						value={p.mode ?? "static"}
+						onchange={(ev: Event) =>
+							mutate((el) => {
+								el.props.mode = (ev.target as HTMLSelectElement).value;
+							})
+						}
+					>
+						<option value="static">
+							{t("overlay.html_template.mode_static")}
+						</option>
+						<option value="countdown">
+							{t("overlay.html_template.mode_countdown")}
+						</option>
+					</select>,
 					sp,
 				);
-			})}
-			{/* the style knobs: one field per `:root` variable the template declares */}
-			{template.uses.includes("vars")
-				? varsFields(template.id, p, mutate)
-				: null}
-		</>
+			if (propKey === "targetIso")
+				return bindField(
+					e,
+					"props.targetIso",
+					t("overlay.html_template.target"),
+					<input
+						type="datetime-local"
+						value={(p.targetIso ?? "").slice(0, 16)}
+						oninput={(ev: Event) =>
+							mutate((el) => {
+								el.props.targetIso = (ev.target as HTMLInputElement).value;
+							})
+						}
+					/>,
+					sp,
+				);
+			return bindField(
+				e,
+				`props.${propKey}`,
+				t(PROP_LABELS[propKey] ?? `overlay.html_template.${propKey}`),
+				propControl(propKey, p, mutate),
+				sp,
+			);
+		})
 	) : catalogMissing ? (
 		<span class="ov-lbl">{t("overlay.html_template.unknown_template")}</span>
 	) : // catalog not loaded yet — the fields appear on the m.redraw

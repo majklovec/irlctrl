@@ -1,10 +1,10 @@
 <!doctype html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="overlay-template:name" content="overlay.tpl.webcam_frame" />
-    <meta name="overlay-template:uses" content="vars,logoAssetId" />
-    <style>
+
+<head>
+	<meta charset="utf-8" />
+	<meta name="overlay-template:name" content="overlay.tpl.webcam_frame" />
+	<style>
 		/*
 		 * webcam_frame — fills the element's box (no design canvas, no scaling). A webcam source is
 		 * layered BEHIND this element, so the center stays transparent and only
@@ -19,21 +19,21 @@
 			--padding: 18px;
 			--frame-glow: rgba(108, 92, 231, 0.35);
 		}
-		
+
 		*,
 		*::before,
 		*::after {
 			box-sizing: border-box;
 		}
-		
+
 		section {
 			position: absolute;
 			inset: 0;
 			width: 100%;
 			height: 100%;
-		    background:transparent;
+			background: transparent;
 		}
-		
+
 		.frame {
 			position: absolute;
 			top: var(--padding);
@@ -44,14 +44,14 @@
 			border-radius: var(--radius);
 			box-shadow: 0 0 14px var(--frame-glow);
 		}
-		
+
 		.corner {
 			position: absolute;
 			width: 28px;
 			height: 28px;
 			border: 4px solid var(--accent);
 		}
-		
+
 		.corner--tl {
 			top: var(--padding);
 			left: var(--padding);
@@ -59,7 +59,7 @@
 			border-bottom: none;
 			border-top-left-radius: var(--radius);
 		}
-		
+
 		.corner--tr {
 			top: var(--padding);
 			right: var(--padding);
@@ -67,7 +67,7 @@
 			border-bottom: none;
 			border-top-right-radius: var(--radius);
 		}
-		
+
 		.corner--bl {
 			bottom: var(--padding);
 			left: var(--padding);
@@ -75,7 +75,7 @@
 			border-top: none;
 			border-bottom-left-radius: var(--radius);
 		}
-		
+
 		.corner--br {
 			bottom: var(--padding);
 			right: var(--padding);
@@ -83,43 +83,18 @@
 			border-top: none;
 			border-bottom-right-radius: var(--radius);
 		}
-		
-		.badge {
-			position: absolute;
-			right: calc(var(--padding) + 8px);
-			bottom: calc(var(--padding) + 8px);
-			width: 56px;
-			height: 56px;
-			padding: 6px;
-			border-radius: calc(var(--radius) * 0.6);
-			background: var(--frame-glow);
-			display: grid;
-		}
-		
-		/* A badge with no logo asset is invisible (no stray rounded square). */
-		.badge:has(img:not([src])) {
-			display: none;
-		}
-		
-		.badge img {
-			width: 100%;
-			height: 100%;
-			object-fit: contain;
-			border-radius: inherit;
-			background: transparent;
-		}
-		
-    </style>
-  </head>
-  <body>
+	</style>
+</head>
+
+<body>
 	<section>
-	    <div class="frame"></div>
-	    <div class="corner corner--tl"></div>
-	    <div class="corner corner--tr"></div>
-	    <div class="corner corner--bl"></div>
-	    <div class="corner corner--br"></div>
-	    <span class="badge"><img data-asset="logo" src="data:image/svg+xml,%3Csvg%20xmlns='http%3A//www.w3.org/2000/svg'width='36'%20height='36'%3E%3C/svg%3E"/></span>
+		<div class="frame"></div>
+		<div class="corner corner--tl"></div>
+		<div class="corner corner--tr"></div>
+		<div class="corner corner--bl"></div>
+		<div class="corner corner--br"></div>
 	</section>
-	
-  </body>
+
+</body>
+
 </html>

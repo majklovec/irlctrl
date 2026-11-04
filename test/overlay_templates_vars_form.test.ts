@@ -28,7 +28,7 @@ import type m from "mithril";
 // transform leaks into them, quietly dropping their test registrations.
 
 type Def =
-	(typeof import("../server/modules/overlay_templates/overlay_elements"))[number];
+	typeof import("../server/modules/overlay_templates/overlay_elements")[number];
 
 type Mutate = (fn: (el: { props: Record<string, unknown> }) => void) => void;
 
@@ -69,7 +69,10 @@ afterAll(() => {
 });
 
 // Serve the template bytes the way the control server's static route does.
-const PUBLIC_TEMPLATES = new URL("../public/overlay_templates/", import.meta.url);
+const PUBLIC_TEMPLATES = new URL(
+	"../public/overlay_templates/",
+	import.meta.url,
+);
 const fetchBytes = (url: string): string => {
 	const path = new URL(url, "http://x/").pathname;
 	// the server's auto-discovery route, not a static file: one entry per
@@ -83,72 +86,65 @@ const fetchBytes = (url: string): string => {
 		);
 	return readFileSync(
 		fileURLToPath(
-			new URL(
-				path.replace(/^\/overlay_templates\//, ""),
-				PUBLIC_TEMPLATES,
-			),
+			new URL(path.replace(/^\/overlay_templates\//, ""), PUBLIC_TEMPLATES),
 		),
 		"utf8",
 	);
 };
 
-beforeAll(
-	async () => {
-		const { Window } = await import("happy-dom");
-		win = new Window();
-		const g = globalThis as Record<string, unknown>;
-		for (const key of GLOBAL_KEYS) savedGlobals.push([key, g[key] as unknown]);
-		// Wire the happy-dom window up as the global DOM before Mithril loads
-		// so its real DOM path (mount, diff, requestAnimationFrame) runs.
-		g.window = win;
-		g.document = win.document;
-		g.navigator = win.navigator;
-		g.HTMLElement = win.HTMLElement;
-		g.Element = win.Element;
-		g.Node = win.Node;
-		g.requestAnimationFrame = win.requestAnimationFrame;
-		g.cancelAnimationFrame = win.cancelAnimationFrame;
-		// the element host and the var-field loader both ride global fetch;
-		// everything else delegates to the REAL fetch (other files'
-		// real-server tests run concurrently against this shared global)
-		const realFetch = g.fetch as typeof fetch;
-		g.fetch = (url: RequestInfo | URL, init?: RequestInit) => {
-			const path =
-				typeof url === "string" ? url : url instanceof URL ? url.pathname : "";
-			if (!path.startsWith("/overlay_templates/"))
-				return realFetch(url, init);
-			return Promise.resolve({
-				text: () => Promise.resolve(fetchBytes(path)),
-			}) as Promise<Response>;
-		};
+beforeAll(async () => {
+	const { Window } = await import("happy-dom");
+	win = new Window();
+	const g = globalThis as Record<string, unknown>;
+	for (const key of GLOBAL_KEYS) savedGlobals.push([key, g[key] as unknown]);
+	// Wire the happy-dom window up as the global DOM before Mithril loads
+	// so its real DOM path (mount, diff, requestAnimationFrame) runs.
+	g.window = win;
+	g.document = win.document;
+	g.navigator = win.navigator;
+	g.HTMLElement = win.HTMLElement;
+	g.Element = win.Element;
+	g.Node = win.Node;
+	g.requestAnimationFrame = win.requestAnimationFrame;
+	g.cancelAnimationFrame = win.cancelAnimationFrame;
+	// the element host and the var-field loader both ride global fetch;
+	// everything else delegates to the REAL fetch (other files'
+	// real-server tests run concurrently against this shared global)
+	const realFetch = g.fetch as typeof fetch;
+	g.fetch = (url: RequestInfo | URL, init?: RequestInit) => {
+		const path =
+			typeof url === "string" ? url : url instanceof URL ? url.pathname : "";
+		if (!path.startsWith("/overlay_templates/")) return realFetch(url, init);
+		return Promise.resolve({
+			text: () => Promise.resolve(fetchBytes(path)),
+		}) as Promise<Response>;
+	};
 
-		const { default: elements } = await import(
-			"../server/modules/overlay_templates/overlay_elements"
-		);
-		mithril = (await import("mithril")) as typeof mithril;
-		getRoot = () => {
-			const el = win.document.createElement("div");
-			win.document.body.appendChild(el);
-			return el;
-		};
-		// Mount the real edit form; the view closure re-runs on every redraw
-		// so the fields read the CURRENT props (a mutate then a m.redraw).
-		formFor = (el, mutate) => {
-			const root = getRoot();
-			const def = elements[0] as Def;
-			mithril.mount(root, {
-				view: () =>
-					def.editForm({
-						element: el as never,
-						mutate,
-						variables: [],
-					}) as m.Vnode,
-			});
-			return { root };
-		};
-	},
-	15000,
-);
+	const { default: elements } = await import(
+		"../server/modules/overlay_templates/overlay_elements"
+	);
+	mithril = (await import("mithril")) as typeof mithril;
+	getRoot = () => {
+		const el = win.document.createElement("div");
+		win.document.body.appendChild(el);
+		return el;
+	};
+	// Mount the real edit form; the view closure re-runs on every redraw
+	// so the fields read the CURRENT props (a mutate then a m.redraw).
+	formFor = (el, mutate) => {
+		const root = getRoot();
+		const def = elements[0] as Def;
+		mithril.mount(root, {
+			view: () =>
+				def.editForm({
+					element: el as never,
+					mutate,
+					variables: [],
+				}) as m.Vnode,
+		});
+		return { root };
+	};
+}, 15000);
 
 /** Poll until `fn` holds (the fetch + m.redraw are both async). */
 async function until(fn: () => boolean, ms = 5000): Promise<void> {
@@ -162,9 +158,7 @@ async function until(fn: () => boolean, ms = 5000): Promise<void> {
 
 /** The labelled field rows of the mounted form (`input` = the first
  * control, `inputs` = every control — the colour-with-alpha field has two). */
-function fields(
-	root: HTMLElement,
-): Array<{
+function fields(root: HTMLElement): Array<{
 	label: string;
 	input: HTMLInputElement | null;
 	inputs: HTMLInputElement[];
@@ -187,7 +181,14 @@ describe("overlay_templates: the :root-driven inspector", () => {
 			id: "el-1",
 			type: "html_template",
 			visible: true,
-			transform: { x: 0, y: 0, width: 800, height: 600, rotation: 0, opacity: 1 },
+			transform: {
+				x: 0,
+				y: 0,
+				width: 800,
+				height: 600,
+				rotation: 0,
+				opacity: 1,
+			},
 			bindings: {},
 			props: { templateId: "corner_brackets", vars: {} },
 		};
@@ -226,9 +227,9 @@ describe("overlay_templates: the :root-driven inspector", () => {
 		expect(byLabel["Accent"]?.value).toBe("#6c5ce7");
 		expect(byLabel["Padding"]?.type).toBe("number");
 		expect(byLabel["Padding"]?.value).toBe("24");
-		const glowInputs = fields(root)
-			.find((f) => f.label === "Corner glow")!
-			.inputs;
+		const glowInputs = fields(root).find(
+			(f) => f.label === "Corner glow",
+		)!.inputs;
 		expect(byLabel["Corner glow"]?.type).toBe("color");
 		expect(byLabel["Corner glow"]?.value).toBe("#6c5ce7");
 		expect(glowInputs[1]?.type).toBe("range");
@@ -245,7 +246,10 @@ describe("overlay_templates: the :root-driven inspector", () => {
 		await step(byLabel["Accent"]!, "#ff0000");
 		expect(el.props.vars).toEqual({ "--accent": "#ff0000" });
 		await step(byLabel["Padding"]!, "40");
-		expect(el.props.vars).toEqual({ "--accent": "#ff0000", "--padding": "40px" });
+		expect(el.props.vars).toEqual({
+			"--accent": "#ff0000",
+			"--padding": "40px",
+		});
 		// the colour-with-alpha control writes the fallback's own shape,
 		// keeping the other control's value (colour edits keep the alpha)
 		await step(glowInputs[0]!, "#000000");
