@@ -416,9 +416,7 @@ function propControl(
 		return (
 			<input
 				type="text"
-				value={String(
-					(p as unknown as Record<string, unknown>)[propKey] ?? "",
-				)}
+				value={String((p as unknown as Record<string, unknown>)[propKey] ?? "")}
 				oninput={(ev: Event) => set((ev.target as HTMLInputElement).value)}
 			/>
 		);
@@ -512,7 +510,7 @@ function varField(
 				</span>
 			);
 		} else {
-			const num = /^-?\d+(?:\.\d+)?(px|em|rem|%)?$/.exec(fallback);
+			const num = /^-?\d+(?:\.\d+)?(px|em|rem|%|s)?$/.exec(fallback);
 			if (num) {
 				const unit = num[1] ?? "";
 				const n = (raw: string) => {
@@ -520,12 +518,15 @@ function varField(
 					set(`${Number.isFinite(v) ? v : 0}${unit}`);
 				};
 				control = (
-					<input
-						type="number"
-						step="any"
-						value={parseFloat(value)}
-						oninput={(ev: Event) => n((ev.target as HTMLInputElement).value)}
-					/>
+					<span class="ov-num">
+						<input
+							type="number"
+							step="any"
+							value={parseFloat(value)}
+							oninput={(ev: Event) => n((ev.target as HTMLInputElement).value)}
+						/>
+						{unit !== "" && <span class="ov-num-unit">{unit}</span>}
+					</span>
 				);
 			} else {
 				control = (

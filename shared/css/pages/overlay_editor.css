@@ -553,6 +553,20 @@ identically here and on the runtime page */
 .ov-colora .ov-colora-a {
     flex: 1 1 auto;
 }
+/* number input + its unit share one row (the input is width:100% by default,
+   so without this the unit text wraps to the next line) */
+.ov-num {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.ov-num input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.ov-num .ov-num-unit {
+    flex: 0 0 auto;
+}
 .ov-grid2,
 .ov-grid3,
 .ov-grid4 {

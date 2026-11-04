@@ -169,7 +169,7 @@ The inspector picks a control per value shape:
 |---|---|
 | 6-digit hex (`#6c5ce7`) | colour picker |
 | colour with alpha (`rgba(…)` / `hsla(…)` / `#rrggbbaa`) | colour picker + alpha slider |
-| a number / `Npx`/`Nem`/`Nrem`/`N%` | number input (unit kept) |
+| a number / `Npx`/`Nem`/`Nrem`/`N%`/`Ns` | number input (unit kept) |
 | anything else (font stacks, …) | text field |
 
 Example: `--corner-glow: rgba(108, 92, 231, 0.35)` → a "Corner glow" colour +
