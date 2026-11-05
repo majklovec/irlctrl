@@ -17,8 +17,8 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_LOWER_THIRD_PROPS } from "../overlay_schema";
 import { ListField } from "../lib/list_field";
+import { DEFAULT_LOWER_THIRD_PROPS } from "../overlay_schema";
 
 interface LTEntry {
 	name: string;
@@ -113,7 +113,12 @@ const LowerThirdBox: m.Component<LTAttrs, LTState> = {
 							{entry.name}
 						</div>
 						{entry.topic ? (
-							<div style={{ fontSize: `${Math.round(fontSize * 0.6)}px`, opacity: "0.85" }}>
+							<div
+								style={{
+									fontSize: `${Math.round(fontSize * 0.6)}px`,
+									opacity: "0.85",
+								}}
+							>
 								{entry.topic}
 							</div>
 						) : null}
@@ -169,22 +174,81 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 				addRow={() => ({ name: "", topic: "" })}
 				addLabel={t("overlay.lt_add_entry")}
 			/>
-			{bindField(e, "props.rotate", t("overlay.lt_rotate"),
-				<input type="checkbox" checked={p.rotate === true} onchange={setBool("rotate")} />, sp)}
-			{p.rotate === true ? (
-				bindField(e, "props.interval", t("overlay.lt_interval"),
-					<input type="number" min={1000} max={600000} step={500} value={numProp(p, "interval", 6000)} oninput={setNum("interval")} />, sp)
-			) : null}
+			{bindField(
+				e,
+				"props.rotate",
+				t("overlay.lt_rotate"),
+				<input
+					type="checkbox"
+					checked={p.rotate === true}
+					onchange={setBool("rotate")}
+				/>,
+				sp,
+			)}
+			{p.rotate === true
+				? bindField(
+						e,
+						"props.interval",
+						t("overlay.lt_interval"),
+						<input
+							type="number"
+							min={1000}
+							max={600000}
+							step={500}
+							value={numProp(p, "interval", 6000)}
+							oninput={setNum("interval")}
+						/>,
+						sp,
+					)
+				: null}
 			<div class="ov-grid3">
-				{bindField(e, "props.color", t("overlay.color"),
-					<input type="color" value={strProp(p, "color", "#ffffff")} oninput={setStr("color")} />, sp)}
-				{bindField(e, "props.background", t("overlay.lt_background"),
-					<input type="color" value={strProp(p, "background", "#111827")} oninput={setStr("background")} />, sp)}
-				{bindField(e, "props.accent", t("overlay.lt_accent"),
-					<input type="color" value={strProp(p, "accent", "#38bdf8")} oninput={setStr("accent")} />, sp)}
+				{bindField(
+					e,
+					"props.color",
+					t("overlay.color"),
+					<input
+						type="color"
+						value={strProp(p, "color", "#ffffff")}
+						oninput={setStr("color")}
+					/>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.background",
+					t("overlay.lt_background"),
+					<input
+						type="color"
+						value={strProp(p, "background", "#111827")}
+						oninput={setStr("background")}
+					/>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.accent",
+					t("overlay.lt_accent"),
+					<input
+						type="color"
+						value={strProp(p, "accent", "#38bdf8")}
+						oninput={setStr("accent")}
+					/>,
+					sp,
+				)}
 			</div>
-			{bindField(e, "props.fontSize", t("overlay.font_size"),
-				<input type="number" min={8} max={300} value={numProp(p, "fontSize", 30)} oninput={setNum("fontSize")} />, sp)}
+			{bindField(
+				e,
+				"props.fontSize",
+				t("overlay.font_size"),
+				<input
+					type="number"
+					min={8}
+					max={300}
+					value={numProp(p, "fontSize", 30)}
+					oninput={setNum("fontSize")}
+				/>,
+				sp,
+			)}
 		</>
 	);
 }
@@ -200,14 +264,7 @@ export const lowerThirdElement: OverlayElementDef = {
 	order: 93,
 	defaultProps: { ...DEFAULT_LOWER_THIRD_PROPS },
 	/** `entries` is one composite control (a row table), not a bindField scalar. */
-	propKeys: [
-		"rotate",
-		"interval",
-		"color",
-		"background",
-		"accent",
-		"fontSize",
-	],
+	propKeys: ["rotate", "interval", "color", "background", "accent", "fontSize"],
 	defaultSize: { width: 420, height: 90 },
 	draw,
 	editForm,

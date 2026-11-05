@@ -19,8 +19,8 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_COUNTDOWN_PROPS } from "../overlay_schema";
 import { formatDuration } from "../lib/ticker";
+import { DEFAULT_COUNTDOWN_PROPS } from "../overlay_schema";
 
 /** Today's `HH:MM` (tomorrow's when it has already passed). */
 function targetTime(clockTarget: string, now: number): number {
@@ -88,9 +88,7 @@ const CountdownBox: m.Component<CdB, CdBState> = {
 			done = rem <= 0;
 		}
 		const shown =
-			done && !(mode === "duration" && loop)
-				? "00:00"
-				: formatDuration(rem);
+			done && !(mode === "duration" && loop) ? "00:00" : formatDuration(rem);
 
 		return (
 			<div
@@ -160,36 +158,127 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 		});
 	return (
 		<>
-			{bindField(e, "props.mode", t("overlay.cd_mode"),
-				<select value={strProp(p, "mode", "duration")} onchange={setSel("mode")}>
+			{bindField(
+				e,
+				"props.mode",
+				t("overlay.cd_mode"),
+				<select
+					value={strProp(p, "mode", "duration")}
+					onchange={setSel("mode")}
+				>
 					<option value="duration">{t("overlay.cd_mode.duration")}</option>
 					<option value="clock">{t("overlay.cd_mode.clock")}</option>
-				</select>, sp)}
-			{strProp(p, "mode", "duration") === "duration" ? (
-				bindField(e, "props.duration", t("overlay.cd_duration"),
-					<input type="number" min={1} max={100000} value={numProp(p, "duration", 60)} oninput={setNum("duration")} />, sp)
-			) : (
-				bindField(e, "props.clockTarget", t("overlay.cd_target"),
-					<input type="time" value={strProp(p, "clockTarget", "20:00")} oninput={setStr("clockTarget")} />, sp)
+				</select>,
+				sp,
 			)}
+			{strProp(p, "mode", "duration") === "duration"
+				? bindField(
+						e,
+						"props.duration",
+						t("overlay.cd_duration"),
+						<input
+							type="number"
+							min={1}
+							max={100000}
+							value={numProp(p, "duration", 60)}
+							oninput={setNum("duration")}
+						/>,
+						sp,
+					)
+				: bindField(
+						e,
+						"props.clockTarget",
+						t("overlay.cd_target"),
+						<input
+							type="time"
+							value={strProp(p, "clockTarget", "20:00")}
+							oninput={setStr("clockTarget")}
+						/>,
+						sp,
+					)}
 			<div class="ov-grid2">
-				{bindField(e, "props.label", t("overlay.cd_label"),
-					<input type="text" value={strProp(p, "label", "Starting in")} oninput={setStr("label")} />, sp)}
-				{bindField(e, "props.labelDone", t("overlay.cd_label_done"),
-					<input type="text" value={strProp(p, "labelDone", "Start now!")} oninput={setStr("labelDone")} />, sp)}
+				{bindField(
+					e,
+					"props.label",
+					t("overlay.cd_label"),
+					<input
+						type="text"
+						value={strProp(p, "label", "Starting in")}
+						oninput={setStr("label")}
+					/>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.labelDone",
+					t("overlay.cd_label_done"),
+					<input
+						type="text"
+						value={strProp(p, "labelDone", "Start now!")}
+						oninput={setStr("labelDone")}
+					/>,
+					sp,
+				)}
 			</div>
-			{bindField(e, "props.loop", t("overlay.cd_loop"),
-				<input type="checkbox" checked={p.loop === true} onchange={setBool("loop")} />, sp)}
+			{bindField(
+				e,
+				"props.loop",
+				t("overlay.cd_loop"),
+				<input
+					type="checkbox"
+					checked={p.loop === true}
+					onchange={setBool("loop")}
+				/>,
+				sp,
+			)}
 			<div class="ov-grid3">
-				{bindField(e, "props.color", t("overlay.color"),
-					<input type="color" value={strProp(p, "color", "#ffffff")} oninput={setStr("color")} />, sp)}
-				{bindField(e, "props.background", t("overlay.cd_background"),
-					<input type="color" value={strProp(p, "background", "#111827")} oninput={setStr("background")} />, sp)}
-				{bindField(e, "props.accent", t("overlay.cd_accent"),
-					<input type="color" value={strProp(p, "accent", "#f59e0b")} oninput={setStr("accent")} />, sp)}
+				{bindField(
+					e,
+					"props.color",
+					t("overlay.color"),
+					<input
+						type="color"
+						value={strProp(p, "color", "#ffffff")}
+						oninput={setStr("color")}
+					/>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.background",
+					t("overlay.cd_background"),
+					<input
+						type="color"
+						value={strProp(p, "background", "#111827")}
+						oninput={setStr("background")}
+					/>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.accent",
+					t("overlay.cd_accent"),
+					<input
+						type="color"
+						value={strProp(p, "accent", "#f59e0b")}
+						oninput={setStr("accent")}
+					/>,
+					sp,
+				)}
 			</div>
-			{bindField(e, "props.fontSize", t("overlay.font_size"),
-				<input type="number" min={8} max={300} value={numProp(p, "fontSize", 40)} oninput={setNum("fontSize")} />, sp)}
+			{bindField(
+				e,
+				"props.fontSize",
+				t("overlay.font_size"),
+				<input
+					type="number"
+					min={8}
+					max={300}
+					value={numProp(p, "fontSize", 40)}
+					oninput={setNum("fontSize")}
+				/>,
+				sp,
+			)}
 		</>
 	);
 }
@@ -197,7 +286,10 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 function validate(e: OverlayElement): string[] {
 	const problems: string[] = [];
 	const ct = strProp(e.props, "clockTarget", "");
-	if (strProp(e.props, "mode", "duration") === "clock" && !/^\d{1,2}:\d{2}$/.test(ct))
+	if (
+		strProp(e.props, "mode", "duration") === "clock" &&
+		!/^\d{1,2}:\d{2}$/.test(ct)
+	)
 		problems.push('clockTarget must be "HH:MM"');
 	return problems;
 }
