@@ -43,7 +43,7 @@ export function parseTwitchBadges(value: string): ChatBadge[] | undefined {
         const s = pair.trim();
         const slash = s.lastIndexOf("/");
         if (slash === -1) continue;
-        const resolved = twitchBadgeUrl(s.slice(0, slash), s.slice(slash + 1));
+        const resolved = twitchBadgeUrl(s.slice(0, slash), "1"); //s.slice(slash + 1));
         if (!resolved) continue;
         out.push({
             type: s.slice(0, slash),
