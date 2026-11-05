@@ -153,6 +153,15 @@ function feedView(element: OverlayElement, p: ChatProps, lines: ChatLine[]): m.C
 		showTimestamps: p.timestamps === "on",
 		showBadges: p.badges !== "off",
 		feedKey: `chat-feed:${element.id}`,
+		fontSize: p.fontSize,
+		fontFamily: p.fontFamily,
+		color: p.color,
+		fontWeight: p.fontWeight,
+		lineHeight: p.lineHeight,
+		messageSpacing: p.messageSpacing,
+		textAlign: p.textAlign,
+		fadeDirection: p.fadeDirection,
+		fadeSize: p.fadeSize,
 	});
 }
 
@@ -164,12 +173,18 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	const p = element.props as unknown as ChatProps;
 	// `--ov-chat-*` custom properties + the fade-<dir> modifier class are the
 	// contract `overlay.css` reads (see its `.chat-element` rules).
+	// `height:100%;overflow:hidden` mirror that rule inline: the editor loads
+	// no element CSS, and without a filled wrapper the feed's `height:100%`
+	// has nothing to resolve to, so bottom order can't pin to the box's
+	// bottom edge (it just flows from the top).
 	return (
 		<div
 			class={`chat-element${
 				p.fadeDirection !== "off" ? ` chat-element-fade-${p.fadeDirection}` : ""
 			}`}
 			style={{
+				height: "100%",
+				overflow: "hidden",
 				"--ov-chat-font-size": `${p.fontSize}px`,
 				"--ov-chat-font-family": p.fontFamily,
 				"--ov-chat-color": p.color,

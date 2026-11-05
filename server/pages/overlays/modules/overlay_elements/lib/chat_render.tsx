@@ -11,9 +11,9 @@
  * boundary.
  */
 
-import m from "mithril";
-import type { Children } from "mithril";
 import { currentLanguage } from "@ui/i18n";
+import type { Children } from "mithril";
+import m from "mithril";
 import type { ChatLine } from "./live_chat_feed";
 
 /** `msg.type` value marking a message removed by the platform's moderation. */
@@ -97,10 +97,7 @@ export function decorateText(text: string): string {
 		.split(urlRegex)
 		.map((part: string, index: number): string => {
 			if (!/^(?:https?:\/\/|www\.)/i.test(part)) {
-				const out = escapeHtml(part).replace(
-					mentionRegex,
-					"$1<b>@$2</b>",
-				);
+				const out = escapeHtml(part).replace(mentionRegex, "$1<b>@$2</b>");
 				return dm && index === 0 && out
 					? `<span class="dm">${out}</span>`
 					: out;
@@ -364,6 +361,10 @@ function renderBadges(badges: ChatLine["msg"]["badges"]): m.Children {
 					<img
 						class="chat-badge"
 						key={index}
+						// Intrinsic 1em height: the editor page doesn't load
+						// overlay.css, so without this the raw badge art
+						// renders at its natural (huge) size there.
+						height="1em"
 						src={badge.url}
 						alt={label}
 						title={title}
@@ -390,6 +391,29 @@ type ChatFeedAttrs = {
 	/** Show the sender's badges in front of the username. */
 	showBadges: boolean;
 	feedKey: string;
+	// Feed text display values. The feed styles itself from these instead of
+	// relying on `overlay.css` consuming the element's `--ov-chat-*` props —
+	// the editor page loads no element CSS, so every value that only lived in
+	// that stylesheet (text-align, font, fade, spacing) ignored the settings
+	// outside the overlay. Same values both places → identical rendering.
+	/** Feed text size in px. */
+	fontSize: number;
+	/** Feed text font stack. */
+	fontFamily: string;
+	/** Feed text colour (`#rrggbb`). */
+	color: string;
+	/** Feed text weight. */
+	fontWeight: number;
+	/** Feed text line-height (unitless). */
+	lineHeight: number;
+	/** Spacing between feed lines in px. */
+	messageSpacing: number;
+	/** Alignment of the feed text. */
+	textAlign: "left" | "center" | "right" | "justify";
+	/** Which feed edge fades out (`"off"` = no fade). */
+	fadeDirection: "off" | "top" | "bottom";
+	/** Fade-out size in px. */
+	fadeSize: number;
 };
 
 /**
@@ -459,12 +483,52 @@ export const ChatFeedView: m.Component<ChatFeedAttrs> = {
 			showTimestamps,
 			showBadges,
 			feedKey,
+			fontSize,
+			fontFamily,
+			color,
+			fontWeight,
+			lineHeight,
+			messageSpacing,
+			textAlign,
+			fadeDirection,
+			fadeSize,
 		} = vnode.attrs;
 
 		return (
 			<div
 				class={bottom ? "chat-feed chat-feed-bottom" : "chat-feed"}
 				key={feedKey}
+				// The feed styles itself from its attrs (mirroring the
+				// `--ov-chat-*` rules in overlay.css, which the editor page
+				// never loads) so the editor and the overlay render identically:
+				// font/colour, text-align, line spacing and the edge fade.
+				// `min-width:0` lets flex items wrap; the flex column +
+				// `justify-content:flex-end` pins bottom order flush on the
+				// element's bottom edge (excess lines clip off the top).
+				style={[
+					"min-width:0",
+					// `white-space:normal` resets the `pre` inherited from the
+					// element wrapper (overlay.css does the same for runtime).
+					"white-space:normal",
+					"height:100%",
+					"overflow:hidden",
+					"display:flex",
+					"flex-direction:column",
+					bottom ? "justify-content:flex-end" : "",
+					`font-size:${fontSize}px`,
+					`font-family:${fontFamily}`,
+					`color:${color}`,
+					`font-weight:${fontWeight}`,
+					`line-height:${lineHeight}`,
+					`text-align:${textAlign}`,
+					fadeDirection === "bottom"
+						? `--ov-chat-fade-opaque:#fff;--ov-chat-fade-clear:#fff0;-webkit-mask-image:linear-gradient(180deg,#fff 0,#fff calc(100% - ${fadeSize}px),#fff0 100%);mask-image:linear-gradient(180deg,#fff 0,#fff calc(100% - ${fadeSize}px),#fff0 100%)`
+						: fadeDirection === "top" && lines.length >= 3
+							? `--ov-chat-fade-opaque:#fff;--ov-chat-fade-clear:#fff0;-webkit-mask-image:linear-gradient(0deg,#fff 0,#fff calc(100% - ${fadeSize}px),#fff0 100%);mask-image:linear-gradient(0deg,#fff 0,#fff calc(100% - ${fadeSize}px),#fff0 100%)`
+							: "",
+				]
+					.filter(Boolean)
+					.join(";")}
 				onscroll={(event: Event) => {
 					// The top-order pin (onupdate) scrolls the feed too — don't
 					// let that reset the auto-follow state, which only bottom
@@ -483,6 +547,14 @@ export const ChatFeedView: m.Component<ChatFeedAttrs> = {
 					<div
 						class={line.banned ? "chat-line chat-line-banned" : "chat-line"}
 						key={line.key}
+						// The line is a flex item of `.chat-feed`; `min-width:0`
+						// (also in overlay.css) is what lets it wrap in the
+						// editor, where the stylesheet isn't loaded. The text
+						// alignment rides on the full-width line boxes (same as
+						// overlay.css), and banned lines are dimmed + struck.
+						style={`min-width:0;text-align:${textAlign};${
+							messageSpacing ? `margin-bottom:${messageSpacing}px;` : ""
+						}${line.banned ? "opacity:0.5" : ""}`}
 					>
 						{showPlatformIcons && (
 							<span class="chat-icon" title={line.platform}>
@@ -505,7 +577,9 @@ export const ChatFeedView: m.Component<ChatFeedAttrs> = {
 							<>
 								<span
 									class="chat-user"
-									style={line.msg.color ? `color:${line.msg.color}` : undefined}
+									style={`${
+										line.msg.color ? `color:${line.msg.color};` : ""
+									}${line.banned ? "text-decoration:line-through" : ""}`}
 								>
 									{line.msg.username}
 								</span>
@@ -513,7 +587,12 @@ export const ChatFeedView: m.Component<ChatFeedAttrs> = {
 							</>
 						)}
 
-						<span class="chat-text">
+						<span
+							class="chat-text"
+							style={`word-break:break-word;${
+								line.banned ? "text-decoration:line-through" : ""
+							}`}
+						>
 							{lineSegments(line.msg.text ?? "")}
 						</span>
 					</div>
