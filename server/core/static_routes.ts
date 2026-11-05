@@ -13,7 +13,7 @@
  * were never embedded).
  */
 
-import { existsSync, mkdirSync } from "node:fs";
+import { type Dirent, mkdirSync, readFileSync, statSync } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import staticPlugin from "@elysia/static";
@@ -44,7 +44,7 @@ const STATIC_OPTIONS = {
  */
 async function templateCatalog() {
 	const dir = appPath(OVERLAY_TEMPLATES_DIR);
-	let entries;
+	let entries: Dirent[];
 	try {
 		entries = (await readdir(dir, { withFileTypes: true })).filter(
 			(e) => e.isFile() && e.name.endsWith(".html"),
@@ -81,17 +81,33 @@ export async function staticRoutes() {
 		}),
 	);
 	// The templates live in the storage dir (user-editable by the templates
-	// page); a fresh deployment has no directory yet — create it, and mount
-	// the static route only when it exists.
+	// page); a fresh deployment has no directory yet — create it eagerly.
 	const templatesDir = appPath(OVERLAY_TEMPLATES_DIR);
 	mkdirSync(templatesDir, { recursive: true });
-	if (existsSync(templatesDir))
-		app.use(
-			await staticPlugin({
-				assets: templatesDir,
-				prefix: "/overlay_templates",
-				...STATIC_OPTIONS,
-			}),
+	// Served by hand (not the static plugin): the templates page edits and
+	// deletes these files at runtime, and the plugin's in-memory view of the
+	// directory outlives the file (a deleted template 500s, not 404s). A
+	// direct read per request keeps the served byte stream in sync with the
+	// storage dir; the docs are tiny and `no-cache` revalidates them anyway.
+	app.get("/overlay_templates/*", ({ request, set }) => {
+		const name = decodeURIComponent(
+			new URL(request.url).pathname.slice("/overlay_templates/".length),
 		);
+		if (name.includes("/") || !name.endsWith(".html")) {
+			set.status = 404;
+			return "Not found";
+		}
+		const path = join(templatesDir, name);
+		try {
+			if (!statSync(path).isFile()) throw new Error("missing");
+		} catch {
+			set.status = 404;
+			return "Not found";
+		}
+		set.status = 200;
+		set.headers["content-type"] = "text/html; charset=utf-8";
+		set.headers["cache-control"] = "no-cache";
+		return readFileSync(path);
+	});
 	return app;
 }

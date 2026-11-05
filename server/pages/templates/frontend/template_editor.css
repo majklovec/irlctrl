@@ -1,0 +1,255 @@
+/* The templates editor: list | editor layout, the knob panels (CSS vars +
+ * data-bind slots), the HTML textarea and the preview frame. */
+
+.tpl-layout {
+	display: grid;
+	grid-template-columns: minmax(220px, 320px) 1fr;
+	gap: 1rem;
+	align-items: start;
+}
+
+@media (max-width: 1100px) {
+	.tpl-layout {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* The list card stays put while the editor grows. */
+.tpl-list-card {
+	position: sticky;
+	top: 1rem;
+	max-height: calc(100vh - 6rem);
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+/* The create row (id input + button) under the list title. */
+.tpl-create {
+	display: flex;
+	gap: 0.5rem;
+	margin-bottom: 0.75rem;
+}
+
+.tpl-create-input {
+	flex: 1;
+	min-width: 0;
+}
+
+/* The template list rows (full-width buttons). */
+.tpl-list {
+	overflow-y: auto;
+	flex: 1;
+	padding: 0.25rem;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.tpl-list-row {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	width: 100%;
+	padding: 0.35rem 0.5rem;
+	border: 0;
+	border-radius: var(--radius, 8px);
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+	user-select: none;
+}
+
+.tpl-list-row:hover {
+	background: var(--card-subtle);
+}
+
+.tpl-list-row.active {
+	background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.tpl-list-id {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: var(--font-mono, ui-monospace, monospace);
+	font-size: 0.9em;
+}
+
+.tpl-list-time {
+	font-size: 0.8em;
+	white-space: nowrap;
+}
+
+/* The editor card and its title row (id + unsaved marker). */
+.tpl-editor-title {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.tpl-dirty {
+	font-size: 0.7em;
+	font-weight: 600;
+	color: var(--warn);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+/* The tab bar (Fields | HTML) above the active panel. */
+.tpl-tabbar {
+	display: flex;
+	gap: 0.25rem;
+	border-bottom: 1px solid var(--border);
+	margin-bottom: 0.75rem;
+}
+
+.tpl-tab {
+	appearance: none;
+	border: 0;
+	border-bottom: 2px solid transparent;
+	margin-bottom: -1px; /* sit the active underline on the bar line */
+	padding: 0.4rem 0.75rem;
+	background: transparent;
+	color: var(--muted);
+	font: inherit;
+	font-size: 0.9em;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.tpl-tab:hover {
+	color: var(--text);
+}
+
+.tpl-tab.active {
+	color: var(--text);
+	border-bottom-color: var(--accent);
+}
+
+/* The merged Fields card (CSS variables + data bindings). */
+.tpl-fields {
+	padding: 0.75rem 1rem;
+}
+
+.tpl-fields-section {
+	margin-bottom: 0.75rem;
+}
+
+.tpl-fields-section:last-child {
+	margin-bottom: 0;
+}
+
+.tpl-fields-section h3 {
+	margin: 0 0 0.5rem;
+	font-size: 0.8em;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.tpl-knob {
+	display: grid;
+	grid-template-columns: minmax(120px, 180px) 1fr;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0.2rem 0;
+}
+
+.tpl-knob-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: var(--font-mono, ui-monospace, monospace);
+	font-size: 0.85em;
+	color: var(--muted);
+}
+
+.tpl-knob-input {
+	min-width: 0;
+}
+
+/* The editor body split: the tab group (Fields | HTML) | the live preview. */
+.tpl-editor-body {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 1rem;
+	align-items: start;
+}
+
+@media (max-width: 1200px) {
+	.tpl-editor-body {
+		grid-template-columns: 1fr;
+	}
+}
+
+.tpl-tabs {
+	min-width: 0;
+}
+
+.tpl-preview h3 {
+	margin: 0 0 0.5rem;
+	font-size: 0.8em;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.tpl-code {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.tpl-html {
+	flex: 1;
+	min-height: 320px;
+	max-height: calc(100vh - 14rem);
+	resize: vertical;
+	padding: 0.75rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius, 8px);
+	background: var(--code-bg);
+	color: var(--text);
+	font-family: var(--font-mono, ui-monospace, monospace);
+	font-size: 0.82em;
+	line-height: 1.5;
+	tab-size: 4;
+}
+
+.tpl-doc-error {
+	margin: 0.5rem 0 0;
+	color: var(--danger);
+	font-size: 0.85em;
+}
+
+/* The preview: a transparent frame the template fills (like the OBS
+ * element's box) over a dark backdrop so edge content is visible. */
+.tpl-preview-frame {
+	width: 100%;
+	aspect-ratio: 16 / 9;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background:
+		repeating-conic-gradient(
+			var(--canvas-check) 0% 25%,
+			var(--canvas-bg) 0% 50%
+		)
+		0 0 / 24px 24px;
+	overflow: hidden;
+}
+
+.tpl-preview-doc {
+	display: block;
+	width: 100%;
+	height: 100%;
+	border: 0;
+	background: transparent;
+}
