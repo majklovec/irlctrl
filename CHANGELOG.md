@@ -1,3 +1,15 @@
+# [2.23.0](https://github.com/majklovec/irlctrl/compare/v2.22.0...v2.23.0) (2026-11-05)
+
+
+### Bug Fixes
+
+* **i18n:** update Czech translations for overlay terminology ([3e3300d](https://github.com/majklovec/irlctrl/commit/3e3300d6de4b5ca450ab9fd46e319e401614662a))
+
+
+### Features
+
+* **i18n:** update translations for overlay templates and UI elements ([ba876f5](https://github.com/majklovec/irlctrl/commit/ba876f53848988b65d6845e8388fe6c5e70a215d))
+
 # [2.22.0](https://github.com/majklovec/irlctrl/compare/v2.21.0...v2.22.0) (2026-11-05)
 
 
