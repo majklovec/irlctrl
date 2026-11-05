@@ -10,8 +10,6 @@ import { countdownElement } from "./elements/countdown";
 import { counterElement } from "./elements/counter";
 import { creditsElement } from "./elements/credits";
 import { ellipseElement } from "./elements/ellipse";
-import { emoteComboElement } from "./elements/emote_combo";
-import { emoteWallElement } from "./elements/emote_wall";
 import { featuredElement } from "./elements/featured";
 import { frameElement } from "./elements/frame";
 import { goalElement } from "./elements/goal";
@@ -21,7 +19,6 @@ import { imageElement } from "./elements/image";
 import { lineElement } from "./elements/line";
 import { liveMapElement } from "./elements/live_map";
 import { lowerThirdElement } from "./elements/lower_third";
-import { nowPlayingElement } from "./elements/now_playing";
 import { progressElement } from "./elements/progress";
 import { rectangleElement } from "./elements/rectangle";
 import { socialsElement } from "./elements/socials";
@@ -45,7 +42,6 @@ const elements: (OverlayElementDef & OverlayElementSchema)[] = [
 	groupElement,
 	alertsElement,
 	weatherElement,
-	nowPlayingElement,
 	countdownElement,
 	lowerThirdElement,
 	frameElement,
@@ -55,8 +51,6 @@ const elements: (OverlayElementDef & OverlayElementSchema)[] = [
 	goalElement,
 	counterElement,
 	spinWheelElement,
-	emoteWallElement,
-	emoteComboElement,
 	featuredElement,
 	chatElement,
 	liveMapElement,

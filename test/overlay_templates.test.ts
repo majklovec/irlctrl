@@ -95,7 +95,6 @@ describe("overlay_templates: catalog", () => {
 				"footer",
 				"header",
 				"lower_third_bar",
-				"now_playing",
 				"starting_soon",
 				"ticker",
 				"webcam_frame",

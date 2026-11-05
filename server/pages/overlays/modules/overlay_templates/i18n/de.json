@@ -24,7 +24,6 @@
     "overlay.tpl.footer": "Fußzeile",
     "overlay.tpl.header": "Kopfzeile",
     "overlay.tpl.lower_third_bar": "Untertitel-Leiste",
-    "overlay.tpl.now_playing": "Gerade läuft",
     "overlay.tpl.starting_soon": "Bald startet",
     "overlay.tpl.ticker": "Ticker",
     "overlay.tpl.webcam_frame": "Webcam-Rahmen"

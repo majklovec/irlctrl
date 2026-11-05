@@ -52,8 +52,10 @@ function catalogCard(def: OverlayElementDef): m.Vnode {
 			onclick={insert}
 		>
 			<span class="ov-cat-card-ic">{def.icon?.() ?? <Icon name="info" />}</span>
-			<span class="ov-cat-card-t">{t(def.labelKey ?? def.type)}</span>
-			<span class="ov-cat-card-d">{t(descKey(def.type))}</span>
+			<span class="ov-cat-card-bd">
+				<span class="ov-cat-card-t">{t(def.labelKey ?? def.type)}</span>
+				<span class="ov-cat-card-d">{t(descKey(def.type))}</span>
+			</span>
 		</button>
 	);
 }

@@ -60,8 +60,6 @@ export interface OverlaySummary {
  * (all of them render live chat lines in the OBS overlay). */
 const CHAT_CARRYING_ELEMENT_TYPES: ReadonlySet<string> = new Set([
     "chat",
-    "emote_wall",
-    "emote_combo",
     "featured",
 ]);
 

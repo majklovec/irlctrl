@@ -24,7 +24,6 @@
     "overlay.tpl.footer": "Нижний колонтитул",
     "overlay.tpl.header": "Верхний колонтитул",
     "overlay.tpl.lower_third_bar": "Нижняя треть",
-    "overlay.tpl.now_playing": "Сейчас играет",
     "overlay.tpl.starting_soon": "Скоро начнётся",
     "overlay.tpl.ticker": "Бегущая строка",
     "overlay.tpl.webcam_frame": "Рамка веб-камеры"

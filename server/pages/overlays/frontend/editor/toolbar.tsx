@@ -1,8 +1,7 @@
-import { IconButton, Toolbar } from "@ui/components/";
+import { Button, IconButton, Toolbar } from "@ui/components/";
 import { Icon } from "@ui/components/icons";
 import { t } from "@ui/i18n";
 import m from "mithril";
-import { elementCatalog } from "./element_catalog";
 import {
 	clamp,
 	closeToolMenus,
@@ -13,6 +12,7 @@ import {
 	state,
 	undo,
 } from "../overlay_store";
+import { elementCatalog } from "./element_catalog";
 
 /** Toolbar below the main nav: history, the single "+" element-catalog
  * button, then — right-aligned — zoom + the utility dialogs. */
@@ -49,9 +49,13 @@ export function editorToolbar(): m.Vnode {
 			{/* Group 2: the one "add element" button — opens the catalog. */}
 			<span class="ov-tb-group">
 				<span class={["ov-dd", state.catalogOpen ? "is-open" : ""].join(" ")}>
-					<IconButton
-						label={t("overlay.add_element")}
-						icon={<Icon name="plus" class="role-icon" />}
+					<Button
+						label={
+							<>
+								<Icon name="plus" class="role-icon" />
+								{t("overlay.add_element")}
+							</>
+						}
 						class="ov-dd-trigger"
 						aria-haspopup="true"
 						aria-expanded={state.catalogOpen ? "true" : "false"}
