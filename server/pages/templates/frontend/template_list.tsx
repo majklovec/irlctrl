@@ -32,6 +32,7 @@ import type { MithrilJSXComponent } from "@ui/jsx";
 import { mountPage } from "@ui/util";
 import m from "mithril";
 import { ServerNav } from "../../../shell/nav";
+import { highlightHtml } from "./highlight";
 import {
 	buildPreviewDoc,
 	defaultBind,
@@ -73,10 +74,14 @@ const editor = {
 	docError: undefined as string | undefined,
 	dirty: false,
 	saving: false,
-	tab: "fields" as "fields" | "html",
+	tab: "html" as "fields" | "html",
 };
 
 const createBox = { open: false, id: "" };
+
+/** The preview frame's box: "fit" fills the pane at 16:9 (like the canvas);
+ * unchecked, it renders at the author's w×h — the OBS element's size. */
+const previewSize = { fit: true, w: 640, h: 360 };
 
 let previewDoc = "";
 let previewTimer: number | null = null;
@@ -120,7 +125,7 @@ function loadDetail(detail: TemplateDetail): void {
 	editor.docError = doc.error;
 	editor.dirty = false;
 	editor.saving = false;
-	editor.tab = "fields";
+	editor.tab = "html";
 	previewDoc = buildPreviewDoc({
 		html: editor.html,
 		vars: editor.vars,
@@ -485,21 +490,38 @@ function EditorPane() {
 						</Card>
 					) : (
 						<div class="tpl-code">
-							<textarea
-								class="tpl-html"
-								spellCheck={false}
-								value={editor.html}
-								placeholder={t("tpl.html")}
-								oninput={(ev: Event) =>
-									applyHtml((ev.target as HTMLTextAreaElement).value)
-								}
-								onkeydown={(ev: KeyboardEvent) => {
-									if ((ev.metaKey || ev.ctrlKey) && ev.key === "s") {
-										ev.preventDefault();
-										void save();
+							<div class="tpl-code-area">
+								<pre
+									class="tpl-code-hl"
+									aria-hidden="true"
+								>{m.trust(highlightHtml(editor.html))}</pre>
+								<textarea
+									class="tpl-html"
+									wrap="off"
+									spellCheck={false}
+									value={editor.html}
+									placeholder={t("tpl.html")}
+									oninput={(ev: Event) =>
+										applyHtml((ev.target as HTMLTextAreaElement).value)
 									}
-								}}
-							/>
+									onscroll={(ev: Event) => {
+										const ta = ev.target as HTMLTextAreaElement;
+										const pre = ta.previousElementSibling as
+											| HTMLPreElement
+											| null;
+										if (pre) {
+											pre.scrollTop = ta.scrollTop;
+											pre.scrollLeft = ta.scrollLeft;
+										}
+									}}
+									onkeydown={(ev: KeyboardEvent) => {
+										if ((ev.metaKey || ev.ctrlKey) && ev.key === "s") {
+											ev.preventDefault();
+											void save();
+										}
+									}}
+								/>
+							</div>
 							{!editor.valid && editor.docError && (
 								<p class="tpl-doc-error" title={editor.docError}>
 									{editor.docError}
@@ -509,8 +531,62 @@ function EditorPane() {
 					)}
 				</div>
 				<div class="tpl-preview">
-					<h3>{t("tpl.preview")}</h3>
-					<div class="tpl-preview-frame">
+					<div class="tpl-preview-head">
+						<h3>{t("tpl.preview")}</h3>
+						<div class="tpl-preview-size">
+							<label class="check">
+								<input
+									type="checkbox"
+									checked={previewSize.fit}
+									onchange={(ev: Event) => {
+										previewSize.fit = (ev.target as HTMLInputElement).checked;
+										m.redraw();
+									}}
+								/>
+								{t("tpl.preview_fit")}
+							</label>
+							<label class="tpl-size-field">
+								{t("tpl.preview_width")}
+								<input
+									type="number"
+									min={1}
+									max={4096}
+									value={previewSize.w}
+									disabled={previewSize.fit}
+									oninput={(ev: Event) => {
+										const v = Number((ev.target as HTMLInputElement).value);
+										if (Number.isFinite(v) && v >= 1) previewSize.w = Math.round(v);
+										m.redraw();
+									}}
+								/>
+							</label>
+							<label class="tpl-size-field">
+								{t("tpl.preview_height")}
+								<input
+									type="number"
+									min={1}
+									max={4096}
+									value={previewSize.h}
+									disabled={previewSize.fit}
+									oninput={(ev: Event) => {
+										const v = Number((ev.target as HTMLInputElement).value);
+										if (Number.isFinite(v) && v >= 1) previewSize.h = Math.round(v);
+										m.redraw();
+									}}
+								/>
+							</label>
+						</div>
+					</div>
+					<div
+						class={
+							previewSize.fit ? "tpl-preview-frame" : "tpl-preview-frame fixed"
+						}
+						style={
+							previewSize.fit
+								? undefined
+								: { width: `${previewSize.w}px`, height: `${previewSize.h}px` }
+						}
+					>
 						<iframe
 							class="tpl-preview-doc"
 							title={t("tpl.preview")}

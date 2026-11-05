@@ -193,13 +193,55 @@
 	min-width: 0;
 }
 
-.tpl-preview h3 {
-	margin: 0 0 0.5rem;
+/* The preview column keeps the pane's width (a wider fixed frame scrolls
+ * inside the pane instead of stretching the grid). */
+.tpl-preview {
+	min-width: 0;
+	overflow-x: auto;
+}
+
+.tpl-preview-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 0.35rem 0.75rem;
+	margin-bottom: 0.5rem;
+}
+
+.tpl-preview-head h3 {
+	margin: 0;
 	font-size: 0.8em;
 	font-weight: 600;
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
 	color: var(--muted);
+}
+
+.tpl-preview-size {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 0.5rem 0.75rem;
+	font-size: 0.85em;
+}
+
+.tpl-preview-size .check {
+	font-weight: 500;
+	color: var(--muted);
+}
+
+.tpl-size-field {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	font-weight: 500;
+	color: var(--muted);
+}
+
+.tpl-size-field input {
+	width: 4.5rem;
+	padding: 0.3rem 0.5rem;
 }
 
 .tpl-code {
@@ -208,20 +250,95 @@
 	min-width: 0;
 }
 
-.tpl-html {
-	flex: 1;
-	min-height: 320px;
-	max-height: calc(100vh - 14rem);
-	resize: vertical;
-	padding: 0.75rem;
-	border: 1px solid var(--border);
-	border-radius: var(--radius, 8px);
-	background: var(--code-bg);
-	color: var(--text);
+/* The HTML editor: a transparent textarea over a highlighted <pre> with the
+ * identical box metrics, so the coloured glyphs land exactly on the editable
+ * (invisible) text — the same overlay the pipeline editor uses. */
+.tpl-code-area {
+	position: relative;
 	font-family: var(--font-mono, ui-monospace, monospace);
 	font-size: 0.82em;
 	line-height: 1.5;
 	tab-size: 4;
+}
+
+/* Syntax palette: declared as tokens here (css_tokens test forbids colour
+ * literals anywhere but a custom-property value). */
+.tpl-code-hl {
+	--code-bg: color-mix(in srgb, var(--card-solid) 55%, var(--base));
+	--code-tk-tag: #56d364;
+	--code-tk-attr: #79c0ff;
+	--code-tk-str: #e3b341;
+	--code-tk-cmt: #6e7681;
+	--code-tk-at: #bc8cff;
+	--code-tk-pun: #8b949e;
+	--code-tk-prop: #79c0ff;
+	--code-tk-sel: #7ee787;
+	--code-tk-val: #e3b341;
+}
+
+/* The highlighted underlay carries the visible surface + the code surface. */
+.tpl-code-hl {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	margin: 0;
+	padding: 0.75rem;
+	overflow: hidden;
+	pointer-events: none;
+	border: 1px solid var(--border);
+	border-radius: var(--radius, 8px);
+	background: var(--code-bg);
+	/* Must match the textarea exactly (the UA stylesheet forces `pre` to
+	 * `monospace`, which would drift); set it here, not just inherited. */
+	font-family: var(--font-mono, ui-monospace, monospace);
+	white-space: pre;
+	color: var(--muted);
+}
+
+/* The editable textarea defines the box (resizable); its own glyphs are
+ * transparent, the caret and selection stay visible. */
+.tpl-code-area .tpl-html {
+	position: relative;
+	z-index: 1;
+	min-height: 320px;
+	max-height: calc(100vh - 14rem);
+	width: 100%;
+	resize: vertical;
+	padding: 0.75rem;
+	border: 1px solid transparent;
+	border-radius: var(--radius, 8px);
+	background: transparent;
+	color: transparent;
+	caret-color: var(--text);
+	white-space: pre;
+}
+
+.tpl-code-hl .tk-tag {
+	color: var(--code-tk-tag);
+}
+.tpl-code-hl .tk-attr {
+	color: var(--code-tk-attr);
+}
+.tpl-code-hl .tk-str {
+	color: var(--code-tk-str);
+}
+.tpl-code-hl .tk-cmt {
+	color: var(--code-tk-cmt);
+}
+.tpl-code-hl .tk-at {
+	color: var(--code-tk-at);
+}
+.tpl-code-hl .tk-pun {
+	color: var(--code-tk-pun);
+}
+.tpl-code-hl .tk-prop {
+	color: var(--code-tk-prop);
+}
+.tpl-code-hl .tk-sel {
+	color: var(--code-tk-sel);
+}
+.tpl-code-hl .tk-val {
+	color: var(--code-tk-val);
 }
 
 .tpl-doc-error {
@@ -244,6 +361,14 @@
 		)
 		0 0 / 24px 24px;
 	overflow: hidden;
+}
+
+/* Author-chosen box (the OBS element's size): explicit px dimensions,
+ * centered in the pane; the pane scrolls when the box is bigger. */
+.tpl-preview-frame.fixed {
+	width: auto;
+	aspect-ratio: auto;
+	margin-inline: auto;
 }
 
 .tpl-preview-doc {

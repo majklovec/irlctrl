@@ -4,10 +4,11 @@
  * (server/core/generated/pages.ts) — adding a page slice adds its menu
  * entry with no edit to this file. The profile menu (account, sign out)
  * is shell-owned and stays hardcoded here. */
-import m from "mithril";
+
 import { apiJson, apiTry } from "@ui/api_client";
 import { t } from "@ui/i18n";
 import type { MithrilJSXComponent } from "@ui/jsx";
+import m from "mithril";
 import { MENUS } from "../../generated/pages";
 
 /** Menu items in display order — the generated manifest is only sorted by
