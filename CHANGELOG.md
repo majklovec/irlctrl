@@ -1,3 +1,10 @@
+# [2.24.0](https://github.com/majklovec/irlctrl/compare/v2.23.0...v2.24.0) (2026-11-05)
+
+
+### Features
+
+* **overlay:** add support for element variants in the catalog and improve element addition ([02471e4](https://github.com/majklovec/irlctrl/commit/02471e44547d2358a159ef24d1b68e138f733694))
+
 # [2.23.0](https://github.com/majklovec/irlctrl/compare/v2.22.0...v2.23.0) (2026-11-05)
 
 
