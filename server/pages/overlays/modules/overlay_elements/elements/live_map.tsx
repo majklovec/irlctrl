@@ -36,7 +36,8 @@ export type LiveMapProvider = "osm" | "arcgis" | "mapy";
 
 export interface LiveMapProps {
 	provider: LiveMapProvider;
-	blackGrayscale: boolean;
+	grayscale: boolean;
+	invert: boolean;
 	zoom: number;
 	centerLat: number;
 	centerLon: number;
@@ -50,7 +51,8 @@ export interface LiveMapProps {
 
 export const DEFAULT_LIVE_MAP_PROPS: Required<LiveMapProps> = {
 	provider: "osm",
-	blackGrayscale: false,
+	grayscale: false,
+	invert: false,
 	zoom: 15,
 	centerLat: 50.1635,
 	centerLon: 12.4034,
@@ -121,10 +123,16 @@ function injectStyles(): void {
 	const s = document.createElement("style");
 	s.id = "live-map-styles";
 	s.textContent = `
-    .bw.leaflet-container .leaflet-tile-pane {
+    .lm-grayscale.leaflet-container .leaflet-tile-pane {
+      filter: grayscale(100%);
+    }
+    .lm-invert.leaflet-container .leaflet-tile-pane {
+      filter: invert(1);
+    }
+    .lm-grayscale.lm-invert.leaflet-container .leaflet-tile-pane {
       filter: grayscale(100%) invert(1);
     }
-    .bw.leaflet-container { background: #0e100f; }
+    .lm-invert.leaflet-container { background: #0e100f; }
     .live-map-distance {
       background: rgba(0,0,0,.7); color: #fff; font-size: 13px;
       padding: 4px 10px; border-radius: 4px; white-space: nowrap;
@@ -169,13 +177,16 @@ function formatDistance(metres: number): string {
 interface MapState {
 	map: any;
 	container: HTMLElement;
+	resizeObserver: ResizeObserver;
 	// One tile layer per available provider; `layers[provider]` is the
 	// visible one, so switching only toggles visibility.
 	layers: Partial<Record<LiveMapProvider, any>>;
 	// `""` until the first sync has picked a provider.
 	provider: LiveMapProvider | "";
-	mapyKey: string;
-	bw: boolean;
+	// `null` until the first sync has built the layer set.
+	mapyKey: string | null;
+	grayscale: boolean;
+	invert: boolean;
 	centerLat: number;
 	centerLon: number;
 	zoom: number;
@@ -195,7 +206,9 @@ function makeTileLayer(key: LiveMapProvider, mapyKey: string): any {
 	return L.tileLayer(
 		providerUrl(key).replace("{key}", encodeURIComponent(mapyKey)),
 		{
-			maxZoom: 19,
+			maxNativeZoom: 19,
+			maxZoom: 25,
+			minZoom: 0,
 			attribution: providerAttribution(key),
 			opacity: 1,
 		},
@@ -263,7 +276,7 @@ function syncDistance(state: MapState, p: LiveMapProps): void {
 		map.on("movestart", updateBadge);
 		map.on("movend", updateBadge);
 		map.on("zoomend", updateBadge);
-		const dctrl = L.control({ position: "bottomright" });
+		const dctrl = L.control({ position: "bottomleft" });
 		dctrl.onAdd = () => badge;
 		map._liveMapBadgeCtrl = dctrl.addTo(map);
 	} else if (!want && map._liveMapBadgeCtrl) {
@@ -278,12 +291,13 @@ function syncDistance(state: MapState, p: LiveMapProps): void {
 function syncMap(state: MapState, p: LiveMapProps): void {
 	const { map } = state;
 
-	// Tile layer URLs embed the mapy key — rebuild when it changes.
+	// Tile layer URLs embed the mapy key — (re)build the layer set when the
+	// key changed (`null` on the first sync always rebuilds).
 	if (state.mapyKey !== p.mapyKey) {
 		for (const k of Object.keys(state.layers) as LiveMapProvider[])
 			map.removeLayer(state.layers[k]);
 		state.layers = {};
-		for (const k of Object.keys(PROVIDER_NAME) as LiveMapProvider[]) {
+		for (const k of PROVIDER_ORDER) {
 			if (k === "mapy" && !p.mapyKey) continue;
 			state.layers[k] = makeTileLayer(k, p.mapyKey);
 		}
@@ -292,8 +306,10 @@ function syncMap(state: MapState, p: LiveMapProps): void {
 	}
 	setProvider(state, p);
 
-	state.bw = p.blackGrayscale;
-	state.container.classList.toggle("bw", state.bw);
+	state.grayscale = p.grayscale;
+	state.invert = p.invert;
+	state.container.classList.toggle("lm-grayscale", state.grayscale);
+	state.container.classList.toggle("lm-invert", state.invert);
 
 	if (p.centerLat !== state.centerLat || p.centerLon !== state.centerLon) {
 		state.centerLat = p.centerLat;
@@ -314,13 +330,20 @@ function initMap(container: HTMLElement, props: LiveMapProps): MapState {
 		props.zoom,
 	);
 
+	// Leaflet does not reflow when the container size changes (overlay
+	// elements are drag-resizable) — invalidate the size to re-tile.
+	const resizeObserver = new ResizeObserver(() => map.invalidateSize());
+	resizeObserver.observe(container);
+
 	const state: MapState = {
 		map,
+		resizeObserver,
 		layers: {},
 		container,
-		bw: false,
+		grayscale: false,
+		invert: false,
 		provider: "",
-		mapyKey: props.mapyKey,
+		mapyKey: null,
 		centerLat: props.centerLat,
 		centerLon: props.centerLon,
 		zoom: props.zoom,
@@ -349,8 +372,10 @@ function safeProps(raw: Record<string, unknown>): LiveMapProps {
 			provider === "osm" || provider === "arcgis" || provider === "mapy"
 				? provider
 				: d.provider,
-		blackGrayscale: cleanBool(raw.blackGrayscale),
-		zoom: cleanNum(raw.zoom, d.zoom, 1, 19),
+		// `blackGrayscale` is the pre-split prop of earlier saved overlays.
+		grayscale: cleanBool(raw.grayscale ?? raw.blackGrayscale),
+		invert: cleanBool(raw.invert),
+		zoom: cleanNum(raw.zoom, d.zoom, 0, 25),
 		centerLat: cleanNum(raw.centerLat, d.centerLat, -90, 90),
 		centerLon: cleanNum(raw.centerLon, d.centerLon, -180, 180),
 		mapyKey: cleanStr(raw.mapyKey, 200),
@@ -394,6 +419,7 @@ function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 			const state = maps.get(container);
 			if (state) {
 				maps.delete(container);
+				state.resizeObserver.disconnect();
 				state.map.remove();
 			}
 		},
@@ -461,22 +487,39 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 				</select>,
 				sp,
 			)}
-			{bindField(
-				e,
-				"props.blackGrayscale",
-				t("overlay.live_map_bw"),
-				<input
-					type="checkbox"
-					checked={p.blackGrayscale === true}
-					onchange={(ev: Event) =>
-						mutate((el) => {
-							el.props.blackGrayscale = (ev.target as HTMLInputElement).checked;
-						})
-					}
-				/>,
-				sp,
-			)}
-			{num("zoom", null, t("overlay.live_map_zoom"), 1, 19)}
+			<div class="ov-grid2">
+				{bindField(
+					e,
+					"props.grayscale",
+					t("overlay.live_map_grayscale"),
+					<input
+						type="checkbox"
+						checked={p.grayscale === true}
+						onchange={(ev: Event) =>
+							mutate((el) => {
+								el.props.grayscale = (ev.target as HTMLInputElement).checked;
+							})
+						}
+					/>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.invert",
+					t("overlay.live_map_invert"),
+					<input
+						type="checkbox"
+						checked={p.invert === true}
+						onchange={(ev: Event) =>
+							mutate((el) => {
+								el.props.invert = (ev.target as HTMLInputElement).checked;
+							})
+						}
+					/>,
+					sp,
+				)}
+			</div>
+			{num("zoom", null, t("overlay.live_map_zoom"), 0, 25)}
 			{num("centerLat", null, t("overlay.live_map_center_lat"), -90, 90)}
 			{num("centerLon", null, t("overlay.live_map_center_lon"), -180, 180)}
 			<div class="ov-grid2">
@@ -561,7 +604,8 @@ export const liveMapElement: OverlayElementDef & OverlayElementSchema = {
 	},
 	propKeys: [
 		"provider",
-		"blackGrayscale",
+		"grayscale",
+		"invert",
 		"zoom",
 		"centerLat",
 		"centerLon",
@@ -581,8 +625,9 @@ export const liveMapElement: OverlayElementDef & OverlayElementSchema = {
 			| undefined;
 		return {
 			provider: read.oneOf("provider", ["osm", "arcgis", "mapy"], d.provider),
-			blackGrayscale: read.bool("blackGrayscale"),
-			zoom: read.num("zoom", d.zoom, 1, 19),
+			grayscale: read.bool("grayscale"),
+			invert: read.bool("invert"),
+			zoom: read.num("zoom", d.zoom, 0, 25),
 			centerLat: read.num("centerLat", d.centerLat, -90, 90),
 			centerLon: read.num("centerLon", d.centerLon, -180, 180),
 			mapyKey: read.str("mapyKey", d.mapyKey, 200),
