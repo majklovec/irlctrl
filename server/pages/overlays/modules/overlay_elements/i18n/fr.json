@@ -119,6 +119,8 @@
     "overlay.cd_loop": "Boucle",
     "overlay.cd_background": "Arrière-plan",
     "overlay.cd_accent": "Accent",
+    "overlay.cd_event": "Événement déclencheur",
+    "overlay.cd_event_link": "Copier le lien déclencheur",
     "overlay.lt_entries": "Entrées",
     "overlay.lt_name": "Nom",
     "overlay.lt_topic": "Sujet",

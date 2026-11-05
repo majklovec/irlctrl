@@ -5,6 +5,11 @@
  * the next day when it has passed). `duration` mode: counts from `duration`
  * anchored at first draw (a loop re-anchors at each zero crossing). The inner
  * component owns a 1 s interval, cleared on removal.
+ *
+ * Like the `spin_wheel` it is trigger-driven and `persistent`: the element
+ * stays on screen at runtime and (re)starts its duration countdown when its
+ * trigger event fires — `GET /overlay/<overlay id>/event/<event>` writes a
+ * fresh start time that the box picks up on its next draw.
  */
 
 import { Icon } from "@ui/components/icons";
@@ -34,6 +39,8 @@ function targetTime(clockTarget: string, now: number): number {
 
 interface CdB {
 	props: Record<string, unknown>;
+	/** Element id — keys the imperative start time written by `onTrigger`. */
+	id: string;
 }
 
 interface CdBState {
@@ -42,6 +49,15 @@ interface CdBState {
 	now: number;
 	timer: ReturnType<typeof setInterval>;
 }
+
+/** Imperative per-element start times, written by `onTrigger`, read (and
+ * cleared) by the box on its next draw so a trigger (re)starts the countdown
+ * from a fixed wall-clock instant. */
+const countdownStarts = new Map<string, number>();
+
+/** The inspector's copy-link green flash (module scope: a `view`-local
+ * boolean would reset on every redraw). */
+let eventLinkCopied = false;
 
 const CountdownBox: m.Component<CdB, CdBState> = {
 	oncreate(vnode) {
@@ -59,6 +75,13 @@ const CountdownBox: m.Component<CdB, CdBState> = {
 	view(vnode) {
 		const p = vnode.attrs.props;
 		const s = vnode.state;
+		// A trigger fired since the last draw: re-anchor to that wall-clock
+		// instant so the duration countdown (re)starts from a fixed point.
+		const startAt = countdownStarts.get(vnode.attrs.id);
+		if (startAt !== undefined) {
+			countdownStarts.delete(vnode.attrs.id);
+			s.anchor = startAt;
+		}
 		const now = s.now;
 		const mode = strProp(p, "mode", "duration");
 		const duration = numProp(p, "duration", 60);
@@ -134,12 +157,35 @@ const CountdownBox: m.Component<CdB, CdBState> = {
 };
 
 function draw(element: OverlayElement, _ctx: ElementContext): Vnode<any, any> {
-	return m(CountdownBox, { props: element.props });
+	return m(CountdownBox, { props: element.props, id: element.id });
 }
 
-function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
+/** Trigger handler (same universal event channel as `spin_wheel`): when the
+ * event name matches `props.event`, record a fresh start time (duration
+ * mode) — the box re-anchors to it on its next draw, (re)starting the
+ * countdown. Persistent, so it returns `undefined` (no display duration). */
+function onTrigger(
+	element: OverlayElement,
+	eventName: string,
+	_payload: Record<string, unknown>,
+	_ctx: ElementContext,
+): number | undefined {
+	if (eventName !== strProp(element.props, "event", "countdown"))
+		return undefined;
+	countdownStarts.set(element.id, Date.now());
+	m.redraw();
+	return undefined;
+}
+
+function editForm({
+	element: e,
+	mutate,
+	variables,
+	eventUrl,
+}: ElementProps): Vnode {
 	const p = e.props;
 	const sp = { mutate, variables };
+	const eventName = strProp(p, "event", "countdown");
 	const setStr = (key: string) => (ev: Event) =>
 		mutate((el) => {
 			el.props[key] = (ev.target as HTMLInputElement).value;
@@ -158,6 +204,46 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 		});
 	return (
 		<>
+			{bindField(
+				e,
+				"props.event",
+				t("overlay.cd_event"),
+				<input
+					type="text"
+					value={eventName}
+					oninput={setStr("event")}
+				/>,
+				sp,
+			)}
+			{eventUrl ? (
+				<button
+					class={
+						eventLinkCopied ? "ov-var-copy ov-copied" : "ov-var-copy"
+					}
+					type="button"
+					style={{ marginTop: "2px" }}
+					title={
+						eventLinkCopied
+							? t("overlay.copied")
+							: eventUrl(eventName) + " — " + t("overlay.cd_event_link")
+					}
+					aria-label={t("overlay.cd_event_link")}
+					onclick={() => {
+						void navigator.clipboard.writeText(eventUrl(eventName)).then(
+							() => {
+								eventLinkCopied = true;
+								m.redraw();
+								setTimeout(() => {
+									eventLinkCopied = false;
+									m.redraw();
+								}, 1500);
+							},
+						);
+					}}
+				>
+					<Icon name="copy" class="role-icon" />
+				</button>
+			) : null}
 			{bindField(
 				e,
 				"props.mode",
@@ -285,6 +371,8 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 
 function validate(e: OverlayElement): string[] {
 	const problems: string[] = [];
+	if (typeof e.props.event !== "string" || e.props.event === "")
+		problems.push("event must be a non-empty string");
 	const ct = strProp(e.props, "clockTarget", "");
 	if (
 		strProp(e.props, "mode", "duration") === "clock" &&
@@ -301,6 +389,7 @@ export const countdownElement: OverlayElementDef = {
 	order: 92,
 	defaultProps: { ...DEFAULT_COUNTDOWN_PROPS },
 	propKeys: [
+		"event",
 		"mode",
 		"duration",
 		"clockTarget",
@@ -317,4 +406,7 @@ export const countdownElement: OverlayElementDef = {
 	editForm,
 	validate,
 	handles: "box",
+	/** On screen at runtime; a trigger event (re)starts the countdown. */
+	persistent: true,
+	onTrigger,
 };

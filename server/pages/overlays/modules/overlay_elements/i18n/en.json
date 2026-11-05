@@ -119,6 +119,8 @@
     "overlay.cd_loop": "Loop",
     "overlay.cd_background": "Background",
     "overlay.cd_accent": "Accent",
+    "overlay.cd_event": "Trigger event",
+    "overlay.cd_event_link": "Copy trigger link",
     "overlay.lt_entries": "Entries",
     "overlay.lt_name": "Name",
     "overlay.lt_topic": "Topic",

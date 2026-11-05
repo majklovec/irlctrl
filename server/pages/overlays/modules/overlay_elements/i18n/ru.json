@@ -119,6 +119,8 @@
     "overlay.cd_loop": "Зациклить",
     "overlay.cd_background": "Фон",
     "overlay.cd_accent": "Акцент",
+    "overlay.cd_event": "Событие-триггер",
+    "overlay.cd_event_link": "Копировать ссылку-триггер",
     "overlay.lt_entries": "Записи",
     "overlay.lt_name": "Имя",
     "overlay.lt_topic": "Тема",

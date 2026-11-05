@@ -119,6 +119,8 @@
     "overlay.cd_loop": "Pętla",
     "overlay.cd_background": "Tło",
     "overlay.cd_accent": "Kolor akcentu",
+    "overlay.cd_event": "Zdarzenie wyzwalacza",
+    "overlay.cd_event_link": "Kopiuj link wyzwalacza",
     "overlay.lt_entries": "Wpisy",
     "overlay.lt_name": "Nazwa",
     "overlay.lt_topic": "Temat",

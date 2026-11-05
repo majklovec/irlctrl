@@ -613,6 +613,8 @@ export const nowPlayingSchema: OverlayElementSchema = {
 
 /* ── countdown ────────────────────────────────────────────────────────── */
 export interface CountdownProps {
+    /** The trigger event that (re)starts the countdown (duration mode). */
+    event: string;
     /** `duration` = count down a fixed time; `clock` = count to a clock time. */
     mode: "duration" | "clock";
     /** Remaining/total time in seconds (duration mode). */
@@ -631,6 +633,7 @@ export interface CountdownProps {
     fontFamily: string;
 }
 export const DEFAULT_COUNTDOWN_PROPS: Required<CountdownProps> = {
+    event: "countdown",
     mode: "duration",
     duration: 60,
     clockTarget: "20:00",
@@ -650,6 +653,7 @@ export const countdownSchema: OverlayElementSchema = {
     normalizeProps(_p, read) {
         const d = DEFAULT_COUNTDOWN_PROPS;
         return {
+            event: read.str("event", d.event, 100),
             mode: read.oneOf("mode", ["duration", "clock"], d.mode),
             duration: read.num("duration", d.duration, 1, 100000),
             clockTarget: read.str("clockTarget", d.clockTarget, 8),

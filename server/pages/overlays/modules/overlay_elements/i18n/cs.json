@@ -119,6 +119,8 @@
     "overlay.cd_loop": "Smyčka",
     "overlay.cd_background": "Pozadí",
     "overlay.cd_accent": "Důrazná barva",
+    "overlay.cd_event": "Událost spouštěče",
+    "overlay.cd_event_link": "Kopírovat odkaz spouštěče",
     "overlay.lt_entries": "Položky",
     "overlay.lt_name": "Jméno",
     "overlay.lt_topic": "Téma",

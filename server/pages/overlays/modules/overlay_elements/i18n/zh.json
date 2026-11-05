@@ -119,6 +119,8 @@
     "overlay.cd_loop": "循环",
     "overlay.cd_background": "背景色",
     "overlay.cd_accent": "强调色",
+    "overlay.cd_event": "触发事件",
+    "overlay.cd_event_link": "复制触发链接",
     "overlay.lt_entries": "条目",
     "overlay.lt_name": "名称",
     "overlay.lt_topic": "主题",

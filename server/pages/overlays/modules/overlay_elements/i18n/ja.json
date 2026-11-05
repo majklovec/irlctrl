@@ -119,6 +119,8 @@
     "overlay.cd_loop": "繰り返し",
     "overlay.cd_background": "背景色",
     "overlay.cd_accent": "アクセント色",
+    "overlay.cd_event": "トリガーイベント",
+    "overlay.cd_event_link": "トリガーリンクをコピー",
     "overlay.lt_entries": "エントリ",
     "overlay.lt_name": "名前",
     "overlay.lt_topic": "トピック",
