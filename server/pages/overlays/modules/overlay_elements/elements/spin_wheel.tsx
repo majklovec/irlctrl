@@ -324,7 +324,7 @@ const PrizesField = {
 		</div>
 	);
 	},
-} as MithrilJSXComponent<{
+} as unknown as MithrilJSXComponent<{
 	element: OverlayElement;
 	mutate: (fn: (el: OverlayElement) => void) => void;
 }>;

@@ -111,7 +111,7 @@ export const ChannelsField = {
 		</div>
 	);
 	},
-} as MithrilJSXComponent<ElementProps>;
+} as unknown as MithrilJSXComponent<ElementProps>;
 
 export interface ListFieldColumn {
 	/** The sub-field key on each row object. */
@@ -219,7 +219,7 @@ export const ListField = {
 		</div>
 	);
 	},
-} as MithrilJSXComponent<{
+} as unknown as MithrilJSXComponent<{
 	element: OverlayElement;
 	mutate: (fn: (el: OverlayElement) => void) => void;
 	propKey: string;
