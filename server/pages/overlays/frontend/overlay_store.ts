@@ -72,16 +72,14 @@ export const state = {
     runtimeDialogOpen: false,
     /** Variables modal (opened from the toolbar icon) is open. */
     variablesDialogOpen: false,
-    /** Editor toolbar dropdown menus (shapes / widgets) are open. */
-    shapesMenuOpen: false,
-    widgetsMenuOpen: false,
+    /** The toolbar's element catalog panel (the "+" menu) is open. */
+    catalogOpen: false,
 };
 
-/** Close the editor toolbar's dropdown menus (click-away, Escape). */
+/** Close the editor toolbar's menus (click-away, Escape). */
 export function closeToolMenus(): void {
-    if (!state.shapesMenuOpen && !state.widgetsMenuOpen) return;
-    state.shapesMenuOpen = false;
-    state.widgetsMenuOpen = false;
+    if (!state.catalogOpen) return;
+    state.catalogOpen = false;
     m.redraw();
 }
 

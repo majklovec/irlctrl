@@ -33,7 +33,7 @@
     --card-subtle: color-mix(in srgb, var(--card-solid) 55%, transparent);
 
     --border: color-mix(in srgb, var(--header-color) 14%, #262b36);
-    --border-strong: color-mix(in srgb, var(--header-color) 28%, #353b48);
+    --border-strong: color-mix(in srgb, var(--header-color) 28%, #525b6f);
 
     --text: color-mix(in srgb, var(--header-color) 6%, #e6e8ee);
     --muted: color-mix(in srgb, var(--header-color) 10%, #8b93a7);

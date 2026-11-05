@@ -84,11 +84,18 @@ const WeatherFetch: m.Component<
 	},
 	WeatherFetchState
 > = {
+	// State defaults live on the component object: Mithril derives the
+	// per-vnode state with the component as prototype, so hooks must mutate
+	// `vnode.state`'s fields only — never reassign `vnode.state` itself.
+	...({
+		data: undefined,
+		loading: true,
+		error: "",
+		timer: undefined,
+		fetching: false,
+		every: 0,
+	} as Partial<WeatherFetchState>),
 	oncreate(vnode) {
-		vnode.state.data = undefined;
-		vnode.state.loading = true;
-		vnode.state.error = "";
-		vnode.state.fetching = false;
 		vnode.state.every = numProp(vnode.attrs.props, "refreshSec", 900) * 1000;
 		vnode.state.timer = setInterval(
 			() => void refresh(vnode),
@@ -260,9 +267,8 @@ const GeoFillButton: m.Component<
 	{ onFill: (lat: number, lon: number) => void },
 	{ locating: boolean; error: string }
 > = {
-	oncreate(vnode) {
-		vnode.state = { locating: false, error: "" };
-	},
+	// State defaults via the component-prototype mechanism (see WeatherFetch).
+	...({ locating: false, error: "" } as const),
 	view(vnode) {
 		const s = vnode.state;
 		return (

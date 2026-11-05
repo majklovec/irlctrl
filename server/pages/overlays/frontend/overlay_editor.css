@@ -1046,49 +1046,169 @@ instead of truncating */
     position: relative;
     display: inline-flex;
 }
-.ov-dd-menu {
+.ov-dd-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+}
+/* ── Element catalog (the toolbar's "+" panel) ──────────────────────── */
+/* The floating panel under the "+" trigger: tabs + search on top, the
+   scrollable section list below. */
+.ov-cat {
     position: absolute;
     top: calc(100% + 6px);
     left: 0;
     z-index: 100;
     display: flex;
-    align-items: center;
-    gap: 2px;
-    padding: 6px;
+    flex-direction: column;
+    width: min(580px, calc(100vw - 32px));
+    max-height: min(560px, calc(100vh - 150px));
     background: var(--card-solid);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     box-shadow: var(--shadow-lg);
+    overflow: hidden;
 }
-/* Widgets menu: an icon grid. A 17-row tall dropdown would outgrow the
-   canvas under the subbar, so it floats up over the canvas and wraps. */
-.ov-dd-grid {
-    top: auto;
-    bottom: calc(100% + 6px);
-    flex-wrap: wrap;
-    width: 308px;
+/* Header row: the category tabs left, the search field at the right edge. */
+.ov-cat-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px 0;
 }
-/* The chevron on the text trigger points down when open. */
-.ov-dd-chevron {
-    width: 1em;
-    height: 1em;
-    transform: rotate(0deg);
+.ov-cat-tabs {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    gap: 2px;
+}
+/* OBS-style tab: only the active one is underlined. */
+.ov-cat-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font: inherit;
+    font-size: 12.5px;
+    padding: 6px 8px 8px;
+    white-space: nowrap;
+    transition: color var(--t);
+}
+.ov-cat-tab:hover {
+    color: var(--text);
+}
+.ov-cat-tab.is-active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+}
+.ov-cat-search {
+    width: 168px;
+    flex-shrink: 0;
+    margin-bottom: 6px;
+    padding: 5px 10px;
+    font: inherit;
+    font-size: 12.5px;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+}
+.ov-cat-search:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--ring);
+}
+/* The scrollable body with the collapsible sections. */
+.ov-cat-body {
+    overflow-y: auto;
+    padding: 4px 12px 12px;
+}
+.ov-cat-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    background: none;
+    border: none;
+    color: var(--text);
+    cursor: pointer;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    padding: 10px 2px 6px;
+    text-align: left;
+}
+
+.ov-cat-chev {
+    width: 14px;
+    height: 14px;
+    color: var(--muted);
+    transform: rotate(90deg);
     transition: transform var(--t);
 }
-.ov-dd.is-open .ov-dd-chevron {
-    transform: rotate(90deg);
+.ov-cat-chev.is-closed {
+    transform: rotate(0deg);
 }
-/* "Widgets" text trigger: an icon-link carrying a label. */
-.ov-dd-textbtn {
-    width: auto;
-    padding: 0 0.55rem;
-    gap: 0.4rem;
-    font-size: 0.8rem;
+/* The card grid: 3 columns on the full panel width, wrapping down. */
+.ov-cat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    padding-bottom: 6px;
 }
-.ov-dd-scrim {
-    position: fixed;
-    inset: 0;
-    z-index: 90;
+/* One element card: icon + title + one-line description. */
+.ov-cat-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 8px 10px;
+    text-align: left;
+    color: var(--text);
+    background: var(--card-subtle);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    transition:
+        border-color var(--t),
+        background-color var(--t);
+}
+.ov-cat-card:hover {
+    color: var(--text-strong);
+    background: var(--card);
+    border-color: var(--border-strong);
+}
+
+.ov-cat-card:hover span {
+    color: var(--text-strong);
+}
+
+.ov-cat-card-ic {
+    display: inline-flex;
+    color: var(--muted);
+    margin-bottom: 3px;
+}
+.ov-cat-card-ic svg {
+    width: 17px;
+    height: 17px;
+}
+.ov-cat-card-t {
+    font-size: 12.5px;
+    font-weight: 500;
+    line-height: 1.25;
+}
+.ov-cat-card-d {
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.3;
+}
+.ov-cat-empty {
+    padding: 18px 4px;
+    color: var(--muted);
+    font-size: 12.5px;
+    text-align: center;
 }
 /* Zoom cluster: two icon buttons around the percentage readout. */
 .ov-zoom {

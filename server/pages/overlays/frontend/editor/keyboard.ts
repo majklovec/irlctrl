@@ -14,10 +14,10 @@ import {
 export function onKey(ev: KeyboardEvent): void {
 	const tag = (ev.target as HTMLElement | null)?.tagName;
 	if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-	// Escape closes an open toolbar dropdown before it reaches the element
-	// shortcuts (its scrim is not focusable, so it never gets keydowns itself)
+	// Escape closes an open toolbar menu before it reaches the element
+	// shortcuts (the scrim is not focusable, so it never gets keydowns itself).
 	if (ev.key === "Escape") {
-		if (state.shapesMenuOpen || state.widgetsMenuOpen) {
+		if (state.catalogOpen) {
 			ev.preventDefault();
 			closeToolMenus();
 		}
