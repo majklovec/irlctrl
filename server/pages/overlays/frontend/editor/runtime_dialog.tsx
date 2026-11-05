@@ -4,8 +4,6 @@ import { t } from "@ui/i18n";
 import m from "mithril";
 import {
 	copyRuntimeUrl,
-	overlay,
-	rotateToken,
 	runtimeUrl,
 	state,
 } from "../overlay_store";
@@ -16,35 +14,26 @@ const focusCopy = ({ dom }: m.VnodeDOM): void =>
 	(dom as HTMLButtonElement).focus();
 
 /** Runtime URL dialog: opened from the toolbar icon, shows the
- * token-authenticated URL (the OBS source) with copy + token-rotate.
- * Only call it while `state.runtimeDialogOpen` and an overlay exists. */
+ * owner-token-authenticated URL (the OBS source) with copy.
+ * Only call it while `state.runtimeDialogOpen` and an overlay is loaded. */
 export function runtimeDialog(): m.Vnode {
-	const s = overlay();
-	const ref =
-		s && state.selectedOverlayId
-			? { id: state.selectedOverlayId, token: state.token }
-			: null;
+	const id = state.selectedOverlayId;
 	return (
 		<Modal
 			title={t("overlay.runtime_url")}
 			onClose={() => (state.runtimeDialogOpen = false)}
 		>
-			{ref ? (
+			{id ? (
 				<div class="ov-runtime">
-					<code class="ov-url" title={runtimeUrl(ref)}>
-						{runtimeUrl(ref)}
+					<code class="ov-url" title={runtimeUrl(id)}>
+						{runtimeUrl(id)}
 					</code>
 					<IconButton
 						class={state.copied ? "ov-copied" : undefined}
 						label={state.copied ? t("overlay.copied") : t("overlay.copy")}
 						icon={<Icon name="copy" class="role-icon" />}
 						oncreate={focusCopy}
-						onclick={() => void copyRuntimeUrl(ref)}
-					/>
-					<IconButton
-						label={t("overlay.rotate")}
-						icon={<Icon name="sync" class="role-icon" />}
-						onclick={() => void rotateToken()}
+						onclick={() => void copyRuntimeUrl(id)}
 					/>
 				</div>
 			) : null}

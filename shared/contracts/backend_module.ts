@@ -107,8 +107,8 @@ export interface ControlRouteContext {
     releaseChatChannels(specs: string[]): void;
     /**
      * The channel specs an overlay's chat elements display, resolved from the
-     * overlay's token + id; `null` when the token is unknown or does not own an
-     * overlay with that id.
+     * overlay OWNER's user token + id; `null` when the token is unknown or its
+     * owner does not have an overlay with that id.
      */
     overlayChatOverlaySpecs(token: string, overlayId: string): string[] | null;
 }

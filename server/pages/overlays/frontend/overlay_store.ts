@@ -18,7 +18,6 @@ import { resolveElement } from "./overlay_render";
 export interface OverlaySummary {
     id: string;
     name: string;
-    token: string;
     elementCount: number;
     updatedAt: number;
 }
@@ -44,7 +43,8 @@ export const state = {
     overlays: [] as OverlaySummary[],
     /** the overlay the editor page has loaded (full state), or null. */
     overlay: null as Overlay | null,
-    /** the loaded overlay's token (editor); the list carries per-row tokens. */
+    /** the current user's device token (owner user-token auth for runtime
+     * URLs); fetched from the profile so runtime URLs name this user. */
     token: "",
     selectedOverlayId: null as string | null,
     selectedElementId: null as string | null,
@@ -225,24 +225,26 @@ export function resolvedTransform(e: OverlayElement): Transform {
     return resolveElement(e, ctx().variables).transform;
 }
 
-/** The runtime URL for an overlay (its own token, its own id). Accepts a list
- * row (`OverlaySummary`) or the editor's `{ id, token }` pair. */
-export function runtimeUrl(s: { id: string; token: string }): string {
+/** The runtime URL for an overlay: the overlay's id + the owner's user token
+ * (which auth resolves to the overlay's owner). */
+export function runtimeUrl(id: string): string {
     return (
         location.origin +
         "/overlay/" +
-        encodeURIComponent(s.id) +
+        encodeURIComponent(id) +
         "?token=" +
-        s.token
+        state.token
     );
 }
 
-/** Token-authenticated URL that revalues one variable: complete the
- * trailing `…&<name>=` with a value, leave it empty to clear the variable. */
+/** Owner-token URL that revalues one variable on the loaded overlay: complete
+ * the trailing `…&<name>=` with a value, leave it empty to clear the variable. */
 export function variableUrl(name: string): string {
     return (
         location.origin +
-        "/overlay/variables?token=" +
+        "/overlay/" +
+        encodeURIComponent(state.selectedOverlayId ?? "") +
+        "/variables?token=" +
         state.token +
         "&" +
         encodeURIComponent(name) +
@@ -250,15 +252,27 @@ export function variableUrl(name: string): string {
     );
 }
 
+/** Owner-token URL that fires one event on the loaded overlay (e.g. a spin
+ * wheel's trigger): opening it in a browser, Stream Deck button, or OBS
+ * browser source runs the element's `onTrigger`. */
+export function eventUrl(name: string): string {
+    return (
+        location.origin +
+        "/overlay/" +
+        encodeURIComponent(state.selectedOverlayId ?? "") +
+        "/event/" +
+        encodeURIComponent(name) +
+        "?token=" +
+        state.token
+    );
+}
+
 /** Copy an overlay's runtime URL so it can be pasted straight into OBS.
  * The list row's copy icon turns green until the state expires. */
-export async function copyOverlayUrl(s: {
-    id: string;
-    token: string;
-}): Promise<void> {
+export async function copyOverlayUrl(id: string): Promise<void> {
     try {
-        await navigator.clipboard.writeText(runtimeUrl(s));
-        state.copiedOverlayId = s.id;
+        await navigator.clipboard.writeText(runtimeUrl(id));
+        state.copiedOverlayId = id;
         setTimeout(() => {
             state.copiedOverlayId = null;
             m.redraw();
@@ -283,17 +297,23 @@ export function variableUsage(variableId: string): number {
 /** Fetch the overlay list; an editor page also loads the overlay its URL
  * names. */
 export async function load(overlayId: string | null = null): Promise<void> {
+    // runtime URLs authenticate with the owner's user token, so fetch this
+    // user's device token from the profile (the overlay API no longer carries
+    // a per-overlay token).
+    const profile = await apiTry<{
+        tokens?: { token: string }[];
+    }>("/api/profile");
+    state.token = profile?.tokens?.[0]?.token ?? "";
     const list = await apiTry<{ overlays: OverlaySummary[] }>("/api/overlays");
     if (list?.overlays) state.overlays = list.overlays;
     if (overlayId) {
-        const body = await apiTry<{ token: string; overlay: Overlay }>(
+        const body = await apiTry<{ overlay: Overlay }>(
             `/api/overlays/${encodeURIComponent(overlayId)}`,
         );
         if (body?.overlay) {
             // the previous overlay's library object URLs are stale now
             releaseLibraryAssets();
             state.overlay = body.overlay;
-            state.token = body.token ?? "";
             state.selectedOverlayId = overlayId;
             void loadLibraryAssets(body.overlay);
         }
@@ -615,24 +635,9 @@ export async function deleteVariable(id: string): Promise<void> {
     }
 }
 
-export async function rotateToken(): Promise<void> {
-    if (!state.selectedOverlayId) return;
-    const body = await apiTry<{ token: string }>(
-        `/api/overlays/${encodeURIComponent(state.selectedOverlayId)}/token/rotate`,
-        { method: "POST" },
-    );
-    if (body?.token) {
-        state.token = body.token;
-        m.redraw();
-    }
-}
-
-export async function copyRuntimeUrl(s: {
-    id: string;
-    token: string;
-}): Promise<void> {
+export async function copyRuntimeUrl(id: string): Promise<void> {
     try {
-        await navigator.clipboard.writeText(runtimeUrl(s));
+        await navigator.clipboard.writeText(runtimeUrl(id));
         state.copied = true;
         setTimeout(() => {
             state.copied = false;
@@ -733,17 +738,5 @@ serverLive.rpc.on("overlays.overlay", (data) => {
         if (overlayIsStale(state.overlay, o)) return;
         state.overlay = o;
     }
-    m.redraw();
-});
-
-serverLive.rpc.on("overlays.token", (data) => {
-    const { overlayId, token } = (data as {
-        overlayId?: string;
-        token?: string;
-    }) ?? {};
-    if (!overlayId || !token) return;
-    const i = state.overlays.findIndex((x) => x.id === overlayId);
-    if (i >= 0) state.overlays[i] = { ...state.overlays[i], token };
-    if (overlayId === state.selectedOverlayId) state.token = token;
     m.redraw();
 });

@@ -90,8 +90,15 @@ export async function createControlServer(options: ControlServerOptions) {
                         acquireWidgetChannels("chat", specs),
                     releaseChatChannels: (specs) =>
                         releaseWidgetChannels("chat", specs),
-                    overlayChatOverlaySpecs: (token, overlayId) =>
-                        overlays.runtimeOverlayChatSpecs(token, overlayId),
+                    overlayChatOverlaySpecs: (token, overlayId) => {
+                        const user = auth.userForToken(token);
+                        return user
+                            ? overlays.runtimeOverlayChatSpecs(
+                                  user,
+                                  overlayId,
+                              )
+                            : null;
+                    },
                 }),
             );
     }

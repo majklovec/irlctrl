@@ -36,7 +36,7 @@ No edits to files outside `server/pages/donations/` except the three additive co
 | **Services bag**             | `PageServices` — `db`, `auth`, `publish(topic, payload)`, `config` (plus the `onShutdown`/`dashboard` helpers in §4.3). Injected via `server.init(services)`.                                                                                                          |
 | **Routing**                  | `server.routes` is an Elysia plugin. Mounted by `server/core/registry.ts → mountRoutes(app)`. Paths must be unique across pages.                                                                                                                                       |
 | **Bus & WS**                 | `services.publish(topic, payload)` publishes to the topic's WS broadcast. Dashboard topic: `dashboards` on `/dashboards/ws`. Overlay topic: `overlay-runtime` on `/overlay/:id/ws?token=…`.                                                                            |
-| **Overlay alert trigger**    | `GET /overlay/alert/<eventName>?token=…` is the existing entry point for on-air alerts. The new page contributes the `donation-alert` element, and the pipeline calls this endpoint with `eventName=donation`.                                                         |
+| **Overlay event trigger**    | `GET /overlay/<overlay id>/event/<eventName>?token=…` is the existing entry point for on-air events. The new page contributes the `donation-alert` element, and the pipeline calls this endpoint with `eventName=donation`.                                                         |
 | **Overlay element contract** | Schema half: `server/core/overlay_element.ts`. Browser half: `shared/ui/overlay/element.ts`. Both are reusable as-is; the page contributes them through `PageModule.overlayElements`.                                                                                  |
 | **Discovery**                | Runtime `readdirSync` in `server/core/registry.ts`. Browser side imports `server/core/generated/pages.ts` (from `scripts/gen_pages.ts`). Adding `server/pages/donations/` and running `bun run gen:pages` (auto-invoked from `predev`/`pretest`) is all that's needed. |
 | **Auth**                     | Webhook routes under `/webhook/*` are unauthenticated (see §6 and §9 Q1). `/donations/*` management routes require the normal session middleware.                                                                                                                      |
@@ -171,7 +171,7 @@ export interface PageServices {
 
 Internally this calls `publish("dashboards", { type: "event", event, data, module })`. If the core already has a similar helper on `services.publish` (e.g. a `dashboards.publish` sub-service), use that instead and skip this addition.
 
-The overlay WS publication does **not** need a new helper — the dispatcher will call the existing `GET /overlay/alert/donation?token=…` endpoint via `fetch()`, which is how the current alert pipeline works.
+The overlay WS publication does **not** need a new helper — the dispatcher will call the existing `GET /overlay/<overlay id>/event/donation?token=…` endpoint via `fetch()`, which is how the current event pipeline works.
 
 ---
 
@@ -267,7 +267,7 @@ export async function dispatch(event: DonationEvent | null): Promise<Response> {
 
 	const alert = translate(event, currentConfig());
 	publishDashboardAlert(alert); // services.dashboard.emit(...)
-	await triggerOverlayAlerts(event, alert); // GET /overlay/alert/donation?token=…
+	await triggerOverlayAlerts(event, alert); // GET /overlay/<overlay id>/event/donation?token=…
 	return json({ ok: true, id: event.id });
 }
 ```
@@ -345,11 +345,11 @@ Rules:
 
 ### 6.5 Overlay trigger
 
-The overlay element's `Event` prop is `"donation"`, so the existing pipeline `GET /overlay/alert/donation?token=…` fires it. The dispatcher just needs to call this endpoint once per **active overlay that contains a `donation-alert` element**.
+The overlay element's `Event` prop is `"donation"`, so the existing pipeline `GET /overlay/<overlay id>/event/donation?token=…` fires it. The dispatcher just needs to call this endpoint once per **active overlay that contains a `donation-alert` element**.
 
 Two options (see §9 Q3):
 - **(a) Broadcast via overlay-runtime WS** — publish the alert on `overlay-runtime` and let each overlay runtime page filter. Simpler, no cross-page DB lookups, and consistent with the "pages don't talk to pages" rule. **Recommended default.**
-- **(b) Look up overlays with the element and call `GET /overlay/alert/donation?token=…` per overlay** — requires DB access to the overlays table, which crosses the slice boundary (via `services.db` query only — no import). Acceptable if the runtime WS broadcast isn't currently set up.
+- **(b) Look up overlays with the element and call `GET /overlay/<overlay id>/event/donation?token=…` per overlay** — requires DB access to the overlays table, which crosses the slice boundary (via `services.db` query only — no import). Acceptable if the runtime WS broadcast isn't currently set up.
 
 Implement (a) first. If the overlay runtime WS doesn't support broadcast frames today, land (b) as a follow-up in `dispatcher.ts` with a single query via `services.db`:
 
@@ -365,7 +365,7 @@ Either way, pass the alert fields as query parameters so they become overlay var
 donation_donor, donation_amount, donation_message, donation_platform, donation_level
 ```
 
-No new overlay mechanism — reuse `overlays.alert` / `applyAlert`.
+No new overlay mechanism — reuse `overlays.event` / `applyEvent`.
 
 ### 6.6 Config (`shared/config.ts` + `server/store.ts`)
 
@@ -475,7 +475,7 @@ import { read } from "../../../../server/core/overlay_element_helpers"; // helpe
 export const schema: OverlayElementSchema = {
 	type: "donation-alert",
 	label: "Donation alert",
-	event: "donation", // binds to GET /overlay/alert/donation
+	event: "donation", // binds to GET /overlay/<overlay id>/event/donation
 	defaultSize: { width: 480, height: 160 },
 	defaultProps: {
 		template: "{{donor}} sent {{amount}}",
@@ -629,7 +629,7 @@ These are the questions that remain **after** the refactor. Resolve each before 
 
 2. **DB placement.** The handoff recommends a page-local `donations.db` in the same directory as the control server DB (WAL enabled, closed via `services.onShutdown`). Confirm this works with `server/core/services.ts` — does `services.config` expose the control-server DB directory? If not, add a `services.paths.dbDir` (or similar) as a minimal addition. Alternative: use `services.db` (shared DB) with dedicated tables. The separate file is preferred for audit volume.
 
-3. **Overlay discovery.** Recommendation: publish the alert on the `overlay-runtime` WS topic and let each runtime page filter — this keeps the dispatcher free of cross-slice DB queries. Verify that the overlay runtime WS actually receives broadcast frames today (see `server/pages/overlays/` after the refactor). If it only accepts targeted `overlays.alert` calls, fall back to a `services.db` query for overlays containing `donation-alert`, and keep the query in `dispatcher.ts` (a plain SQL string, no imports from `../overlays/`).
+3. **Overlay discovery.** Recommendation: publish the alert on the `overlay-runtime` WS topic and let each runtime page filter — this keeps the dispatcher free of cross-slice DB queries. Verify that the overlay runtime WS actually receives broadcast frames today (see `server/pages/overlays/` after the refactor). If it only accepts targeted `overlays.event` calls, fall back to a `services.db` query for overlays containing `donation-alert`, and keep the query in `dispatcher.ts` (a plain SQL string, no imports from `../overlays/`).
 
 4. **`init` cleanup.** Does the post-refactor `PageInit` already support returning a disposer or receive `services.onShutdown`? If neither, add **`services.onShutdown`** (§4.2) before wiring the StreamElements WS.
 

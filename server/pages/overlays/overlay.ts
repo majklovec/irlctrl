@@ -3,9 +3,9 @@
  *
  * The control server persists one overlay per row in the `overlays` table as a
  * JSON blob (see server/pages/overlays/backend/registry.ts). An overlay is
- * self-contained: its own canvas, variables and elements, plus (in the DB)
- * the token. Media lives in the server-side asset library (disk). The
- * runtime page renders an overlay from the same types
+ * self-contained: its own canvas, variables and elements. Media lives in the
+ * server-side asset library (disk). The runtime page renders an overlay from
+ * the same types
  * (server/pages/overlays/frontend/overlay_render.tsx). Validation is hand-rolled
  * `ApiError` style like the rest of the server (no Zod in this repo).
  *
@@ -20,9 +20,6 @@ import { overlayElementSchema } from "./overlay_elements";
 import { ApiError } from "../../../shared/params";
 
 export const OVERLAY_SCHEMA_VERSION = 2;
-
-const TOKEN_BYTES = 32;
-const TOKEN_CHARS = "abcdef0123456789";
 
 export type VariableType = "string" | "number" | "boolean" | "color";
 
@@ -198,28 +195,6 @@ export const OVERLAY_LIMITS = {
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
 	typeof v === "object" && v !== null && !Array.isArray(v);
-
-/** Constant-time token comparison for runtime URLs. */
-export function overlayTokenMatches(
-	expected: string,
-	provided: string,
-): boolean {
-	if (!expected || !provided || expected.length !== provided.length)
-		return false;
-	let diff = 0;
-	for (let i = 0; i < expected.length; i++)
-		diff |= expected.charCodeAt(i) ^ provided.charCodeAt(i);
-	return diff === 0;
-}
-
-/** 64 hex chars, `crypto.getRandomValues` (works on plain-HTTP control servers). */
-export function generateOverlayToken(): string {
-	const bytes = new Uint8Array(TOKEN_BYTES);
-	crypto.getRandomValues(bytes);
-	let out = "";
-	for (const b of bytes) out += TOKEN_CHARS[b % TOKEN_CHARS.length];
-	return out;
-}
 
 export function defaultCanvas(): { width: number; height: number } {
 	return { width: 1920, height: 1080 };

@@ -1,7 +1,7 @@
 /** @jsx m */
 /*
  * Alert element — a trigger-driven overlay (TODO.md "Alert element").
- * It fires for a named event: `GET /overlay/alert/<name>` shows this alert
+ * It fires for a named event: `GET /overlay/<overlay id>/event/<name>` shows this alert
  * while `<name>` equals `props.event`, rendering a media + template-text
  * composition with intro/outro animations, an optional audio sting and TTS,
  * for `duration` ms. Consecutive triggers on the same element queue FIFO;
@@ -11,7 +11,7 @@
  * them).
  *
  * Template tokens `{name}` resolve against a project variable of that name
- * first, then against a key of the trigger payload (the alert endpoint's
+ * first, then against a key of the trigger payload (the event endpoint's
  * `?<name>=<value>` pairs); token segments render in the accent colour.
  */
 

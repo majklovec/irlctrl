@@ -13,6 +13,7 @@ import {
 } from "../../overlay";
 import {
 	deleteElement,
+	eventUrl,
 	mutateElementOf,
 	overlay,
 	reorderElement,
@@ -390,6 +391,7 @@ export function elementProps(e: OverlayElement): m.Vnode {
 						element: e,
 						mutate: (fn) => mutateElementOf(e.id, fn),
 						variables: state.overlay?.variables ?? [],
+						eventUrl,
 					})
 				: null}
 

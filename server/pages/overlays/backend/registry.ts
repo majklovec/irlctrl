@@ -1,33 +1,29 @@
 /*
  * OBS overlay editor backend: one row per overlay in the `overlays` table,
  * persisted as a JSON blob (the `dashboards.widgets` precedent). An overlay is
- * self-contained — its own canvas, variables, elements and token. Media
- * lives in the server-side asset library (disk), which elements reference
- * by file id.
+ * self-contained — its own canvas, variables and elements. Media lives in the
+ * server-side asset library (disk), which elements reference by file id.
  * Mutations go over REST (`/api/overlays…`, handled by `Overlays.api`) and fan
  * out to:
  *   - the editor live feed (the shared `dashboards:<owner>` topic), and
- *   - the runtime feed (`overlay-runtime:<overlayId>`, now keyed per overlay)
- *     consumed by the token-authenticated OBS runtime pages (their WS is wired
- *     in overlay_routes.ts).
+ *   - the runtime feed (`overlay-runtime:<overlayId>`, keyed per overlay)
+ *     consumed by the OBS runtime pages (their WS is wired in overlay_routes.ts).
  *
- * Runtime pages authenticate with the overlay's token (chat-overlay pattern:
- * `?token=…`, constant-time compare) — no cookie, because a Browser Source has
- * no session.
+ * Runtime pages are owner-authenticated with the overlay OWNER's user token
+ * (`?token=…`, resolved to a login and checked against the overlay's owner) —
+ * no cookie, because a Browser Source has no session.
  */
 
 import type { Database } from "bun:sqlite";
 import { createHash, randomUUID } from "node:crypto";
 import {
     defaultOverlay,
-    generateOverlayToken,
     migrateOverlayBlob,
     normalizeOverlay,
     OVERLAY_LIMITS,
     OVERLAY_SCHEMA_VERSION,
     type Overlay,
     type OverlayElement,
-    overlayTokenMatches,
     parseCanvasInput,
     parseElementInput,
     parseOverlayInput,
@@ -48,7 +44,6 @@ interface Store {
     id: string;
     owner: string;
     overlay: Overlay;
-    token: string;
     updatedAt: number;
 }
 
@@ -56,7 +51,6 @@ interface Store {
 export interface OverlaySummary {
     id: string;
     name: string;
-    token: string;
     elementCount: number;
     updatedAt: number;
 }
@@ -93,56 +87,61 @@ export interface Overlays {
     /** A user's overlays (lightweight, list-page shape). */
     overlaysFor(user: string): OverlaySummary[];
     /**
-     * The full overlay an OBS runtime page renders, resolved from its token +
-     * id; `null` when the token is unknown or does not own an overlay with that
-     * id (token probes must not leak existence, same as the runtime page).
+     * The full overlay an OBS runtime page renders, resolved from the owner's
+     * login + overlay id; `null` when that user does not own an overlay with
+     * that id (probes must not leak existence, same as the runtime page).
      */
-    runtimeOverlay(token: string, overlayId: string): RuntimeOverlay | null;
+    runtimeOverlay(user: string, overlayId: string): RuntimeOverlay | null;
     /**
      * The channel specs an overlay's chat elements display, resolved from the
-     * overlay's token + id; `null` when the token is unknown or does not own an
+     * owner's login + overlay id; `null` when that user does not own an
      * overlay with that id. Used by the standalone chat overlay WebSocket to
      * know which providers to keep attached.
      */
-    runtimeOverlayChatSpecs(token: string, overlayId: string): string[] | null;
+    runtimeOverlayChatSpecs(user: string, overlayId: string): string[] | null;
     /**
-     * Token-authenticated batch revalue for the variables endpoint
-     * (`GET /overlay/variables?token=…&<name>=<value>…` and
-     * `POST /overlay/variables?token=…` with a JSON `{<name>: value|null}`
-     * body). `values` maps variable name → raw value; `null`/`""` empties the
-     * variable to its type's neutral value. The whole batch lands in one commit
-     * and one `overlays.overlay` frame. `null` when the token is unknown (the
-     * route 404s — token probes must not leak overlay existence); an empty
-     * batch, an unknown name, or a bad value throws ApiError(404/400).
+     * Owner-authenticated batch revalue for the variables endpoint
+     * (`GET /overlay/:id/variables?token=…&<name>=<value>…` and
+     * `POST /overlay/:id/variables?token=…` with a JSON `{<name>: value|null}`
+     * body, `token` the owner's user token). `values` maps variable name → raw
+     * value; `null`/`""` empties the variable to its type's neutral value. The
+     * whole batch lands in one commit and one `overlays.overlay` frame. `null`
+     * when the user does not own an overlay with `overlayId` (the route 404s —
+     * probes must not leak overlay existence); an empty batch, an unknown name,
+     * or a bad value throws ApiError(404/400).
      */
-    setVariablesByToken(
-        token: string,
+    setVariables(
+        user: string,
+        overlayId: string,
         values: Record<string, unknown>,
     ): { status: number; body: Record<string, unknown> } | null;
     /**
-     * Token-authenticated alert trigger for
-     * `GET /overlay/alert/<name>?token=…&<name>=<value>…`: publishes an
-     * `overlays.alert` frame (`{name, payload}`) on the overlay's runtime
-     * topic; the runtime page shows every alert element whose `event` prop
-     * equals `name`. Any query values are validated and type-coerced and ride
-     * along in `payload` — the runtime page writes them into the overlay
-     * variables (the `overlays.applyAlert` WS uplink → `applyAlertValues`) only
-     * when that alert goes on air. `null` when the token is unknown; `name` is
-     * not validated against overlay state (it just needs to match an element on
+     * Owner-authenticated universal event trigger for
+     * `GET /overlay/:id/event/<name>?token=…&<name>=<value>…` (`token` the
+     * owner's user token): publishes an `overlays.event` frame
+     * (`{name, payload}`) on the overlay's runtime topic; the runtime page
+     * routes it to every trigger-driven element (alerts, spin wheel, …) whose
+     * `event` prop equals `name`. Any query values are validated and
+     * type-coerced and ride along in `payload` — the runtime page writes them
+     * into the overlay variables (the `overlays.applyEvent` WS uplink →
+     * `applyEventValues`) only when an element goes on air for it. `null` when
+     * the user does not own an overlay with `overlayId`; `name` is not
+     * validated against overlay state (it just needs to match an element on
      * the client).
      */
-    triggerAlertByToken(
-        token: string,
+    triggerEvent(
+        user: string,
+        overlayId: string,
         name: string,
         values: Record<string, unknown>,
     ): { status: number; body: Record<string, unknown> } | null;
     /**
-     * The runtime page's `overlays.applyAlert` WS uplink: writes an on-air
-     * alert's payload values into the overlay variables (one commit + one
+     * The runtime page's `overlays.applyEvent` WS uplink: writes an on-air
+     * event's payload values into the overlay variables (one commit + one
      * `overlays.overlay` frame). Only reachable from a runtime WS whose open
      * already passed the token+overlay check. `false` on unknown overlay.
      */
-    applyAlertValues(overlayId: string, values: Record<string, unknown>): boolean;
+    applyEventValues(overlayId: string, values: Record<string, unknown>): boolean;
 }
 
 export function createOverlays({
@@ -155,27 +154,25 @@ export function createOverlays({
     publish: Publish;
 }): Overlays {
     const DB_FILE = databaseFile;
-    // one entry per overlay (key = overlay id); each carries its own token
+    // one entry per overlay (key = overlay id)
     const stores = new Map<string, Store>();
 
     function persist(store: Store): void {
         if (!db) return;
         try {
             db.prepare(
-                `INSERT INTO overlays (id, owner, schema_version, data, token, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?)
+                `INSERT INTO overlays (id, owner, schema_version, data, updated_at)
+                 VALUES (?, ?, ?, ?, ?)
                  ON CONFLICT(id) DO UPDATE SET
                      owner = excluded.owner,
                      schema_version = excluded.schema_version,
                      data = excluded.data,
-                     token = excluded.token,
                      updated_at = excluded.updated_at`,
             ).run(
                 store.id,
                 store.owner,
                 OVERLAY_SCHEMA_VERSION,
                 JSON.stringify(store.overlay),
-                store.token,
                 store.updatedAt,
             );
         } catch (err: unknown) {
@@ -195,8 +192,8 @@ export function createOverlays({
 
     /** One-time migration from the legacy `overlay_projects` table (one project
      * per user, `scenes[]` inside). Splits each project into one overlay per
-     * scene (the scene's elements promote to the overlay root), each with a
-     * fresh token, then drops the legacy table (no backward compatibility). */
+     * scene (the scene's elements promote to the overlay root), then drops the
+     * legacy table (no backward compatibility). */
     function backfillFromLegacy(): void {
         if (!db) return;
         const hasLegacy = db
@@ -217,7 +214,7 @@ export function createOverlays({
             .prepare("SELECT owner, data FROM overlay_projects")
             .all() as { owner: string; data: string }[];
         const insert = db.prepare(
-            "INSERT INTO overlays (id, owner, schema_version, data, token, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO overlays (id, owner, schema_version, data, updated_at) VALUES (?, ?, ?, ?, ?)",
         );
         for (const row of rows) {
             let project: Record<string, unknown>;
@@ -253,7 +250,6 @@ export function createOverlays({
                         row.owner,
                         OVERLAY_SCHEMA_VERSION,
                         JSON.stringify(overlay),
-                        generateOverlayToken(),
                         Date.now(),
                     );
                 } catch (err: unknown) {
@@ -271,12 +267,11 @@ export function createOverlays({
         if (!db) return;
         backfillFromLegacy();
         const rows = db
-            .prepare("SELECT id, owner, data, token, updated_at FROM overlays")
+            .prepare("SELECT id, owner, data, updated_at FROM overlays")
             .all() as {
             id: string;
             owner: string;
             data: string;
-            token: string;
             updated_at: number;
         }[];
         for (const row of rows) {
@@ -286,7 +281,6 @@ export function createOverlays({
                     id: row.id,
                     owner: row.owner,
                     overlay,
-                    token: row.token,
                     updatedAt: row.updated_at,
                 });
             } catch (err: unknown) {
@@ -302,7 +296,6 @@ export function createOverlays({
     const summary = (s: Store): OverlaySummary => ({
         id: s.id,
         name: s.overlay.name,
-        token: s.token,
         elementCount: s.overlay.elements.length,
         updatedAt: s.updatedAt,
     });
@@ -357,7 +350,7 @@ export function createOverlays({
     const runtime = (overlayId: string, name: string, data: unknown): void => {
         publish(overlayRuntimeTopic(overlayId), event(name, data));
     };
-    /** Refresh the owner's list page (names, counts, tokens). */
+    /** Refresh the owner's list page (names, counts). */
     const feedList = (owner: string): void => {
         feed(owner, "overlays.overlays", { overlays: overlaysFor(owner) });
     };
@@ -391,7 +384,6 @@ export function createOverlays({
             id: randomUUID(),
             owner,
             overlay: defaultOverlay(name),
-            token: generateOverlayToken(),
             updatedAt: Date.now(),
         };
         stores.set(store.id, store);
@@ -430,7 +422,7 @@ export function createOverlays({
     ): Promise<Response> {
         try {
             const m = url.pathname.match(
-                /^\/api\/overlays(\/([\w.-]{1,64})(?:\/(variables|token|canvas|elements|duplicate)(?:\/([\w.-]{1,64})?)?)?)?$/,
+                /^\/api\/overlays(\/([\w.-]{1,64})(?:\/(variables|canvas|elements|duplicate)(?:\/([\w.-]{1,64})?)?)?)?$/,
             );
             if (!m)
                 return Response.json(
@@ -440,7 +432,6 @@ export function createOverlays({
             const id = m[2] as string | undefined;
             const sub = (m[3] as
                 | "variables"
-                | "token"
                 | "canvas"
                 | "elements"
                 | "duplicate"
@@ -461,7 +452,7 @@ export function createOverlays({
                             : "Overlay";
                     const store = createOverlay(user, name);
                     return Response.json(
-                        { ok: true, id: store.id, token: store.token, overlay: store.overlay },
+                        { ok: true, id: store.id, overlay: store.overlay },
                         { status: 201 },
                     );
                 }
@@ -475,7 +466,6 @@ export function createOverlays({
                     return Response.json({
                         ok: true,
                         id: store.id,
-                        token: store.token,
                         overlay: store.overlay,
                     });
                 }
@@ -520,7 +510,6 @@ export function createOverlays({
                     id: randomUUID(),
                     owner: user,
                     overlay: copy,
-                    token: generateOverlayToken(),
                     updatedAt: Date.now(),
                 };
                 revalidate(store.overlay);
@@ -529,7 +518,7 @@ export function createOverlays({
                 feedList(user);
                 feedOverlay(store);
                 return Response.json(
-                    { ok: true, id: store.id, token: store.token, overlay: store.overlay },
+                    { ok: true, id: store.id, overlay: store.overlay },
                     { status: 201 },
                 );
             }
@@ -724,23 +713,6 @@ export function createOverlays({
                 return notAllowed();
             }
 
-
-
-            if (sub === "token") {
-                if (req.method === "POST" && subId === "rotate") {
-                    const store = storeWithOwner(user, id);
-                    store.token = generateOverlayToken();
-                    commit(store);
-                    feedList(user);
-                    feed(store.owner, "overlays.token", {
-                        overlayId: store.id,
-                        token: store.token,
-                    });
-                    return Response.json({ ok: true, token: store.token });
-                }
-                return notAllowed();
-            }
-
             return notAllowed();
         } catch (err: unknown) {
             const code = err instanceof ApiError ? err.code : 500;
@@ -756,11 +728,13 @@ export function createOverlays({
         }
     }
 
-    // ── runtime access (token-authenticated, no user session) ────────────
-    function runtimeStore(token: string): Store | null {
-        for (const s of stores.values())
-            if (overlayTokenMatches(s.token, token)) return s;
-        return null;
+    // ── runtime access (owner-authenticated via the owner's user token) ──
+    function runtimeStore(user: string, overlayId: string): Store | null {
+        const store = stores.get(overlayId);
+        // ownership check: a user's token names only their own overlays, so a
+        // probe with a valid token for a foreign id 404s (no existence leak)
+        if (!store || store.owner !== user) return null;
+        return store;
     }
 
     /** Validate + type-coerce a value batch against the overlay's variables
@@ -768,7 +742,7 @@ export function createOverlays({
      * booleans map "true"/"false"/"0"/"1", numbers parse (the
      * variables-endpoint rules). Returns the resolved `{name: coercedValue}`
      * pairs. Shared by the variables endpoint (which then applies the result)
-     * and the alert trigger endpoint (which ships the result with the frame). */
+     * and the event trigger endpoint (which ships the result with the frame). */
     function resolveTokenValues(
         store: Store,
         values: Record<string, unknown>,
@@ -824,11 +798,12 @@ export function createOverlays({
         }
     }
 
-    function setVariablesByToken(
-        token: string,
+    function setVariables(
+        user: string,
+        overlayId: string,
         values: Record<string, unknown>,
     ): { status: number; body: Record<string, unknown> } | null {
-        const store = runtimeStore(token);
+        const store = runtimeStore(user, overlayId);
         if (!store) return null;
         if (Object.keys(values).length === 0)
             throw new ApiError("at least one variable is required", 400);
@@ -851,37 +826,39 @@ export function createOverlays({
         };
     }
 
-    /** Trigger an alert through its event name (the `<name>` in
-     * `GET /overlay/alert/<name>`): the event is pushed to the overlay's
-     * runtime topic as an `overlays.alert` frame. Any query values are
+    /** Trigger a universal event through its name (the `<name>` in
+     * `GET /overlay/:id/event/<name>`): the event is pushed to the overlay's
+     * runtime topic as an `overlays.event` frame. Any query values are
      * validated + type-coerced and shipped in the frame's `payload` — the
      * runtime page applies them to same-named overlay variables (via the
-     * `overlays.applyAlert` WS uplink → `applyAlertValues`) only when that
-     * alert goes on air, so a queued alert's values never clobber the on-air
-     * ones early (and they persist once written). `null` when the token is
-     * unknown (the route 404s, same no-leak contract as the variables
-     * endpoint); unknown variable names and bad values throw ApiError. */
-    function triggerAlertByToken(
-        token: string,
+     * `overlays.applyEvent` WS uplink → `applyEventValues`) only when an
+     * element goes on air for it, so a queued element's values never clobber
+     * the on-air ones early (and they persist once written). `null` when the
+     * user does not own an overlay with `overlayId` (the route 404s, same
+     * no-leak contract as the variables endpoint); unknown variable names and
+     * bad values throw ApiError. */
+    function triggerEvent(
+        user: string,
+        overlayId: string,
         name: string,
         values: Record<string, unknown>,
     ): { status: number; body: Record<string, unknown> } | null {
-        const store = runtimeStore(token);
+        const store = runtimeStore(user, overlayId);
         if (!store) return null;
         // validate + coerce without touching the overlay: the values travel
-        // with the alert and land when it plays
+        // with the event and land when an element plays it
         const payload = resolveTokenValues(store, values);
-        runtime(store.id, "overlays.alert", { name, payload });
+        runtime(store.id, "overlays.event", { name, payload });
         return { status: 200, body: { ok: true, name } };
     }
 
-    /** The runtime page's `overlays.applyAlert` WS uplink: writes an on-air
-     * alert's payload values into the overlay variables (one commit + one
+    /** The runtime page's `overlays.applyEvent` WS uplink: writes an on-air
+     * event's payload values into the overlay variables (one commit + one
      * `overlays.overlay` frame). Only reachable from a runtime WS whose `open`
      * already passed the token+overlay check. Returns `false` on unknown
      * overlay; unknown variable names still throw (they can't have come from a
      * validated trigger frame in the first place). */
-    function applyAlertValues(
+    function applyEventValues(
         overlayId: string,
         values: Record<string, unknown>,
     ): boolean {
@@ -894,7 +871,7 @@ export function createOverlays({
             // overlay binding lost against the variable set — surface it (the
             // runtime WS is an authenticated internal client)
             throw new ApiError(
-                "overlay validation failed after applying alert values",
+                "overlay validation failed after applying event values",
                 500,
             );
         }
@@ -907,19 +884,19 @@ export function createOverlays({
         api,
         overlaysFor,
         runtimeOverlay: (
-            token: string,
+            user: string,
             overlayId: string,
         ): RuntimeOverlay | null => {
-            const store = runtimeStore(token);
-            if (!store || store.id !== overlayId) return null;
+            const store = runtimeStore(user, overlayId);
+            if (!store) return null;
             return { owner: store.owner, overlay: store.overlay };
         },
         runtimeOverlayChatSpecs: (
-            token: string,
+            user: string,
             overlayId: string,
         ): string[] | null => {
-            const store = runtimeStore(token);
-            if (!store || store.id !== overlayId) return null;
+            const store = runtimeStore(user, overlayId);
+            if (!store) return null;
             const specs = new Set<string>();
             for (const el of store.overlay.elements) {
                 // The chat element and the chat-driven widgets (emote wall,
@@ -945,8 +922,8 @@ export function createOverlays({
             }
             return [...specs];
         },
-        setVariablesByToken,
-        triggerAlertByToken,
-        applyAlertValues,
+        setVariables,
+        triggerEvent,
+        applyEventValues,
     };
 }

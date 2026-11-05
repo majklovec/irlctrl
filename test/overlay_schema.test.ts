@@ -10,13 +10,11 @@ import {
 import {
 	cssFilterString,
 	defaultOverlay,
-	generateOverlayToken,
 	isMimeKind,
 	migrateOverlayBlob,
 	normalizeFilters,
 	normalizeOverlay,
 	OVERLAY_SCHEMA_VERSION,
-	overlayTokenMatches,
 	parseCanvasInput,
 	parseElementInput,
 	parseVariableValueInput,
@@ -123,17 +121,6 @@ describe("overlay schema", () => {
 		expect(() =>
 			migrateOverlayBlob({ ...validV1Overlay(), schemaVersion: 99 }),
 		).toThrow("too old to load it");
-	});
-
-	test("token comparison is constant-time and shape-checked", () => {
-		const token = generateOverlayToken();
-		expect(token).toMatch(/^[0-9a-f]{32}$/);
-		expect(generateOverlayToken()).not.toBe(token);
-		expect(overlayTokenMatches(token, token)).toBe(true);
-		expect(overlayTokenMatches(token, token.slice(0, -1))).toBe(false);
-		expect(overlayTokenMatches(token, "f".repeat(32))).toBe(false);
-		expect(overlayTokenMatches(token, token.slice(1) + token[0])).toBe(false);
-		expect(overlayTokenMatches("", "")).toBe(false);
 	});
 
 	test("normalizeOverlay validates and types variables", () => {

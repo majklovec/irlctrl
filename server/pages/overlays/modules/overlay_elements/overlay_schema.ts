@@ -255,7 +255,7 @@ export const groupSchema: OverlayElementSchema = {
 };
 
 /** Alert element: fires for the named event `props.event` (published by
- * `GET /overlay/alert/<name>`), shows media + token text for `duration` ms,
+ * `GET /overlay/<overlay id>/event/<name>`), shows media + token text for `duration` ms,
  * then fades out (TODO.md "Alert element"). Consecutive triggers on the
  * same element queue FIFO; the trigger's `<name>=<value>` pairs ride with
  * the alert and are written to the project variables when the alert
@@ -1009,13 +1009,12 @@ export const counterSchema: OverlayElementSchema = {
 
 /* ── spin wheel ───────────────────────────────────────────────────────── */
 export interface SpinWheelProps {
-    /** The trigger event that spins the wheel (the alert channel). */
+    /** The trigger event that spins the wheel (the universal event channel). */
     event: string;
     prizes: string[];
     /** Spin duration in ms. */
     duration: number;
     color: string;
-    background: string;
     accent: string;
     radius: number;
     fontSize: number;
@@ -1026,7 +1025,6 @@ export const DEFAULT_SPIN_WHEEL_PROPS: Required<SpinWheelProps> = {
     prizes: ["Prize 1", "Prize 2", "Prize 3", "Prize 4"],
     duration: 4000,
     color: "#ffffff",
-    background: "#111827",
     accent: "#f59e0b",
     radius: 0,
     fontSize: 16,
@@ -1040,13 +1038,13 @@ export const spinWheelSchema: OverlayElementSchema = {
         const raw = Array.isArray(props.prizes) ? props.prizes : [];
         return {
             event: read.str("event", d.event, 100),
-            prizes: raw
-                .map((v) => cleanStr(v, 60))
-                .filter((v) => v !== "")
-                .slice(0, 24),
+            // Keep blank entries: they are rows the user just added and is
+            // about to type into (the server broadcast replaces the editor
+            // state, so filtering them here would make "add prize" vanish).
+            // Blank rows are ignored by the wheel's render and onTrigger.
+            prizes: raw.map((v) => cleanStr(v, 60)).slice(0, 24),
             duration: read.num("duration", d.duration, 500, 60000),
             color: read.hex("color", d.color),
-            background: read.hex("background", d.background),
             accent: read.hex("accent", d.accent),
             radius: read.num("radius", d.radius, 0, 1000),
             fontSize: read.num("fontSize", d.fontSize, 6, 400),

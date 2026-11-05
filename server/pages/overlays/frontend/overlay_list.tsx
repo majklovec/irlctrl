@@ -108,12 +108,12 @@ export function overlayList(): m.Vnode {
 								<td class="ov-row-url">
 									<a
 										class="ov-row-url-text"
-										href={runtimeUrl(s)}
+										href={runtimeUrl(s.id)}
 										target="_blank"
 										rel="noreferrer"
-										title={runtimeUrl(s)}
+										title={runtimeUrl(s.id)}
 									>
-										{runtimeUrl(s)}
+										{runtimeUrl(s.id)}
 									</a>
 									<IconButton
 										class={
@@ -127,7 +127,7 @@ export function overlayList(): m.Vnode {
 												: t("overlay.copy")
 										}
 										icon={<Icon name="copy" class="role-icon" />}
-										onclick={() => void copyOverlayUrl(s)}
+										onclick={() => void copyOverlayUrl(s.id)}
 									/>
 								</td>
 								<td class="muted">{s.elementCount}</td>

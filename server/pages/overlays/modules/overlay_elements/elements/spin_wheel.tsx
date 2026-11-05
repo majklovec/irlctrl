@@ -1,16 +1,24 @@
 /** @jsx m */
 /*
  * Spin-wheel widget — a prize wheel that spins when its trigger event fires
- * (the same alert channel as the `alert` element: `GET /overlay/alert/<event>`
- * hits `onTrigger`, which picks a prize and returns the spin duration in ms).
- * The wheel is a `conic-gradient` disc segmented per prize; the winning
- * segment is the one under the top pointer when the CSS rotation transition
- * lands. In the editor it renders its design state (stopped, no prize).
+ * (the same universal event channel as the `alert` element:
+ * `GET /overlay/<overlay id>/event/<event>` hits `onTrigger`, which picks a prize and
+ * returns the spin duration in ms).
+ * Like `alert` it is trigger-driven, but `persistent`: the wheel stays on
+ * screen at all times at runtime (it only reacts to triggers) instead of
+ * existing only while a trigger is active.
+ *
+ * Look: a gold rim (the `accent` colour) around a `conic-gradient` disc
+ * segmented per prize (bright palette, cycled), cream spokes and rim studs
+ * on the segment boundaries, a black centre hub with a gold cap, and a dark
+ * red pointer on top. The winning segment is the one under the top pointer
+ * when the CSS rotation transition lands. In the editor it renders its
+ * design state (stopped, no prize).
  */
 
 import { Icon } from "@ui/components/icons";
-import type { MithrilJSXComponent } from "@ui/jsx";
 import { t } from "@ui/i18n";
+import type { MithrilJSXComponent } from "@ui/jsx";
 import type {
 	ElementContext,
 	ElementProps,
@@ -27,6 +35,29 @@ import { DEFAULT_SPIN_WHEEL_PROPS } from "../overlay_schema";
 function pickPrize(count: number): number {
 	return Math.floor(Math.random() * count);
 }
+
+/** Landing rotation: 4 full turns AHEAD of the current rotation (always
+ * forward) so that `offset` (0–360, the resting rotation under the top
+ * pointer) ends up where the transition stops. */
+function accumulateSpin(current: number, offset: number): number {
+	const base = ((current % 360) + 360) % 360;
+	const delta = ((offset - base) % 360 + 360) % 360;
+	return base + 360 * 4 + delta;
+}
+
+/** Bright per-segment palette, cycled when the prize list is longer. */
+const SEGMENT_PALETTE = [
+	"#ffc400",
+	"#f4511e",
+	"#8b5cf6",
+	"#00bfa5",
+	"#ef4444",
+	"#3b82f6",
+	"#22c55e",
+	"#ec4899",
+];
+/** Spokes and rim studs. */
+const CREAM = "#f8f1de";
 
 interface SpinState {
 	/** The wheel's current rotation in degrees (0 = design state). */
@@ -54,7 +85,10 @@ const SpinWheelBox: m.Component<SpinAttrs, SpinState> = {
 		// on this draw and lets the CSS transition do the spinning).
 		const pending = spinTargets.get(vnode.attrs.id);
 		if (pending) {
-			s.rotation = pending.rotation;
+			// Accumulate full turns from the CURRENT rotation so repeated
+			// spins (the wheel is persistent, so it spins many times on air)
+			// always turn forward and stop exactly on the winner.
+			s.rotation = accumulateSpin(s.rotation, pending.offset);
 			s.winner = pending.winner;
 			spinTargets.delete(vnode.attrs.id);
 		}
@@ -64,7 +98,6 @@ const SpinWheelBox: m.Component<SpinAttrs, SpinState> = {
 			.filter((v) => v !== "");
 		const duration = numProp(p, "duration", 4000);
 		const color = strProp(p, "color", "#ffffff");
-		const background = strProp(p, "background", "#111827");
 		const accent = strProp(p, "accent", "#f59e0b");
 		const radius = numProp(p, "radius", 0);
 		const fontSize = numProp(p, "fontSize", 16);
@@ -73,19 +106,20 @@ const SpinWheelBox: m.Component<SpinAttrs, SpinState> = {
 		const n = Math.max(prizes.length, 2);
 		const seg = 360 / n;
 
-		// Build the conic-gradient: alternating accent tints per segment.
+		// The conic-gradient: one bright palette colour per prize segment
+		// (starts at 12 o'clock, clockwise — the same geometry the labels
+		// and spokes use).
 		const stops: string[] = [];
 		for (let i = 0; i < n; i++) {
-			const tone = i % 2 === 0 ? accent : background;
+			const tone = SEGMENT_PALETTE[i % SEGMENT_PALETTE.length];
 			stops.push(`${tone} ${i * seg}deg ${(i + 1) * seg}deg`);
 		}
 
-		// The pointer sits at the top (-90deg / 270deg). A prize i is under
-		// the pointer when (rotation + i*seg + seg/2) mod 360 == 270.
-		const centerLabel =
-			s.winner !== undefined && prizes[s.winner] !== undefined
-				? prizes[s.winner]
-				: "";
+		// Segment-center angle, deg clockwise from the top. Each label sits
+		// in the middle of its OWN segment, running along the radius with
+		// the text pointing INWARD (toward the hub); spokes and rim studs
+		// sit on the segment BOUNDARIES (`i * seg`).
+		const midOf = (i: number) => i * seg + seg / 2;
 
 		return (
 			<div
@@ -97,96 +131,159 @@ const SpinWheelBox: m.Component<SpinAttrs, SpinState> = {
 					display: "flex",
 					alignItems: "center",
 					justifyContent: "center",
-					background: background,
+					/* no background — the wheel sits directly on the stream */
+					background: "transparent",
 					borderRadius: `${radius}px`,
 					overflow: "hidden",
 					color,
 					fontFamily,
 				}}
 			>
+				{/* wheel assembly (1:1; its own size container so all inner
+				 * geometry can use cqi = the wheel's diameter) */}
 				<div
 					style={{
 						position: "relative",
 						width: "min(100%, 100cqh)",
 						aspectRatio: "1",
-						borderRadius: "50%",
-						border: `4px solid ${accent}`,
-						boxShadow: `0 0 24px ${accent}55`,
+						containerType: "size",
 					}}
 				>
-					{/* the rotating disc */}
+					{/* gold rim + drop shadow under the wheel */}
 					<div
 						style={{
 							position: "absolute",
 							inset: 0,
 							borderRadius: "50%",
-							background: `conic-gradient(${stops.join(", ")})`,
-							transform: `rotate(${s.rotation}deg)`,
-							transition: s.rotation > 0
-								? `transform ${duration}ms cubic-bezier(0.2, 0.7, 0.3, 1)`
-								: "none",
+							background: accent,
+							boxShadow:
+								"0 calc(100cqi * 0.035) calc(100cqi * 0.09) rgba(0,0,0,0.45)",
 						}}
 					/>
-					{prizes.map((prize, i) => (
-						m(
-							"div",
-							{
-								key: i,
-								style: {
+					{/* rotating disc: palette segments, thin black ring,
+					 * spokes + rim studs on the boundaries and the labels —
+					 * all of it rotates together */}
+					<div
+						style={{
+							position: "absolute",
+							inset: "calc(100cqi * 0.05)",
+							boxSizing: "border-box",
+							borderRadius: "50%",
+							border: "calc(100cqi * 0.016) solid #17181c",
+							background: `conic-gradient(${stops.join(", ")})`,
+							transform: `rotate(${s.rotation}deg)`,
+							transition:
+								s.rotation > 0
+									? `transform ${duration}ms cubic-bezier(0.2, 0.7, 0.3, 1)`
+									: "none",
+						}}
+					>
+						{Array.from({ length: n }, (_, i) => (
+							<div
+								key={`spoke-${i}`}
+								style={{
+									position: "absolute",
+									left: "50%",
+									top: "0",
+									width: "calc(100cqi * 0.012)",
+									height: "50%",
+									marginLeft: "calc(100cqi * -0.006)",
+									background: CREAM,
+									transform: `rotate(${i * seg}deg)`,
+									transformOrigin: "50% 100%",
+								}}
+							/>
+						))}
+						{Array.from({ length: n }, (_, i) => (
+							<div
+								key={`stud-${i}`}
+								style={{
 									position: "absolute",
 									left: "50%",
 									top: "50%",
-									transform: `rotate(${i * seg + seg / 2}deg) translateY(-38%)`,
-									transformOrigin: "0 0",
-									fontSize: `${fontSize}px`,
-									fontWeight: "700",
-									whiteSpace: "nowrap",
-									textShadow: "0 1px 2px rgba(0,0,0,0.7)",
+									width: "calc(100cqi * 0.03)",
+									height: "calc(100cqi * 0.03)",
+									marginLeft: "calc(100cqi * -0.015)",
+									marginTop: "calc(100cqi * -0.015)",
+									borderRadius: "50%",
+									background: CREAM,
+									// circle: rotating about its own centre is a
+									// no-op, so this lands the stud on the rim
+									// at the boundary angle
+									transform: `rotate(${i * seg}deg) translateY(calc(100cqi * -0.47))`,
+								}}
+							/>
+						))}
+						{prizes.map((prize, i) =>
+							m(
+								"div",
+								{
+									key: `label-${i}`,
+									style: {
+										position: "absolute",
+										left: "50%",
+										top: "50%",
+										// transform-origin is the div's top-left, which
+										// sits on the wheel centre: rotate to the
+										// segment's centre angle, hop out along that
+										// radius, then rotate the TEXT 90° so it runs
+										// along the radius pointing at the wheel
+										// centre, and centre it on the spoke point.
+										transformOrigin: "0 0",
+										transform: `rotate(${midOf(i)}deg) translateY(calc(100cqi * -0.33)) rotate(90deg) translate(-50%, -50%)`,
+										fontSize: `${fontSize}px`,
+										fontWeight: "800",
+										whiteSpace: "nowrap",
+										textShadow: "0 1px 2px rgba(0,0,0,0.65)",
+									},
 								},
-							},
-							prize,
-						)
-					))}
-					{/* center hub with the winner */}
+								prize,
+							),
+						)}
+					</div>
+					{/* centre hub: black disc, accent ring, accent cap */}
 					<div
 						style={{
 							position: "absolute",
 							left: "50%",
 							top: "50%",
 							transform: "translate(-50%, -50%)",
-							width: "42%",
-							height: "42%",
+							width: "calc(100cqi * 0.2)",
+							height: "calc(100cqi * 0.2)",
 							borderRadius: "50%",
-							background: background,
-							border: `3px solid ${accent}`,
-							display: "flex",
-							alignItems: "center",
-							justifyContent: "center",
-							textAlign: "center",
-							fontSize: `${Math.round(fontSize * 0.9)}px`,
-							fontWeight: "700",
-							padding: "6%",
-							overflow: "hidden",
+							background: "#14161a",
+							border: `calc(100cqi * 0.016) solid ${accent}`,
+							boxShadow: "0 2px 8px rgba(0,0,0,0.55)",
+							zIndex: 2,
 						}}
 					>
-						{centerLabel}
+						<div
+							style={{
+								position: "absolute",
+								inset: "34%",
+								borderRadius: "50%",
+								background: accent,
+							}}
+						/>
 					</div>
+					{/* top pointer: dark red, always over the wheel (top: 0 —
+					 * it must not overflow the element box, which clips) */}
+					<div
+						style={{
+							position: "absolute",
+							top: "calc(100cqi * 0.02)",
+							left: "50%",
+							transform: "translateX(-50%)",
+							width: 0,
+							height: 0,
+							borderLeft: "calc(100cqi * 0.04) solid transparent",
+							borderRight: "calc(100cqi * 0.04) solid transparent",
+							borderTop: "calc(100cqi * 0.06) solid #b91c1c",
+							filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.4))",
+							zIndex: 3,
+						}}
+					/>
 				</div>
-				{/* the top pointer */}
-				<div
-					style={{
-						position: "absolute",
-						top: "0",
-						left: "50%",
-						transform: "translateX(-50%)",
-						width: 0,
-						height: 0,
-						borderLeft: "10px solid transparent",
-						borderRight: "10px solid transparent",
-						borderTop: `16px solid ${accent}`,
-						zIndex: 2,
-					}}
-				/>
 			</div>
 		);
 	},
@@ -200,8 +297,10 @@ function draw(element: OverlayElement, _ctx: ElementContext): Vnode<any, any> {
  * event matches `props.event`, pick a prize and return the spin duration
  * (ms) — the wheel component animates to the winner.
  *
- * The rotation target is computed so the winning segment's center lands under
- * the top pointer (270deg). We spin a few full turns plus the offset. */
+ * `onTrigger` only records the RESTING rotation (the 0–360 offset that puts
+ * the winner's center under the top pointer) into `spinTargets`; the box
+ * adds the full turns at draw time, so every spin turns forward from
+ * wherever the previous spin stopped. */
 function onTrigger(
 	element: OverlayElement,
 	eventName: string,
@@ -223,25 +322,34 @@ function onTrigger(
 	const n = prizes.length;
 	const seg = 360 / n;
 	const winner = pickPrize(n);
-	// Target rotation: current full-turns + the offset that puts `winner`
-	// center under the pointer. pointer at 270deg; segment center at
+	// Resting rotation that puts `winner`'s center under the top pointer:
+	// pointer at 270deg; segment center at
 	// (rotation + winner*seg + seg/2) mod 360 == 270 → rotation = 270 - winner*seg - seg/2.
 	const offset = (270 - winner * seg - seg / 2) % 360;
-	const target = 360 * 4 + offset; // a few full turns + the landing offset
 
-	spinTargets.set(element.id, { rotation: target, winner });
+	spinTargets.set(element.id, { offset, winner });
 	m.redraw();
 	return duration;
 }
 
 /** Imperative spin state per element, written by `onTrigger`, read (and
  * cleared) by the box on its next draw so the CSS transition animates to the
- * new rotation. */
-const spinTargets = new Map<string, { rotation: number; winner: number }>();
+ * new rotation. `offset` is the resting rotation (0–360). */
+const spinTargets = new Map<string, { offset: number; winner: number }>();
 
-function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
+/** The inspector's copy-link green flash (module scope: a `view`-local
+ * boolean would reset on every redraw). */
+let eventLinkCopied = false;
+
+function editForm({
+	element: e,
+	mutate,
+	variables,
+	eventUrl,
+}: ElementProps): Vnode {
 	const p = e.props;
 	const sp = { mutate, variables };
+	const eventName = strProp(p, "event", "spin");
 	const setStr = (key: string) => (ev: Event) =>
 		mutate((el) => {
 			el.props[key] = (ev.target as HTMLInputElement).value;
@@ -252,21 +360,102 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 		});
 	return (
 		<>
-			{bindField(e, "props.event", t("overlay.sw_event"),
-				<input type="text" value={strProp(p, "event", "spin")} oninput={setStr("event")} />, sp)}
-			{bindField(e, "props.duration", t("overlay.sw_duration"),
-				<input type="number" min={500} max={60000} step={250} value={numProp(p, "duration", 4000)} oninput={setNum("duration")} />, sp)}
+			{bindField(
+				e,
+				"props.event",
+				t("overlay.sw_event"),
+				<input
+					type="text"
+					value={eventName}
+					oninput={setStr("event")}
+				/>,
+				sp,
+			)}
+			{eventUrl ? (
+				<button
+					class={
+						eventLinkCopied ? "ov-var-copy ov-copied" : "ov-var-copy"
+					}
+					type="button"
+					style={{ marginTop: "2px" }}
+					title={
+						eventLinkCopied
+							? t("overlay.copied")
+							: eventUrl(eventName) + " — " + t("overlay.sw_event_link")
+					}
+					aria-label={t("overlay.sw_event_link")}
+					onclick={() => {
+						void navigator.clipboard.writeText(eventUrl(eventName)).then(
+							() => {
+								eventLinkCopied = true;
+								m.redraw();
+								setTimeout(() => {
+									eventLinkCopied = false;
+									m.redraw();
+								}, 1500);
+							},
+						);
+					}}
+				>
+					<Icon name="copy" class="role-icon" />
+				</button>
+			) : null}
+			{bindField(
+				e,
+				"props.duration",
+				t("overlay.sw_duration"),
+				<input
+					type="number"
+					min={500}
+					max={60000}
+					step={250}
+					value={numProp(p, "duration", 4000)}
+					oninput={setNum("duration")}
+				/>,
+				sp,
+			)}
 			<PrizesField element={e} mutate={mutate} />
 			<div class="ov-grid3">
-				{bindField(e, "props.color", t("overlay.color"),
-					<input type="color" value={strProp(p, "color", "#ffffff")} oninput={setStr("color")} />, sp)}
-				{bindField(e, "props.accent", t("overlay.sw_accent"),
-					<input type="color" value={strProp(p, "accent", "#f59e0b")} oninput={setStr("accent")} />, sp)}
-				{bindField(e, "props.background", t("overlay.sw_background"),
-					<input type="color" value={strProp(p, "background", "#111827")} oninput={setStr("background")} />, sp)}
+				{bindField(
+					e,
+					"props.color",
+					t("overlay.color"),
+					<input
+						type="color"
+						value={strProp(p, "color", "#ffffff")}
+						oninput={setStr("color")}
+					/>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.accent",
+					t("overlay.sw_accent"),
+					<input
+						type="color"
+						value={strProp(p, "accent", "#f59e0b")}
+						oninput={setStr("accent")}
+					/>,
+					sp,
+				)}
 			</div>
-			{bindField(e, "props.fontSize", t("overlay.font_size"),
-				<input type="number" min={8} max={200} value={numProp(p, "fontSize", 16)} oninput={(ev: Event) => mutate((el) => { el.props.fontSize = Number((ev.target as HTMLInputElement).value); })} />, sp)}
+			{bindField(
+				e,
+				"props.fontSize",
+				t("overlay.font_size"),
+				<input
+					type="number"
+					min={8}
+					max={200}
+					value={numProp(p, "fontSize", 16)}
+					oninput={(ev: Event) =>
+						mutate((el) => {
+							el.props.fontSize = Number((ev.target as HTMLInputElement).value);
+						})
+					}
+				/>,
+				sp,
+			)}
 		</>
 	);
 }
@@ -279,50 +468,56 @@ const PrizesField = {
 			element: OverlayElement;
 			mutate: (fn: (el: OverlayElement) => void) => void;
 		};
-	const prizes = (Array.isArray(e.props.prizes) ? e.props.prizes : []) as string[];
-	const set = (next: string[]): void =>
-		mutate((el) => {
-			el.props.prizes = next;
-		});
-	return (
-		<div class="ov-field">
-			<span class="ov-lbl">{t("overlay.sw_prizes")}</span>
-			<div class="ov-channels">
-				{prizes.length === 0 ? (
-					<div class="ov-channels-empty">{t("overlay.no_rows")}</div>
-				) : (
-					prizes.map((prize, i) => (
-						<div class="ov-list-row" key={i}>
-							<span class="ov-list-cell">
-								<input
-									value={prize}
-									aria-label={t("overlay.sw_prize")}
-									oninput={(ev: Event) =>
-										set(prizes.map((v, j) => (j === i ? (ev.target as HTMLInputElement).value : v)))
-									}
-								/>
-							</span>
-							<button
-								class="ov-channel-remove"
-								type="button"
-								aria-label={t("overlay.remove_row")}
-								onclick={() => set(prizes.filter((_, j) => j !== i))}
-							>
-								<Icon name="close" class="role-icon" />
-							</button>
-						</div>
-					))
-				)}
-				<button
-					class="ov-channel-add"
-					type="button"
-					onclick={() => set([...prizes, ""])}
-				>
-					+ {t("overlay.sw_add_prize")}
-				</button>
+		const prizes = (
+			Array.isArray(e.props.prizes) ? e.props.prizes : []
+		) as string[];
+		const set = (next: string[]): void =>
+			mutate((el) => {
+				el.props.prizes = next;
+			});
+		return (
+			<div class="ov-field">
+				<span class="ov-lbl">{t("overlay.sw_prizes")}</span>
+				<div class="ov-channels">
+					{prizes.length === 0 ? (
+						<div class="ov-channels-empty">{t("overlay.no_rows")}</div>
+					) : (
+						prizes.map((prize, i) => (
+							<div class="ov-list-row" key={i}>
+								<span class="ov-list-cell">
+									<input
+										value={prize}
+										aria-label={t("overlay.sw_prize")}
+										oninput={(ev: Event) =>
+											set(
+												prizes.map((v, j) =>
+													j === i ? (ev.target as HTMLInputElement).value : v,
+												),
+											)
+										}
+									/>
+								</span>
+								<button
+									class="ov-channel-remove"
+									type="button"
+									aria-label={t("overlay.remove_row")}
+									onclick={() => set(prizes.filter((_, j) => j !== i))}
+								>
+									<Icon name="close" class="role-icon" />
+								</button>
+							</div>
+						))
+					)}
+					<button
+						class="ov-channel-add"
+						type="button"
+						onclick={() => set([...prizes, ""])}
+					>
+						+ {t("overlay.sw_add_prize")}
+					</button>
+				</div>
 			</div>
-		</div>
-	);
+		);
 	},
 } as unknown as MithrilJSXComponent<{
 	element: OverlayElement;
@@ -333,7 +528,9 @@ function validate(e: OverlayElement): string[] {
 	const problems: string[] = [];
 	if (typeof e.props.event !== "string" || e.props.event === "")
 		problems.push("event must be a non-empty string");
-	const prizes = (Array.isArray(e.props.prizes) ? e.props.prizes : []) as string[];
+	const prizes = (
+		Array.isArray(e.props.prizes) ? e.props.prizes : []
+	) as string[];
 	if (prizes.filter((v) => typeof v === "string" && v !== "").length < 2)
 		problems.push("at least 2 prizes are required");
 	return problems;
@@ -346,18 +543,13 @@ export const spinWheelElement: OverlayElementDef = {
 	order: 100,
 	defaultProps: { ...DEFAULT_SPIN_WHEEL_PROPS },
 	/** `prizes` is one composite control (a string list), not a bindField scalar. */
-	propKeys: [
-		"event",
-		"duration",
-		"color",
-		"accent",
-		"background",
-		"fontSize",
-	],
+	propKeys: ["event", "duration", "color", "accent", "fontSize"],
 	defaultSize: { width: 340, height: 340 },
 	draw,
 	editForm,
 	validate,
 	handles: "box",
+	/** Always on screen at runtime; it only reacts to its trigger event. */
+	persistent: true,
 	onTrigger,
 };

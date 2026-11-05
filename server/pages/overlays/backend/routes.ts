@@ -2,34 +2,41 @@
  * OBS overlay editor routes:
  *   GET  /overlays/                the overlay list page (cookie auth)
  *   GET  /overlays/edit/:id/       the overlay editor page (cookie auth)
- *   GET  /overlay/:id?token=…      the runtime page (token auth, transparent)
- *   GET  /overlay/variables?…      revalue variables: ?<name>=<value>…, an
- *                                  empty value clears (token auth)
- *   POST /overlay/variables?…      revalue variables from a JSON body
- *                                  {<name>: value|null} (token auth)
- *   GET  /overlay/alert/:name?…    trigger an alert whose element event
- *                                  matches <name>; optional ?<name>=<value>
- *                                  pairs ride with the alert and land in
- *                                  overlay variables when the alert plays
- *                                  (token auth)
+ *   GET  /overlay/:id?token=…      the runtime page (owner user-token auth,
+ *                                  transparent); <token> is the overlay
+ *                                  owner's user token
+ *   GET  /overlay/:id/variables?…  revalue variables: ?<name>=<value>…, an
+ *                                  empty value clears (owner user-token auth)
+ *   POST /overlay/:id/variables?…  revalue variables from a JSON body
+ *                                  {<name>: value|null} (owner user-token auth)
+ *   GET  /overlay/:id/event/:name?…
+ *                                  trigger a universal event on overlay <id>:
+ *                                  every trigger-driven element (alerts, spin
+ *                                  wheel, …) whose event prop matches <name>
+ *                                  reacts; optional ?<name>=<value> pairs ride
+ *                                  with the event and land in overlay
+ *                                  variables when an element plays it (owner
+ *                                  user-token auth)
  *   GET  /overlay/:id/files/:fileId?token=…
  *                                  the bytes of an asset-library file an
  *                                  image/video element references
  *                                  (`libraryAssetId`); owner-scoped through
- *                                  the overlay's token (token auth)
- *   WS   /overlay/:id/ws?token=…   the runtime live feed (token auth);
- *                                  also accepts the runtime page's
- *                                  `overlays.applyAlert` uplink (it writes
- *                                  an on-air alert's values to variables)
+ *                                  the owner's user token (owner user-token
+ *                                  auth)
+ *   WS   /overlay/:id/ws?token=…   the runtime live feed (owner user-token
+ *                                  auth); also accepts the runtime page's
+ *                                  `overlays.applyEvent` uplink (it writes
+ *                                  an on-air event's values to variables)
  *   POST /api/overlays/:id/duplicate
  *                            copy an overlay (cookie auth); the clone gets a
- *                            fresh id, name and token
+ *                            fresh id and name
  *   …    /api/overlays…            the editor REST API (cookie auth)
  *
- * The runtime page is what OBS loads as a Browser Source: no session, only
- * the overlay token (chat-overlay pattern), a fully transparent body.
+ * The runtime page is what OBS loads as a Browser Source: no session cookie,
+ * only the overlay OWNER's user token (chat-overlay pattern), a fully
+ * transparent body. The token resolves to a login and the overlay's owner is
+ * checked against it, so a token can only reach its owner's overlays.
  */
-import { Elysia } from "elysia";
 import { Elysia } from "elysia";
 import { APP_VERSION } from "../../../../shared/app_version";
 import type { createFrontend } from "../../../../shared/frontend";
@@ -43,16 +50,17 @@ import { ApiError, type Overlays, overlayRuntimeTopic } from "./registry";
 
 type Frontend = Awaited<ReturnType<typeof createFrontend>>;
 
-/** Runs a token-authenticated store action and maps the outcome: ApiError
- * → JSON `{ok:false, error, code}`, `null` → 404 "Not found" (a token probe
- * must not leak project existence, exactly like /overlay/:id). */
-type TokenResult = { status: number; body: Record<string, unknown> } | null;
+/** Runs an owner-authenticated store action and maps the outcome: ApiError
+ * → JSON `{ok:false, error, code}`, `null` → 404 "Not found" (a probe with a
+ * foreign/unknown token must not leak overlay existence, exactly like
+ * /overlay/:id). */
+type OwnerResult = { status: number; body: Record<string, unknown> } | null;
 
-function tokenJson(
-    action: () => TokenResult | Promise<TokenResult>,
+function ownerJson(
+    action: () => OwnerResult | Promise<OwnerResult>,
 ): Promise<Response> {
     return (async (): Promise<Response> => {
-        let result: TokenResult;
+        let result: OwnerResult;
         try {
             result = await action();
         } catch (err: unknown) {
@@ -117,6 +125,14 @@ export function mountOverlayRoutes(
     assets: Assets,
 ): void {
     const { auth, frontend } = s;
+
+    /** Resolve a runtime request's `?token=` to the owner's login
+     * (`auth.userForToken` maps a user device token → login, and to the local
+     * user under `--no-auth`); `null` when the token is unknown. The overlay
+     * store then owner-checks the id against this login. */
+    const runtimeUser = (request: Request): string | null =>
+        auth.userForToken(runtimeToken(request));
+
     routes
         .get(
             "/overlays/",
@@ -132,19 +148,24 @@ export function mountOverlayRoutes(
         )
         // before /overlay/:id — the static paths must win over the scene id
         .get(
-            "/overlay/variables",
-            ({ request }) =>
-                tokenJson(() =>
-                    overlays.setVariablesByToken(
-                        runtimeToken(request),
+            "/overlay/:id/variables",
+            ({ request, params }) =>
+                ownerJson(() => {
+                    const user = runtimeUser(request);
+                    if (!user) return null;
+                    return overlays.setVariables(
+                        user,
+                        decodeURIComponent(params.id),
                         queryValues(request),
-                    ),
-                ),
+                    );
+                }),
         )
         .post(
-            "/overlay/variables",
-            ({ request }) =>
-                tokenJson(async () => {
+            "/overlay/:id/variables",
+            ({ request, params }) =>
+                ownerJson(async () => {
+                    const user = runtimeUser(request);
+                    if (!user) return null;
                     // JSON body: {<name>: value|null} — null/"" clears
                     let body: unknown;
                     try {
@@ -161,20 +182,24 @@ export function mountOverlayRoutes(
                             "body must be a JSON object of variable name → value",
                             400,
                         );
-                    return overlays.setVariablesByToken(
-                        runtimeToken(request),
+                    return overlays.setVariables(
+                        user,
+                        decodeURIComponent(params.id),
                         body as Record<string, unknown>,
                     );
                 }),
         )
         .get(
-            "/overlay/alert/:name",
+            "/overlay/:id/event/:name",
             ({ request, params }) =>
-                tokenJson(() => {
+                ownerJson(() => {
+                    const user = runtimeUser(request);
+                    if (!user) return null;
                     // query pairs (if any) set project variables; the
                     // trigger itself is the URL's <name>
-                    return overlays.triggerAlertByToken(
-                        runtimeToken(request),
+                    return overlays.triggerEvent(
+                        user,
+                        decodeURIComponent(params.id),
                         decodeURIComponent(params.name),
                         queryValues(request),
                     );
@@ -182,16 +207,17 @@ export function mountOverlayRoutes(
         )
         // Media of an image/video element that references the owner's asset
         // library (`libraryAssetId`). Token-scoped like the rest of the
-        // runtime: the overlay's token names its owner, and only that owner's
-        // files can be served through it. A bad token, unknown overlay, or a
-        // file that is not the owner's all 404 (probes must not leak).
+        // runtime: the owner's user token names the overlay's owner, and only
+        // that owner's files can be served through it. A bad token, unknown
+        // overlay, a foreign overlay, or a file that is not the owner's all
+        // 404 (probes must not leak).
         .get(
             "/overlay/:id/files/:fileId",
             ({ request, params }) => {
-                const feed = overlays.runtimeOverlay(
-                    runtimeToken(request),
-                    decodeURIComponent(params.id),
-                );
+                const user = runtimeUser(request);
+                const feed = user
+                    ? overlays.runtimeOverlay(user, decodeURIComponent(params.id))
+                    : null;
                 if (!feed)
                     return Response.json(
                         { ok: false, error: "Not found", code: 404 },
@@ -246,10 +272,10 @@ export function mountOverlayRoutes(
                 );
                 if (!m) return ws.close(1008, "Unknown overlay route");
                 const overlayId = decodeURIComponent(m[1]);
-                const feed = overlays.runtimeOverlay(
-                    runtimeToken(ws.data.request),
-                    overlayId,
-                );
+                const user = auth.userForToken(runtimeToken(ws.data.request));
+                const feed = user
+                    ? overlays.runtimeOverlay(user, overlayId)
+                    : null;
                 if (!feed) return ws.close(1008, "Invalid overlay token");
                 // the message handler reuses the already-validated overlay id
                 (ws.data as { overlayId?: string }).overlayId = overlayId;
@@ -269,7 +295,7 @@ export function mountOverlayRoutes(
                 );
             },
             message(ws, message) {
-                // uplink from the runtime page: an alert went on air and its
+                // uplink from the runtime page: an event went on air and its
                 // values must land in the overlay variables
                 const overlayId = (ws.data as { overlayId?: string }).overlayId;
                 if (!overlayId) return;
@@ -283,7 +309,7 @@ export function mountOverlayRoutes(
                 } catch {
                     return;
                 }
-                if (frame.event !== "overlays.applyAlert") return;
+                if (frame.event !== "overlays.applyEvent") return;
                 const values = (frame.data as { values?: unknown } | null)
                     ?.values;
                 if (
@@ -293,14 +319,14 @@ export function mountOverlayRoutes(
                 )
                     return;
                 try {
-                    overlays.applyAlertValues(
+                    overlays.applyEventValues(
                         overlayId,
                         values as Record<string, unknown>,
                     );
                 } catch {
                     // the values came from this page's own validated
                     // trigger payload; an apply failure means the overlay
-                    // changed underneath — the alert already played, there
+                    // changed underneath — the event already played, there
                     // is nothing safe to surface over a fire-and-forget WS
                 }
             },

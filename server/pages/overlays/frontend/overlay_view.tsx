@@ -7,13 +7,14 @@
  * - when the snapshot's server version differs from this bundle's, reload
  *   (a new deployment replaced the server while the page was open)
  * - on disconnect: hold last-known state, reconnect with exponential backoff
- * - an `overlays.alert` frame shows every alert element whose event matches
- *   the frame's name; an element already showing an alert queues the new
+ * - an `overlays.event` frame (a universal trigger) is routed to every
+ *   trigger-driven element (alerts, spin wheel, …) whose event prop matches
+ *   the frame's name; an element already reacting to an event queues the new
  *   one FIFO and starts it when the current one expires
  * - a trigger's `?<name>=<value>` pairs ride in the frame's payload and
- *   are written into the project variables only when that alert goes on
- *   air (never while it waits in the queue), then persisted via the
- *   `overlays.applyAlert` WS uplink — so a queued alert's values never
+ *   are written into the project variables only when an element goes on air
+ *   for it (never while it waits in the queue), then persisted via the
+ *   `overlays.applyEvent` WS uplink — so a queued element's values never
  *   clobber the on-air ones early, and the written values persist
  */
 
@@ -72,19 +73,19 @@ const triggerTimers = new Map<
 	[ReturnType<typeof setTimeout>, ReturnType<typeof setTimeout>]
 >();
 
-/** an alert claim: the element that wants it, when it was claimed, and
+/** an event claim: the element that wants it, when it was claimed, and
  * the values that must go on air with it */
-interface PendingAlert {
+interface PendingEvent {
 	element: OverlayElement;
 	eventName: string;
 	payload: Record<string, unknown>;
 }
 
-/** element id -> FIFO of pending alerts (the element is showing an earlier
- * one); drained when the element's current trigger expires. Values are
- * applied only when the alert plays, so queued alerts never clobber the
- * on-air values early */
-const alertQueues = new Map<string, PendingAlert[]>();
+/** element id -> FIFO of pending events (the element is reacting to an
+ * earlier one); drained when the element's current trigger expires. Values
+ * are applied only when the element plays it, so queued events never
+ * clobber the on-air values early */
+const eventQueues = new Map<string, PendingEvent[]>();
 
 let ws: WebSocket | undefined;
 let delay = 1000;
@@ -198,14 +199,15 @@ function handleMessage(raw: MessageEvent, first: { open: boolean }): void {
 		}
 		case "overlays.variables":
 			// values only render into templates/`amount`; triggering is the
-			// dedicated `overlays.alert` frame
+			// dedicated `overlays.event` frame
 			if (Array.isArray(data.variables))
 				state.variables = data.variables as Variable[];
 			break;
-		case "overlays.alert":
-			// fired by GET /overlay/alert/<name>: show every alert element
-			// whose event matches <name>, queueing per element
-			handleTrigger(
+		case "overlays.event":
+			// fired by GET /overlay/<overlay id>/event/<name>: route to every
+			// trigger-driven element whose event prop matches <name>,
+			// queueing per element
+			handleEvent(
 				String(data.name ?? ""),
 				(data.payload ?? {}) as Record<string, unknown>,
 			);
@@ -249,12 +251,12 @@ function activateTrigger(
 	scheduleTriggerLifecycle(elementId, duration);
 }
 
-/** Show a claimed trigger: apply its values to the project variables
+/** Show a claimed event: apply its values to the project variables
  * first (they were validated by the trigger endpoint, so the names exist
  * here), then let the element decide (event match + variation condition
  * + side effects) with the live values in place. Returns `false` when the
  * element declines the claim. */
-function playAlert(
+function playEvent(
 	element: OverlayElement,
 	eventName: string,
 	payload: Record<string, unknown>,
@@ -272,13 +274,13 @@ function playAlert(
 	if (duration === undefined || !Number.isFinite(duration) || duration <= 0)
 		return false;
 	activateTrigger(element.id, payload, duration);
-	// persist the on-air values (best-effort: the alert plays even if the
+	// persist the on-air values (best-effort: the element plays even if the
 	// socket is momentarily down)
 	if (Object.keys(payload).length > 0 && ws?.readyState === WebSocket.OPEN)
 		ws.send(
 			JSON.stringify({
 				type: "event",
-				event: "overlays.applyAlert",
+				event: "overlays.applyEvent",
 				data: { values: payload },
 			}),
 		);
@@ -298,13 +300,13 @@ function scheduleTriggerLifecycle(elementId: string, duration: number): void {
 			setTimeout(() => {
 				state.activeTriggers.delete(elementId);
 				triggerTimers.delete(elementId);
-				const queue = alertQueues.get(elementId);
+				const queue = eventQueues.get(elementId);
 				if (queue && queue.length > 0) {
 					while (queue.length > 0) {
 						const [next, ...rest] = queue;
-						if (rest.length > 0) alertQueues.set(elementId, rest);
-						else alertQueues.delete(elementId);
-						if (playAlert(next.element, next.eventName, next.payload)) break;
+						if (rest.length > 0) eventQueues.set(elementId, rest);
+						else eventQueues.delete(elementId);
+						if (playEvent(next.element, next.eventName, next.payload)) break;
 					}
 				}
 				m.redraw();
@@ -313,13 +315,13 @@ function scheduleTriggerLifecycle(elementId: string, duration: number): void {
 	triggerTimers.set(elementId, timers);
 }
 
-/** Route an `overlays.alert` frame to every trigger-driven element in the
+/** Route an `overlays.event` frame to every trigger-driven element in the
  * scene. A claim plays immediately (values applied, `onTrigger` evaluated
  * with the live values) when the element is free, and is queued FIFO with
- * its values when the element is still showing an earlier alert — the
+ * its values when the element is still reacting to an earlier event — the
  * queued values only land at play time, and the written values persist
- * via the `overlays.applyAlert` uplink (nothing is cleared here). */
-function handleTrigger(
+ * via the `overlays.applyEvent` uplink (nothing is cleared here). */
+function handleEvent(
 	eventName: string,
 	payload: Record<string, unknown>,
 ): void {
@@ -328,14 +330,14 @@ function handleTrigger(
 	for (const element of overlay.elements) {
 		if (!elementDef(element.type)?.onTrigger) continue;
 		if (state.activeTriggers.has(element.id)) {
-			// the element is showing an earlier alert: queue the claim
+			// the element is reacting to an earlier event: queue the claim
 			// with its values; they apply at play time
-			const queue = alertQueues.get(element.id) ?? [];
+			const queue = eventQueues.get(element.id) ?? [];
 			queue.push({ element, eventName, payload });
-			alertQueues.set(element.id, queue);
+			eventQueues.set(element.id, queue);
 			continue;
 		}
-		playAlert(element, eventName, payload);
+		playEvent(element, eventName, payload);
 	}
 }
 

@@ -1,1 +1,4 @@
-curl "http://localhost:8090/overlay/variables/?token=6496c836fe43f76acdb2d9cc4440de5e&alert=test&title=New+subscriber&message=Michasdsel"
+#!/usr/bin/env bash
+# scratch debug script — replace <overlayId> with the overlay's id and
+# <token> with the overlay owner's user token
+curl "http://localhost:8090/overlay/<overlayId>/variables?token=<token>&title=New+subscriber&message=Michasdsel"

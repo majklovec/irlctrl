@@ -6,8 +6,8 @@
 import { alertsElement } from "./elements/alerts";
 import { chatElement } from "./elements/chat";
 import { countdownElement } from "./elements/countdown";
-import { creditsElement } from "./elements/credits";
 import { counterElement } from "./elements/counter";
+import { creditsElement } from "./elements/credits";
 import { ellipseElement } from "./elements/ellipse";
 import { emoteComboElement } from "./elements/emote_combo";
 import { emoteWallElement } from "./elements/emote_wall";

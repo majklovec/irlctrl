@@ -5,14 +5,17 @@ served as transparent runtime pages that OBS loads with a **Browser Source**.
 
 A user can have **multiple independent overlays** (stored in the `overlays`
 table). Each overlay is fully self-contained — its own canvas, variables and
-elements — and has its **own runtime token**, so one account can run several
-OBS scenes side by side. Media (images, videos, alert sounds) is not stored
-in the overlay: elements reference files in the user's asset library, which
-the server keeps on disk (the `--storage` directory) and serves to the
-runtime page through its token-scoped file endpoint.
+elements — so one account can run several OBS scenes side by side. Runtime
+pages are owner-scoped: every runtime URL carries the overlay **owner's user
+token** (a profile device token) plus the overlay id, and the server resolves
+the token to a login and checks it owns the overlay. Media (images, videos,
+alert sounds) is not stored in the overlay: elements reference files in the
+user's asset library, which the server keeps on disk (the `--storage`
+directory) and serves to the runtime page through its owner-scoped file
+endpoint.
 
 - Overlay list: `/overlays/`, overlay editor: `/overlays/edit/<overlay id>/` (logged-in users only)
-- Runtime: `/overlay/<overlay id>?token=<token>` (no session, token-gated)
+- Runtime: `/overlay/<overlay id>?token=<user token>` (no session, owner-gated)
 - Schema, limits and normalization: [`server/pages/overlays/overlay.ts`](../server/pages/overlays/overlay.ts)
 - Element plugin contract: [`server/core/overlay_element.ts`](../server/core/overlay_element.ts)
   (schema half) and [`shared/ui/overlay/element.ts`](../shared/ui/overlay/element.ts)
@@ -93,15 +96,15 @@ overlay has its own set).
   air; bound elements re-render live in the runtime page.
 - **Modify URL** — each row of the *Variables* footer shows a copy icon next
   to the name; it copies the variable's token URL
-  (`<origin>/overlay/variables?token=…&<name>=`). Completing the URL with a
-  value and fetching it (browser, curl, script) sets the value — typed per
-  variable: `number` accepts finite numbers, `boolean` accepts `true`/`false`,
-  `color` accepts `#rrggbb`, `string` accepts anything. Several variables can
-  be set in one fetch — append `<name2>=<value2>…` — and an empty value
-  (`<name>=`) empties the variable to its neutral value (0 / false /
-  `#000000` / ""). `POST /overlay/variables?token=…` accepts the same batch
-  as a JSON body (`{<name>: value|null}`, typed JSON values, `null`/`""`
-  empties). The
+  (`<origin>/overlay/<overlay id>/variables?token=…&<name>=`). Completing the
+  URL with a value and fetching it (browser, curl, script) sets the value —
+  typed per variable: `number` accepts finite numbers, `boolean` accepts
+  `true`/`false`, `color` accepts `#rrggbb`, `string` accepts anything. Several
+  variables can be set in one fetch — append `<name2>=<value2>…` — and an empty
+  value (`<name>=`) empties the variable to its neutral value (0 / false /
+  `#000000` / ""). `POST /overlay/<overlay id>/variables?token=…` accepts the
+  same batch as a JSON body (`{<name>: value|null}`, typed JSON values,
+  `null`/`""` empties). The
   fetch returns `{"ok":true,"variables":[…]}` and fans out exactly like an
   in-editor edit (editor feed + runtime feed, so a live overlay re-renders) —
   the whole batch in one frame. A missing token or variable 404s; a bad value
@@ -163,18 +166,17 @@ Every mutation goes over REST and is fanned out to two WebSocket topics
    (cookie session). Delivered to every open editor tab, so multiple editors
    stay in sync.
 2. **Runtime feed** — topic `overlay-runtime:<overlay id>` on
-   `WS /overlay/<overlay id>/ws?token=…` (overlay token, no session).
+   `WS /overlay/<overlay id>/ws?token=…` (owner user token, no session).
    Delivered to that one overlay's OBS runtime page (each overlay feeds its
    own topic, so one user's overlays never feed each other).
 
 | Event                 | Payload                    | Fires when                                                        | Editor | Runtime |
 | --------------------- | -------------------------- | ------------------------------------------------------------------ | :----: | :-----: |
-| `overlays.snapshot`   | `{overlay, version}`       | Runtime WS connects, after the token check (the full overlay; `version` is the server build stamp the page compares to its own bundle to reload after a new deployment) | –    | ✔ |
-| `overlays.overlays`   | `{overlays}`               | the user's overlay list changed (create/delete/duplicate) — each item is a summary `{id, name, token, elementCount, updatedAt}` | ✔      | – |
+| `overlays.snapshot`   | `{overlay, version}`       | Runtime WS connects, after the owner check (the full overlay; `version` is the server build stamp the page compares to its own bundle to reload after a new deployment) | –    | ✔ |
+| `overlays.overlays`   | `{overlays}`               | the user's overlay list changed (create/delete/duplicate) — each item is a summary `{id, name, elementCount, updatedAt}` | ✔      | – |
 | `overlays.overlay`    | `{overlay}`                | any mutation of one overlay: rename, element add/update/delete, canvas resize, variable create/rename/retype/revalue/delete | ✔      | ✔ |
-| `overlays.alert`      | `{name, payload}`          | `GET /overlay/alert/<name>` was called (the trigger event; `payload` carries the trigger's validated `<name>=<value>` pairs) | – | ✔  |
-| `overlays.applyAlert` | `{values}`                 | uplink: the runtime page goes on air with an alert and writes its values to the overlay variables (`overlays.overlay` frame is the ack) | – | uplink |
-| `overlays.token`      | `{overlayId, token}`       | that overlay's token rotation                                       | ✔      | –  |
+| `overlays.event`      | `{name, payload}`          | `GET /overlay/<overlay id>/event/<name>` was called (the universal trigger event; `payload` carries the trigger's validated `<name>=<value>` pairs) | – | ✔  |
+| `overlays.applyEvent` | `{values}`                 | uplink: the runtime page goes on air with an event and writes its values to the overlay variables (`overlays.overlay` frame is the ack) | – | uplink |
 
 Notes:
 
@@ -189,43 +191,45 @@ Notes:
 - The runtime page holds its last known state on disconnect and reconnects
   with exponential backoff (1 s → 30 s); a bad token keeps it blank (the
   server closes the WS with 1008).
-- Trigger-based elements (v1: the `Alert` element) fire off **named
-  events**: `GET /overlay/alert/<name>?token=…[&<name>=<value>…]` publishes
-  an `overlays.alert` frame and the runtime page shows every alert whose
-  *Event* prop equals `<name>`. Consecutive triggers on the same element
-  **queue FIFO** — a second trigger while the first is on air starts right
-  when the first expires (different elements fire independently). Any
-  `?<name>=<value>` pairs are validated in the same call (typed like the
-  variables endpoint, 404/400 on unknown/bad values) and ride in the
-  frame's `payload`; the runtime page writes them to the overlay variables
-  **when the alert goes on air** — so a queued alert's values never
-  clobber the on-air ones early — and persists them with the
-  `overlays.applyAlert` WS uplink (the `overlays.overlay` frame that
-  follows is the ack). The written values persist: the runtime page never
-  clears them (variation `amount` thresholds read the variable, so
-  templates and TTS see the trigger's values while the alert is on air).
-  A bare trigger without values (`/overlay/alert/follow?token=…`) is
-  valid; `<name>` does not need to be a variable, it just needs to match
-  an element's *Event* prop on the runtime page.
+- Trigger-driven elements (`Alert`, the spin wheel, …) fire off **named
+  events**: `GET /overlay/<overlay id>/event/<name>?token=…[&<name>=<value>…]`
+  publishes an `overlays.event` frame and the runtime page routes it to every
+  trigger-driven element whose *Event* prop equals `<name>`. Consecutive
+  triggers on the same element **queue FIFO** — a second trigger while the
+  first is on air starts right when the first expires (different elements
+  fire independently). Any `?<name>=<value>` pairs are validated in the
+  same call (typed like the variables endpoint, 404/400 on unknown/bad
+  values) and ride in the frame's `payload`; the runtime page writes them
+  to the overlay variables **when an element goes on air** — so a queued
+  element's values never clobber the on-air ones early — and persists them
+  with the `overlays.applyEvent` WS uplink (the `overlays.overlay` frame
+  that follows is the ack). The written values persist: the runtime page
+  never clears them (variation `amount` thresholds read the variable, so
+  templates and TTS see the trigger's values while the element is on air).
+  A bare trigger without values (`/overlay/<overlay id>/event/follow?token=…`)
+  is valid;
+  `<name>` does not need to be a variable, it just needs to match an
+  element's *Event* prop on the runtime page.
 
 ## URL binding
 
 | URL                                        | Auth                       | Serves                                     |
 | ------------------------------------------ | -------------------------- | ------------------------------------------ |
 | `/overlays/`                               | cookie session             | the overlay list; the editor lives at `/overlays/edit/<overlay id>/` |
-| `/overlay/<overlay id>`                    | overlay token in `?token=` | the transparent runtime page (OBS Browser Source); a bad token renders a blank page |
-| `/overlay/variables?token=&<name>=<value>…`| overlay token              | revalue variables from the querystring (several `<name>=<value>` pairs per fetch; an empty value empties the variable to its neutral value: 0 / false / `#000000` / ""), returns the new variable list |
-| `POST /overlay/variables?token=`           | overlay token              | revalue variables from a JSON body `{<name>: value\|null}` (`null`/`""` empties), returns the new variable list |
-| `/overlay/alert/<name>?token=…[&<name>=<value>…]` | overlay token      | trigger every alert element whose *Event* prop equals `<name>` (queues FIFO per element); optional `<name>=<value>` pairs ride with the alert and are written to the overlay variables when the alert plays (persist), returns `{"ok":true,"name":…}` |
-| `/overlay/<overlay id>/ws?token=`          | overlay token              | the runtime live feed (WebSocket; also the page's `overlays.applyAlert` uplink) |
+| `/overlay/<overlay id>`                    | owner user token in `?token=` | the transparent runtime page (OBS Browser Source); a bad/foreign token renders a blank page |
+| `/overlay/<overlay id>/variables?token=&<name>=<value>…`| owner user token    | revalue variables from the querystring (several `<name>=<value>` pairs per fetch; an empty value empties the variable to its neutral value: 0 / false / `#000000` / ""), returns the new variable list |
+| `POST /overlay/<overlay id>/variables?token=`           | owner user token  | revalue variables from a JSON body `{<name>: value\|null}` (`null`/`""` empties), returns the new variable list |
+| `/overlay/<overlay id>/event/<name>?token=…[&<name>=<value>…]` | owner user token | trigger every trigger-driven element in that overlay (alerts, spin wheel, …) whose *Event* prop equals `<name>` (queues FIFO per element); optional `<name>=<value>` pairs ride with the event and are written to the overlay variables when an element plays it (persist), returns `{"ok":true,"name":…}` |
+| `/overlay/<overlay id>/ws?token=`          | owner user token         | the runtime live feed (WebSocket; also the page's `overlays.applyEvent` uplink) |
 | `/chat/<dashboardId>/<widgetId>?token=`    | per-widget token           | a chat widget's live page                   |
 
-**Overlay token** — one per overlay, 64 hex chars, the only credential the
-runtime needs. It is returned by `GET /api/overlays/:id` (the list GET
-returns each overlay's token too) and shown (with copy) in the editor;
-**Rotate** (`POST /api/overlays/:id/token/rotate`) invalidates that
-overlay's previously shared URL immediately. The token alone addresses the
-overlay, so the runtime URLs never carry an overlay id.
+**Owner user token** — the overlay **owner's** profile device token
+(`POST /api/profile/tokens`, listed by `GET /api/profile`), the only
+credential any runtime surface needs. Every runtime URL carries it in
+`?token=` **plus the overlay id**; the server resolves the token to a login
+and serves the overlay only to its owner (a foreign or unknown token 404s /
+blank-renders, so probes leak nothing). Revoking the token from the profile
+invalidates every URL that used it immediately.
 
 **Element URLs** — the `iframe` and `chat` elements carry a `props.url`:
 
@@ -239,13 +243,17 @@ overlay, so the runtime URLs never carry an overlay id.
 
 ## Tokens
 
-- One runtime token per overlay (the token alone addresses the overlay).
-- The token is the only credential the runtime URL needs. Requests without a
-  valid token render an **empty page** (no data, no error text).
-- **Rotate** in the editor: that overlay's previously shared URL stops
-  immediately; copy the new URL into the OBS Browser Source.
-- Treat the token like a password: it grants read access to that overlay and
-  its variable values. Other overlays in the same account are unaffected.
+- The overlay **owner's user token** is the only credential a runtime URL
+  needs; the URL's overlay id + the token owner-check together address the
+  overlay.
+- Requests without a valid, owner-matching token render an **empty page** (no
+  data, no error text) or 404 (REST/WS).
+- Revoke a token from the profile: every runtime URL using it stops
+  immediately; mint a new one and copy the new URL into the OBS Browser
+  Source.
+- Treat the token like a password: it grants access to **the owner's**
+  overlays and their variable values. A user's token never reaches another
+  user's overlays.
 
 ## Adding a new element type
 

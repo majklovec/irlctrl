@@ -67,9 +67,9 @@ export interface ElementContext {
 	 * the editor has none, so trigger-driven elements always render their
 	 * design state there. Absent/missing = the element is not active. */
 	activeTriggers?: Map<string, TriggerState>;
-	/** The overlay token that authenticates token-scoped feeds (a self-
-	 * contained chat element). The editor uses its overlay's token; the
-	 * runtime page the one its URL carries. Absent = not live. */
+	/** The owner's user token that authenticates owner-scoped feeds (a
+	 * self-contained chat element). The editor uses this user's device token;
+	 * the runtime page the one its URL carries. Absent = not live. */
 	token?: string;
 	/** The id of the overlay being rendered. The runtime page's overlay is
 	 * fixed; the editor's is its selected overlay. */
@@ -253,6 +253,10 @@ export interface ElementProps {
 	element: OverlayElement;
 	mutate: (fn: (e: OverlayElement) => void) => void;
 	variables: Variable[];
+	/** Builds the runtime event-trigger URL (owner-token auth) for the loaded
+	 * overlay. Optional: trigger-driven elements use it to offer a copyable
+	 * "fire this event" link; others ignore it. */
+	eventUrl?: (name: string) => string;
 }
 
 /** Which editing affordance an element shows when selected on the canvas.
@@ -293,6 +297,12 @@ export interface OverlayElementDef {
 	 * frame, from the fixed endpoint) so the element can record which
 	 * diagonal it runs along. */
 	onEndpointDrag?(element: OverlayElement, dx: number, dy: number): void;
+	/** Trigger-driven elements render only while a runtime trigger has them
+	 * active (alert-style). Persistent ones are the exception: they stay on
+	 * screen at runtime all the time and only REACT to triggers (a spin
+	 * wheel, a live counter). Must be paired with `onTrigger`; the editor
+	 * renders their design state either way. */
+	readonly persistent?: boolean;
 	/** Offer in-place editing of one string prop on the canvas (double-click):
 	 * the editor overlays a textarea styled by `style(resolvedProps)` so the
 	 * edit is what-you-see. */
@@ -302,8 +312,8 @@ export interface OverlayElementDef {
 	};
 	/** Present = the element is trigger-driven: it renders only while a
 	 * runtime trigger has it active (the editor always renders its design
-	 * state). The runtime page calls this for every alert event
-	 * (`GET /overlay/alert/<name>` → `overlays.alert` frame) at the
+	 * state). The runtime page calls this for every event
+	 * (`GET /overlay/<overlay id>/event/<name>` → `overlays.event` frame) at the
 	 * moment the alert goes on air — immediately when the element is
 	 * free, at the previous claim's expiry when it is queued; it returns
 	 * the display duration in ms when this instance fires on the event
@@ -314,7 +324,7 @@ export interface OverlayElementDef {
 	 * into the project variables (and `ctx`) by the runtime page before
 	 * this runs — a queued alert's values only land at its play time, so
 	 * they never clobber the on-air ones early; the written values
-	 * persist (the runtime page sends them over the `overlays.applyAlert`
+	 * persist (the runtime page sends them over the `overlays.applyEvent`
 	 * uplink) and are never emptied. Side effects (audio, TTS) belong in
 	 * here so they play when the alert goes on air, not when the trigger
 	 * arrives. `ctx` carries the live asset URLs and variable values. */

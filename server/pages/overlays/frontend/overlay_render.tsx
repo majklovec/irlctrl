@@ -48,10 +48,11 @@ export function overlayElementView(
 		...resolveElement(element, ctx.variables),
 	};
 	// Trigger-driven elements (def.onTrigger) exist in the DOM only while a
-	// trigger is active. The editor has no live trigger state and always
-	// renders their design state; the runtime hides inactive ones entirely.
+	// trigger is active — except `persistent` ones, which stay on screen at
+	// runtime and merely react to triggers. The editor has no live trigger
+	// state and always renders their design state.
 	const shown =
-		!def?.onTrigger ||
+		!(def?.onTrigger && !def.persistent) ||
 		ctx.activeTriggers === undefined ||
 		ctx.activeTriggers.has(element.id);
 	const content = shown && def ? def.draw(resolved, ctx) : null;
