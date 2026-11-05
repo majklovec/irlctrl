@@ -12,6 +12,17 @@ import { strProp } from "@ui/overlay/element";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import { libraryAssetField } from "@ui/overlay/asset_picker";
+import type { OverlayElementSchema } from "../../../../../core/overlay_element";
+
+export interface ImageProps {
+	/** id of a file in the user's asset library; `""` (or a missing file)
+	 * renders an empty box */
+	libraryAssetId: string;
+}
+
+export const DEFAULT_IMAGE_PROPS: Required<ImageProps> = {
+	libraryAssetId: "",
+};
 
 /** The image's display URL: the asset-library file the element picks
  * (resolved by the page's context into a browsable URL). */
@@ -58,7 +69,7 @@ function validate(e: OverlayElement): string[] {
 	return problems;
 }
 
-export const imageElement: OverlayElementDef = {
+export const imageElement: OverlayElementDef & OverlayElementSchema = {
 	type: "image",
 	category: "media",
 
@@ -72,4 +83,10 @@ export const imageElement: OverlayElementDef = {
 	editForm,
 	validate,
 	handles: "box",
+	serverAssetProps: ["libraryAssetId"],
+	normalizeProps(_props, read) {
+		return {
+			libraryAssetId: read.str("libraryAssetId", "", 200),
+		};
+	},
 };

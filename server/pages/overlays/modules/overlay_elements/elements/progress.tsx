@@ -12,7 +12,25 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_PROGRESS_PROPS } from "./progress_schema";
+import type { OverlayElementSchema } from "../../../../../core/overlay_element";
+
+export interface ProgressProps {
+	/** progress percentage, 0–100 */
+	value: number;
+	/** color of the filled portion */
+	fill: string;
+	/** color of the empty track behind the fill */
+	background: string;
+	/** corner radius in px (0 = square corners) */
+	radius: number;
+}
+
+export const DEFAULT_PROGRESS_PROPS: Required<ProgressProps> = {
+	value: 25,
+	fill: "#22c55e",
+	background: "#e5e7eb",
+	radius: 6,
+};
 
 /** Clamp the (possibly bound) value into 0–100 so a bad variable can't widen
  * the fill past the track. */
@@ -151,7 +169,7 @@ function validate(e: OverlayElement): string[] {
 	return problems;
 }
 
-export const progressElement: OverlayElementDef = {
+export const progressElement: OverlayElementDef & OverlayElementSchema = {
 	type: "progress",
 	category: "basics",
 
@@ -165,4 +183,13 @@ export const progressElement: OverlayElementDef = {
 	editForm,
 	validate,
 	handles: "box",
+	normalizeProps(_props, read) {
+		const d = DEFAULT_PROGRESS_PROPS;
+		return {
+			value: read.num("value", d.value, 0, 100),
+			fill: read.hex("fill", d.fill),
+			background: read.hex("background", d.background),
+			radius: read.num("radius", d.radius, 0, 10000),
+		};
+	},
 };

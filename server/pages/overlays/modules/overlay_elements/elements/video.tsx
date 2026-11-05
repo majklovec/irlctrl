@@ -12,8 +12,30 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_VIDEO_PROPS } from "./video_schema";
 import { libraryAssetField } from "@ui/overlay/asset_picker";
+import type { OverlayElementSchema } from "../../../../../core/overlay_element";
+
+export interface VideoProps {
+	/** id of a file in the user's asset library (video/*); `""` (or a missing
+	 * file) renders an empty box */
+	libraryAssetId: string;
+	/** 0–1, the video's audio track (no effect while muted) */
+	volume: number;
+	/** muted videos are the only ones browsers allow to autoplay — the safe default */
+	muted: boolean;
+	/** restart from the beginning when the video ends */
+	loop: boolean;
+	/** start playing on page load (a browser may defer it while un-muted) */
+	autoplay: boolean;
+}
+
+export const DEFAULT_VIDEO_PROPS: Required<VideoProps> = {
+	libraryAssetId: "",
+	volume: 1,
+	muted: true,
+	loop: true,
+	autoplay: true,
+};
 
 /** Defensive read of a boolean prop (the contract has no `boolProp`). */
 const boolProp = (p: Record<string, unknown>, key: string, fb: boolean) =>
@@ -141,7 +163,7 @@ function validate(e: OverlayElement): string[] {
 	return problems;
 }
 
-export const videoElement: OverlayElementDef = {
+export const videoElement: OverlayElementDef & OverlayElementSchema = {
 	type: "video",
 	category: "media",
 
@@ -155,6 +177,24 @@ export const videoElement: OverlayElementDef = {
 	editForm,
 	validate,
 	handles: "box",
+	serverAssetProps: ["libraryAssetId"],
+	normalizeProps(props, read) {
+		const d = DEFAULT_VIDEO_PROPS;
+		return {
+			libraryAssetId: read.str("libraryAssetId", "", 200),
+			volume: read.num("volume", d.volume, 0, 1),
+			// `read.bool` can't express a default of `true` (a missing key
+			// reads as `false`), so these flags keep their default unless the
+			// stored value is a real boolean.
+			muted:
+				typeof props.muted === "boolean" ? props.muted : d.muted,
+			loop: typeof props.loop === "boolean" ? props.loop : d.loop,
+			autoplay:
+				typeof props.autoplay === "boolean"
+					? props.autoplay
+					: d.autoplay,
+		};
+	},
 };
 
 export default videoElement;

@@ -18,7 +18,34 @@ import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import { ListField } from "../lib/list_field";
-import { DEFAULT_LOWER_THIRD_PROPS } from "./lower_third_schema";
+import type { OverlayElementSchema } from "../../../../../core/overlay_element";
+import { cleanStr } from "./schema_utils";
+
+/* ── lower third ──────────────────────────────────────────────────────── */
+export interface LowerThirdProps {
+	/** The name/topic lines; rotate cycles through them. */
+	entries: Array<{ name: string; topic: string }>;
+	rotate: boolean;
+	/** Per-entry time in ms (rotation). */
+	interval: number;
+	color: string;
+	background: string;
+	accent: string;
+	radius: number;
+	fontSize: number;
+	fontFamily: string;
+}
+export const DEFAULT_LOWER_THIRD_PROPS: Required<LowerThirdProps> = {
+	entries: [{ name: "Your Name", topic: "Your topic here" }],
+	rotate: false,
+	interval: 6000,
+	color: "#ffffff",
+	background: "#111827",
+	accent: "#38bdf8",
+	radius: 8,
+	fontSize: 30,
+	fontFamily: "Inter, system-ui, sans-serif",
+};
 
 interface LTEntry {
 	name: string;
@@ -257,7 +284,7 @@ function validate(e: OverlayElement): string[] {
 	return [];
 }
 
-export const lowerThirdElement: OverlayElementDef = {
+export const lowerThirdElement: OverlayElementDef & OverlayElementSchema = {
 	type: "lower_third",
 	category: "widgets",
 
@@ -272,4 +299,28 @@ export const lowerThirdElement: OverlayElementDef = {
 	editForm,
 	validate,
 	handles: "box",
+	normalizeProps(props, read) {
+		const d = DEFAULT_LOWER_THIRD_PROPS;
+		const raw = Array.isArray(props.entries) ? props.entries : [];
+		return {
+			entries: raw.slice(0, 16).map((item) => {
+				const rec =
+					typeof item === "object" && item !== null
+						? (item as Record<string, unknown>)
+						: {};
+				return {
+					name: cleanStr(rec.name, 120),
+					topic: cleanStr(rec.topic, 200),
+				};
+			}),
+			rotate: read.bool("rotate"),
+			interval: read.num("interval", d.interval, 1000, 600000),
+			color: read.hex("color", d.color),
+			background: read.hex("background", d.background),
+			accent: read.hex("accent", d.accent),
+			radius: read.num("radius", d.radius, 0, 500),
+			fontSize: read.num("fontSize", d.fontSize, 6, 400),
+			fontFamily: read.str("fontFamily", d.fontFamily, 300),
+		};
+	},
 };

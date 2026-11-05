@@ -1,13 +1,12 @@
 /*
- * Overlay element plugin contract — the half of an element that is
- * environment-free, so the control server can validate stored scenes and the
- * browser can seed new elements from the same source of truth.
+ * Overlay element schema contract, used by the control server to validate
+ * stored scenes and by the browser to seed new elements from the same source.
  *
  * A module contributes schemas by default-exporting an array of them from
  * `<module>/overlay_schema.ts` (discovered into generated/overlay_schemas.ts
- * by scripts/gen_modules.ts). The browser half — rendering and the inspector
- * form — is `OverlayElementDef` in shared/ui/overlay/element.ts, contributed
- * from `<module>/overlay_elements.tsx`.
+ * by scripts/gen_modules.ts). Modules may combine this contract with the
+ * browser's `OverlayElementDef` and register the same definitions from
+ * `<module>/overlay_elements.tsx`.
  */
 
 /** Defensive readers over a raw props record; every returned value is safe to store. */

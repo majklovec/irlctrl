@@ -12,7 +12,14 @@ import { drawIframe } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_IFRAME_PROPS } from "./iframe_schema";
+import type { OverlayElementSchema } from "../../../../../core/overlay_element";
+
+export interface IframeProps {
+	/** The page to embed. Any absolute URL; `""` renders a placeholder box. */
+	url: string;
+}
+
+export const DEFAULT_IFRAME_PROPS: Required<IframeProps> = { url: "" };
 
 function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 	// `element` is already resolved by the renderer — drawIframe reads props.url.
@@ -48,7 +55,7 @@ function validate(e: OverlayElement): string[] {
 	return problems;
 }
 
-export const iframeElement: OverlayElementDef = {
+export const iframeElement: OverlayElementDef & OverlayElementSchema = {
 	type: "iframe",
 	category: "media",
 
@@ -62,4 +69,7 @@ export const iframeElement: OverlayElementDef = {
 	editForm,
 	validate,
 	handles: "box",
+	normalizeProps(_props, read) {
+		return { url: read.str("url", "") };
+	},
 };

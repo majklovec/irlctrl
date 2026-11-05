@@ -22,10 +22,10 @@ const { spinWheelElement } = await import(
     "../server/pages/overlays/modules/overlay_elements/elements/spin_wheel"
 );
 const { DEFAULT_ALERT_PROPS } = await import(
-    "../server/pages/overlays/modules/overlay_elements/elements/alerts_schema"
+    "../server/pages/overlays/modules/overlay_elements/elements/alerts"
 );
 const { DEFAULT_SPIN_WHEEL_PROPS } = await import(
-    "../server/pages/overlays/modules/overlay_elements/elements/spin_wheel_schema"
+    "../server/pages/overlays/modules/overlay_elements/elements/spin_wheel"
 );
 const { parseElementInput } = await import(
     "../server/pages/overlays/overlay"

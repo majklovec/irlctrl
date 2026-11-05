@@ -18,13 +18,38 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_FEATURED_PROPS } from "./featured_schema";
 import {
 	ChatLine,
 	LiveChatFeed,
 	normalizeChannels,
 } from "../lib/live_chat_feed";
 import { ChannelsField } from "../lib/list_field";
+import type { OverlayElementSchema } from "../../../../../core/overlay_element";
+import type { ChannelRow } from "./schema_utils";
+import { normalizeChannelRows } from "./schema_utils";
+
+/* ── featured (chat-driven) ───────────────────────────────────────────── */
+export interface FeaturedProps {
+	channels: ChannelRow[];
+	/** What to feature: "message" (latest chat line) or "user" (latest sender). */
+	kind: "message" | "user";
+	color: string;
+	accent: string;
+	background: string;
+	radius: number;
+	fontSize: number;
+	fontFamily: string;
+}
+export const DEFAULT_FEATURED_PROPS: Required<FeaturedProps> = {
+	channels: [],
+	kind: "message",
+	color: "#ffffff",
+	accent: "#38bdf8",
+	background: "#111827",
+	radius: 12,
+	fontSize: 26,
+	fontFamily: "Inter, system-ui, sans-serif",
+};
 
 function draw(element: OverlayElement, ctx: ElementContext): Vnode<any, any> {
 	const p = element.props;
@@ -165,7 +190,7 @@ function validate(e: OverlayElement): string[] {
 	return [];
 }
 
-export const featuredElement: OverlayElementDef = {
+export const featuredElement: OverlayElementDef & OverlayElementSchema = {
 	type: "featured",
 	category: "widgets",
 
@@ -186,4 +211,17 @@ export const featuredElement: OverlayElementDef = {
 	editForm,
 	validate,
 	handles: "box",
+	normalizeProps(props, read) {
+		const d = DEFAULT_FEATURED_PROPS;
+		return {
+			channels: normalizeChannelRows(props.channels),
+			kind: read.oneOf("kind", ["message", "user"], d.kind),
+			color: read.hex("color", d.color),
+			accent: read.hex("accent", d.accent),
+			background: read.hex("background", d.background),
+			radius: read.num("radius", d.radius, 0, 500),
+			fontSize: read.num("fontSize", d.fontSize, 6, 400),
+			fontFamily: read.str("fontFamily", d.fontFamily, 300),
+		};
+	},
 };

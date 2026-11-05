@@ -1,10 +1,6 @@
 /*
- * Shared environment-free normalizers for the schema halves of the built-in
- * overlay elements (`elements/*.schema.ts`). The list props are normalized
- * here (the scalar `read` helpers can't touch object arrays), mirroring how
- * the alert and chat schemas handle their structured props. Kept free of the
- * browser lib (which imports mithril) — the server's scene validator reaches
- * these files through generated/overlay_schemas.ts.
+ * Shared environment-free normalizers for the built-in overlay elements.
+ * The scalar `read` helpers cannot normalize object arrays.
  */
 
 /** Defensive scalar coercions for the list-row normalizers below. */
@@ -22,8 +18,7 @@ export const cleanNum = (
 export const cleanBool = (v: unknown): boolean => v === true;
 
 /** A platform channel a chat-driven widget displays (mirrors the chat
- * element's `channels`). Kept here so the schemas stay free of the browser
- * lib (which imports mithril). */
+ * element's `channels`). */
 export interface ChannelRow {
     platform: "youtube" | "twitch" | "tiktok" | "kick";
     channel: string;

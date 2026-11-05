@@ -12,9 +12,29 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_TEXT_PROPS } from "./text_schema";
+import type { OverlayElementSchema } from "../../../../../core/overlay_element";
 
-interface TextProps {
+export interface TextProps {
+	text: string;
+	fontSize: number;
+	fontFamily: string;
+	color: string;
+	weight: number;
+	lineHeight: number;
+	align: "left" | "center" | "right";
+}
+
+export const DEFAULT_TEXT_PROPS: Required<TextProps> = {
+	text: "Text",
+	fontSize: 48,
+	fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+	color: "#ffffff",
+	weight: 400,
+	lineHeight: 1.2,
+	align: "left",
+};
+
+interface TextRenderProps {
 	text: string;
 	fontSize: number;
 	fontFamily: string;
@@ -24,7 +44,7 @@ interface TextProps {
 	textAlign: "left" | "center" | "right";
 }
 
-function textProps(p: Record<string, unknown>): TextProps {
+function textProps(p: Record<string, unknown>): TextRenderProps {
 	const align = p.textAlign;
 	return {
 		text: strProp(p, "text", ""),
@@ -169,7 +189,7 @@ function validate(e: OverlayElement): string[] {
 	return problems;
 }
 
-export const textElement: OverlayElementDef = {
+export const textElement: OverlayElementDef & OverlayElementSchema = {
 	type: "text",
 	category: "basics",
 
@@ -205,5 +225,17 @@ export const textElement: OverlayElementDef = {
 				textAlign: props.textAlign,
 			};
 		},
+	},
+	normalizeProps(props, read) {
+		const d = DEFAULT_TEXT_PROPS;
+		return {
+			text: read.str("text", d.text, 10000),
+			fontSize: read.num("fontSize", d.fontSize, 1, 2000),
+			fontFamily: read.str("fontFamily", d.fontFamily, 300),
+			color: read.hex("color", d.color),
+			weight: read.num("weight", d.weight, 100, 900),
+			lineHeight: read.num("lineHeight", d.lineHeight, 0.1, 10),
+			align: read.oneOf("align", ["left", "center", "right"], d.align),
+		};
 	},
 };

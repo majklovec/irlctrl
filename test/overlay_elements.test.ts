@@ -18,7 +18,7 @@ const { resolveElement, resolveElementProps, elementStyle } = await import(
     "../shared/ui/overlay/element"
 );
 const { DEFAULT_ALERT_PROPS } = await import(
-    "../server/pages/overlays/modules/overlay_elements/elements/alerts_schema"
+    "../server/pages/overlays/modules/overlay_elements/elements/alerts"
 );
 
 import {
@@ -85,6 +85,8 @@ describe("element registry contract", () => {
                     unknown
                 >,
             );
+            if (type !== "html_template")
+                expect(overlayElementSchemas.get(type)).toBe(def);
         }
     });
 

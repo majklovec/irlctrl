@@ -59,44 +59,49 @@ function readInitial(): Language {
 	return isLanguage(base) ? base : DEFAULT_LANGUAGE;
 }
 
-let current: Language = readInitial();
-document.documentElement.lang = current;
+// Element definitions are also loaded by the server's scene validator.
+const isBrowser =
+	typeof document !== "undefined" && typeof window !== "undefined";
+let current: Language = isBrowser ? readInitial() : DEFAULT_LANGUAGE;
+if (isBrowser) document.documentElement.lang = current;
 
-const initPromise = i18n
-	.use(httpBackend)
-	.use(LanguageDetector)
-	.init({
-		lng: current,
-		fallbackLng: DEFAULT_LANGUAGE,
-		detection,
-		backend: {
-			// Absolute URL so non-browser fetch (Bun) and cross-origin hosts both
-			// work; in the page this is same-origin.
-			loadPath: (languages: string[]) =>
-				`${window.location.origin}/i18n/${languages[0]}.json`,
-			addPath: false,
-			reloadInterval: false,
-		},
-		// Keys are flat strings that may contain dots, so no path splitting.
-		keySeparator: false,
-		nsSeparator: false,
-		interpolation: { escapeValue: false },
-		returnNull: false,
-	});
+const initPromise = isBrowser
+	? i18n
+			.use(httpBackend)
+			.use(LanguageDetector)
+			.init({
+				lng: current,
+				fallbackLng: DEFAULT_LANGUAGE,
+				detection,
+				backend: {
+					loadPath: (languages: string[]) =>
+						`${window.location.origin}/i18n/${languages[0]}.json`,
+					addPath: false,
+					reloadInterval: false,
+				},
+				// Keys are flat strings that may contain dots, so no path splitting.
+				keySeparator: false,
+				nsSeparator: false,
+				interpolation: { escapeValue: false },
+				returnNull: false,
+			})
+	: Promise.resolve();
 
 /**
  * Resolves once i18next is initialized and the catalogs it loads on init
  * (the selected language plus the English fallback) have settled
  * (mountPage awaits this).
  */
-export const i18nReady: Promise<void> = initPromise
-	.then(
-		() =>
-			new Promise<void>((resolve, reject) =>
-				i18n.loadResources((error) => (error ? reject(error) : resolve())),
-			),
-	)
-	.then(() => undefined);
+export const i18nReady: Promise<void> = isBrowser
+	? initPromise
+			.then(
+				() =>
+					new Promise<void>((resolve, reject) =>
+						i18n.loadResources((error) => (error ? reject(error) : resolve())),
+					),
+			)
+			.then(() => undefined)
+	: Promise.resolve();
 
 /** Translate using the current UI language and standard i18next options. */
 export function t(key: string, options?: TOptions): string {
@@ -107,7 +112,7 @@ export function t(key: string, options?: TOptions): string {
 export const currentLanguage = (): Language => current;
 
 // The shared log wording localizes through the installed translator.
-setLogTranslator(t);
+if (isBrowser) setLogTranslator(t);
 
 /** "🇨🇿 Čeština": flag and native name, the same whatever the UI language. */
 export const languageLabel = (l: Language): string => {

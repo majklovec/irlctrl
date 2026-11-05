@@ -7,6 +7,7 @@ import type {
 	OverlayElementDef,
 } from "@ui/overlay/element";
 import type { Children, Vnode } from "mithril";
+import type { OverlayElementSchema } from "../../../../../core/overlay_element";
 
 // A group is a container: it renders no content of its own (children are the
 // elements that set `parentId` to it) and shows no resize handles — it is
@@ -24,7 +25,7 @@ function validate(_element: OverlayElement): string[] {
 	return [];
 }
 
-export const groupElement: OverlayElementDef = {
+export const groupElement: OverlayElementDef & OverlayElementSchema = {
 	type: "group",
 	category: "basics",
 
@@ -35,4 +36,6 @@ export const groupElement: OverlayElementDef = {
 	editForm,
 	validate,
 	handles: "none",
+	container: true,
+	normalizeProps: () => ({}),
 };

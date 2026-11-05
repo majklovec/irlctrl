@@ -20,13 +20,41 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_EMOTE_COMBO_PROPS } from "./emote_combo_schema";
 import {
 	ChatLine,
 	LiveChatFeed,
 	normalizeChannels,
 } from "../lib/live_chat_feed";
 import { ChannelsField } from "../lib/list_field";
+import type { OverlayElementSchema } from "../../../../../core/overlay_element";
+import type { ChannelRow } from "./schema_utils";
+import { normalizeChannelRows } from "./schema_utils";
+
+/* ── emote combo (chat-driven) ────────────────────────────────────────── */
+export interface EmoteComboProps {
+	channels: ChannelRow[];
+	/** Window (seconds) in which repeats count as a combo. */
+	windowSec: number;
+	/** Minimum repeats before the combo shows. */
+	threshold: number;
+	color: string;
+	accent: string;
+	background: string;
+	radius: number;
+	fontSize: number;
+	fontFamily: string;
+}
+export const DEFAULT_EMOTE_COMBO_PROPS: Required<EmoteComboProps> = {
+	channels: [],
+	windowSec: 5,
+	threshold: 3,
+	color: "#ffffff",
+	accent: "#ffd700",
+	background: "#111827",
+	radius: 10,
+	fontSize: 28,
+	fontFamily: "Inter, system-ui, sans-serif",
+};
 
 /** Per-element combo streak (mutated by the feed callback; `m.redraw()`
  * re-renders the box, which reads these fields). */
@@ -185,7 +213,7 @@ function validate(e: OverlayElement): string[] {
 	return [];
 }
 
-export const emoteComboElement: OverlayElementDef = {
+export const emoteComboElement: OverlayElementDef & OverlayElementSchema = {
 	type: "emote_combo",
 	category: "widgets",
 
@@ -207,4 +235,18 @@ export const emoteComboElement: OverlayElementDef = {
 	editForm,
 	validate,
 	handles: "box",
+	normalizeProps(props, read) {
+		const d = DEFAULT_EMOTE_COMBO_PROPS;
+		return {
+			channels: normalizeChannelRows(props.channels),
+			windowSec: read.num("windowSec", d.windowSec, 1, 120),
+			threshold: read.num("threshold", d.threshold, 2, 1000),
+			color: read.hex("color", d.color),
+			accent: read.hex("accent", d.accent),
+			background: read.hex("background", d.background),
+			radius: read.num("radius", d.radius, 0, 500),
+			fontSize: read.num("fontSize", d.fontSize, 6, 400),
+			fontFamily: read.str("fontFamily", d.fontFamily, 300),
+		};
+	},
 };

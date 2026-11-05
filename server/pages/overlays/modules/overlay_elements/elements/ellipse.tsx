@@ -12,7 +12,19 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_ELLIPSE_PROPS } from "./ellipse_schema";
+import type { OverlayElementSchema } from "../../../../../core/overlay_element";
+
+export interface EllipseProps {
+	fill: string;
+	stroke: string;
+	strokeWidth: number;
+}
+
+export const DEFAULT_ELLIPSE_PROPS: Required<EllipseProps> = {
+	fill: "#3b82f6",
+	stroke: "#000000",
+	strokeWidth: 0,
+};
 
 function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	// `element` is already resolved by the renderer — props carry binding values.
@@ -94,7 +106,7 @@ function validate(e: OverlayElement): string[] {
 	return problems;
 }
 
-export const ellipseElement: OverlayElementDef = {
+export const ellipseElement: OverlayElementDef & OverlayElementSchema = {
 	type: "ellipse",
 	category: "basics",
 
@@ -108,4 +120,12 @@ export const ellipseElement: OverlayElementDef = {
 	editForm,
 	validate,
 	handles: "box",
+	normalizeProps(_props, read) {
+		const d = DEFAULT_ELLIPSE_PROPS;
+		return {
+			fill: read.hex("fill", d.fill),
+			stroke: read.hex("stroke", d.stroke),
+			strokeWidth: read.num("strokeWidth", d.strokeWidth, 0, 500),
+		};
+	},
 };

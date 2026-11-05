@@ -17,7 +17,35 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_GOAL_PROPS } from "./goal_schema";
+import type { OverlayElementSchema } from "../../../../../core/overlay_element";
+
+/* ── goal ─────────────────────────────────────────────────────────────── */
+export interface GoalProps {
+	label: string;
+	/** The target value to reach. */
+	target: number;
+	/** Current progress; bind this to a variable to make it live. */
+	value: number;
+	color: string;
+	fill: string;
+	background: string;
+	radius: number;
+	fontSize: number;
+	fontFamily: string;
+	showValue: boolean;
+}
+export const DEFAULT_GOAL_PROPS: Required<GoalProps> = {
+	label: "Sub goal",
+	target: 100,
+	value: 0,
+	color: "#ffffff",
+	fill: "#22c55e",
+	background: "#e5e7eb",
+	radius: 8,
+	fontSize: 20,
+	fontFamily: "Inter, system-ui, sans-serif",
+	showValue: true,
+};
 
 function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 	const p = element.props;
@@ -134,7 +162,7 @@ function validate(e: OverlayElement): string[] {
 	return problems;
 }
 
-export const goalElement: OverlayElementDef = {
+export const goalElement: OverlayElementDef & OverlayElementSchema = {
 	type: "goal",
 	category: "widgets",
 
@@ -157,4 +185,19 @@ export const goalElement: OverlayElementDef = {
 	editForm,
 	validate,
 	handles: "box",
+	normalizeProps(_p, read) {
+		const d = DEFAULT_GOAL_PROPS;
+		return {
+			label: read.str("label", d.label, 120),
+			target: read.num("target", d.target, 1, 1e12),
+			value: read.num("value", d.value, 0, 1e12),
+			color: read.hex("color", d.color),
+			fill: read.hex("fill", d.fill),
+			background: read.hex("background", d.background),
+			radius: read.num("radius", d.radius, 0, 500),
+			fontSize: read.num("fontSize", d.fontSize, 6, 400),
+			fontFamily: read.str("fontFamily", d.fontFamily, 300),
+			showValue: read.bool("showValue"),
+		};
+	},
 };

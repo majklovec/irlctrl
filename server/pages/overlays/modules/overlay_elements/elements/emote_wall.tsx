@@ -22,7 +22,6 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_EMOTE_WALL_PROPS } from "./emote_wall_schema";
 import {
 	ChatLine,
 	LiveChatFeed,
@@ -30,6 +29,30 @@ import {
 } from "../lib/live_chat_feed";
 import { ChannelsField } from "../lib/list_field";
 import { hashUnit } from "../lib/ticker";
+import type { OverlayElementSchema } from "../../../../../core/overlay_element";
+import type { ChannelRow } from "./schema_utils";
+import { normalizeChannelRows } from "./schema_utils";
+
+/* ── emote wall (chat-driven) ─────────────────────────────────────────── */
+export interface EmoteWallProps {
+	channels: ChannelRow[];
+	/** How the emotes move. */
+	motion: "calm" | "normal" | "chaos" | "bounce";
+	/** Max concurrent floating emotes. */
+	maxEmotes: number;
+	/** Float lifetime in ms. */
+	lifetime: number;
+	fontSize: number;
+	fontFamily: string;
+}
+export const DEFAULT_EMOTE_WALL_PROPS: Required<EmoteWallProps> = {
+	channels: [],
+	motion: "normal",
+	maxEmotes: 24,
+	lifetime: 8000,
+	fontSize: 40,
+	fontFamily: "Inter, system-ui, sans-serif",
+};
 
 interface FloatChip {
 	key: string;
@@ -186,7 +209,7 @@ function validate(e: OverlayElement): string[] {
 	return [];
 }
 
-export const emoteWallElement: OverlayElementDef = {
+export const emoteWallElement: OverlayElementDef & OverlayElementSchema = {
 	type: "emote_wall",
 	category: "widgets",
 
@@ -206,4 +229,19 @@ export const emoteWallElement: OverlayElementDef = {
 	editForm,
 	validate,
 	handles: "box",
+	normalizeProps(props, read) {
+		const d = DEFAULT_EMOTE_WALL_PROPS;
+		return {
+			channels: normalizeChannelRows(props.channels),
+			motion: read.oneOf(
+				"motion",
+				["calm", "normal", "chaos", "bounce"],
+				d.motion,
+			),
+			maxEmotes: read.num("maxEmotes", d.maxEmotes, 1, 200),
+			lifetime: read.num("lifetime", d.lifetime, 1000, 120000),
+			fontSize: read.num("fontSize", d.fontSize, 6, 400),
+			fontFamily: read.str("fontFamily", d.fontFamily, 300),
+		};
+	},
 };

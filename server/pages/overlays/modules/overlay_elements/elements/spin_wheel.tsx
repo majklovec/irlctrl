@@ -29,7 +29,32 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_SPIN_WHEEL_PROPS } from "./spin_wheel_schema";
+import type { OverlayElementSchema } from "../../../../../core/overlay_element";
+import { cleanStr } from "./schema_utils";
+
+/* ── spin wheel ───────────────────────────────────────────────────────── */
+export interface SpinWheelProps {
+	/** The trigger event that spins the wheel (the universal event channel). */
+	event: string;
+	prizes: string[];
+	/** Spin duration in ms. */
+	duration: number;
+	color: string;
+	accent: string;
+	radius: number;
+	fontSize: number;
+	fontFamily: string;
+}
+export const DEFAULT_SPIN_WHEEL_PROPS: Required<SpinWheelProps> = {
+	event: "spin",
+	prizes: ["Prize 1", "Prize 2", "Prize 3", "Prize 4"],
+	duration: 4000,
+	color: "#ffffff",
+	accent: "#f59e0b",
+	radius: 0,
+	fontSize: 16,
+	fontFamily: "Inter, system-ui, sans-serif",
+};
 
 /** Deterministic-ish prize pick: uniform random over the prize list. */
 function pickPrize(count: number): number {
@@ -41,7 +66,7 @@ function pickPrize(count: number): number {
  * pointer) ends up where the transition stops. */
 function accumulateSpin(current: number, offset: number): number {
 	const base = ((current % 360) + 360) % 360;
-	const delta = ((offset - base) % 360 + 360) % 360;
+	const delta = (((offset - base) % 360) + 360) % 360;
 	return base + 360 * 4 + delta;
 }
 
@@ -108,10 +133,7 @@ function startSpin(
 	s.spinning = true;
 	s.anim?.cancel();
 	const anim = disc.animate(
-		[
-			{ transform: `rotate(${from}deg)` },
-			{ transform: `rotate(${to}deg)` },
-		],
+		[{ transform: `rotate(${from}deg)` }, { transform: `rotate(${to}deg)` }],
 		{
 			duration: Math.max(0, duration),
 			easing: "cubic-bezier(0.2, 0.7, 0.3, 1)",
@@ -171,14 +193,17 @@ interface SpinAttrs {
  * has no `ref` hook, so the disc (tagged `[data-disc]`) is found by querying
  * the first rendered DOM node the component owns. */
 function resolveDisc(dom: Element | Text | null): HTMLElement | null {
-	return (dom as Element | null)?.querySelector<HTMLElement>("[data-disc]") ??
-		null;
+	return (
+		(dom as Element | null)?.querySelector<HTMLElement>("[data-disc]") ?? null
+	);
 }
 
 /** Same for the winning-segment highlight wedge. */
 function resolveHighlight(dom: Element | Text | null): HTMLElement | null {
-	return (dom as Element | null)?.querySelector<HTMLElement>("[data-highlight]") ??
-		null;
+	return (
+		(dom as Element | null)?.querySelector<HTMLElement>("[data-highlight]") ??
+		null
+	);
 }
 
 const SpinWheelBox: m.Component<SpinAttrs, SpinState> = {
@@ -281,8 +306,6 @@ const SpinWheelBox: m.Component<SpinAttrs, SpinState> = {
 							inset: 0,
 							borderRadius: "50%",
 							background: accent,
-							boxShadow:
-								"0 calc(100cqi * 0.035) calc(100cqi * 0.09) rgba(0,0,0,0.45)",
 						}}
 					/>
 					{/* rotating disc: palette segments, thin black ring,
@@ -518,18 +541,12 @@ function editForm({
 				e,
 				"props.event",
 				t("overlay.sw_event"),
-				<input
-					type="text"
-					value={eventName}
-					oninput={setStr("event")}
-				/>,
+				<input type="text" value={eventName} oninput={setStr("event")} />,
 				sp,
 			)}
 			{eventUrl ? (
 				<button
-					class={
-						eventLinkCopied ? "ov-var-copy ov-copied" : "ov-var-copy"
-					}
+					class={eventLinkCopied ? "ov-var-copy ov-copied" : "ov-var-copy"}
 					type="button"
 					style={{ marginTop: "2px" }}
 					title={
@@ -539,16 +556,14 @@ function editForm({
 					}
 					aria-label={t("overlay.sw_event_link")}
 					onclick={() => {
-						void navigator.clipboard.writeText(eventUrl(eventName)).then(
-							() => {
-								eventLinkCopied = true;
+						void navigator.clipboard.writeText(eventUrl(eventName)).then(() => {
+							eventLinkCopied = true;
+							m.redraw();
+							setTimeout(() => {
+								eventLinkCopied = false;
 								m.redraw();
-								setTimeout(() => {
-									eventLinkCopied = false;
-									m.redraw();
-								}, 1500);
-							},
-						);
+							}, 1500);
+						});
 					}}
 				>
 					<Icon name="copy" class="role-icon" />
@@ -690,7 +705,7 @@ function validate(e: OverlayElement): string[] {
 	return problems;
 }
 
-export const spinWheelElement: OverlayElementDef = {
+export const spinWheelElement: OverlayElementDef & OverlayElementSchema = {
 	type: "spin_wheel",
 	category: "widgets",
 
@@ -708,4 +723,22 @@ export const spinWheelElement: OverlayElementDef = {
 	/** Always on screen at runtime; it only reacts to its trigger event. */
 	persistent: true,
 	onTrigger,
+	normalizeProps(props, read) {
+		const d = DEFAULT_SPIN_WHEEL_PROPS;
+		const raw = Array.isArray(props.prizes) ? props.prizes : [];
+		return {
+			event: read.str("event", d.event, 100),
+			// Keep blank entries: they are rows the user just added and is
+			// about to type into (the server broadcast replaces the editor
+			// state, so filtering them here would make "add prize" vanish).
+			// Blank rows are ignored by the wheel's render and onTrigger.
+			prizes: raw.map((v) => cleanStr(v, 60)).slice(0, 24),
+			duration: read.num("duration", d.duration, 500, 60000),
+			color: read.hex("color", d.color),
+			accent: read.hex("accent", d.accent),
+			radius: read.num("radius", d.radius, 0, 1000),
+			fontSize: read.num("fontSize", d.fontSize, 6, 400),
+			fontFamily: read.str("fontFamily", d.fontFamily, 300),
+		};
+	},
 };

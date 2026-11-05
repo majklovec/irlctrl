@@ -12,7 +12,27 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_LINE_PROPS } from "./line_schema";
+import type { OverlayElementSchema } from "../../../../../core/overlay_element";
+
+export interface LineProps {
+	/** the line's color */
+	stroke: string;
+	/** the line's thickness in px */
+	strokeWidth: number;
+	/**
+	 * Which box diagonal the line runs along. The box is stored in
+	 * min/abs form (negative deltas are impossible in CSS), so this flag
+	 * disambiguates: false = top-left → bottom-right, true = top-right →
+	 * bottom-left.
+	 */
+	flip: boolean;
+}
+
+export const DEFAULT_LINE_PROPS: Required<LineProps> = {
+	stroke: "#3b82f6",
+	strokeWidth: 4,
+	flip: false,
+};
 
 /**
  * Which box diagonal a drag delta runs along. The box is stored in min/abs
@@ -108,7 +128,7 @@ function validate(e: OverlayElement): string[] {
 	return problems;
 }
 
-export const lineElement: OverlayElementDef = {
+export const lineElement: OverlayElementDef & OverlayElementSchema = {
 	type: "line",
 	category: "basics",
 
@@ -126,5 +146,13 @@ export const lineElement: OverlayElementDef = {
 	handles: "endpoints",
 	onEndpointDrag: (e, dx, dy) => {
 		e.props.flip = lineFlipFromDelta(dx, dy);
+	},
+	normalizeProps(_props, read) {
+		const d = DEFAULT_LINE_PROPS;
+		return {
+			stroke: read.hex("stroke", d.stroke),
+			strokeWidth: read.num("strokeWidth", d.strokeWidth, 1, 500),
+			flip: read.bool("flip"),
+		};
 	},
 };

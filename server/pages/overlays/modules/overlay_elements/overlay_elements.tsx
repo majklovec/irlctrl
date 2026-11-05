@@ -1,8 +1,9 @@
 /*
- * The built-in overlay elements (browser half): one file per element under
- * elements/, each fulfilling `OverlayElementDef` with its schema next to it
- * in elements/<name>_schema.ts (aggregated in overlay_schema.ts).
+ * Built-in overlay element definitions. Each element owns its rendering,
+ * inspector and server-side normalization in one file under elements/.
  */
+import type { OverlayElementDef } from "@ui/overlay/element";
+import type { OverlayElementSchema } from "../../../../core/overlay_element";
 import { alertsElement } from "./elements/alerts";
 import { chatElement } from "./elements/chat";
 import { countdownElement } from "./elements/countdown";
@@ -29,7 +30,7 @@ import { textElement } from "./elements/text";
 import { videoElement } from "./elements/video";
 import { weatherElement } from "./elements/weather";
 
-export default [
+const elements: (OverlayElementDef & OverlayElementSchema)[] = [
 	textElement,
 	rectangleElement,
 	ellipseElement,
@@ -56,3 +57,5 @@ export default [
 	featuredElement,
 	chatElement,
 ];
+
+export default elements;
