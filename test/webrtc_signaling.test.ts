@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Elysia } from "elysia";
 import {
 	parseWebrtcClientMessage,
+	type RoomState,
 	WEBRTC_STREAM_ID_RE,
 } from "../server/pages/overlays/modules/overlay_elements/webrtc_protocol";
 import {
@@ -82,19 +83,30 @@ class FakeSocket {
 }
 
 describe("webrtc room manager", () => {
-	test("an early join sits quietly; the late joiner and incumbent meet", () => {
+	test("a join announces the room layout to both peers", () => {
 		const m = new WebrtcRoomManager();
 		const sender = new FakeSocket();
 		m.join("s1", "sender", sender);
-		expect(sender.frames).toEqual([]);
+		expect(
+			sender.matches({
+				type: "room-state",
+				state: { sender: true, receiver: false },
+			}),
+		).toBe(true);
 		const receiver = new FakeSocket();
 		m.join("s1", "receiver", receiver);
-		expect(sender.matches({ type: "peer-joined", role: "receiver" })).toBe(
-			true,
-		);
-		expect(receiver.matches({ type: "peer-joined", role: "sender" })).toBe(
-			true,
-		);
+		expect(
+			sender.matches({
+				type: "room-state",
+				state: { sender: true, receiver: true },
+			}),
+		).toBe(true);
+		expect(
+			receiver.matches({
+				type: "room-state",
+				state: { sender: true, receiver: true },
+			}),
+		).toBe(true);
 	});
 
 	test("relay delivers a frame only to the peer holding the other role", () => {
@@ -111,8 +123,9 @@ describe("webrtc room manager", () => {
 			type: "offer",
 			sdp: { type: "offer", sdp: "v=0" },
 		});
-		// the sender saw only its own peer-joined, not the frame it sent
-		expect(sender.frames.length).toBe(1);
+		// the sender saw only its own room-state announcements, not the
+		// frame it sent
+		expect(sender.frames.length).toBe(2);
 		expect(
 			sender.matches({ type: "offer", sdp: { type: "offer", sdp: "v=0" } }),
 		).toBe(false);
@@ -134,15 +147,27 @@ describe("webrtc room manager", () => {
 		m.join("b", "sender", bSender);
 		const bReceiver = new FakeSocket();
 		m.join("b", "receiver", bReceiver);
-		expect(aSender.frames).toEqual([]);
-		expect(bSender.matches({ type: "peer-joined", role: "receiver" })).toBe(
-			true,
-		);
+		// the stream-a peer only ever hears about its own (empty) room
+		expect(
+			aSender.matches({
+				type: "room-state",
+				state: { sender: true, receiver: false },
+			}),
+		).toBe(true);
+		expect(
+			aSender.matches({
+				type: "room-state",
+				state: { sender: true, receiver: true },
+			}),
+		).toBe(false);
+		expect(bSender.matches({ type: "offer" })).toBe(false);
 		m.relay("b", "receiver", {
 			type: "offer",
 			sdp: { type: "offer", sdp: "x" },
 		});
-		expect(aSender.frames).toEqual([]);
+		expect(
+			aSender.matches({ type: "offer", sdp: { type: "offer", sdp: "x" } }),
+		).toBe(false);
 	});
 
 	test("leaving tells the other peer and drops the emptied room", () => {
@@ -153,14 +178,22 @@ describe("webrtc room manager", () => {
 		m.join("s1", "receiver", receiver);
 		m.leave("s1", "receiver");
 		expect(sender.matches({ type: "peer-left" })).toBe(true);
+		expect(
+			sender.frames.at(-1)
+				? (sender.frames.at(-1) as { type: string }).type
+				: null,
+		).toBe("peer-left");
 		// the peer that left is not told it left
 		expect(receiver.matches({ type: "peer-left" })).toBe(false);
-		// the room is gone: a fresh receiver now meets the sender anew
+		// the room is gone: a fresh receiver now re-meets the sender
 		const fresh = new FakeSocket();
 		m.join("s1", "receiver", fresh);
-		expect(sender.matches({ type: "peer-joined", role: "receiver" })).toBe(
-			true,
-		);
+		expect(
+			sender.matches({
+				type: "room-state",
+				state: { sender: true, receiver: true },
+			}),
+		).toBe(true);
 	});
 
 	test("a fresh receiver replaces the stale one (the old one is told it left)", () => {
@@ -172,12 +205,45 @@ describe("webrtc room manager", () => {
 		const newReceiver = new FakeSocket();
 		m.join("s1", "receiver", newReceiver);
 		expect(oldReceiver.matches({ type: "peer-left" })).toBe(true);
-		expect(sender.matches({ type: "peer-joined", role: "receiver" })).toBe(
-			true,
-		);
-		expect(newReceiver.matches({ type: "peer-joined", role: "sender" })).toBe(
-			true,
-		);
+		expect(
+			sender.matches({
+				type: "room-state",
+				state: { sender: true, receiver: true },
+			}),
+		).toBe(true);
+		expect(
+			newReceiver.matches({
+				type: "room-state",
+				state: { sender: true, receiver: true },
+			}),
+		).toBe(true);
+	});
+
+	test("sync answers with the current room state", () => {
+		const m = new WebrtcRoomManager();
+		const sender = new FakeSocket();
+		const receiver = new FakeSocket();
+		m.join("s1", "sender", sender);
+		m.join("s1", "receiver", receiver);
+		// the manager returns the reply frame the route should send back to the
+		// caller carrying the caller's view of the room
+		expect(m.message("s1", "sender", { type: "sync" })).toEqual({
+			type: "room-state",
+			state: { sender: true, receiver: true },
+		});
+		// a media-handshake frame is relayed to the other peer with no direct reply
+		expect(
+			m.message("s1", "sender", {
+				type: "ice",
+				candidate: { candidate: "c", sdpMid: "0" },
+			}),
+		).toBeNull();
+		expect(
+			receiver.matches({
+				type: "ice",
+				candidate: { candidate: "c", sdpMid: "0" },
+			}),
+		).toBe(true);
 	});
 });
 
@@ -275,9 +341,15 @@ describe("webrtc signaling routes (integration)", () => {
 			`${origin}/api/webrtc/stream/s1/ws?role=receiver`,
 		);
 		try {
-			// both peers learn about each other once both are connected
-			await nextFrame(sender, (f) => f.type === "peer-joined");
-			await nextFrame(receiver, (f) => f.type === "peer-joined");
+			// both peers receive a room-state snapshot reflecting both occupants
+			await nextFrame(sender, (f) => {
+				if (f.type !== "room-state") return false;
+				return (f.state as RoomState).sender && (f.state as RoomState).receiver;
+			});
+			await nextFrame(receiver, (f) => {
+				if (f.type !== "room-state") return false;
+				return (f.state as RoomState).sender && (f.state as RoomState).receiver;
+			});
 			// regression: the room must be keyed by the REAL stream id from the
 			// path (…/stream/<id>/ws), not by a stray path segment
 			expect(manager.occupancy()).toEqual({ s1: ["sender", "receiver"] });

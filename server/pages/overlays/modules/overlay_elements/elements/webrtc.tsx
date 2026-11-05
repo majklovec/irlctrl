@@ -46,7 +46,11 @@ interface ReceiverState {
 /** One live receiver per stream id (a stream's receiver re-attach is a no-op). */
 const receivers = new Map<string, ReceiverState>();
 
-/** The signaling WebSocket for a stream id (same origin, role receiver). */
+/**
+ * The signaling WebSocket for a stream id. The route is shared by sender and
+ * receiver; the role is a query param read by the server on upgrade (no
+ * `join` frame).
+ */
 function signalingUrl(streamId: string): string {
 	return (
 		(location.protocol === "https:" ? "wss://" : "ws://") +
@@ -73,6 +77,13 @@ function attachReceiver(
 		if (state.hint) state.hint.style.display = "";
 	};
 	const ws = new WebSocket(signalingUrl(streamId));
+	ws.onopen = () => {
+		// Joining is implicit in the WS upgrade (role in the query). Now ask
+		// for the room layout in the open channel: the on-join room-state
+		// snapshot can race this listener's setup, while a `sync` reply
+		// always arrives after the socket is usable.
+		ws.send(JSON.stringify({ type: "sync" }));
+	};
 	const pc = new RTCPeerConnection({
 		iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 	});
@@ -134,14 +145,19 @@ function attachReceiver(
 				),
 			);
 	};
-	ws.onmessage = (ev) => {
+	ws.onmessage = async (ev) => {
+		// SDP frames are large; a WebSocket client may hand us a `Blob` for
+		// them, so normalise to text before parsing.
+		const raw = ev.data as string | Blob;
+		const text = raw instanceof Blob ? await raw.text() : String(raw);
 		let msg: {
 			type?: string;
 			sdp?: RTCSessionDescriptionInit;
 			candidate?: RTCIceCandidateInit;
+			state?: { sender?: boolean; receiver?: boolean };
 		};
 		try {
-			msg = JSON.parse(String(ev.data));
+			msg = JSON.parse(text);
 		} catch {
 			return;
 		}
@@ -182,10 +198,13 @@ function attachReceiver(
 		}
 	};
 	ws.onclose = () => {
-		// The signaling dropped (server restarted / element removed). Clear the
-		// feed; a fresh receiver attaches when the DOM re-creates the element.
-		video.srcObject = null;
-		showHint();
+		if (ws === state.ws) {
+			// The signaling dropped (server restarted / element removed).
+			// Clear the feed; a fresh receiver attaches when the DOM
+			// re-creates the element.
+			video.srcObject = null;
+			showHint();
+		}
 	};
 
 	return state;

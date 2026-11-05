@@ -25,6 +25,8 @@ interface ServerMessage {
 	role?: string;
 	sdp?: RTCSessionDescriptionInit;
 	candidate?: RTCIceCandidateInit;
+	/** room-state snapshot: which peers are present in the room */
+	state?: { sender?: boolean; receiver?: boolean };
 }
 
 const params = new URLSearchParams(location.search);
@@ -83,8 +85,18 @@ function sendOffer(): Promise<void> {
 	return pc
 		.createOffer()
 		.then((offer) => pc.setLocalDescription(offer))
-		.then((offer) => {
-			ws.send(JSON.stringify({ type: "offer", sdp: offer }));
+		.then(() => {
+			// Read the authoritative local description after `setLocalDescription`
+			// resolves: `setLocalDescription` returns `Promise<void>`, so relying
+			// on the chain to forward the offer would hand the next step
+			// `undefined` (and a frame with no `sdp`).
+			const desc = pc.localDescription;
+			if (!desc) return;
+			ws.send(JSON.stringify({ type: "offer", sdp: desc }));
+		})
+		.catch((err) => {
+			console.error("[webrtc] sender offer failed", err);
+			state.negotiating = false;
 		});
 }
 
@@ -156,6 +168,10 @@ async function start(source: "camera" | "screen"): Promise<void> {
 	ws.onopen = () => {
 		if (stopBtn) stopBtn.disabled = false;
 		setStatus("Waiting for the overlay to receive…", "waiting");
+		// Ask for the room layout right after the socket is usable: the
+		// server's on-join snapshot can race this listener's setup, while a
+		// `sync` reply always arrives in the open channel.
+		ws.send(JSON.stringify({ type: "sync" }));
 	};
 	ws.onmessage = async (event: MessageEvent) => {
 		let msg: ServerMessage;
@@ -164,9 +180,14 @@ async function start(source: "camera" | "screen"): Promise<void> {
 		} catch {
 			return;
 		}
+		// offer/answer/ice are relayed between the two peers; room-state gives
+		// a trustworthy snapshot of who is present (authoritative over
+		// peer-joined, which can be missed during connection setup).
 		switch (msg.type) {
+			case "room-state":
+				if (msg.state?.receiver && !state.negotiating) void sendOffer();
+				break;
 			case "peer-joined":
-				// A receiver is present (it just joined, or was already here).
 				if (msg.role === "receiver" && !state.negotiating) void sendOffer();
 				break;
 			case "answer":

@@ -13,7 +13,9 @@ import { upgradeRequired } from "../../../../../shared/http";
 import {
 	otherRole,
 	parseWebrtcClientMessage,
+	type RoomState,
 	WEBRTC_STREAM_ID_RE,
+	type WebrtcClientMessage,
 	type WebrtcRole,
 	type WebrtcServerMessage,
 } from "./webrtc_protocol";
@@ -57,7 +59,47 @@ export class WebrtcRoomManager {
 		return out;
 	}
 
-	/** Claim `role` in `streamId`; notify whichever peer is affected. */
+	/** A snapshot of the room's occupancy (an absent room is empty). */
+	state(streamId: string): RoomState {
+		const room = this.#rooms.get(streamId);
+		return {
+			sender: !!room?.sender,
+			receiver: !!room?.receiver,
+		};
+	}
+
+	/**
+	 * Handle one parsed client frame and return the response frame to send back
+	 * to the caller (if any). A `sync` frame is answered with a `room-state`
+	 * snapshot — this is the reliable re-sync path, since the on-join snapshot
+	 * can race the client's `onopen` listener setup. Media-handshake frames are
+	 * relayed to the other peer and have no direct reply.
+	 */
+	message(
+		streamId: string,
+		role: WebrtcRole,
+		frame: WebrtcClientMessage,
+	): WebrtcServerMessage | null {
+		if (frame.type === "sync") {
+			return { type: "room-state", state: this.state(streamId) };
+		}
+		this.relay(streamId, role, frame);
+		return null;
+	}
+
+	/** Broadcast the current room state to both occupants. */
+	announce(streamId: string): void {
+		const room = this.#rooms.get(streamId);
+		if (!room) return;
+		const state = {
+			sender: !!room.sender,
+			receiver: !!room.receiver,
+		} satisfies RoomState;
+		if (room.sender) sendJson(room.sender, { type: "room-state", state });
+		if (room.receiver) sendJson(room.receiver, { type: "room-state", state });
+	}
+
+	/** Claim `role` in `streamId`; refresh the room state for both peers. */
 	join(streamId: string, role: WebrtcRole, sock: SignalingSocket): void {
 		let room = this.#rooms.get(streamId);
 		if (!room) {
@@ -70,12 +112,10 @@ export class WebrtcRoomManager {
 		if (existing && existing !== sock)
 			sendJson(existing, { type: "peer-left" });
 		room[role] = sock;
-
-		const other = room[otherRole(role)];
-		// Tell the newcomer the counterpart is already here, and the counterpart
-		// that this peer just arrived — so the sender offers in either order.
-		if (other) sendJson(sock, { type: "peer-joined", role: otherRole(role) });
-		if (other) sendJson(other, { type: "peer-joined", role });
+		// A room-state snapshot reaches BOTH occupants, so a peer that joins
+		// while the other is mid-handshake (or that misses the first snapshot
+		// during its own connection setup) always learns the room layout.
+		this.announce(streamId);
 	}
 
 	/** Forward a handshake frame to the peer holding the other role. */
@@ -139,9 +179,12 @@ export function webrtcSignalingRoutes(manager: WebrtcRoomManager): AnyElysia {
 				}
 				const parsed = parseWebrtcClientMessage(frame);
 				if (!parsed) return;
-				// Media-handshake frames are relayed to the peer holding the
-				// other role; `join` is implicit in the WebSocket upgrade.
-				manager.relay(data.streamId, data.role, parsed);
+				// `sync` asks for the room layout; the manager answers with a
+				// snapshot (the reliable re-sync path — a snapshot sent during
+				// the connection upgrade can race the client's listener setup).
+				// Media-handshake frames are relayed with no direct reply.
+				const reply = manager.message(data.streamId, data.role, parsed);
+				if (reply) sendJson(ws, reply);
 			},
 			close(ws) {
 				const data = ws.data as WebrtcWsData;

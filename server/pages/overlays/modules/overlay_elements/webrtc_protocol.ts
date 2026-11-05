@@ -19,20 +19,35 @@ export const WEBRTC_STREAM_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 /**
  * Client → server. A peer joins its room simply by opening the WebSocket
  * (the stream id is the path, the role the query param) — the server claims
- * the slot in `ws.open`. The only frames a client sends afterwards are the
- * media-handshake ones, relayed unchanged to the peer holding the other role.
+ * the slot in `ws.open`. `sync` requests a fresh room snapshot (the server
+ * answers with `room-state`); a peer sends it on open and again after a
+ * dropped connection to re-learn the room without a full reconnect. The
+ * media-handshake frames are relayed unchanged to the peer holding the
+ * other role.
  */
 export type WebrtcClientMessage =
 	| { type: "offer"; sdp: RTCSessionDescriptionInit }
 	| { type: "answer"; sdp: RTCSessionDescriptionInit }
-	| { type: "ice"; candidate: RTCIceCandidateInit };
+	| { type: "ice"; candidate: RTCIceCandidateInit }
+	| { type: "sync" };
 
 /**
- * Server → client. `peer-joined` / `peer-left` tell a peer that its counterpart
- * appeared or went away; `offer` / `answer` / `ice` are the relayed media
- * handshake frames.
+ * A snapshot of a room's occupancy: which peer roles are present (a peer
+ * reads `hasX` to decide whether to start the media handshake).
+ */
+export interface RoomState {
+	sender: boolean;
+	receiver: boolean;
+}
+
+/**
+ * Server → client. `room-state` is the authoritative occupancy snapshot
+ * (sent on every join and on every `sync`); `peer-joined` / `peer-left`
+ * tell a peer that its counterpart appeared or went away; `offer` /
+ * `answer` / `ice` are the relayed media handshake frames.
  */
 export type WebrtcServerMessage =
+	| { type: "room-state"; state: RoomState }
 	| { type: "peer-joined"; role: WebrtcRole }
 	| { type: "peer-left" }
 	| { type: "offer"; sdp: RTCSessionDescriptionInit }
@@ -55,6 +70,8 @@ export function parseWebrtcClientMessage(
 			return isCandidate(msg.candidate)
 				? { type: "ice", candidate: msg.candidate }
 				: null;
+		case "sync":
+			return { type: "sync" };
 		default:
 			return null;
 	}
