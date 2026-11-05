@@ -10,6 +10,12 @@ import { t } from "@ui/i18n";
 import type { MithrilJSXComponent } from "@ui/jsx";
 import { MENUS } from "../../generated/pages";
 
+/** Menu items in display order — the generated manifest is only sorted by
+ * page id, mirroring the server registry's menu.order ordering (default 100). */
+const MENU_ITEMS = [...MENUS].sort(
+	(a, b) => (a.order ?? 100) - (b.order ?? 100),
+);
+
 /** Session user shown in the profile menu + whether its menu is open. */
 const profile = { username: null as string | null, open: false };
 
@@ -37,7 +43,7 @@ const ServerNavComponent: m.Component<{ active?: string }> = {
 	},
 	view: ({ attrs: { active } }) => (
 		<span>
-			{MENUS.map((item) => (
+			{MENU_ITEMS.map((item) => (
 				<a
 					key={item.id}
 					href={item.path}
