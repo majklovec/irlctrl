@@ -497,12 +497,18 @@ function onTrigger(
 	const n = prizes.length;
 	const seg = 360 / n;
 	const winner = pickPrize(n);
-	// Resting rotation that puts `winner`'s center under the TOP pointer
+	// Landing point SOMEWHERE inside `winner`'s segment, kept clear of the rim
+	// studs / spokes on the segment BOUNDARIES so the pointer never rests on a
+	// stud and the wheel looks organic (not always dead-centre): a random point
+	// in the middle band of the segment (15%..85% of the way across it).
+	const margin = seg * 0.15;
+	const pointInSegment = winner * seg + margin + Math.random() * (seg - 2 * margin);
+	// Resting rotation that puts that point under the TOP pointer
 	// (12 o'clock = 0deg in the clockwise-from-top geometry, same as the
-	// conic-gradient / spokes / labels): the disc's segment center at
-	// (rotation + winner*seg + seg/2) mod 360 must equal 0 →
-	// rotation = -(winner*seg + seg/2) mod 360, kept in [0, 360).
-	const offset = (360 - (winner * seg + seg / 2)) % 360;
+	// conic-gradient / spokes / labels): the disc's point at
+	// (rotation + pointInSegment) mod 360 must equal 0 →
+	// rotation = -pointInSegment mod 360, kept in [0, 360).
+	const offset = (360 - pointInSegment) % 360;
 
 	spinTargets.set(element.id, { offset, winner });
 	m.redraw();
