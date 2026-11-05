@@ -6,7 +6,10 @@
  * toggle** on its right. Clicking it turns the chain yellow and swaps the
  * control for a variable picker; picking a variable binds the field (the
  * chain stays yellow, marking the field as bound). Clicking the yellow
- * chain again detaches. (Element *content* lives in the per-element
+ * chain again detaches. A bound field additionally offers a **copy-icon
+ * button** (when its editor provides a `variableUrl`) that copies the
+ * owner-token URL revaluing the bound variable (append a value to its
+ * trailing `…&<name>=`). (Element *content* lives in the per-element
  * modules; nothing here is specific to a single element type.)
  */
 
@@ -20,8 +23,10 @@ import type { ElementProps, OverlayElement } from "./element";
 /** element id + path of fields whose picker is open. Module scope on
  * purpose: Mithril re-creates per-render closures, so a `view()`-local
  * "open" flag would reset on every redraw and the picker would never
- * stay open. */
+ * stay open. `varCopied` tracks the same way, briefly, which bound fields
+ * just copied their variable URL — the copied button flashes green. */
 const pickOpen = new Set<string>();
+const varCopied = new Set<string>();
 
 export function lbl(label: string): Vnode {
 	return <span class="ov-lbl">{label}</span>;
@@ -45,13 +50,16 @@ function isBindable(control: Vnode): boolean {
  * the field's normal control. While the picker is open — or the field is
  * bound — the control is replaced by a `select` of the project's variables
  * and the chain stays yellow. A binding to a since-deleted variable
- * renders as unbound (the stale reference is replaced on the next bind). */
+ * renders as unbound (the stale reference is replaced on the next bind).
+ * When the field is bound and `props.variableUrl` is provided, a copy-icon
+ * button appears next to the chain and copies the owner-token URL that
+ * revalues the bound variable. */
 export function bindField(
 	e: OverlayElement,
 	path: string,
 	title: string,
 	input: Vnode,
-	props: Pick<ElementProps, "mutate" | "variables">,
+	props: Pick<ElementProps, "mutate" | "variables" | "variableUrl">,
 ): Vnode {
 	if (!isBindable(input))
 		return (
@@ -61,13 +69,34 @@ export function bindField(
 			</div>
 		);
 
-	const { mutate, variables } = props;
+	const { mutate, variables, variableUrl } = props;
 	const key = e.id + ":" + path;
 	const binding = e.bindings[path];
-	const bound =
-		binding !== undefined && variables.some((v) => v.id === binding.variableId);
+	const boundVar =
+		binding !== undefined
+			? variables.find((v) => v.id === binding.variableId)
+			: undefined;
+	const bound = boundVar !== undefined;
 	const open = !bound && pickOpen.has(key);
 	const active = bound || open;
+	const copied = varCopied.has(key);
+
+	const copyUrl = (): void => {
+		if (!boundVar || !variableUrl) return;
+		void navigator.clipboard
+			.writeText(variableUrl(boundVar.name))
+			.then(() => {
+				varCopied.add(key);
+				m.redraw();
+				setTimeout(() => {
+					varCopied.delete(key);
+					m.redraw();
+				}, 1500);
+			})
+			.catch(() => {
+				/* clipboard unavailable — the URL is also available in the variables dialog */
+			});
+	};
 
 	const setPick = (id: string): void => {
 		pickOpen.delete(key);
@@ -124,6 +153,17 @@ export function bindField(
 			<span class="ov-lbl">{title}</span>
 			<div class="ov-field-row">
 				<div class="ov-field-ctl">{active ? picker : input}</div>
+				{bound && variableUrl ? (
+					<button
+						class={copied ? "ov-bind-copy ov-copied" : "ov-bind-copy"}
+						type="button"
+						title={copied ? t("overlay.copied") : t("overlay.copy_variable_url")}
+						aria-label={t("overlay.copy_variable_url")}
+						onclick={copyUrl}
+					>
+						<Icon name="copy" class="role-icon" />
+					</button>
+				) : null}
 				<button
 					class={active ? "ov-bind-chk on" : "ov-bind-chk"}
 					type="button"

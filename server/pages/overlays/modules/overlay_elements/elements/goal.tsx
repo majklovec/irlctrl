@@ -115,9 +115,9 @@ function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 	);
 }
 
-function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
+function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
 	const p = e.props;
-	const sp = { mutate, variables };
+	const sp = { mutate, variables, variableUrl };
 	const setStr = (key: string) => (ev: Event) =>
 		mutate((el) => {
 			el.props[key] = (ev.target as HTMLInputElement).value;

@@ -529,9 +529,10 @@ function editForm({
 	mutate,
 	variables,
 	eventUrl,
+	variableUrl,
 }: ElementProps): Vnode {
 	const p = e.props;
-	const sp = { mutate, variables };
+	const sp = { mutate, variables, variableUrl };
 	const eventName = strProp(p, "event", "spin");
 	const setStr = (key: string) => (ev: Event) =>
 		mutate((el) => {

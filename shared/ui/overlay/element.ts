@@ -266,6 +266,10 @@ export interface ElementProps {
 	 * overlay. Optional: trigger-driven elements use it to offer a copyable
 	 * "fire this event" link; others ignore it. */
 	eventUrl?: (name: string) => string;
+	/** Builds the owner-token URL that revalues one variable of the loaded
+	 * overlay (complete the trailing `&<name>=` with a value). Optional:
+	 * `bindField` shows a copy button for a bound field when present. */
+	variableUrl?: (name: string) => string;
 }
 
 /** Which editing affordance an element shows when selected on the canvas.

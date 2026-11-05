@@ -26,7 +26,7 @@ function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 	return drawIframe(element) as Vnode;
 }
 
-function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
+function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
 	const current = String(e.props.url ?? "");
 	return (
 		<>

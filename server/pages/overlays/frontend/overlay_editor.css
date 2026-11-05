@@ -633,6 +633,26 @@ identically here and on the runtime page */
 .ov-bind-chk.on:hover {
     color: color-mix(in srgb, var(--warn) 70%, var(--text));
 }
+/* the copy-icon button a bound field shows next to the chain: copies the
+   owner-token URL revaluing the bound variable; flashes green (`.ov-copied`)
+   right after a successful copy */
+.ov-bind-copy {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    margin: 0;
+    padding: 2px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+}
+.ov-bind-copy:hover {
+    color: var(--accent);
+}
+.ov-bind-copy.ov-copied {
+    color: var(--ok);
+}
 /* variable picker shown in place of a field's control while bound (or
    while the picker is open) */
 .ov-var-sel {

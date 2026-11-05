@@ -345,9 +345,9 @@ const GeoFillButton: m.Component<
 	},
 };
 
-function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
+function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
 	const p = e.props;
-	const sp = { mutate, variables };
+	const sp = { mutate, variables, variableUrl };
 	const setNum = (key: string) => (ev: Event) =>
 		mutate((el) => {
 			el.props[key] = Number((ev.target as HTMLInputElement).value);

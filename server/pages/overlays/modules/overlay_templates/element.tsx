@@ -571,9 +571,9 @@ function varsFields(
 	);
 }
 
-function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
+function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
 	const p = e.props as unknown as HtmlTemplateProps;
-	const sp = { mutate, variables };
+	const sp = { mutate, variables, variableUrl };
 	// The template's metadata rides the fetched catalog (_catalog.json +
 	// the documents). Synchronous-render pattern, like the vars fields: the
 	// fields are empty until the catalog resolves (the select's oncreate

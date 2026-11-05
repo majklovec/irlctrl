@@ -413,9 +413,10 @@ function editForm({
 	element: e,
 	mutate,
 	variables,
+	variableUrl,
 }: ElementProps): Vnode {
 	const p = e.props;
-	const sp = { mutate, variables };
+	const sp = { mutate, variables, variableUrl };
 	const str = (key: string, fallback: string) => strProp(p, key, fallback);
 	const num = (key: string, fallback: number) => numProp(p, key, fallback);
 	const set = (key: string) => (ev: Event) =>

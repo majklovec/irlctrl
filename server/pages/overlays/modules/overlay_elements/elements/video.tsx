@@ -91,9 +91,10 @@ function editForm({
 	element: e,
 	mutate,
 	variables,
+	variableUrl,
 }: ElementProps): Vnode {
 	const d = DEFAULT_VIDEO_PROPS;
-	const sp = { mutate, variables };
+	const sp = { mutate, variables, variableUrl };
 	const setBool = (key: string) => (ev: Event) =>
 		mutate((el) => {
 			el.props[key] = (ev.target as HTMLInputElement).checked;

@@ -428,9 +428,9 @@ function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 
 /* ── Edit form ────────────────────────────────────────────────────── */
 
-function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
+function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
 	const p = safeProps(e.props);
-	const sp = { mutate, variables };
+	const sp = { mutate, variables, variableUrl };
 	const num = (
 		key: "zoom" | "centerLat" | "centerLon" | "startPosition",
 		sub: "lat" | "lon" | null,

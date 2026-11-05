@@ -20,6 +20,7 @@ import {
 	setElementLocked,
 	state,
 	toggleElementRow,
+	variableUrl,
 } from "../overlay_store";
 
 /**
@@ -354,6 +355,7 @@ export function elementProps(e: OverlayElement): m.Vnode {
 							{
 								mutate: (fn) => mutateElementOf(e.id, fn),
 								variables: state.overlay?.variables ?? [],
+								variableUrl,
 							},
 						)}
 					</div>
@@ -381,6 +383,7 @@ export function elementProps(e: OverlayElement): m.Vnode {
 						{
 							mutate: (fn) => mutateElementOf(e.id, fn),
 							variables: state.overlay?.variables ?? [],
+							variableUrl,
 						},
 					)}
 				</div>
@@ -392,6 +395,7 @@ export function elementProps(e: OverlayElement): m.Vnode {
 						mutate: (fn) => mutateElementOf(e.id, fn),
 						variables: state.overlay?.variables ?? [],
 						eventUrl,
+						variableUrl,
 					})
 				: null}
 
