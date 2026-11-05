@@ -255,6 +255,54 @@ function draw(element: OverlayElement, _ctx: ElementContext): Vnode<any, any> {
 	});
 }
 
+/** Fills the latitude/longitude inputs with the browser's current position. */
+const GeoFillButton: m.Component<
+	{ onFill: (lat: number, lon: number) => void },
+	{ locating: boolean; error: string }
+> = {
+	oncreate(vnode) {
+		vnode.state = { locating: false, error: "" };
+	},
+	view(vnode) {
+		const s = vnode.state;
+		return (
+			<div class="ov-field-row">
+				<button
+					class="ov-geofill"
+					type="button"
+					disabled={s.locating}
+					onclick={() => {
+						if (!navigator.geolocation) {
+							s.error = t("overlay.weather_geo_error");
+							m.redraw();
+							return;
+						}
+						s.locating = true;
+						s.error = "";
+						m.redraw();
+						navigator.geolocation.getCurrentPosition(
+							(pos) => {
+								s.locating = false;
+								vnode.attrs.onFill(pos.coords.latitude, pos.coords.longitude);
+								m.redraw();
+							},
+							() => {
+								s.locating = false;
+								s.error = t("overlay.weather_geo_error");
+								m.redraw();
+							},
+						);
+					}}
+				>
+					<Icon name="target" class="role-icon" />
+					{s.locating ? t("overlay.weather_geo_locating") : t("overlay.weather_geo_use")}
+				</button>
+				{s.error && <span class="ov-geofill-err">{s.error}</span>}
+			</div>
+		);
+	},
+};
+
 function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 	const p = e.props;
 	const sp = { mutate, variables };
@@ -278,6 +326,14 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 				{bindField(e, "props.longitude", t("overlay.weather_longitude"),
 					<input type="number" step={0.0001} value={numProp(p, "longitude", 14.4378)} oninput={setNum("longitude")} />, sp)}
 			</div>
+			<GeoFillButton
+				onFill={(lat, lon) =>
+					mutate((el) => {
+						el.props.latitude = lat;
+						el.props.longitude = lon;
+					})
+				}
+			/>
 			{bindField(e, "props.place", t("overlay.weather_place"),
 				<input type="text" value={strProp(p, "place", "")} oninput={setStr("place")} />, sp)}
 			<div class="ov-grid2">
