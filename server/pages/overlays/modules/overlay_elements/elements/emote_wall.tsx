@@ -84,14 +84,16 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode<any, any> {
 		if (!text) return;
 		const el = list;
 		el.push({
-			key: `${line.spec}:${String(line.msg.id)}`,
+			// `line.key` is stamped unique per line — `msg.id` alone can
+			// collide across duplicate/re-sent provider ids.
+			key: line.key,
 			name: line.msg.username ?? "",
 			text,
 			color:
 				line.msg.color && /^#[0-9a-f]{3,8}$/i.test(line.msg.color)
 					? line.msg.color
 					: "#ffffff",
-			r: hashUnit(`${line.spec}:${String(line.msg.id)}`),
+			r: hashUnit(line.key),
 		});
 		while (el.length > maxEmotes) el.shift();
 		m.redraw();

@@ -152,7 +152,6 @@ function feedView(element: OverlayElement, p: ChatProps, lines: ChatLine[]): m.C
 		showPlatformIcons,
 		showTimestamps: p.timestamps === "on",
 		showBadges: p.badges !== "off",
-		autoFit: true,
 		feedKey: `chat-feed:${element.id}`,
 	});
 }

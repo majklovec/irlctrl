@@ -16,6 +16,16 @@
 import type { Children } from "mithril";
 import m from "mithril";
 
+/**
+ * The buffer key used to de-dupe re-sent history. Id-less messages (a
+ * provider emitted no id) cannot be identified, so they get no key.
+ */
+const lineKey = (spec: string, msg: ChatMessage): string | null => {
+	const id = msg.id;
+	if (id == null || id === "") return null;
+	return `${spec}:${String(id)}`;
+};
+
 export const CHAT_PLATFORMS = ["youtube", "twitch", "tiktok", "kick"] as const;
 export type ChatPlatform = (typeof CHAT_PLATFORMS)[number];
 
@@ -53,6 +63,14 @@ export interface ChatLine {
 	platform: ChatPlatform;
 	channel: string;
 	msg: ChatMessage;
+	/**
+	 * Uniqueness-stamped vnode key, minted once when the line enters the
+	 * buffer. Providers can emit duplicate/missing message ids (stale Kick
+	 * re-rejoins re-send history, YouTube gaps), so rendering must never key
+	 * off `msg.id` alone — duplicate keys desync Mithril's keyed diff and the
+	 * feed dies with `removeChild` NotFoundErrors.
+	 */
+	key: string;
 }
 
 /** Rolling buffer size per widget; far less than the chat element's, these
@@ -118,6 +136,10 @@ interface LiveChatFeedState {
 	attempt: number;
 	ready: boolean;
 	specs: Set<string>;
+	/** Buffer keys (`spec:msg.id`), kept in sync with `lines`. */
+	seen: Set<string>;
+	/** Monotonic counter minting each line's unique vnode key. */
+	seq: number;
 	lines: ChatLine[];
 	timer?: ReturnType<typeof setTimeout>;
 	socket?: WebSocket;
@@ -139,6 +161,8 @@ export const LiveChatFeed: m.Component<
 		vnode.state.stopped = false;
 		vnode.state.attempt = 0;
 		vnode.state.ready = false;
+		vnode.state.seen = new Set();
+		vnode.state.seq = 0;
 		vnode.state.lines = [];
 		vnode.state.specs = new Set(chatSpecs(vnode.attrs.channels));
 		connect(vnode);
@@ -222,8 +246,21 @@ function connect(vnode: m.Vnode<LiveChatFeedAttrs, LiveChatFeedState>): void {
 				const colon = spec.indexOf(":");
 				const platform = spec.slice(0, colon).toLowerCase() as ChatPlatform;
 				const channel = spec.slice(colon + 1).toLowerCase();
-				for (const msg of entry.messages ?? [])
-					seeded.push({ spec, platform, channel, msg });
+				for (const msg of entry.messages ?? []) {
+					s.seq += 1;
+					const line: ChatLine = {
+						spec,
+						platform,
+						channel,
+						msg,
+						// Stamp every line — id-less ones included — with a
+						// unique vnode key.
+						key: `${spec}:${String(msg.id)}#${s.seq}`,
+					};
+					seeded.push(line);
+					const dedupeKey = lineKey(spec, msg);
+					if (dedupeKey != null) s.seen.add(dedupeKey);
+				}
 			}
 			seeded.sort((a, b) => (a.msg.ts ?? 0) - (b.msg.ts ?? 0));
 			s.lines = seeded;
@@ -251,19 +288,45 @@ function connect(vnode: m.Vnode<LiveChatFeedAttrs, LiveChatFeedState>): void {
 		const platform = frame.event.slice(0, dot).toLowerCase() as ChatPlatform;
 		const spec = `${platform}:${channel}`;
 		if (!s.specs.has(spec)) return;
-		// `reconnect` re-sends rolling history; a plain frame carries one new
-		// `message`.
-		const fresh: ChatMessage[] = data.reconnect
+		// `reconnect` re-sends rolling history (newest first); a plain frame
+		// carries one new `message`.
+		const batch: ChatMessage[] = data.reconnect
 			? data.messages ?? []
 			: data.message
 				? [data.message]
 				: [];
-		for (const msg of fresh) {
-			const line: ChatLine = { spec, platform, channel, msg };
-			s.lines.push(line);
-			if (s.lines.length > CAP) s.lines = s.lines.slice(-CAP);
-			vnode.attrs.onMessage?.(line);
+		if (!batch.length) return;
+		if (batch.length > 1)
+			batch.sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
+		let added = 0;
+		for (const msg of batch) {
+			const dedupeKey = lineKey(spec, msg);
+			// The re-sent history overlaps what the buffer already holds —
+			// skip identifiable lines we've buffered before. Id-less lines
+			// (dedupeKey is null) cannot be identified; keep them.
+			if (dedupeKey != null && s.seen.has(dedupeKey)) continue;
+			if (dedupeKey != null) s.seen.add(dedupeKey);
+			s.seq += 1;
+			s.lines.push({
+				spec,
+				platform,
+				channel,
+				msg,
+				key: `${spec}:${String(msg.id)}#${s.seq}`,
+			});
+			added += 1;
 		}
+		if (added === 0) return;
+		if (s.lines.length > CAP) s.lines = s.lines.slice(-CAP);
+		// Shed `seen` entries the cap trimmed, so a re-sent history frame can
+		// still seed those lines; keep `seen` bounded to the buffer.
+		while (s.seen.size > CAP) {
+			const stale = s.seen.values().next().value as string | undefined;
+			if (stale == undefined) break;
+			s.seen.delete(stale);
+		}
+		for (const line of s.lines.slice(-added))
+			vnode.attrs.onMessage?.(line);
 		m.redraw();
 	};
 
