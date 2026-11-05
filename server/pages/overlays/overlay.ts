@@ -19,7 +19,7 @@ import type {
 import { overlayElementSchema } from "./overlay_elements";
 import { ApiError } from "../../../shared/params";
 
-export const OVERLAY_SCHEMA_VERSION = 1;
+export const OVERLAY_SCHEMA_VERSION = 2;
 
 const TOKEN_BYTES = 32;
 const TOKEN_CHARS = "abcdef0123456789";
@@ -493,6 +493,25 @@ type Migration = (p: Overlay) => Overlay;
  * Add the next step here when the schema bumps. */
 const MIGRATIONS: Record<number, Migration> = {
 	// v1 is the first schema; nothing to migrate into it.
+	// v1→v2: the `viewer_chat` element type was removed. Drop its elements
+	// (and un-parent anything nested inside one) so a whole overlay is not
+	// lost over a removed type.
+	1: (p) => {
+		const removed = new Set(
+			p.elements.filter((e) => e.type === "viewer_chat").map((e) => e.id),
+		);
+		if (!removed.size) return p;
+		return {
+			...p,
+			elements: p.elements
+				.filter((e) => !removed.has(e.id))
+				.map((e) =>
+					e.parentId && removed.has(e.parentId)
+						? { ...e, parentId: null }
+						: e,
+				),
+		};
+	},
 };
 
 /**

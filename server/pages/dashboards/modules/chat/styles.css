@@ -9,22 +9,6 @@
     line-height: 1.5;
 }
 
-/* Overlay canvas element: no scrollbar — the feed is clipped to the element
-   box and long lines wrap inside it, like on the standalone overlay page.
-   `white-space: normal` resets the `.overlay-element` `pre` inheritance so
-   lines actually wrap. The `--ov-chat-*` custom properties are set by the
-   chat element's wrapper (overlay_elements.tsx); the fallbacks keep a feed
-   rendered without an element (e.g. the bare preview) at its defaults. */
-.dash-widget-body.chat-overlay-live .chat-feed {
-    overflow: hidden;
-    white-space: normal;
-    font-size: var(--ov-chat-font-size, 24px);
-    font-family: var(--ov-chat-font-family, inherit);
-    color: var(--ov-chat-color, inherit);
-    font-weight: var(--ov-chat-font-weight, inherit);
-    line-height: var(--ov-chat-line-height, inherit);
-}
-
 /* Card-head status: one platform icon per channel, green when online, red
    while disconnected. */
 .dash-widget-badge .chat-status {
@@ -60,118 +44,6 @@
 
 .chat-status-icon.chat-tts.on {
     opacity: 1;
-}
-
-/* The in-scene feed (no overlay page): the element wrapper carries the
- * `--ov-chat-*` props, so the feed's text style reads them here — the old
- * `.dash-widget-body.chat-overlay-live` rules above only reach the iframe page.
- * `height: 100%` + `overflow: hidden` clip the feed to the element box (no
- * scrollbar, matching the overlay page); in bottom order the newest line then
- * sits exactly on the box's bottom edge instead of overflowing past it. */
-.chat-element .chat-feed {
-    height: 100%;
-    overflow: hidden;
-    /* The `.overlay-element` wrapper sets `white-space: pre` (overlay text
-     * elements keep verbatim whitespace) — the chat feed must reset it or
-     * long messages never wrap. */
-    white-space: normal;
-    font-size: var(--ov-chat-font-size, 24px);
-    font-family: var(--ov-chat-font-family, inherit);
-    color: var(--ov-chat-color, inherit);
-    font-weight: var(--ov-chat-font-weight, inherit);
-    line-height: var(--ov-chat-line-height, inherit);
-}
-
-/* Overlay-element feed presentation (element props, set on the `.chat-element`
- * wrapper by overlay_elements.tsx). Scoped to the element so the dashboard
- * widget's own feed is unaffected. A mask is used for the fade instead of
- * `background-clip: text` so inline-colour usernames fade along with the
- * text (a text-clip gradient cannot). */
-/* `text-align` rides on the full-width lines (not the feed container, which
- * would centre the shrink-to-fit line boxes like chat bubbles). */
-.chat-element .chat-feed .chat-line {
-    margin-bottom: var(--ov-chat-message-gap, 0);
-    text-align: var(--ov-chat-text-align, left);
-}
-
-.chat-element .chat-feed .chat-line img,
-.chat-element .chat-feed .chat-line svg {
-    height: 1em;
-}
-
-.chat-element .chat-feed .chat-line a {
-    color: var(--ov-chat-link-color, inherit);
-    text-decoration: none;
-}
-
-.chat-element .chat-feed .chat-line .chat-icon {
-    margin-right: 5px;
-}
-
-/* The word-break rule for message text is scoped under `.dash-widget-body`
- * (dashboard + iframe page) — the in-scene element needs its own so unbroken
- * strings (URLs, long handles) wrap too. */
-.chat-element .chat-feed .chat-text {
-    word-break: break-word;
-}
-
-/* A flex column so the lines pin to the edge new messages enter: bottom
- * order sits flush on the box's bottom edge (any excess overflows — and is
- * clipped — at the top), top order on the top edge (excess clipped at the
- * bottom). The feed is a few lines short of the box when it has few
- * messages, and pinning is what keeps the newest line on the entry edge. */
-.chat-element .chat-feed {
-    display: flex;
-    flex-direction: column;
-}
-
-.chat-element .chat-feed.chat-feed-bottom {
-    justify-content: flex-end;
-}
-
-/* Fade-mask colour stops (a mask only sees alpha, so a white gradient works
-   for any per-line colour). */
-.chat-element {
-    /* Fill the element box so the feed's `height: 100%` resolves to the box
-     * height (`.overlay-element` carries the explicit width/height); clip so
-     * the feed never draws past the box edges. */
-    height: 100%;
-    overflow: hidden;
-    --ov-chat-fade-opaque: #fff;
-    --ov-chat-fade-clear: #fff0;
-}
-
-.chat-element.chat-element-fade-bottom .chat-feed {
-    -webkit-mask-image: linear-gradient(
-        180deg,
-        var(--ov-chat-fade-opaque) 0,
-        var(--ov-chat-fade-opaque) calc(100% - var(--ov-chat-fade, 96px)),
-        var(--ov-chat-fade-clear) 100%
-    );
-    mask-image: linear-gradient(
-        180deg,
-        var(--ov-chat-fade-opaque) 0,
-        var(--ov-chat-fade-opaque) calc(100% - var(--ov-chat-fade, 96px)),
-        var(--ov-chat-fade-clear) 100%
-    );
-}
-
-/* The top fade only makes sense once the feed is full enough to overflow
-   upward — mask only when there are at least 3 messages (a 3rd `.chat-line`
-   child, the feed's only child type), so a fresh/short feed stays crisp. */
-.chat-element.chat-element-fade-top .chat-feed:has(.chat-line:nth-child(3)) {
-    -webkit-mask-image: linear-gradient(
-        0deg,
-        var(--ov-chat-fade-opaque) 0,
-        var(--ov-chat-fade-opaque) calc(100% - var(--ov-chat-fade, 96px)),
-        var(--ov-chat-fade-clear) 100%
-    );
-    mask-image: linear-gradient(
-        0deg,
-        var(--ov-chat-fade-opaque) 0,
-        var(--ov-chat-fade-opaque) calc(100% - var(--ov-chat-fade, 96px)),
-        var(--ov-chat-fade-clear) 100%
-    );
 }
 
 /* Per-line platform icon (visibility follows the widget configuration). */
@@ -269,9 +141,4 @@
     text-decoration: line-through;
 }
 
-/* The self-contained chat element's connecting/fatal state (rendered inside
- * the `.chat-element` wrapper while its token-scoped stream is open). */
-.chat-overlay-error {
-    font: 16px sans-serif;
-    text-shadow: 0 1px 3px var(--ink);
-}
+

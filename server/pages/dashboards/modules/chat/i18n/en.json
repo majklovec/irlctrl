@@ -32,13 +32,5 @@
     "dash.widget_ignoredUsernames": "Ignored usernames (comma-separated)",
     "chat.tts.on": "Reading chat aloud",
     "chat.tts.off": "TTS off",
-    "chat.tts.waiting": "Waiting for a Czech voice…",
-    "overlay.add_chat": "Chat",
-    "overlay.chat_channels": "Channels",
-    "overlay.chat_add_channel": "Add channel",
-    "overlay.chat_remove_channel": "Remove channel",
-    "overlay.chat_no_channels": "No channels",
-    "overlay.chat_platform": "Platform",
-    "overlay.chat_channel": "Channel",
-    "overlay.chat_channel_ph": "channel"
+    "chat.tts.waiting": "Waiting for a Czech voice…"
 }

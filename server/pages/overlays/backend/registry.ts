@@ -69,7 +69,6 @@ const CHAT_CARRYING_ELEMENT_TYPES: ReadonlySet<string> = new Set([
     "emote_wall",
     "emote_combo",
     "featured",
-    "viewer_chat",
 ]);
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>

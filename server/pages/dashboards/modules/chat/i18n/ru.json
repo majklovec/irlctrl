@@ -32,13 +32,5 @@
     "dash.widget_ignoredUsernames": "Игнорируемые пользователи (через запятую)",
     "chat.tts.on": "Говорит чат вслух",
     "chat.tts.off": "TTS выключен",
-    "chat.tts.waiting": "Ожидание чешского голоса…",
-    "overlay.add_chat": "Чат",
-    "overlay.chat_channels": "Каналы",
-    "overlay.chat_add_channel": "Добавить канал",
-    "overlay.chat_remove_channel": "Удалить канал",
-    "overlay.chat_no_channels": "Нет каналов",
-    "overlay.chat_platform": "Платформа",
-    "overlay.chat_channel": "Канал",
-    "overlay.chat_channel_ph": "канал"
+    "chat.tts.waiting": "Ожидание чешского голоса…"
 }

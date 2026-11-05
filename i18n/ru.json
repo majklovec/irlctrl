@@ -161,6 +161,8 @@
     "nav.profile": "Профиль",
     "overlay.add": "Add",
     "overlay.add_shape": "Shape",
+    "overlay.add_shapes": "Фигуры",
+    "overlay.add_widgets": "Виджеты",
     "overlay.assets": "Assets",
     "overlay.back_list": "Назад к списку",
     "overlay.bind_variable": "Связать с переменной",

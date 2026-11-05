@@ -12,8 +12,9 @@
  * The live text renders straight into the same DOM the overlay composites, so
  * a browser tab shows the exact feed OBS sees. It never uses an <iframe> — a
  * browser-source capture composites iframes opaquely. The feed is fed by the
- * scene token + id via `EmbeddedChat` (./frontend.tsx); props are normalized
- * & clamped by ./overlay_schema.ts, so the form only edits.
+ * scene token + id through the module's `LiveChatFeed` connector (the
+ * overlay's token-scoped chat WebSocket); props are normalized & clamped by
+ * ../overlay_schema.ts, so the form only edits.
  */
 
 import { Icon } from "@ui/components/icons";
@@ -27,19 +28,15 @@ import type {
 import { bindField } from "@ui/overlay/fields";
 import type { Children, Vnode } from "mithril";
 import m from "mithril";
-import { CHAT_PLATFORMS, type ChatChannel, chatPropsToConfig } from "./config";
-import { EmbeddedChat } from "./frontend";
-import { type ChatProps, DEFAULT_CHAT_PROPS } from "./overlay_schema";
-
-/** Platform option label keys — YouTube/Twitch/Kick live in the core catalog
- * and TikTok in this module's; all resolve once every catalog is registered. */
-const PLATFORM_LABEL_KEY: Record<string, string> = {
-	youtube: "dash.widget_youtube",
-	twitch: "dash.widget_twitch",
-	tiktok: "dash.widget_tiktok",
-	kick: "dash.widget_kick",
-};
-const platformLabel = (p: string): string => t(PLATFORM_LABEL_KEY[p] ?? p);
+import {
+	CHAT_BANNED_TYPE,
+	ChatFeedView,
+	type FeedLine,
+} from "../lib/chat_render";
+import type { ChatLine } from "../lib/live_chat_feed";
+import { LiveChatFeed, normalizeChannels } from "../lib/live_chat_feed";
+import { ChannelsField } from "../lib/list_field";
+import { type ChatProps, DEFAULT_CHAT_PROPS } from "../overlay_schema";
 
 /** One inspector field wrapping a `<select>` of fixed choices. `bindField`
  * shows no binding toggle for selects (a fixed choice set can't take a
@@ -71,80 +68,40 @@ function choiceField(
 	);
 }
 
-/** Filters-style channel list: add rows, pick a platform, type a handle,
- * remove. Mutates `props.channels` (a normalized `ChatChannel[]`); the schema
- * normalizes on load so the stored value is always a clean array. */
-function channelsField(props: ElementProps): Children {
-	const element = props.element;
-	const channels = (element.props.channels ?? []) as ChatChannel[];
-	const set = (next: ChatChannel[]): void =>
-		props.mutate((el) => {
-			el.props.channels = next;
-		});
-	return (
-		<div class="ov-field">
-			<span class="ov-lbl">{t("overlay.chat_channels")}</span>
-			<div class="ov-channels">
-				{channels.length === 0 ? (
-					<div class="ov-channels-empty">{t("overlay.chat_no_channels")}</div>
-				) : (
-					channels.map((c, i) => (
-						<div class="ov-channel-row" key={i}>
-							<select
-								value={c.platform}
-								aria-label={t("overlay.chat_platform")}
-								onchange={(ev: Event) => {
-									const platform = (ev.target as HTMLSelectElement)
-										.value as ChatChannel["platform"];
-									set(
-										channels.map((row, j) =>
-											j === i ? { ...row, platform } : row,
-										),
-									);
-								}}
-							>
-								{CHAT_PLATFORMS.map((pf) => (
-									<option key={pf} value={pf}>
-										{platformLabel(pf)}
-									</option>
-								))}
-							</select>
-							<input
-								value={c.channel}
-								placeholder={t("overlay.chat_channel_ph")}
-								aria-label={t("overlay.chat_channel")}
-								oninput={(ev: Event) => {
-									const channel = (ev.target as HTMLInputElement).value;
-									set(
-										channels.map((row, j) =>
-											j === i ? { ...row, channel } : row,
-										),
-									);
-								}}
-							/>
-							<button
-								class="ov-channel-remove"
-								type="button"
-								aria-label={t("overlay.chat_remove_channel")}
-								onclick={() => set(channels.filter((_, j) => j !== i))}
-							>
-								<Icon name="close" class="role-icon" />
-							</button>
-						</div>
-					))
-				)}
-				<button
-					class="ov-channel-add"
-					type="button"
-					onclick={() =>
-						set([...channels, { platform: CHAT_PLATFORMS[0], channel: "" }])
-					}
-				>
-					+ {t("overlay.chat_add_channel")}
-				</button>
-			</div>
-		</div>
-	);
+/** The display list for one snapshot of the feed: banned lines filtered
+ * (or flagged, per the element's `bannedMessages`), in the element's message
+ * order (top: newest first; bottom: oldest first). */
+function shownLines(p: ChatProps, lines: ChatLine[]): FeedLine[] {
+	const hideBanned = p.bannedMessages === "hide";
+	const kept = lines
+		.filter((line) => line.msg.type !== CHAT_BANNED_TYPE || !hideBanned)
+		.map((line) => ({ ...line, banned: line.msg.type === CHAT_BANNED_TYPE }));
+	// `LiveChatFeed` buffers oldest→newest; top order reads newest first.
+	return p.order === "bottom" ? kept : kept.reverse();
+}
+
+/** The feed content for one (re)render: the auto-fit container with the
+ * element's display options. */
+function feedView(element: OverlayElement, p: ChatProps, lines: ChatLine[]): m.Children {
+	const cut = shownLines(p, lines);
+	if (!cut.length) return null;
+
+	const channels = normalizeChannels(p.channels);
+	const channelCount = channels.filter((c) => c.channel).length;
+	const showPlatformIcons =
+		p.platformIcons === "on" ||
+		(p.platformIcons === "auto" && channelCount > 1);
+	const bottom = p.order === "bottom";
+
+	return m(ChatFeedView, {
+		lines: cut,
+		bottom,
+		showPlatformIcons,
+		showTimestamps: p.timestamps === "on",
+		showBadges: p.badges !== "off",
+		autoFit: true,
+		feedKey: `chat-feed:${element.id}`,
+	});
 }
 
 /** Draw the element as a live chat feed in the current DOM. `ctx` carries the
@@ -154,7 +111,7 @@ function channelsField(props: ElementProps): Children {
 function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	const p = element.props as unknown as ChatProps;
 	// `--ov-chat-*` custom properties + the fade-<dir> modifier class are the
-	// contract `styles.css` reads (see its `.chat-element` rules).
+	// contract `overlay.css` reads (see its `.chat-element` rules).
 	return (
 		<div
 			class={`chat-element${
@@ -171,11 +128,15 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 				"--ov-chat-text-align": p.textAlign,
 			}}
 		>
-			{m(EmbeddedChat, {
-				id: element.id,
-				config: chatPropsToConfig(element.props),
+			{m(LiveChatFeed, {
 				token: ctx.token ?? "",
 				overlayId: ctx.overlayId ?? "",
+				channels: normalizeChannels(p.channels),
+				render({ ready, lines }: { ready: boolean; lines: ChatLine[] }) {
+					return ready
+						? feedView(element, p, lines)
+						: m("p.chat-overlay-error", { role: "alert" }, "…");
+				},
 			})}
 		</div>
 	);
@@ -188,7 +149,7 @@ function editForm(props: ElementProps): Children {
 
 	return (
 		<>
-			{channelsField(props)}
+			<ChannelsField element={e} mutate={mutate} variables={props.variables} />
 
 			{choiceField(
 				e,
@@ -452,7 +413,7 @@ function editForm(props: ElementProps): Children {
 
 function validate(_e: OverlayElement): string[] {
 	// Channels are optional while editing (an empty list just shows nothing),
-	// and there is no URL to point at any more — so there is nothing to check.
+	// and there is no URL to point at — so there is nothing to check.
 	return [];
 }
 

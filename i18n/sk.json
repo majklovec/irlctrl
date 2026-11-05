@@ -161,6 +161,8 @@
     "nav.profile": "Profil",
     "overlay.add": "Add",
     "overlay.add_shape": "Shape",
+    "overlay.add_shapes": "Tvary",
+    "overlay.add_widgets": "Prvky",
     "overlay.assets": "Assets",
     "overlay.back_list": "Späť na zoznam",
     "overlay.bind_variable": "Propojiť premennú",

@@ -1,8 +1,18 @@
+/*
+ * The chat overlay element's server half: the endpoint + token-scoped
+ * WebSocket that stream the overlay's chat channels to a scene. Moved from
+ * the dashboards chat module so the element's frontend half (elements/chat.tsx)
+ * and its backend routes live in one module — the chat module keeps only the
+ * dashboard widget's hub.
+ */
 import { Elysia } from "elysia";
 import { APP_VERSION } from "../../../../../shared/app_version";
 import type { ControlRouteContext } from "../../../../../shared/contracts/backend_module";
 import { upgradeRequired } from "../../../../../shared/http";
-import type { ChatSnapshot } from "./types";
+
+/** One channel's hub entry (mirrors the chat module's `ChatSnapshot`); kept
+ * local so this module's server half has no cross-module import. */
+type ChatSnapshot = Record<string, { connected: boolean; messages: unknown[] }>;
 
 const headers = {
     "cache-control": "no-store",

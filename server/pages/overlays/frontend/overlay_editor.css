@@ -730,6 +730,32 @@ identically here and on the runtime page */
     color: var(--text);
     border-color: var(--text);
 }
+/* Weather form: "use my location" fill button below the lat/lon pair. */
+.ov-geofill {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    padding: 2px 8px;
+    font-size: 12px;
+    background: none;
+    border: 1px dashed var(--border);
+    color: var(--muted);
+    cursor: pointer;
+}
+.ov-geofill:hover:not(:disabled) {
+    color: var(--text);
+    border-color: var(--text);
+}
+.ov-geofill:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+.ov-geofill-err {
+    font-size: 11px;
+    color: var(--bad);
+}
 .ov-danger {
     margin-top: 6px;
 }
@@ -969,9 +995,9 @@ instead of truncating */
     border-bottom: 1px solid var(--border);
     background: var(--header-bg);
 }
-/* The editor's icon strip is a `Toolbar` inside the subbar: tight, no margins.
-   It stretches to the full subbar width so the trailing zoom cluster can be
-   pushed to the right edge via `margin-left: auto`. */
+/* The editor's icon strip is a `Toolbar` inside the subbar: tight, no
+   margins. It stretches to the full subbar width so the trailing zoom +
+   utility groups can be pushed to the right edge via the toolbar spacer. */
 .page-subbar .dash-toolbar {
     flex: 1;
     gap: 4px;
@@ -994,24 +1020,89 @@ instead of truncating */
 .page-subbar .icon-link .role-icon {
     height: 1.15em;
 }
-.ov-toolsep {
+/* Toolbar grouping: visual clusters separated by dividers (history, core
+   editing, widgets … spacer … zoom, utilities). */
+.ov-tb-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+.ov-tb-divider {
     width: 1px;
     height: 1.6rem;
-    margin: 0 4px;
+    margin: 0 6px;
+    flex-shrink: 0;
     background: var(--border);
 }
-/* Pushes the trailing zoom cluster to the right edge of the toolbar. */
+/* Pushes the trailing zoom + utility groups to the right edge; the toolbar
+   keeps a single horizontal row on desktop. */
+.ov-tb-spacer {
+    flex: 1 0 auto;
+}
+/* Dropdown inside the toolbar: the trigger sits in the row, the menu floats
+   below it; a fixed full-viewport scrim behind the open menu closes it on
+   any outside click. */
+.ov-dd {
+    position: relative;
+    display: inline-flex;
+}
+.ov-dd-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 6px;
+    background: var(--card-solid);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-lg);
+}
+/* Widgets menu: an icon grid. A 17-row tall dropdown would outgrow the
+   canvas under the subbar, so it floats up over the canvas and wraps. */
+.ov-dd-grid {
+    top: auto;
+    bottom: calc(100% + 6px);
+    flex-wrap: wrap;
+    width: 308px;
+}
+/* The chevron on the text trigger points down when open. */
+.ov-dd-chevron {
+    width: 1em;
+    height: 1em;
+    transform: rotate(0deg);
+    transition: transform var(--t);
+}
+.ov-dd.is-open .ov-dd-chevron {
+    transform: rotate(90deg);
+}
+/* "Widgets" text trigger: an icon-link carrying a label. */
+.ov-dd-textbtn {
+    width: auto;
+    padding: 0 0.55rem;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+}
+.ov-dd-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+}
+/* Zoom cluster: two icon buttons around the percentage readout. */
 .ov-zoom {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    margin-left: auto;
 }
 .ov-zoom-val {
-    min-width: 30px;
+    min-width: 34px;
     text-align: center;
     font-size: 12px;
+    font-weight: 600;
     color: var(--muted);
+    user-select: none;
 }
 /* ── asset library picker (image/video elements reuse server assets) ── */
 .ov-lib-field {

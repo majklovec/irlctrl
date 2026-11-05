@@ -32,13 +32,5 @@
     "dash.widget_ignoredUsernames": "Utilisateurs ignorés (séparés par des virgules)",
     "chat.tts.on": "Lit le chat à voix haute",
     "chat.tts.off": "TTS désactivé",
-    "chat.tts.waiting": "En attente d'une voix tchèque…",
-    "overlay.add_chat": "Chat",
-    "overlay.chat_channels": "Canaux",
-    "overlay.chat_add_channel": "Ajouter un canal",
-    "overlay.chat_remove_channel": "Retirer un canal",
-    "overlay.chat_no_channels": "Aucun canal",
-    "overlay.chat_platform": "Plateforme",
-    "overlay.chat_channel": "Canal",
-    "overlay.chat_channel_ph": "canal"
+    "chat.tts.waiting": "En attente d'une voix tchèque…"
 }

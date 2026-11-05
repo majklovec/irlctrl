@@ -161,6 +161,8 @@
     "nav.profile": "プロフィール",
     "overlay.add": "Add",
     "overlay.add_shape": "Shape",
+    "overlay.add_shapes": "図形",
+    "overlay.add_widgets": "ウィジェット",
     "overlay.assets": "Assets",
     "overlay.back_list": "リストに戻る",
     "overlay.bind_variable": "変数にバインド",

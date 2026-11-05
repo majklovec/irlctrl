@@ -1,5 +1,6 @@
 import m from "mithril";
 import {
+	closeToolMenus,
 	deleteElement,
 	overlay,
 	redo,
@@ -13,6 +14,15 @@ import {
 export function onKey(ev: KeyboardEvent): void {
 	const tag = (ev.target as HTMLElement | null)?.tagName;
 	if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+	// Escape closes an open toolbar dropdown before it reaches the element
+	// shortcuts (its scrim is not focusable, so it never gets keydowns itself)
+	if (ev.key === "Escape") {
+		if (state.shapesMenuOpen || state.widgetsMenuOpen) {
+			ev.preventDefault();
+			closeToolMenus();
+		}
+		return;
+	}
 	const e = selElement();
 	const meta = ev.metaKey || ev.ctrlKey;
 	if (meta && ev.key.toLowerCase() === "z") {

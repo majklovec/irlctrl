@@ -32,13 +32,5 @@
     "dash.widget_ignoredUsernames": "忽略的用户 (逗号分隔)",
     "chat.tts.on": "正在朗读聊天",
     "chat.tts.off": "TTS 已关闭",
-    "chat.tts.waiting": "等待捷克语语音…",
-    "overlay.add_chat": "聊天",
-    "overlay.chat_channels": "频道",
-    "overlay.chat_add_channel": "添加频道",
-    "overlay.chat_remove_channel": "移除频道",
-    "overlay.chat_no_channels": "没有频道",
-    "overlay.chat_platform": "平台",
-    "overlay.chat_channel": "频道",
-    "overlay.chat_channel_ph": "频道"
+    "chat.tts.waiting": "等待捷克语语音…"
 }

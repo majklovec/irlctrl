@@ -42,7 +42,6 @@ import {
 	type ChatBadge,
 	type ChatLive,
 	type ChatPlatform,
-	type ChatSnapshot,
 } from "./types";
 import "./styles.css";
 
@@ -210,13 +209,10 @@ function onFrame(event: string, data: unknown): void {
 
 /** Merge configured channels, newest first by timestamp, and cap history.
  * Banned lines are dropped when the widget is set to `hide`, kept (flagged)
- * when set to `strike`. With `maxLines: "auto"` the config cap is skipped —
- * the feed measures its own box and trims to what fits (the buffer is
- * already capped upstream). */
+ * when set to `strike`. */
 function mergedLines(
 	w: Pick<FeedWidget, "config">,
 	specs: ChatSpec[],
-	maxLines?: "auto",
 ): MergedLine[] {
 	const hideBanned = bannedMessagesFromConfig(w.config) === "hide";
 	const all: MergedLine[] = [];
@@ -236,8 +232,7 @@ function mergedLines(
 
 	all.sort((a, b) => (b.line.ts ?? 0) - (a.line.ts ?? 0));
 
-	const capped = maxLines === "auto" ? null : historyLengthFromConfig(w.config);
-	const cut = capped === null ? all : all.slice(0, Math.max(1, capped));
+	const cut = all.slice(0, Math.max(1, historyLengthFromConfig(w.config)));
 
 	// "bottom" means oldest first and newest at the bottom.
 	if (chatOrderFromConfig(w.config) === "bottom") cut.reverse();
@@ -605,44 +600,9 @@ type ChatFeedAttrs = {
 	/** Show the sender's badges in front of the username. */
 	showBadges: boolean;
 	feedKey: string;
-	/** The feed sizes itself to its box: show as many lines as fit (the
-	 * in-scene element). The dashboard widget leaves it unset (config cap). */
-	maxLines?: "auto";
 };
 
-type ChatFeedState = {
-	/** With `maxLines: "auto"`: how many lines fit the box (measured). */
-	fit?: number;
-};
-
-/** How many lines fit `el`'s visible height, measured from one rendered line
- * (height + its margin-bottom, so wrapped lines count at their real size);
- * the fallback when no line is rendered yet. */
-function measuredFitLines(el: HTMLElement, fallback: number): number {
-	const first = el.querySelector<HTMLElement>(".chat-line");
-	if (!first) return fallback;
-	const unit =
-		first.offsetHeight + (parseFloat(getComputedStyle(first).marginBottom) || 0);
-	if (unit <= 0) return fallback;
-	return Math.max(1, Math.floor(el.clientHeight / unit));
-}
-
-/** Refresh the measured line count of an `auto`-sized feed; re-renders when
- * the fit changes (redrawing with the new count re-measures to the same
- * value, so this terminates). */
-function updateFitLines(
-	vnode: m.VnodeDOM<ChatFeedAttrs, ChatFeedState>,
-): void {
-	if (vnode.attrs.maxLines !== "auto") return;
-	const el = vnode.dom as HTMLElement;
-	const fit = measuredFitLines(el, vnode.state.fit ?? 0);
-	if (fit !== vnode.state.fit) {
-		vnode.state.fit = fit;
-		m.redraw();
-	}
-}
-
-const ChatFeed: m.Component<ChatFeedAttrs, ChatFeedState> = {
+const ChatFeed: m.Component<ChatFeedAttrs> = {
 	oncreate(vnode) {
 		const el = vnode.dom as HTMLElement;
 
@@ -656,14 +616,10 @@ const ChatFeed: m.Component<ChatFeedAttrs, ChatFeedState> = {
 				}
 			});
 		}
-
-		updateFitLines(vnode);
 	},
 
 	onupdate(vnode) {
 		const el = vnode.dom as HTMLElement;
-
-		updateFitLines(vnode);
 
 		if (!vnode.attrs.bottom) {
 			// Top order: new lines enter at the top of the feed. Pin the feed
@@ -697,15 +653,6 @@ const ChatFeed: m.Component<ChatFeedAttrs, ChatFeedState> = {
 			showBadges,
 			feedKey,
 		} = vnode.attrs;
-		// `auto` size: keep only the lines that fit the box — the newest in
-		// either order (bottom order lists oldest first, so its newest are at
-		// the end). `overflow: hidden` on the feed clips the rounding.
-		const shown =
-			vnode.attrs.maxLines === "auto"
-				? bottom
-					? lines.slice(-(vnode.state.fit ?? lines.length))
-					: lines.slice(0, vnode.state.fit ?? lines.length)
-				: lines;
 
 		return (
 			<div
@@ -776,14 +723,8 @@ function body(w: ServerDashboardWidget, _ctx: WidgetContext): m.Children {
 	return chatFeed(w);
 }
 
-/** Shared rendering without dashboard chrome or TTS side effects. With
- * `maxLines: "auto"` the feed measures its own box and shows as many lines
- * as fit (the in-scene element); the dashboard widget keeps the config cap. */
-export function chatFeed(
-	w: FeedWidget,
-	showEmpty = true,
-	maxLines?: "auto",
-): m.Children {
+/** Shared rendering without dashboard chrome or TTS side effects. */
+export function chatFeed(w: FeedWidget, showEmpty = true): m.Children {
 	const specs = chatSpecsOf(w);
 
 	if (!specs.length) {
@@ -792,7 +733,7 @@ export function chatFeed(
 		) : null;
 	}
 
-	const lines = mergedLines(w, specs, maxLines);
+	const lines = mergedLines(w, specs);
 
 	if (!lines.length) {
 		return showEmpty ? <p class="muted">{t("chat.empty")}</p> : null;
@@ -812,180 +753,9 @@ export function chatFeed(
 		showPlatformIcons,
 		showTimestamps,
 		showBadges,
-		maxLines,
 	});
 }
 
-// ── Self-contained chat element feed ──────────────────────────────────────
-// The chat overlay element renders its live feed straight into the canvas
-// DOM — no `<iframe>` (Chromium composites every iframe on an opaque white
-// layer a transparent editor canvas can't show through). It is fed by a
-// scene-token WebSocket that streams the hub frames narrowed to the element's
-// own channel list, so it is fully independent of any dashboard chat widget.
-
-/** Attributes carrying the element's display config + scene identity. */
-type EmbeddedChatAttrs = {
-	/** Chat-widget-shaped config built from the element's props. */
-	config: Record<string, string>;
-	/** Stable element id (keys the feed). */
-	id: string;
-	/** The OBS overlay's token. */
-	token: string;
-	/** The overlay's id (selects which overlay's channels stream). */
-	overlayId: string;
-};
-
-interface EmbeddedChatState {
-	ready: boolean;
-	stopped: boolean;
-	attempt: number;
-	timer?: ReturnType<typeof setTimeout>;
-	socket?: WebSocket;
-	specs: Set<string>;
-}
-
-/**
- * The live chat feed for one chat overlay element. Renders the shared
- * `chatFeed` (the same merged feed a dashboard widget shows), fed by the
- * scene-token WebSocket; the snapshot seeds state, then each hub frame is
- * narrowed to the element's channel specs.
- */
-export const EmbeddedChat: m.Component<EmbeddedChatAttrs, EmbeddedChatState> = {
-	oninit(vnode) {
-		// `state` is pre-initialized by mithril; mutate it, never reassign.
-		vnode.state.ready = false;
-		vnode.state.stopped = false;
-		vnode.state.attempt = 0;
-		vnode.state.specs = new Set(
-			chatSpecsOf({ config: vnode.attrs.config }).map((c) => c.spec),
-		);
-		embeddedChatConnect(vnode);
-	},
-	onupdate(vnode) {
-		// Channels added/removed in the inspector change the spec set;
-		// refresh it and reconnect so the narrowed stream tracks the config.
-		const wanted = new Set(
-			chatSpecsOf({ config: vnode.attrs.config }).map((c) => c.spec),
-		);
-		if (!sameSpecs(vnode.state.specs, wanted)) {
-			vnode.state.specs = wanted;
-			// Drop the connection AND any pending retry: a retry that fires
-			// after this reconnect would open a second socket for the same
-			// channels (doubled messages).
-			clearTimeout(vnode.state.timer);
-			vnode.state.timer = undefined;
-			vnode.state.attempt = 0;
-			const old = vnode.state.socket;
-			vnode.state.socket = undefined;
-			old?.close();
-			embeddedChatConnect(vnode);
-		}
-	},
-	onremove(vnode) {
-		vnode.state.stopped = true;
-		clearTimeout(vnode.state.timer);
-		vnode.state.socket?.close();
-	},
-	view(vnode) {
-		const s = vnode.state;
-		return s.ready
-			? (chatFeed(
-					  { id: vnode.attrs.id, config: vnode.attrs.config },
-					  false,
-					  // The element has no history prop — the feed measures its
-					  // own box and shows as many lines as fit.
-					  "auto",
-			  ) ??
-					m("p.chat-overlay-error", { role: "alert" }, "…"))
-			: m("p.chat-overlay-error", { role: "alert" }, "…");
-	},
-};
-
-/** Two spec sets have the same members (order-independent). */
-function sameSpecs(a: Set<string>, b: Set<string>): boolean {
-	if (a.size !== b.size) return false;
-	for (const spec of a) if (!b.has(spec)) return false;
-	return true;
-}
-
-/**
- * Connect the element's feed socket: same origin, ws(s) scheme, the scene
- * token in the query string (the browser WebSocket API can't set the
- * Authorization header). On close, 1008 is fatal (token gone); anything else
- * retries with exponential backoff.
- */
-function embeddedChatConnect(
-	vnode: m.Vnode<EmbeddedChatAttrs, EmbeddedChatState>,
-): void {
-	const s = vnode.state;
-	if (s.stopped) return;
-	const { token, overlayId } = vnode.attrs;
-	if (!token || !overlayId) return;
-	const url = new URL(
-		`/api/overlay/chat/${encodeURIComponent(overlayId)}/ws`,
-		location.origin,
-	);
-	url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
-	url.searchParams.set("token", token);
-	const socket = new WebSocket(url);
-	s.socket = socket;
-
-	// A replacement socket supersedes this one (channel change, retry):
-	// its close/retry must never touch the state of the connection that
-	// came after it, or two sockets end up streaming the same channels
-	// into the shared live map at once (doubled messages).
-	const isActive = (): boolean => s.socket === socket;
-
-	socket.onopen = () => {
-		if (!isActive()) return;
-		s.attempt = 0;
-	};
-
-	socket.onmessage = (event) => {
-		if (!isActive()) return;
-		let frame: { type?: string; event?: string; data?: unknown };
-		try {
-			frame = JSON.parse(String(event.data)) as typeof frame;
-		} catch {
-			return;
-		}
-		if (frame.type !== "event" || !frame.event) return;
-		if (frame.event === "chat.overlay.snapshot") {
-			const snap = frame.data as { chat?: ChatSnapshot };
-			onFrame?.("widget.snapshot", { chat: snap.chat ?? {} });
-			s.ready = true;
-			m.redraw();
-			return;
-		}
-		// The hub stream carries every channel — keep only this element's.
-		if (!frame.event.endsWith(".chat")) return;
-		const channel = (frame.data as { channel?: unknown } | null)?.channel;
-		if (typeof channel !== "string") return;
-		const dot = frame.event.indexOf(".");
-		const spec = `${frame.event.slice(0, dot)}:${channel.toLowerCase()}`;
-		if (!s.specs.has(spec)) return;
-		onFrame?.(frame.event, frame.data);
-		m.redraw();
-	};
-
-	socket.onclose = (event) => {
-		if (!isActive()) return;
-		s.socket = undefined;
-		if (s.stopped) return;
-		if (event.code === 1008) {
-			// The scene token was rotated/removed — reconnecting can't succeed.
-			s.stopped = true;
-			s.ready = false;
-			m.redraw();
-			return;
-		}
-		s.ready = false;
-		m.redraw();
-		const delay = Math.min(1_000 * 2 ** s.attempt, 15_000);
-		s.attempt += 1;
-		s.timer = setTimeout(() => embeddedChatConnect(vnode), delay);
-	};
-}
 
 const chatModule: ChannelWidgetModule<ServerDashboardWidget> = {
 	id: "chat",

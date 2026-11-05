@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { APP_VERSION } from "../generated/version";
-import { chatOverlayRoutes } from "../server/pages/dashboards/modules/chat/overlay_server";
+import { chatOverlayRoutes } from "../server/pages/overlays/modules/overlay_elements/overlay_server";
 import type { ChatSnapshot } from "../server/pages/dashboards/modules/chat/types";
 
 const BunWebSocket = WebSocket as unknown as new (

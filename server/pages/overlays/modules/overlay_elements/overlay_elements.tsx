@@ -4,6 +4,7 @@
  * overlay_schema.ts.
  */
 import { alertsElement } from "./elements/alerts";
+import { chatElement } from "./elements/chat";
 import { countdownElement } from "./elements/countdown";
 import { creditsElement } from "./elements/credits";
 import { counterElement } from "./elements/counter";
@@ -26,7 +27,6 @@ import { spinWheelElement } from "./elements/spin_wheel";
 import { tasksElement } from "./elements/tasks";
 import { textElement } from "./elements/text";
 import { videoElement } from "./elements/video";
-import { viewerChatElement } from "./elements/viewer_chat";
 import { weatherElement } from "./elements/weather";
 
 export default [
@@ -54,5 +54,5 @@ export default [
 	emoteWallElement,
 	emoteComboElement,
 	featuredElement,
-	viewerChatElement,
+	chatElement,
 ];

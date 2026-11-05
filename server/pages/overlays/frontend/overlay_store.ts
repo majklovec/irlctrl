@@ -72,7 +72,18 @@ export const state = {
     runtimeDialogOpen: false,
     /** Variables modal (opened from the toolbar icon) is open. */
     variablesDialogOpen: false,
+    /** Editor toolbar dropdown menus (shapes / widgets) are open. */
+    shapesMenuOpen: false,
+    widgetsMenuOpen: false,
 };
+
+/** Close the editor toolbar's dropdown menus (click-away, Escape). */
+export function closeToolMenus(): void {
+    if (!state.shapesMenuOpen && !state.widgetsMenuOpen) return;
+    state.shapesMenuOpen = false;
+    state.widgetsMenuOpen = false;
+    m.redraw();
+}
 
 /** Page URLs: the list and one editor page per overlay (linkable). */
 export const LIST_URL = "/overlays/";

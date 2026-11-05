@@ -1,12 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
     CHAT_CONFIG_FIELDS,
-    type ChatChannel,
     chatBadgesFromConfig,
     chatPlatformIconsFromConfig,
-    chatPropsToConfig,
-    chatSpecsFromChannels,
-    normalizeChannels,
 } from "../server/pages/dashboards/modules/chat/config";
 
 describe("chat platform icons", () => {
@@ -76,68 +72,3 @@ describe("chat sender badges", () => {
     });
 });
 
-describe("chat element channel list", () => {
-    test("normalizes channels: keeps known-platform rows (empty handles become ''), drops unknown platforms and non-objects", () => {
-        expect(
-            normalizeChannels([
-                { platform: "twitch", channel: " Some Streamer " },
-                { platform: "kick", channel: "handle" },
-                { platform: "hulu", channel: "nope" },
-                { platform: "youtube", channel: "   " },
-                { platform: "tiktok", channel: 42 as unknown as string },
-                "not-an-object",
-                null,
-            ]),
-        ).toEqual<ChatChannel[]>([
-            { platform: "twitch", channel: "some streamer" },
-            { platform: "kick", channel: "handle" },
-            { platform: "youtube", channel: "" },
-            { platform: "tiktok", channel: "" },
-        ]);
-    });
-
-    test("treats non-array and empty input as no channels", () => {
-        expect(normalizeChannels(undefined)).toEqual([]);
-        expect(normalizeChannels("nope")).toEqual([]);
-        expect(normalizeChannels([])).toEqual([]);
-    });
-
-    test("chatSpecsFromChannels renders specs and skips empty handles", () => {
-        expect(
-            chatSpecsFromChannels([
-                { platform: "twitch", channel: "alice" },
-                { platform: "youtube", channel: "creator" },
-                { platform: "kick", channel: "" },
-            ]),
-        ).toEqual(["twitch:alice", "youtube:creator"]);
-    });
-
-    test("chatPropsToConfig rebuilds a widget-shaped config from element props", () => {
-        const config = chatPropsToConfig({
-            channels: [{ platform: "twitch", channel: " Alice " }],
-            order: "bottom",
-            bannedMessages: "hide",
-            timestamps: "on",
-            platformIcons: "on",
-        });
-        expect(config).toEqual({
-            twitch: "alice",
-            order: "bottom",
-            bannedMessages: "hide",
-            timestamps: "on",
-            badges: "on",
-            platformIcons: "on",
-        });
-    });
-
-    test("chatPropsToConfig falls back to defaults for missing/invalid props", () => {
-        const config = chatPropsToConfig({ channels: [] });
-        expect(config).toEqual({
-            order: "top",
-            bannedMessages: "strike",
-            timestamps: "off",
-            badges: "on",
-            platformIcons: "auto",
-        });
-    });
-});

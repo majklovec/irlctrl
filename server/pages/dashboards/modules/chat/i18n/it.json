@@ -32,13 +32,5 @@
     "dash.widget_ignoredUsernames": "Utenti ignorati (separati da virgole)",
     "chat.tts.on": "Legge la chat ad alta voce",
     "chat.tts.off": "TTS disattivato",
-    "chat.tts.waiting": "In attesa di una voce ceca…",
-    "overlay.add_chat": "Chat",
-    "overlay.chat_channels": "Canali",
-    "overlay.chat_add_channel": "Aggiungi canale",
-    "overlay.chat_remove_channel": "Rimuovi canale",
-    "overlay.chat_no_channels": "Nessun canale",
-    "overlay.chat_platform": "Piattaforma",
-    "overlay.chat_channel": "Canale",
-    "overlay.chat_channel_ph": "canale"
+    "chat.tts.waiting": "In attesa di una voce ceca…"
 }

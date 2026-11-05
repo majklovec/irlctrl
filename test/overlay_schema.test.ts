@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { DEFAULT_CHAT_PROPS } from "../server/pages/dashboards/modules/chat/overlay_schema";
 import {
+	DEFAULT_CHAT_PROPS,
 	DEFAULT_LINE_PROPS,
 	DEFAULT_PROGRESS_PROPS,
 	DEFAULT_RECTANGLE_PROPS,
@@ -87,9 +87,32 @@ describe("overlay schema", () => {
 		el0.note = "editor draft marker";
 
 		const { overlay, migrated } = migrateOverlayBlob(raw);
-		expect(migrated).toBe(false);
+		// v1 input now migrates through the v1→v2 step.
+		expect(migrated).toBe(true);
 		expect(overlay).toHaveProperty("customFlag", "keep-me");
 		expect(overlay.elements[0]).toHaveProperty("note", "editor draft marker");
+	});
+
+	test("migrateOverlayBlob drops removed viewer_chat elements (v1 → v2)", () => {
+		const raw = validV1Overlay();
+		raw.elements.push(
+			{
+				id: "vc-1", name: "chat", type: "viewer_chat",
+				transform: { x: 10, y: 10, w: 400, h: 300 },
+				visible: true, locked: false, parentId: null, bindings: {}, props: {},
+			},
+			{
+				...textElement(),
+				id: "el-2",
+				parentId: "vc-1",
+			},
+		);
+		const { overlay } = migrateOverlayBlob(raw);
+		const ids = overlay.elements.map((e) => e.id);
+		expect(ids).not.toContain("vc-1");
+		// a child nested in the removed element is kept, un-parented
+		const child = overlay.elements.find((e) => e.id === "el-2");
+		expect(child?.parentId).toBeNull();
 	});
 
 	test("migrateOverlayBlob rejects unmigratable overlays", () => {

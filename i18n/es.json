@@ -161,6 +161,8 @@
     "nav.profile": "Perfil",
     "overlay.add": "Add",
     "overlay.add_shape": "Shape",
+    "overlay.add_shapes": "Formas",
+    "overlay.add_widgets": "Widgets",
     "overlay.assets": "Assets",
     "overlay.back_list": "Volver a la lista",
     "overlay.bind_variable": "Vincular a una variable",

@@ -161,6 +161,8 @@
     "nav.profile": "个人资料",
     "overlay.add": "Add",
     "overlay.add_shape": "Shape",
+    "overlay.add_shapes": "形状",
+    "overlay.add_widgets": "小组件",
     "overlay.assets": "Assets",
     "overlay.back_list": "返回列表",
     "overlay.bind_variable": "绑定到变量",
