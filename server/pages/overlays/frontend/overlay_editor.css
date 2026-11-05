@@ -173,6 +173,12 @@
     cursor: move;
     /* keep drag/resize from starting a text selection on the element content */
     user-select: none;
+    /* make each element its own stacking context. Without this, Leaflet's
+       internal panes (z-index 200-700) and iframes escape to the page-level
+       context and paint ABOVE the toolbar's floating panels (the element
+       catalog, z-index 100). `isolation` keeps sibling paint order (DOM
+       order) intact, so back-to-front layering is unchanged. */
+    isolation: isolate;
 }
 /* element content sizing: the runtime page gets these from overlay.css, which
 the editor page must NOT load (it carries document-level transparent/full-screen
