@@ -331,6 +331,8 @@ function lineSegments(text: string): m.Children {
 			<img
 				class="chat-emote"
 				key={index}
+				// Inline mirror of overlay.css: the editor doesn't load it.
+				style="height:1em;width:auto;vertical-align:-0.15em;margin:0 1px"
 				src={src}
 				alt={segment.name}
 				loading="lazy"
