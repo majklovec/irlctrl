@@ -26,5 +26,11 @@
     "overlay.tpl.lower_third_bar": "Barra de legendas",
     "overlay.tpl.starting_soon": "Começando em breve",
     "overlay.tpl.ticker": "Letreiro",
-    "overlay.tpl.webcam_frame": "Moldura da webcam"
+    "overlay.tpl.webcam_frame": "Moldura da webcam",
+    "overlay.tpl.alert": "Alerta",
+    "overlay.tpl.breaking_banner": "Faixa de última hora",
+    "overlay.tpl.chat_box": "Caixa de chat",
+    "overlay.tpl.goal_bar": "Barra de objetivo",
+    "overlay.tpl.music_viz": "Visualizador de música",
+    "overlay.tpl.question_card": "Cartão de pergunta"
 }

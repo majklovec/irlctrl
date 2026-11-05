@@ -26,5 +26,11 @@
     "overlay.tpl.lower_third_bar": "Barratura sottotitoli",
     "overlay.tpl.starting_soon": "Sta per iniziare",
     "overlay.tpl.ticker": "Ticker",
-    "overlay.tpl.webcam_frame": "Cornice webcam"
+    "overlay.tpl.webcam_frame": "Cornice webcam",
+    "overlay.tpl.alert": "Avviso",
+    "overlay.tpl.breaking_banner": "Banner ultim'ora",
+    "overlay.tpl.chat_box": "Riquadro chat",
+    "overlay.tpl.goal_bar": "Barra obiettivo",
+    "overlay.tpl.music_viz": "Visualizzatore musicale",
+    "overlay.tpl.question_card": "Scheda domanda"
 }

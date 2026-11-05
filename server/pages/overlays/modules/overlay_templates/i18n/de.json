@@ -26,5 +26,11 @@
     "overlay.tpl.lower_third_bar": "Untertitel-Leiste",
     "overlay.tpl.starting_soon": "Bald startet",
     "overlay.tpl.ticker": "Ticker",
-    "overlay.tpl.webcam_frame": "Webcam-Rahmen"
+    "overlay.tpl.webcam_frame": "Webcam-Rahmen",
+    "overlay.tpl.alert": "Alert",
+    "overlay.tpl.breaking_banner": "Eilmeldungs-Banner",
+    "overlay.tpl.chat_box": "Chatbox",
+    "overlay.tpl.goal_bar": "Zielbalken",
+    "overlay.tpl.music_viz": "Musik-Visualizer",
+    "overlay.tpl.question_card": "Fragekarte"
 }

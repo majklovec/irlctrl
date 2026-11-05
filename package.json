@@ -6,6 +6,7 @@
     "scripts": {
         "gen:modules": "bun scripts/gen_modules.ts",
         "gen:pages": "bun scripts/gen_pages.ts",
+        "i18n": "bun scripts/i18n.ts",
         "predev": "bun scripts/gen_modules.ts && bun scripts/gen_pages.ts",
         "pretest": "bun scripts/gen_pages.ts && bun scripts/gen_control_server_assets.ts",
         "dev": "bun server/main.ts",

@@ -193,7 +193,7 @@ export const textElement: OverlayElementDef & OverlayElementSchema = {
 	type: "text",
 	category: "basics",
 
-	labelKey: "overlay.add_text",
+	labelKey: "overlay.text",
 	icon: () => <Icon name="text" class="role-icon" />,
 	order: 10,
 	defaultProps: { ...DEFAULT_TEXT_PROPS },

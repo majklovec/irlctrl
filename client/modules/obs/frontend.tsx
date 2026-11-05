@@ -882,7 +882,7 @@ export function createObsPanel({
 									)}
 								</div>
 							</FieldGroup>
-							<FieldGroup legend={t("lowbs.group_scenes")}>
+							<FieldGroup legend={t("obs.scenes")}>
 								<div class="lbs-grid">
 									{SWITCHER_SCENE_FIELDS.map(([label, prop, optional]) => (
 										<Field
@@ -1230,7 +1230,7 @@ const obsControllerModule: FrontendModule = (() => {
 		defaultSize: { w: 6, h: 13 },
 		minSize: { w: 4, h: 4 },
 		component: (status) => (
-			<Card title={t("obs.card")} class="mod-obs" headActions={panel.head()}>
+			<Card title={t("wtype.obs")} class="mod-obs" headActions={panel.head()}>
 				{panel.component(
 					status
 						? { host: card, status: status as ObsStatus, live: null }

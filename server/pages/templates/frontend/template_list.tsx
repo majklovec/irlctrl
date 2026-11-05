@@ -413,7 +413,7 @@ function EditorPane() {
 			headActions={
 				<Actions>
 					<Button
-						label={t("tpl.save")}
+						label={t("ui.save")}
 						class="tpl-save"
 						disabled={editor.saving || !editor.dirty}
 						onclick={() => void save()}

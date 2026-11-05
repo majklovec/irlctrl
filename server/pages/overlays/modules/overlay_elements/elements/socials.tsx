@@ -176,16 +176,16 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 				{bindField(e, "props.slide", t("overlay.so_slide"),
 					<input type="checkbox" checked={p.slide === true} onchange={setBool("slide")} />, sp)}
 				{p.slide === true ? (
-					bindField(e, "props.interval", t("overlay.so_interval"),
+					bindField(e, "props.interval", t("overlay.interval"),
 						<input type="number" min={1000} max={600000} step={500} value={numProp(p, "interval", 4000)} oninput={setNum("interval")} />, sp)
 				) : null}
 			</div>
 			<div class="ov-grid3">
 				{bindField(e, "props.color", t("overlay.color"),
 					<input type="color" value={strProp(p, "color", "#ffffff")} oninput={setStr("color")} />, sp)}
-				{bindField(e, "props.background", t("overlay.so_background"),
+				{bindField(e, "props.background", t("overlay.cd_background"),
 					<input type="color" value={strProp(p, "background", "#1f2937")} oninput={setStr("background")} />, sp)}
-				{bindField(e, "props.accent", t("overlay.so_accent"),
+				{bindField(e, "props.accent", t("overlay.accent"),
 					<input type="color" value={strProp(p, "accent", "#38bdf8")} oninput={setStr("accent")} />, sp)}
 			</div>
 			{bindField(e, "props.fontSize", t("overlay.font_size"),
@@ -202,7 +202,7 @@ export const socialsElement: OverlayElementDef & OverlayElementSchema = {
 	type: "socials",
 	category: "widgets",
 
-	labelKey: "overlay.add_socials",
+	labelKey: "overlay.so_entries",
 	icon: () => <Icon name="share" class="role-icon" />,
 	order: 95,
 	defaultProps: { ...DEFAULT_SOCIALS_PROPS },

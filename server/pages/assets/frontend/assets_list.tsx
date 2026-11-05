@@ -471,7 +471,7 @@ function filesPanel(): m.Vnode {
 				}}
 			>
 				{filesState?.status === "loading" ? (
-					<p class="muted">{t("assets.loading")}</p>
+					<p class="muted">{t("overlay.loading")}</p>
 				) : filesState?.status === "error" ? (
 					<EmptyState message={filesState.error}>
 						<Toolbar>
@@ -486,7 +486,7 @@ function filesPanel(): m.Vnode {
 				) : (
 					<Table
 						columns={[
-							{ key: "name", header: t("assets.name") },
+							{ key: "name", header: t("overlay.name") },
 							{ key: "size", header: t("assets.size") },
 							{
 								key: "modified",
@@ -755,9 +755,9 @@ function modalView(): m.Vnode | null {
 					/>
 				</label>
 				<div class="actions">
-					<Button label={t("assets.cancel")} onclick={close} />
+					<Button label={t("ui.cancel")} onclick={close} />
 					<Button
-						label={t("assets.create")}
+						label={t("tpl.create")}
 						disabled={!state.modalValue.trim()}
 						onclick={() => void submitNewFolder()}
 					/>
@@ -788,7 +788,7 @@ function modalView(): m.Vnode | null {
 					/>
 				</label>
 				<div class="actions">
-					<Button label={t("assets.cancel")} onclick={close} />
+					<Button label={t("ui.cancel")} onclick={close} />
 					<Button
 						label={t("assets.save")}
 						disabled={!state.modalValue.trim()}

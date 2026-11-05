@@ -88,7 +88,7 @@ export function libraryAssetField(
 	return (
 		<>
 			<span class="ov-field">
-				<span class="ov-lbl">{t("overlay.library_asset")}</span>
+				<span class="ov-lbl">{t("overlay.library")}</span>
 				<span class="ov-lib-field">
 					<button
 						type="button"

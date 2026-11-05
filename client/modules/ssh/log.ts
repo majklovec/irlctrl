@@ -17,7 +17,7 @@ const log: LogWording = {
         ),
     },
     sections: { ssh: "SSH" },
-    labels: { SSH: "dev.card.ssh" },
+    labels: { SSH: "set.ssh" },
 };
 
 export default log;

@@ -26,5 +26,11 @@
     "overlay.tpl.lower_third_bar": "Нижняя треть",
     "overlay.tpl.starting_soon": "Скоро начнётся",
     "overlay.tpl.ticker": "Бегущая строка",
-    "overlay.tpl.webcam_frame": "Рамка веб-камеры"
+    "overlay.tpl.webcam_frame": "Рамка веб-камеры",
+    "overlay.tpl.alert": "Оповещение",
+    "overlay.tpl.breaking_banner": "Баннер срочных новостей",
+    "overlay.tpl.chat_box": "Окно чата",
+    "overlay.tpl.goal_bar": "Шкала цели",
+    "overlay.tpl.music_viz": "Музыкальный визуализатор",
+    "overlay.tpl.question_card": "Карточка вопроса"
 }

@@ -1,5 +1,5 @@
 {
-    "dev.card.ssh": "SSH",
+    "set.ssh": "SSH",
     "dev.row.password": "Heslo",
     "dev.row.user": "Uživatel",
     "dev.ssh_new_password": "Nové heslo",
@@ -7,7 +7,6 @@
     "dev.ssh_stop_confirm": "Zastavit SSH server na tomto zařízení? Aktivní ssh připojení se ukončí.",
     "mlog.done.ssh_password_reset": "SSH heslo uživatele {{user}} obnoveno",
     "mlog.done.ssh_password_set": "Heslo SSH pro {{user}} nastaveno",
-    "set.ssh": "SSH",
     "set.ssh_desc": "Spravujte SSH server tohoto zařízení — spouštějte a zastavujte ho, zvolte přihlašovací účet a nastavte nebo obnovte heslo.",
     "set.ssh_reset_done": "Heslo obnoveno — nové heslo pro {{user}} je uvedeno níže.",
     "set.ssh_saved": "Heslo pro {{user}} uloženo — bude použito na účtu při spuštění SSH.",

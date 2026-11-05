@@ -254,7 +254,7 @@ function editForm({
 			{bindField(
 				e,
 				"props.event",
-				t("overlay.cd_event"),
+				t("overlay.event"),
 				<input
 					type="text"
 					value={eventName}
@@ -272,9 +272,9 @@ function editForm({
 					title={
 						eventLinkCopied
 							? t("overlay.copied")
-							: eventUrl(eventName) + " — " + t("overlay.cd_event_link")
+							: eventUrl(eventName) + " — " + t("overlay.event_link")
 					}
-					aria-label={t("overlay.cd_event_link")}
+					aria-label={t("overlay.event_link")}
 					onclick={() => {
 						void navigator.clipboard.writeText(eventUrl(eventName)).then(
 							() => {
@@ -333,7 +333,7 @@ function editForm({
 				{bindField(
 					e,
 					"props.label",
-					t("overlay.cd_label"),
+					t("overlay.label"),
 					<input
 						type="text"
 						value={strProp(p, "label", "Starting in")}
@@ -356,7 +356,7 @@ function editForm({
 			{bindField(
 				e,
 				"props.loop",
-				t("overlay.cd_loop"),
+				t("overlay.loop"),
 				<input
 					type="checkbox"
 					checked={p.loop === true}
@@ -390,7 +390,7 @@ function editForm({
 				{bindField(
 					e,
 					"props.accent",
-					t("overlay.cd_accent"),
+					t("overlay.accent"),
 					<input
 						type="color"
 						value={strProp(p, "accent", "#f59e0b")}

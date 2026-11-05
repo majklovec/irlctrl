@@ -26,5 +26,11 @@
     "overlay.tpl.lower_third_bar": "ローサーバー",
     "overlay.tpl.starting_soon": "まもなく開始",
     "overlay.tpl.ticker": "ティッカー",
-    "overlay.tpl.webcam_frame": "Webcamフレーム"
+    "overlay.tpl.webcam_frame": "Webcamフレーム",
+    "overlay.tpl.alert": "アラート",
+    "overlay.tpl.breaking_banner": "速報バナー",
+    "overlay.tpl.chat_box": "チャットボックス",
+    "overlay.tpl.goal_bar": "目標バー",
+    "overlay.tpl.music_viz": "音楽ビジュアライザー",
+    "overlay.tpl.question_card": "質問カード"
 }

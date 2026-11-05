@@ -399,9 +399,9 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 			<div class="ov-grid3">
 				{bindField(e, "props.color", t("overlay.color"),
 					<input type="color" value={strProp(p, "color", "#ffffff")} oninput={setStr("color")} />, sp)}
-				{bindField(e, "props.background", t("overlay.weather_background"),
+				{bindField(e, "props.background", t("overlay.cd_background"),
 					<input type="color" value={strProp(p, "background", "#1f2937")} oninput={setStr("background")} />, sp)}
-				{bindField(e, "props.accent", t("overlay.weather_accent"),
+				{bindField(e, "props.accent", t("overlay.accent"),
 					<input type="color" value={strProp(p, "accent", "#38bdf8")} oninput={setStr("accent")} />, sp)}
 			</div>
 			{bindField(e, "props.fontSize", t("overlay.font_size"),

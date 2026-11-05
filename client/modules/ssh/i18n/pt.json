@@ -1,5 +1,5 @@
 {
-    "dev.card.ssh": "SSH",
+    "set.ssh": "SSH",
     "dev.row.password": "Senha",
     "dev.row.user": "Usuário",
     "dev.ssh_new_password": "Nova senha",
@@ -7,7 +7,6 @@
     "dev.ssh_stop_confirm": "Parar o servidor SSH? As ligações SSH ativas serão encerradas.",
     "mlog.done.ssh_password_reset": "Senha SSH de {{user}} redefinida",
     "mlog.done.ssh_password_set": "Senha SSH de {{user}} definida",
-    "set.ssh": "SSH",
     "set.ssh_desc": "Gerencie o servidor SSH deste dispositivo: inicie e pare-o, escolha a conta de login e defina ou redefina a senha.",
     "set.ssh_reset_done": "Senha redefinida — a nova senha de {{user}} está mostrada abaixo.",
     "set.ssh_saved": "Senha de {{user}} guardada — será aplicada à conta ao iniciar o SSH.",

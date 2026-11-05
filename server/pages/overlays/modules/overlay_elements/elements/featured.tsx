@@ -220,7 +220,7 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 				{bindField(
 					e,
 					"props.accent",
-					t("overlay.ft_accent"),
+					t("overlay.accent"),
 					<input
 						type="color"
 						value={strProp(p, "accent", "#38bdf8")}
@@ -231,7 +231,7 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 				{bindField(
 					e,
 					"props.background",
-					t("overlay.ft_background"),
+					t("overlay.cd_background"),
 					<input
 						type="color"
 						value={strProp(p, "background", "#111827")}

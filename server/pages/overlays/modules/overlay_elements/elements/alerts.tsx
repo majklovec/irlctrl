@@ -538,7 +538,7 @@ function editForm({
 			{bindField(
 				e,
 				"props.titleTemplate",
-				t("overlay.alert_title"),
+				t("overlay.ft_title"),
 				<input
 					type="text"
 					value={str("titleTemplate", "Hello {name}!")}

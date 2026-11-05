@@ -58,7 +58,7 @@
     "mlog.done.quality_on": "Qualità: on",
     "mlog.done.reloaded": "Ricaricato",
     "setup.step.relay_sub": "Impostazioni SRTLA",
-    "ui.off": "off",
+    "ui.off": "spento",
     "wtype.relay": "Relay",
     "act.relay.stop": "Ferma SRTLA",
     "act.relay.reload": "Ricarica uplink",

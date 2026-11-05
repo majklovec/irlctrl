@@ -55,7 +55,7 @@ export const ChannelsField = {
 						<div class="ov-channel-row" key={i}>
 							<select
 								value={c.platform}
-								aria-label={t("overlay.chat_platform")}
+								aria-label={t("overlay.so_label")}
 								onchange={(ev: Event) => {
 									const platform = (ev.target as HTMLSelectElement)
 										.value as ChatChannel["platform"];

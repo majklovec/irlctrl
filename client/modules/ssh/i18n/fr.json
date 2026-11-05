@@ -1,5 +1,5 @@
 {
-    "dev.card.ssh": "SSH",
+    "set.ssh": "SSH",
     "dev.row.password": "Mot de passe",
     "dev.row.user": "Utilisateur",
     "dev.ssh_new_password": "Nouveau mot de passe",
@@ -7,7 +7,6 @@
     "dev.ssh_stop_confirm": "Arrêter le serveur SSH ? Les connexions SSH actives seront fermées.",
     "mlog.done.ssh_password_reset": "Mot de passe SSH de {{user}} réinitialisé",
     "mlog.done.ssh_password_set": "Mot de passe SSH de {{user}} défini",
-    "set.ssh": "SSH",
     "set.ssh_desc": "Gérez le serveur SSH de cet appareil : démarrage et arrêt, compte de connexion, définition ou réinitialisation du mot de passe.",
     "set.ssh_reset_done": "Mot de passe réinitialisé — le nouveau mot de passe de {{user}} figure ci-dessous.",
     "set.ssh_saved": "Mot de passe de {{user}} enregistré — il sera appliqué au compte au démarrage de SSH.",

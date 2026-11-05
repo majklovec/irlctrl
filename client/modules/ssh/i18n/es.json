@@ -1,5 +1,5 @@
 {
-    "dev.card.ssh": "SSH",
+    "set.ssh": "SSH",
     "dev.row.password": "Contraseña",
     "dev.row.user": "Usuario",
     "dev.ssh_new_password": "Nueva contraseña",
@@ -7,7 +7,6 @@
     "dev.ssh_stop_confirm": "¿Detener el servidor SSH? Las conexiones SSH activas se cierran.",
     "mlog.done.ssh_password_reset": "Contraseña SSH de {{user}} restablecida",
     "mlog.done.ssh_password_set": "Contraseña SSH de {{user}} establecida",
-    "set.ssh": "SSH",
     "set.ssh_desc": "Administre el servidor SSH de este dispositivo: inicie y detenga, elija la cuenta de inicio de sesión y establezca o restablezca su contraseña.",
     "set.ssh_reset_done": "Contraseña restablecida — la nueva contraseña de {{user}} se muestra a continuación.",
     "set.ssh_saved": "Contraseña de {{user}} guardada — se aplicará a la cuenta al iniciar SSH.",

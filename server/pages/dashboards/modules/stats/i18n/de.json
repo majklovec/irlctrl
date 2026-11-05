@@ -1,5 +1,5 @@
 {
-    "stats.card": "Stats",
+    "stats.card": "Statistiken",
     "stats.youtube": "YouTube",
     "stats.twitch": "Twitch",
     "stats.kick": "Kick",
@@ -20,7 +20,7 @@
     "stats.viewers_many": "Zuschauer",
     "stats.viewers_other": "Zuschauer",
     "stats.waiting": "Warte auf den ersten Abruf…",
-    "wtype.stats": "Stats",
+    "wtype.stats": "Statistiken",
     "dash.widget_channel": "Kanal",
     "dash.widget_seriesCap": "Messpunkte-Limit"
 }

@@ -41,7 +41,7 @@
     "dev.stale": "veraltet, {{time}}",
     "dev.tech": "Technik",
     "dev.th.bond": "Bond",
-    "dev.th.in_flight": "In flight",
+    "dev.th.in_flight": "Unterwegs",
     "dev.th.in_flight_title": "Anzahl der SRTLA-Datenpuffer in der Warteschlange zu SRTLA",
     "dev.th.interface": "Schnittstelle",
     "dev.th.link": "Link",

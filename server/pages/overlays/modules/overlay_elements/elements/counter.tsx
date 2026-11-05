@@ -162,7 +162,7 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 		});
 	return (
 		<>
-			{bindField(e, "props.title", t("overlay.ct_title"),
+			{bindField(e, "props.title", t("overlay.cr_title"),
 				<input type="text" value={strProp(p, "title", "")} oninput={setStr("title")} />, sp)}
 			<ListField
 				element={e}
@@ -170,7 +170,7 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 				propKey="counters"
 				label={t("overlay.ct_counters")}
 				columns={[
-					{ key: "label", label: t("overlay.ct_label") },
+					{ key: "label", label: t("overlay.label") },
 					{ key: "value", label: t("overlay.ct_value"), type: "number" },
 				]}
 				addRow={() => ({ label: "", value: 0 })}
@@ -184,9 +184,9 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 			<div class="ov-grid3">
 				{bindField(e, "props.color", t("overlay.color"),
 					<input type="color" value={strProp(p, "color", "#ffffff")} oninput={setStr("color")} />, sp)}
-				{bindField(e, "props.accent", t("overlay.ct_accent"),
+				{bindField(e, "props.accent", t("overlay.accent"),
 					<input type="color" value={strProp(p, "accent", "#f59e0b")} oninput={setStr("accent")} />, sp)}
-				{bindField(e, "props.background", t("overlay.ct_background"),
+				{bindField(e, "props.background", t("overlay.cd_background"),
 					<input type="color" value={strProp(p, "background", "#111827")} oninput={setStr("background")} />, sp)}
 			</div>
 			{bindField(e, "props.fontSize", t("overlay.font_size"),

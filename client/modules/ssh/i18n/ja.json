@@ -1,5 +1,5 @@
 {
-    "dev.card.ssh": "SSH",
+    "set.ssh": "SSH",
     "dev.row.password": "パスワード",
     "dev.row.user": "ユーザー",
     "dev.ssh_new_password": "新しいパスワード",
@@ -7,7 +7,6 @@
     "dev.ssh_stop_confirm": "SSHサーバーを停止しますか？接続中のSSHセッションはクローズされます。",
     "mlog.done.ssh_password_reset": "SSH パスワードをリセットしました（{{user}}）",
     "mlog.done.ssh_password_set": "SSHパスワード（{{user}}）を設定しました",
-    "set.ssh": "SSH",
     "set.ssh_desc": "このデバイスのSSHサーバーを管理します。起動と停止、ログインアカウントの選択、パスワードの設定またはリセットができます。",
     "set.ssh_reset_done": "パスワードをリセットしました。新しいパスワード（{{user}}）を以下に表示しています。",
     "set.ssh_saved": "{{user}} のパスワードを保存しました — SSH の起動時にアカウントへ適用されます。",

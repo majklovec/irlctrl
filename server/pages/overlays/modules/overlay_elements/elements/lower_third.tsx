@@ -216,7 +216,7 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 				? bindField(
 						e,
 						"props.interval",
-						t("overlay.lt_interval"),
+						t("overlay.interval"),
 						<input
 							type="number"
 							min={1000}
@@ -243,7 +243,7 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 				{bindField(
 					e,
 					"props.background",
-					t("overlay.lt_background"),
+					t("overlay.cd_background"),
 					<input
 						type="color"
 						value={strProp(p, "background", "#111827")}
@@ -254,7 +254,7 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 				{bindField(
 					e,
 					"props.accent",
-					t("overlay.lt_accent"),
+					t("overlay.accent"),
 					<input
 						type="color"
 						value={strProp(p, "accent", "#38bdf8")}

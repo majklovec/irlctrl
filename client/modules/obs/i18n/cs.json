@@ -1,6 +1,6 @@
 {
     "obs.audio": "Hladina zvuku",
-    "obs.card": "OBS Studio",
+    "wtype.obs": "OBS Studio",
     "obs.connected": "připojeno",
     "obs.manual": "manuálně",
     "obs.mute": "Ztlumit mikrofon",
@@ -28,7 +28,6 @@
     "set.obs_desc": "Připojení k OBS Studio, které používá modul obs. Po uložení se modul restartuje.",
     "set.obs_url": "OBS WebSocket URL",
     "set.obs_password": "OBS heslo",
-    "wtype.obs": "OBS Studio",
     "lowbs.title": "Přepínač nízkého datového toku",
     "lowbs.idle": "nečinný",
     "lowbs.idle_hint": "Žádný modul zatím neběží. Nahoře nastavte OBS SRT zdroj, vyberte scény a uložte konfiguraci. Přepínač se spustí po jejím uložení.",
@@ -50,7 +49,6 @@
     "lowbs.trigger_rtt": "RTT (ms)",
     "lowbs.retry_attempts": "Počet opakování",
     "lowbs.poll_interval": "Interval dotazování (ms)",
-    "lowbs.group_scenes": "Scény",
     "lowbs.scene_normal": "Normální",
     "lowbs.scene_low": "Nízký datový tok",
     "lowbs.scene_offline": "Offline",

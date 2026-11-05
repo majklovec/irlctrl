@@ -546,7 +546,7 @@ function editForm({
 			{bindField(
 				e,
 				"props.event",
-				t("overlay.sw_event"),
+				t("overlay.event"),
 				<input type="text" value={eventName} oninput={setStr("event")} />,
 				sp,
 			)}
@@ -558,9 +558,9 @@ function editForm({
 					title={
 						eventLinkCopied
 							? t("overlay.copied")
-							: eventUrl(eventName) + " — " + t("overlay.sw_event_link")
+							: eventUrl(eventName) + " — " + t("overlay.event_link")
 					}
-					aria-label={t("overlay.sw_event_link")}
+					aria-label={t("overlay.event_link")}
 					onclick={() => {
 						void navigator.clipboard.writeText(eventUrl(eventName)).then(() => {
 							eventLinkCopied = true;
@@ -605,7 +605,7 @@ function editForm({
 				{bindField(
 					e,
 					"props.accent",
-					t("overlay.sw_accent"),
+					t("overlay.accent"),
 					<input
 						type="color"
 						value={strProp(p, "accent", "#f59e0b")}

@@ -26,5 +26,11 @@
     "overlay.tpl.lower_third_bar": "Titulky dole",
     "overlay.tpl.starting_soon": "Čoskoro",
     "overlay.tpl.ticker": "Biehúci pás",
-    "overlay.tpl.webcam_frame": "Rámec webkamery"
+    "overlay.tpl.webcam_frame": "Rámec webkamery",
+    "overlay.tpl.alert": "Upozornenie",
+    "overlay.tpl.breaking_banner": "Mimoriadny pás",
+    "overlay.tpl.chat_box": "Okno chatu",
+    "overlay.tpl.goal_bar": "Lišta cieľa",
+    "overlay.tpl.music_viz": "Hudobný vizualizér",
+    "overlay.tpl.question_card": "Karta s otázkou"
 }

@@ -1,5 +1,5 @@
 {
-    "dev.card.ssh": "SSH",
+    "set.ssh": "SSH",
     "dev.row.password": "Hasło",
     "dev.row.user": "Użytkownik",
     "dev.ssh_new_password": "Nowe hasło",
@@ -7,7 +7,6 @@
     "dev.ssh_stop_confirm": "Zatrzymać serwer SSH? Aktywne połączenia SSH zostaną zamknięte.",
     "mlog.done.ssh_password_reset": "Zresetowano hasło SSH użytkownika {{user}}",
     "mlog.done.ssh_password_set": "Ustawiono hasło SSH dla {{user}}",
-    "set.ssh": "SSH",
     "set.ssh_desc": "Zarządzaj serwerem SSH tego urządzenia — uruchamiaj i zatrzymuj go, wybierz konto logowania i ustaw lub zresetuj hasło.",
     "set.ssh_reset_done": "Hasło zresetowane — nowe hasło dla {{user}} jest wyświetlone poniżej.",
     "set.ssh_saved": "Hasło dla {{user}} zapisane — zostanie zastosowane na koncie przy uruchomieniu SSH.",

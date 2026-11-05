@@ -183,15 +183,15 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 			<div class="ov-grid2">
 				{bindField(e, "props.speed", t("overlay.cr_speed"),
 					<input type="number" min={0.1} max={20} step={0.5} value={numProp(p, "speed", 1)} oninput={setNum("speed")} />, sp)}
-				{bindField(e, "props.loop", t("overlay.cr_loop"),
+				{bindField(e, "props.loop", t("overlay.loop"),
 					<input type="checkbox" checked={p.loop === true} onchange={setBool("loop")} />, sp)}
 			</div>
 			<div class="ov-grid3">
 				{bindField(e, "props.color", t("overlay.color"),
 					<input type="color" value={strProp(p, "color", "#ffffff")} oninput={setStr("color")} />, sp)}
-				{bindField(e, "props.accent", t("overlay.cr_accent"),
+				{bindField(e, "props.accent", t("overlay.accent"),
 					<input type="color" value={strProp(p, "accent", "#ffd700")} oninput={setStr("accent")} />, sp)}
-				{bindField(e, "props.background", t("overlay.cr_background"),
+				{bindField(e, "props.background", t("overlay.cd_background"),
 					<input type="color" value={strProp(p, "background", "#000000")} oninput={setStr("background")} />, sp)}
 			</div>
 			{bindField(e, "props.fontSize", t("overlay.font_size"),

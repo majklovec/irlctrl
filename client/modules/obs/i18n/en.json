@@ -1,6 +1,6 @@
 {
     "obs.audio": "Audio level",
-    "obs.card": "OBS Studio",
+    "wtype.obs": "OBS Studio",
     "obs.connected": "connected",
     "obs.manual": "manual",
     "obs.mute": "Mute mic",
@@ -28,7 +28,6 @@
     "set.obs_desc": "Connection to OBS Studio used by the obs module. The module is restarted after saving.",
     "set.obs_url": "OBS WebSocket URL",
     "set.obs_password": "OBS password",
-    "wtype.obs": "OBS Studio",
     "lowbs.title": "Low bitrate switcher",
     "lowbs.idle": "idle",
     "lowbs.idle_hint": "No engine running yet. Set the OBS SRT source above, pick the scenes, and save — the switcher starts once its config is stored.",
@@ -50,7 +49,6 @@
     "lowbs.trigger_rtt": "RTT (ms)",
     "lowbs.retry_attempts": "Retry attempts",
     "lowbs.poll_interval": "Poll interval (ms)",
-    "lowbs.group_scenes": "Scenes",
     "lowbs.scene_normal": "Normal",
     "lowbs.scene_low": "Low bitrate",
     "lowbs.scene_offline": "Offline",

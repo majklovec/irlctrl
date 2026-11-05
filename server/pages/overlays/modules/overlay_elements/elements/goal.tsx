@@ -132,7 +132,7 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 		});
 	return (
 		<>
-			{bindField(e, "props.label", t("overlay.gl_label"),
+			{bindField(e, "props.label", t("overlay.label"),
 				<input type="text" value={strProp(p, "label", "Sub goal")} oninput={setStr("label")} />, sp)}
 			<div class="ov-grid2">
 				{bindField(e, "props.target", t("overlay.gl_target"),

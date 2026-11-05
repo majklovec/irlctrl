@@ -305,7 +305,7 @@ export function relayCardBody(host: DeviceCard, status: RelayStatus): m.Vnode {
 							<Badge text={t("dev.badge.stopped")} kind="off" />
 						),
 					],
-					[t("dev.row.started"), s.running ? since(s.startedAt) : null],
+					[t("mlog.done.started"), s.running ? since(s.startedAt) : null],
 					[
 						t("dev.reloads"),
 						t("dev.reloads_detail", {

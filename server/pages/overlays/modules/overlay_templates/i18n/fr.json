@@ -26,5 +26,11 @@
     "overlay.tpl.lower_third_bar": "Bandeau de sous-titres",
     "overlay.tpl.starting_soon": "Bientôt",
     "overlay.tpl.ticker": "Défilant",
-    "overlay.tpl.webcam_frame": "Cadre webcam"
+    "overlay.tpl.webcam_frame": "Cadre webcam",
+    "overlay.tpl.alert": "Alerte",
+    "overlay.tpl.breaking_banner": "Bandeau flash info",
+    "overlay.tpl.chat_box": "Boîte de chat",
+    "overlay.tpl.goal_bar": "Barre d’objectif",
+    "overlay.tpl.music_viz": "Visualiseur musical",
+    "overlay.tpl.question_card": "Carte de question"
 }

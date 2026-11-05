@@ -326,7 +326,7 @@ async function complete(): Promise<void> {
 		Object.assign(payload, setupStep.config(role));
 	try {
 		await rpc.call("setup.complete", payload);
-		state.message = `${t("setup.saved")} ${t("setup.restart_required")}`;
+		state.message = `${t("setup.saved")} ${t("set.restart_required")}`;
 		rpc.reconnect();
 	} catch (error: unknown) {
 		state.message = errorMessage(error);

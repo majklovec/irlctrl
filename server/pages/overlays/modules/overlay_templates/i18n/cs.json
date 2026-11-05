@@ -27,10 +27,10 @@
     "overlay.tpl.starting_soon": "Za chvíli",
     "overlay.tpl.ticker": "Běžící pás",
     "overlay.tpl.webcam_frame": "Rámeček webkamery",
-    "overlay.tpl.alert": "Alert",
-    "overlay.tpl.breaking_banner": "Breaking banner",
-    "overlay.tpl.chat_box": "Chat box",
-    "overlay.tpl.goal_bar": "Goal bar",
-    "overlay.tpl.music_viz": "Music visualizer",
-    "overlay.tpl.question_card": "Question card"
+    "overlay.tpl.alert": "Upozornění",
+    "overlay.tpl.breaking_banner": "Mimořádný pruh",
+    "overlay.tpl.chat_box": "Okno chatu",
+    "overlay.tpl.goal_bar": "Lišta cíle",
+    "overlay.tpl.music_viz": "Hudební vizualizér",
+    "overlay.tpl.question_card": "Karta s otázkou"
 }

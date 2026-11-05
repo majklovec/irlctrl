@@ -1,5 +1,5 @@
 {
-    "dev.card.ssh": "SSH",
+    "set.ssh": "SSH",
     "dev.row.password": "Password",
     "dev.row.user": "Utente",
     "dev.ssh_new_password": "Nuova password",
@@ -7,7 +7,6 @@
     "dev.ssh_stop_confirm": "Arrestare il server SSH? Le connessioni SSH attive verranno chiuse.",
     "mlog.done.ssh_password_reset": "Password SSH di {{user}} reimpostata",
     "mlog.done.ssh_password_set": "Password SSH di {{user}} impostato",
-    "set.ssh": "SSH",
     "set.ssh_desc": "Gestisci il server SSH di questo dispositivo: avvia e arresta, scegli l'account di accesso e imposta o reimposta la password.",
     "set.ssh_reset_done": "Password reimpostata — la nuova password di {{user}} è mostrata di seguito.",
     "set.ssh_saved": "Password di {{user}} salvata — verrà applicata all'account all'avvio di SSH.",

@@ -1,5 +1,5 @@
 {
-    "dev.card.ssh": "SSH",
+    "set.ssh": "SSH",
     "dev.row.password": "Passwort",
     "dev.row.user": "Benutzer",
     "dev.ssh_new_password": "Neues Passwort",
@@ -7,7 +7,6 @@
     "dev.ssh_stop_confirm": "SSH-Server stoppen? Aktive SSH-Verbindungen werden getrennt.",
     "mlog.done.ssh_password_reset": "SSH-Passwort für {{user}} zurückgesetzt",
     "mlog.done.ssh_password_set": "SSH-Passwort für {{user}} festgelegt",
-    "set.ssh": "SSH",
     "set.ssh_desc": "Verwalten Sie den SSH-Server dieses Geräts - starten und stoppen, Login-Konto wählen, Passwort setzen oder zurücksetzen.",
     "set.ssh_reset_done": "Passwort zurückgesetzt - das neue Passwort für {{user}} wird unten angezeigt.",
     "set.ssh_saved": "Passwort für {{user}} gespeichert - es wird beim SSH-Start auf dem Konto angewendet.",

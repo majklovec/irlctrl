@@ -26,5 +26,11 @@
     "overlay.tpl.lower_third_bar": "Pasek dolnych napisów",
     "overlay.tpl.starting_soon": "Wkrótce",
     "overlay.tpl.ticker": "Taśma",
-    "overlay.tpl.webcam_frame": "Rama kamerki"
+    "overlay.tpl.webcam_frame": "Rama kamerki",
+    "overlay.tpl.alert": "Alert",
+    "overlay.tpl.breaking_banner": "Pasek z pilną wiadomością",
+    "overlay.tpl.chat_box": "Okno czatu",
+    "overlay.tpl.goal_bar": "Pasek celu",
+    "overlay.tpl.music_viz": "Wizualizer muzyki",
+    "overlay.tpl.question_card": "Karta pytania"
 }

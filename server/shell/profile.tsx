@@ -189,8 +189,8 @@ const App: m.Component = {
 		void load();
 	},
 	view: () => (
-		<Page title={t("profile.title")} nav={<ServerNav active="profile" />}>
-			<Card title={t("profile.password")}>
+		<Page title={t("nav.profile")} nav={<ServerNav active="profile" />}>
+			<Card title={t("login.password")}>
 				<Form onSubmit={changePassword}>
 					<FieldGroup legend={t("profile.password.change")}>
 						<Field
@@ -360,6 +360,6 @@ const App: m.Component = {
 	),
 };
 
-void mountPage(() => t("profile.title"), App);
+void mountPage(() => t("nav.profile"), App);
 // Redraw once the catalogs land so the first paint is already translated
 void i18nReady.then(() => m.redraw());

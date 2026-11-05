@@ -182,7 +182,7 @@ const setupBitrateValid = (value: string) =>
 
 const encoderSetupStep: ModuleSetupStep = {
 	id: "encoder",
-	title: "setup.step.encoder",
+	title: "wtype.encoder",
 	subtitle: "setup.step.encoder_sub",
 	roles: ["encoder", "combined"],
 	isValid(role: Status["role"]) {
@@ -408,7 +408,7 @@ const encoderSummaryColumns = [
 		order: 30,
 		available: (device: DeviceSummary) =>
 			device.role === "encoder" || device.role === "combined",
-		header: () => [encoderIcon(), ` ${t("setup.step.encoder")}`],
+		header: () => [encoderIcon(), ` ${t("wtype.encoder")}`],
 		cell: (device: DeviceSummary) => {
 			const { encoder } = device as EncoderDeviceSummary;
 			if (!encoder) return "—";
@@ -781,7 +781,7 @@ function statusRows(
 			cfg &&
 				`${audioName ?? cfg.audioSource ?? t("dev.audio_pipeline_default")}, ${(cfg.audioCodec ?? "aac").toUpperCase()}`,
 		],
-		[t("dev.row.started"), e.running ? since(e.startedAt) : null],
+		[t("mlog.done.started"), e.running ? since(e.startedAt) : null],
 		[t("dev.row.restarts"), e.running ? (e.restarts ?? 0) : null],
 	];
 }
@@ -794,7 +794,7 @@ export function encoderCardBody(
 	const combined = status.role === "combined";
 	const pipeline = selectedPipeline(host);
 	return (
-		<Card title={t("dev.card.encoder")} class="mod-encoder">
+		<Card title={t("wtype.encoder")} class="mod-encoder">
 			<DefinitionList rows={statusRows(host, status)} />
 			<Form onSubmit={() => encoderStart(host)}>
 				<FieldGroup legend={t("dev.group.video")}>
@@ -824,7 +824,7 @@ export function encoderCardBody(
 						/>
 					)}
 				</FieldGroup>
-				<FieldGroup legend={t("dev.group.bitrate")}>
+				<FieldGroup legend={t("dev.row.bitrate")}>
 					<Field
 						label={t("dev.field.min_bitrate")}
 						control={
@@ -863,7 +863,7 @@ export function encoderCardBody(
 					/>
 				</FieldGroup>
 				{status.ceracoder && ceracoderControls(host)}
-				<FieldGroup legend={t("dev.group.audio")}>
+				<FieldGroup legend={t("dev.row.audio")}>
 					{pipeline?.asrc && (
 						<Field
 							label={t("dev.field.audio_source")}

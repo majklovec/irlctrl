@@ -26,5 +26,11 @@
     "overlay.tpl.lower_third_bar": "下三分之一条",
     "overlay.tpl.starting_soon": "即将开始",
     "overlay.tpl.ticker": "滚动条",
-    "overlay.tpl.webcam_frame": "摄像头边框"
+    "overlay.tpl.webcam_frame": "摄像头边框",
+    "overlay.tpl.alert": "提醒",
+    "overlay.tpl.breaking_banner": "突发新闻横幅",
+    "overlay.tpl.chat_box": "聊天框",
+    "overlay.tpl.goal_bar": "目标进度条",
+    "overlay.tpl.music_viz": "音乐可视化",
+    "overlay.tpl.question_card": "问题卡片"
 }

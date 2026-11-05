@@ -120,7 +120,7 @@ const App: m.Component = {
 				) : null}
 				<form onsubmit={submit}>
 					<Field
-						label={t("register.username")}
+						label={t("login.username")}
 						control={
 							<Input
 								target={state}
@@ -172,7 +172,7 @@ const App: m.Component = {
 					/>
 					<div class="actions">
 						<button type="submit" disabled={state.busy}>
-							{t("register.submit")}
+							{t("register.title")}
 						</button>
 					</div>
 					{state.error ? <p class="error">{t(state.error)}</p> : null}

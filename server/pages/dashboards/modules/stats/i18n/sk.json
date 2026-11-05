@@ -1,5 +1,5 @@
 {
-    "stats.card": "Stats",
+    "stats.card": "Štatistiky",
     "stats.youtube": "YouTube",
     "stats.twitch": "Twitch",
     "stats.kick": "Kick",
@@ -20,7 +20,7 @@
     "stats.viewers_many": "divákov",
     "stats.viewers_other": "divákov",
     "stats.waiting": "Čaká na prvý dotaz…",
-    "wtype.stats": "Stats",
+    "wtype.stats": "Štatistiky",
     "dash.widget_channel": "Kanál",
     "dash.widget_seriesCap": "Počet vzoriek"
 }

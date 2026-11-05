@@ -141,7 +141,7 @@ function createToolbar(): m.Vnode {
 				placeholder={t("dash.new_placeholder")}
 			/>
 			<Button
-				label={t("dash.create")}
+				label={t("tpl.create")}
 				onclick={createDashboard}
 				disabled={state.saving || !state.newName.trim()}
 			/>

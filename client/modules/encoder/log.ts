@@ -63,7 +63,7 @@ const log: LogWording = {
     },
     sections: { encoder: "Encoder", stream: "Stream", pipelines: "Pipelines" },
     labels: {
-        Encoder: "mlog.section.encoder",
+        Encoder: "wtype.encoder",
         Pipelines: "mlog.section.pipelines",
         Stream: "mgmt.th.stream",
         "Bitrate change": "mlog.action.bitrate",
