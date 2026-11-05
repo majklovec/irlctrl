@@ -1,3 +1,10 @@
+# [2.19.0](https://github.com/majklovec/irlctrl/compare/v2.18.0...v2.19.0) (2026-11-05)
+
+
+### Features
+
+* **chat:** enhance chat feed styling with customizable text properties ([3c8f389](https://github.com/majklovec/irlctrl/commit/3c8f389e3465bd4758971de244d16df183b22b97))
+
 # [2.18.0](https://github.com/majklovec/irlctrl/compare/v2.17.0...v2.18.0) (2026-11-05)
 
 
