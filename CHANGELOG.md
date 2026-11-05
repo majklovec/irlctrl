@@ -1,3 +1,16 @@
+# [2.22.0](https://github.com/majklovec/irlctrl/compare/v2.21.0...v2.22.0) (2026-11-05)
+
+
+### Bug Fixes
+
+* **twitch:** badges ([1ca684b](https://github.com/majklovec/irlctrl/commit/1ca684bcef9276a9f1f05b7dabc8f5eab43e3bc7))
+
+
+### Features
+
+* **map:** add live map overlay element with internationalization support ([30c3708](https://github.com/majklovec/irlctrl/commit/30c370841cc12eb2c6eb864e027d0110bd3e57a4))
+* **map:** enhance live map props with grayscale and invert options, update translations ([3eccd17](https://github.com/majklovec/irlctrl/commit/3eccd172ac65d8909165e7260e8577ad683e3333))
+
 # [2.21.0](https://github.com/majklovec/irlctrl/compare/v2.20.0...v2.21.0) (2026-11-05)
 
 
