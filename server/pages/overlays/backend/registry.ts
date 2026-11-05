@@ -61,6 +61,17 @@ export interface OverlaySummary {
     updatedAt: number;
 }
 
+/** Element types that carry a `props.channels` list the runtime must attach
+ * chat providers for: the `chat` element itself plus the chat-driven widgets
+ * (all of them render live chat lines in the OBS overlay). */
+const CHAT_CARRYING_ELEMENT_TYPES: ReadonlySet<string> = new Set([
+    "chat",
+    "emote_wall",
+    "emote_combo",
+    "featured",
+    "viewer_chat",
+]);
+
 const isRecord = (v: unknown): v is Record<string, unknown> =>
     typeof v === "object" && v !== null && !Array.isArray(v);
 
@@ -912,7 +923,11 @@ export function createOverlays({
             if (!store || store.id !== overlayId) return null;
             const specs = new Set<string>();
             for (const el of store.overlay.elements) {
-                if (el.type !== "chat") continue;
+                // The chat element and the chat-driven widgets (emote wall,
+                // emote combo, featured, viewer chat) all carry a normalized
+                // `props.channels` list; every one of them needs its
+                // channels' providers attached for this overlay's viewers.
+                if (!CHAT_CARRYING_ELEMENT_TYPES.has(el.type)) continue;
                 // `props.channels` is already normalized by the chat schema
                 // (a clean `{platform, channel}[]`), so it can be mapped to
                 // specs without re-importing the chat module.

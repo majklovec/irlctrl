@@ -637,7 +637,7 @@ function editForm({
 						<option value="">{t("overlay.alert_tts_default_voice")}</option>
 						{typeof window !== "undefined" && "speechSynthesis" in window
 							? window.speechSynthesis.getVoices().map((v) => (
-									<option key={v.voiceURI} value={v.name}>
+									<option value={v.name}>
 										{v.name} ({v.lang})
 									</option>
 								))

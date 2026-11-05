@@ -166,6 +166,82 @@ export const SHAPES = {
 			<path d="m20.5 20.5-4.2-4.2" />
 		</>
 	),
+	/* ── overlay widget pictograms ── */
+	clock: (
+		<>
+			<circle cx="12" cy="12" r="9" />
+			<path d="M12 7v5l3 2" />
+		</>
+	),
+	weather: (
+		<>
+			<path d="M17.5 18a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6 1.2A3 3 0 0 0 8 18Z" />
+			<path d="M12 2v2M4.9 4.9l1.4 1.4M2 12h2" />
+		</>
+	),
+	music: (
+		<>
+			<path d="M9 18V5l10-2v13" />
+			<circle cx="6" cy="18" r="3" />
+			<circle cx="16" cy="16" r="3" />
+		</>
+	),
+	target: (
+		<>
+			<circle cx="12" cy="12" r="9" />
+			<circle cx="12" cy="12" r="5" />
+			<circle cx="12" cy="12" r="1" />
+		</>
+	),
+	hash: (
+		<>
+			<path d="M5 9h14M5 15h14M10 4 7 20M17 4l-3 16" />
+		</>
+	),
+	frame: (
+		<path d="M4 7V4h3M20 7V4h-3M4 17v3h3M20 17v3h-3" />
+	),
+	checklist: (
+		<>
+			<path d="M4 6l1.5 1.5L8 5M4 12l1.5 1.5L8 11M4 18l1.5 1.5L8 17" />
+			<path d="M11 6h9M11 12h9M11 18h9" />
+		</>
+	),
+	smile: (
+		<>
+			<circle cx="12" cy="12" r="9" />
+			<path d="M8.5 14a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01" />
+		</>
+	),
+	star: (
+		<path d="m12 3 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.2l1-5.8L3.5 9.3l5.9-.9Z" />
+	),
+	spin: (
+		<>
+			<circle cx="12" cy="12" r="9" />
+			<path d="M12 12 4.6 8M12 12l7.4-4M12 12v8" />
+		</>
+	),
+	subtitles: (
+		<>
+			<rect x="3" y="5" width="18" height="14" rx="2" />
+			<path d="M7 13h6M15 13h2M7 16h3M12.5 16H17" />
+		</>
+	),
+	share: (
+		<>
+			<circle cx="6" cy="12" r="2.5" />
+			<circle cx="18" cy="6" r="2.5" />
+			<circle cx="18" cy="18" r="2.5" />
+			<path d="m8.2 10.8 7.6-3.6M8.2 13.2l7.6 3.6" />
+		</>
+	),
+	credits: (
+		<>
+			<rect x="4" y="3" width="16" height="18" rx="2" />
+			<path d="M8 8h8M8 12h8M8 16h5" />
+		</>
+	),
 } as const;
 
 export type IconName = keyof typeof SHAPES;

@@ -4,15 +4,30 @@
  * overlay_schema.ts.
  */
 import { alertsElement } from "./elements/alerts";
+import { countdownElement } from "./elements/countdown";
+import { creditsElement } from "./elements/credits";
+import { counterElement } from "./elements/counter";
 import { ellipseElement } from "./elements/ellipse";
+import { emoteComboElement } from "./elements/emote_combo";
+import { emoteWallElement } from "./elements/emote_wall";
+import { featuredElement } from "./elements/featured";
+import { frameElement } from "./elements/frame";
+import { goalElement } from "./elements/goal";
 import { groupElement } from "./elements/group";
 import { iframeElement } from "./elements/iframe";
 import { imageElement } from "./elements/image";
 import { lineElement } from "./elements/line";
+import { lowerThirdElement } from "./elements/lower_third";
+import { nowPlayingElement } from "./elements/now_playing";
 import { progressElement } from "./elements/progress";
 import { rectangleElement } from "./elements/rectangle";
+import { socialsElement } from "./elements/socials";
+import { spinWheelElement } from "./elements/spin_wheel";
+import { tasksElement } from "./elements/tasks";
 import { textElement } from "./elements/text";
 import { videoElement } from "./elements/video";
+import { viewerChatElement } from "./elements/viewer_chat";
+import { weatherElement } from "./elements/weather";
 
 export default [
 	textElement,
@@ -25,4 +40,19 @@ export default [
 	iframeElement,
 	groupElement,
 	alertsElement,
+	weatherElement,
+	nowPlayingElement,
+	countdownElement,
+	lowerThirdElement,
+	frameElement,
+	socialsElement,
+	creditsElement,
+	tasksElement,
+	goalElement,
+	counterElement,
+	spinWheelElement,
+	emoteWallElement,
+	emoteComboElement,
+	featuredElement,
+	viewerChatElement,
 ];

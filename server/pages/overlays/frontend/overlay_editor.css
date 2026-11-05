@@ -714,7 +714,7 @@ identically here and on the runtime page */
     cursor: pointer;
 }
 .ov-channel-remove:hover {
-    color: #fff;
+    color: var(--on-accent);
     background: var(--bad);
 }
 .ov-channel-add {
@@ -1097,4 +1097,31 @@ instead of truncating */
 .ov-lib-path {
     font-size: 11px;
     color: var(--muted);
+}
+
+/* widget list-editor rows (socials/credits/tasks/counters tables): a flex
+ * row of inputs + a remove button, the `.ov-channel-row` grid is reserved
+ * for the platform+handle channel rows */
+.ov-list-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+.ov-list-cell {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+}
+.ov-list-cell input {
+    width: 100%;
+    min-width: 0;
+}
+.ov-list-num {
+    flex: 0 0 4.5rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+.ov-list-bool {
+    flex: 0 0 auto;
+    margin: 0;
 }

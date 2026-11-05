@@ -362,3 +362,48 @@ body {
 .alert-text-pop {
     animation: ovAlertPop 0.5s ease-out both;
 }
+
+/* ── widget keyframes (runtime only; the editor renders design states) ─── */
+
+/* credits: the track scrolls up by its own height (animation duration is
+ * set inline from the element's speed prop) */
+@keyframes ovCreditsScroll {
+    from {
+        transform: translateY(0);
+    }
+    to {
+        transform: translateY(-100%);
+    }
+}
+
+/* emote wall: a chip drifts up the board and fades out; `--ew-drift`
+ * (set inline per chip) adds a little sideways wander */
+@keyframes ovEmoteFloat {
+    0% {
+        bottom: -15%;
+        opacity: 0;
+        transform: translateX(0);
+    }
+    10% {
+        opacity: 1;
+    }
+    85% {
+        opacity: 1;
+    }
+    100% {
+        bottom: 112%;
+        opacity: 0;
+        transform: translateX(var(--ew-drift, 0));
+    }
+}
+
+.ov-emote-chip {
+    /* a chip's own colour is set inline; the shadow is not a theme colour */
+    --ov-emote-shadow: rgba(0, 0, 0, 0.8);
+    position: absolute;
+    white-space: nowrap;
+    text-shadow: 0 1px 3px var(--ov-emote-shadow);
+    pointer-events: none;
+    will-change: bottom, opacity, transform;
+    animation: ovEmoteFloat linear both;
+}
