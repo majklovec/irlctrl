@@ -19,6 +19,7 @@ import { groupElement } from "./elements/group";
 import { iframeElement } from "./elements/iframe";
 import { imageElement } from "./elements/image";
 import { lineElement } from "./elements/line";
+import { liveMapElement } from "./elements/live_map";
 import { lowerThirdElement } from "./elements/lower_third";
 import { nowPlayingElement } from "./elements/now_playing";
 import { progressElement } from "./elements/progress";
@@ -58,6 +59,7 @@ const elements: (OverlayElementDef & OverlayElementSchema)[] = [
 	emoteComboElement,
 	featuredElement,
 	chatElement,
+	liveMapElement,
 ];
 
 export default elements;
