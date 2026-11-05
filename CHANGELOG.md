@@ -1,3 +1,10 @@
+# [2.20.0](https://github.com/majklovec/irlctrl/compare/v2.19.0...v2.20.0) (2026-11-05)
+
+
+### Features
+
+* **chat:** improve image URL handling for Google CDNs and update segment regex ([a9a4ae2](https://github.com/majklovec/irlctrl/commit/a9a4ae29c91aece2c0de4caaa601c5a5f799f872))
+
 # [2.19.0](https://github.com/majklovec/irlctrl/compare/v2.18.0...v2.19.0) (2026-11-05)
 
 
