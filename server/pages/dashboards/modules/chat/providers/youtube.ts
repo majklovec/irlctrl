@@ -15,8 +15,8 @@
  */
 
 import { RateLimitError, ScrapeError } from "youtube-chat-next";
-import { fetchLivePage } from "youtube-chat-next/dist/requests";
 import { parseChatData } from "youtube-chat-next/dist/parser";
+import { fetchLivePage } from "youtube-chat-next/dist/requests";
 import type { ChatItem } from "youtube-chat-next/dist/types/data";
 import type {
     Action,
@@ -74,13 +74,27 @@ function userNameColor(username: string): string {
  * handle, not the display name YouTube shows in chat) and a stable color is
  * attached for the username display. `badges` are the raw role/membership
  * renderers for this message's id, mapped to wire badges. */
-function asChatMessage(item: ChatItem, badges?: AuthorBadge[]): ChatLive | null {
+function asChatMessage(
+    item: ChatItem,
+    badges?: AuthorBadge[],
+): ChatLive | null {
     const text = item.message
-        .map((part) =>
-            "text" in (part as object)
-                ? (part as { text: string }).text
-                : (part as { emojiText: string }).emojiText,
-        )
+        .map((part) => {
+            const p = part as {
+                text?: string;
+                emojiText?: string;
+                isCustomEmoji?: boolean;
+                url?: string;
+            };
+            // Plain text run.
+            if (typeof p.text === "string") return p.text;
+            // Global preset emojis carry the Unicode glyph in `emojiText`
+            // (e.g. "🫡"), which renders natively as-is. Channel-specific
+            // ("custom") emojis instead carry a picture in `url` — emit that
+            // URL so the feed renders the actual image (as an inline emote)
+            // rather than the bare `:name:` shortcut word.
+            return p.isCustomEmoji && p.url ? p.url : (p.emojiText ?? "");
+        })
         .join("");
     const username = item.author?.name?.replace(/^@/, "") || undefined;
     const out: ChatLive = {
@@ -132,7 +146,10 @@ async function fetchChatWithActions(
         },
         body: JSON.stringify({
             context: {
-                client: { clientVersion: options.clientVersion, clientName: "WEB" },
+                client: {
+                    clientVersion: options.clientVersion,
+                    clientName: "WEB",
+                },
             },
             continuation: options.continuation,
         }),
@@ -148,9 +165,8 @@ async function fetchChatWithActions(
     }
     const data = (await res.json()) as GetLiveChatResponse;
     const [items, continuation] = parseChatData(data);
-    const actions = (
-        data.continuationContents?.liveChatContinuation?.actions ?? []
-    ) as ChatAction[];
+    const actions = (data.continuationContents?.liveChatContinuation?.actions ??
+        []) as ChatAction[];
     return [items, continuation, actions];
 }
 

@@ -149,12 +149,11 @@ function upgradeEmoteUrl(raw: string): string {
 		return url.replace(/\/(?:1|2|3)\.0$/, "/3.0");
 	}
 
-	// YouTube:  yt3.ggpht.com images use =s{size} suffixes; =s0 is max.
-	if (
-		url.startsWith("https://yt3.ggpht.com/") ||
-		url.startsWith("https://lh3.googleusercontent.com/")
-	) {
-		return url.replace(/=s\d+(-[a-z-]+)?$/, "=s0$1");
+	// Google image CDNs (yt3.ggpht.com, lh3.ggpht.com,
+	// lh3.googleusercontent.com — the ggpht hosts carry YouTube channel
+	// emojis) use =s{size} suffixes; =s0 is max.
+	if (/\/\/[a-z0-9.-]+\.(?:ggpht\.com|googleusercontent\.com)\//.test(url)) {
+		return url.replace(/=s\d+(?=-|$)/, "=s0");
 	}
 
 	// Kick already serves fullsize in our constructed URLs; nothing to do.
@@ -239,10 +238,12 @@ type ChatSegment =
  * Combined segment regex:
  *   1. Kick:      [emote:<id>:<name>]
  *   2. YouTube:   :<shortcode>:            (only known emojis)
- *   3. Image URL: direct https link to a known emote CDN
+ *   3. Image URL: direct https link to a known emote CDN (the *.ggpht.com /
+ *      *.googleusercontent.com hosts cover YouTube channel emojis, which the
+ *      provider inlines as URLs)
  */
 const SEGMENT_RE =
-	/\[emote:(\d+):([^\]]*)\]|:([a-zA-Z0-9_+-]{1,40}):|(https?:\/\/(?:cdn\.7tv\.app|cdn\.betterttv\.net|cdn\.frankerfacez\.com|static-cdn\.jtvnw\.net|yt3\.ggpht\.com|lh3\.googleusercontent\.com|files\.kick\.com)\/[^\s<>"']+)/g;
+	/\[emote:(\d+):([^\]]*)\]|:([a-zA-Z0-9_+-]{1,40}):|(https?:\/\/(?:cdn\.7tv\.app|cdn\.betterttv\.net|cdn\.frankerfacez\.com|static-cdn\.jtvnw\.net|(?:yt\d|lh\d)\.(?:ggpht\.com|googleusercontent\.com)|files\.kick\.com)\/[^\s<>"']+)/g;
 
 function parseSegments(text: string): ChatSegment[] {
 	const out: ChatSegment[] = [];
