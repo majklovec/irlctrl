@@ -45,6 +45,89 @@ function accumulateSpin(current: number, offset: number): number {
 	return base + 360 * 4 + delta;
 }
 
+/** The disc's CURRENT visual angle in degrees, read straight off the live
+ * computed transform. Starting the next spin here (rather than from a stored
+ * value) means an interrupted spin continues seamlessly from wherever the
+ * wheel actually is. `matrix(a,b,…)` is `rotate(θ)` where θ = atan2(b, a). */
+function currentAngle(disc: HTMLElement | null): number {
+	if (!disc) return 0;
+	const t = getComputedStyle(disc).transform;
+	const m = /matrix\(([^)]+)\)/.exec(t ?? "");
+	if (!m) return 0;
+	const [a, b] = m[1].split(",").map((v) => parseFloat(v.trim()));
+	return ((Math.atan2(b, a) * 180) / Math.PI + 360) % 360;
+}
+
+/** Drive one guaranteed spin: from `from` (the live angle) to `to` (resting
+ * angle on the winner), for exactly `duration` ms, via the Web Animations
+ * API. WAAPI runs independently of Mithril's render/batching and CSS
+ * transitions, so every trigger produces a full-duration spin. The previous
+ * animation is cancelled first so an in-flight spin is interrupted cleanly. */
+/** Stop the "win" highlight and its pulse (used when a new spin starts — the
+ * previous winner is no longer valid). */
+function clearHighlight(s: SpinState): void {
+	s.pulse?.cancel();
+	s.pulse = null;
+	if (s.highlight) s.highlight.style.opacity = "0";
+}
+
+/** Reveal the winning-segment wedge and give it a gentle looping opacity
+ * pulse so it reads as "this is the winner". The wedge sits inside the
+ * rotating disc, so it lands on whatever segment is under the pointer. */
+function showHighlight(s: SpinState): void {
+	if (!s.highlight) return;
+	s.pulse?.cancel();
+	s.pulse = null;
+	if (typeof s.highlight.animate === "function") {
+		s.pulse = s.highlight.animate(
+			[{ opacity: "0.2" }, { opacity: "0.55" }, { opacity: "0.2" }],
+			{ duration: 1400, iterations: Infinity, easing: "ease-in-out" },
+		);
+	} else {
+		// no WAAPI (very old engine) — a static, clearly visible wedge
+		s.highlight.style.opacity = "0.4";
+	}
+}
+
+/** Drive one guaranteed spin: from `from` (the live angle) to `to` (resting
+ * angle on the winner), for exactly `duration` ms, via the Web Animations
+ * API. WAAPI runs independently of Mithril's render/batching and CSS
+ * transitions, so every trigger produces a full-duration spin. The previous
+ * animation is cancelled first so an in-flight spin is interrupted cleanly.
+ * On finish the winning segment is highlighted. */
+function startSpin(
+	s: SpinState,
+	from: number,
+	to: number,
+	duration: number,
+): void {
+	const disc = s.disc;
+	if (!disc || typeof disc.animate !== "function") return;
+	// A new spin invalidates the previous winner — hide it and mark spinning.
+	clearHighlight(s);
+	s.spinning = true;
+	s.anim?.cancel();
+	const anim = disc.animate(
+		[
+			{ transform: `rotate(${from}deg)` },
+			{ transform: `rotate(${to}deg)` },
+		],
+		{
+			duration: Math.max(0, duration),
+			easing: "cubic-bezier(0.2, 0.7, 0.3, 1)",
+			fill: "forwards",
+		},
+	);
+	s.anim = anim;
+	anim.onfinish = () => {
+		s.spinning = false;
+		showHighlight(s);
+		// Redraw so the `spinning`-dependent label emphasis re-renders; the
+		// wedge itself is shown imperatively above (WAAPI owns it).
+		m.redraw();
+	};
+}
+
 /** Bright per-segment palette, cycled when the prize list is longer. */
 const SEGMENT_PALETTE = [
 	"#ffc400",
@@ -60,10 +143,22 @@ const SEGMENT_PALETTE = [
 const CREAM = "#f8f1de";
 
 interface SpinState {
-	/** The wheel's current rotation in degrees (0 = design state). */
+	/** The wheel's resting rotation in degrees (0 = design state). This is the
+	 * base `transform`; the in-flight spin is a WAAPI animation on top of it. */
 	rotation: number;
 	/** The prize index the current spin landed on (undefined until a spin). */
 	winner: number | undefined;
+	/** True while a WAAPI spin is running; the winner highlight is shown only
+	 * once this flips back to false (the `onfinish` of the spin animation). */
+	spinning: boolean;
+	/** The rotating disc DOM node (found via `[data-disc]`) that the spin animates. */
+	disc: HTMLElement | null;
+	/** The winning-segment highlight node (found via `[data-highlight]`). */
+	highlight: HTMLElement | null;
+	/** The WAAPI animation of the current spin, cancelled when a new one starts. */
+	anim: Animation | null;
+	/** The looping WAAPI opacity "win pulse" on the highlight, if running. */
+	pulse: Animation | null;
 }
 
 interface SpinAttrs {
@@ -72,31 +167,61 @@ interface SpinAttrs {
 	id: string;
 }
 
+/** Resolve the rotating disc node from the component's own DOM. Mithril 2.3.x
+ * has no `ref` hook, so the disc (tagged `[data-disc]`) is found by querying
+ * the first rendered DOM node the component owns. */
+function resolveDisc(dom: Element | Text | null): HTMLElement | null {
+	return (dom as Element | null)?.querySelector<HTMLElement>("[data-disc]") ??
+		null;
+}
+
+/** Same for the winning-segment highlight wedge. */
+function resolveHighlight(dom: Element | Text | null): HTMLElement | null {
+	return (dom as Element | null)?.querySelector<HTMLElement>("[data-highlight]") ??
+		null;
+}
+
 const SpinWheelBox: m.Component<SpinAttrs, SpinState> = {
 	oncreate(vnode) {
 		vnode.state.rotation = 0;
 		vnode.state.winner = undefined;
+		vnode.state.spinning = false;
+		vnode.state.disc = resolveDisc(vnode.dom);
+		vnode.state.highlight = resolveHighlight(vnode.dom);
+		vnode.state.anim = null;
+		vnode.state.pulse = null;
+	},
+	// Re-resolve the disc + highlight in case the subtree is recreated; cheap
+	// and keeps `s.disc`/`s.highlight` pointing at the live nodes.
+	onupdate(vnode) {
+		vnode.state.disc = resolveDisc(vnode.dom);
+		vnode.state.highlight = resolveHighlight(vnode.dom);
+	},
+	onremove(vnode) {
+		vnode.state.anim?.cancel();
+		vnode.state.pulse?.cancel();
 	},
 	view(vnode) {
 		const p = vnode.attrs.props;
 		const s = vnode.state;
-		// Consume a spin target left by `onTrigger` (the runtime page
-		// re-renders right after the trigger fires, so the box picks it up
-		// on this draw and lets the CSS transition do the spinning).
+		const duration = numProp(p, "duration", 4000);
+		// Consume a spin target left by `onTrigger` and drive the spin with
+		// the Web Animations API so it always runs for the full duration.
 		const pending = spinTargets.get(vnode.attrs.id);
 		if (pending) {
-			// Accumulate full turns from the CURRENT rotation so repeated
-			// spins (the wheel is persistent, so it spins many times on air)
-			// always turn forward and stop exactly on the winner.
-			s.rotation = accumulateSpin(s.rotation, pending.offset);
+			// Start from the LIVE angle (handles an interrupted spin) and
+			// accumulate 4+ full turns forward so the wheel always spins
+			// forward and stops exactly on the winner.
+			const from = currentAngle(s.disc);
+			s.rotation = accumulateSpin(from, pending.offset);
 			s.winner = pending.winner;
 			spinTargets.delete(vnode.attrs.id);
+			startSpin(s, from, s.rotation, duration);
 		}
 		const rawPrizes = Array.isArray(p.prizes) ? p.prizes : [];
 		const prizes = rawPrizes
 			.map((v) => (typeof v === "string" ? v : ""))
 			.filter((v) => v !== "");
-		const duration = numProp(p, "duration", 4000);
 		const color = strProp(p, "color", "#ffffff");
 		const accent = strProp(p, "accent", "#f59e0b");
 		const radius = numProp(p, "radius", 0);
@@ -162,8 +287,15 @@ const SpinWheelBox: m.Component<SpinAttrs, SpinState> = {
 					/>
 					{/* rotating disc: palette segments, thin black ring,
 					 * spokes + rim studs on the boundaries and the labels —
-					 * all of it rotates together */}
+					 * all of it rotates together. The resting transform is the
+					 * base; an in-flight spin is a WAAPI animation on this node
+					 * (bound via `ref`), so `transition` stays none — WAAPI
+					 * owns the motion. */}
 					<div
+						// `data-disc` marks the node `resolveDisc` targets —
+						// Mithril has no `ref`, so the spin animates the node
+						// looked up in `oncreate`/`onupdate`.
+						data-disc="1"
 						style={{
 							position: "absolute",
 							inset: "calc(100cqi * 0.05)",
@@ -172,12 +304,32 @@ const SpinWheelBox: m.Component<SpinAttrs, SpinState> = {
 							border: "calc(100cqi * 0.016) solid #17181c",
 							background: `conic-gradient(${stops.join(", ")})`,
 							transform: `rotate(${s.rotation}deg)`,
-							transition:
-								s.rotation > 0
-									? `transform ${duration}ms cubic-bezier(0.2, 0.7, 0.3, 1)`
-									: "none",
+							transition: "none",
 						}}
 					>
+						{/* Winning-segment highlight: a translucent wedge drawn for
+						 * the current `s.winner`. It lives INSIDE the rotating
+						 * disc, so once the wheel stops it sits on the segment
+						 * under the pointer. Base opacity is Mithril-driven:
+						 * 0 while spinning / in the design state (no winner),
+						 * 0.5 at rest with a winner; `startSpin`'s `onfinish`
+						 * layers a WAAPI "win pulse" (0.2→0.55) on top.
+						 * Rendered below the spokes/labels so text stays readable
+						 * over it. */}
+						<div
+							data-highlight="1"
+							style={{
+								position: "absolute",
+								inset: 0,
+								borderRadius: "50%",
+								background:
+									s.winner !== undefined
+										? `conic-gradient(from ${s.winner * seg}deg, rgba(255,255,255,0.75) 0deg ${seg}deg, transparent ${seg}deg 360deg)`
+										: "transparent",
+								opacity: s.spinning || s.winner === undefined ? 0 : 0.5,
+								pointerEvents: "none",
+							}}
+						/>
 						{Array.from({ length: n }, (_, i) => (
 							<div
 								key={`spoke-${i}`}
@@ -322,10 +474,12 @@ function onTrigger(
 	const n = prizes.length;
 	const seg = 360 / n;
 	const winner = pickPrize(n);
-	// Resting rotation that puts `winner`'s center under the top pointer:
-	// pointer at 270deg; segment center at
-	// (rotation + winner*seg + seg/2) mod 360 == 270 → rotation = 270 - winner*seg - seg/2.
-	const offset = (270 - winner * seg - seg / 2) % 360;
+	// Resting rotation that puts `winner`'s center under the TOP pointer
+	// (12 o'clock = 0deg in the clockwise-from-top geometry, same as the
+	// conic-gradient / spokes / labels): the disc's segment center at
+	// (rotation + winner*seg + seg/2) mod 360 must equal 0 →
+	// rotation = -(winner*seg + seg/2) mod 360, kept in [0, 360).
+	const offset = (360 - (winner * seg + seg / 2)) % 360;
 
 	spinTargets.set(element.id, { offset, winner });
 	m.redraw();
