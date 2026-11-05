@@ -36,6 +36,7 @@ import { libraryAssetField } from "@ui/overlay/asset_picker";
 import type {
 	ElementContext,
 	ElementProps,
+	ElementVariant,
 	OverlayElement,
 	OverlayElementDef,
 } from "@ui/overlay/element";
@@ -695,6 +696,19 @@ export const htmlTemplateElement: OverlayElementDef = {
 	icon: () => <Icon name="iframe" class="role-icon" />,
 	order: 75,
 	defaultProps: { ...DEFAULT_HTML_TEMPLATE_PROPS },
+	/** Catalog cards: one per known template, preselecting it. Calling this
+	 * also kicks the idempotent lazy catalog load, so the cards appear as
+	 * soon as the add-element panel first renders (it re-renders on resolve). */
+	listVariants: (): ElementVariant[] => {
+		loadCatalog();
+		return (catalogMetas ?? []).map(
+			(tpl): ElementVariant => ({
+				labelKey: tpl.name,
+				hint: tpl.id,
+				props: { templateId: tpl.id },
+			}),
+		);
+	},
 	propKeys: [
 		"templateId",
 		"title",

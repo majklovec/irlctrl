@@ -273,6 +273,19 @@ export interface ElementProps {
  * rectangle's box editing — the mode is structural, not a prop check. */
 export type HandleMode = "box" | "endpoints" | "none";
 
+/** One selectable variant of an element in the add-element catalog (e.g. a
+ * ready-made template): a card that inserts the element with `props`
+ * preselected over its defaults. The declaring module owns the vocabulary —
+ * the core catalog only renders the cards. */
+export interface ElementVariant {
+	/** i18n key of the variant card's title. */
+	labelKey: string;
+	/** The card's second line, rendered as-is (the variant id); omit for a title-only card. */
+	hint?: string;
+	/** Props merged over the element's defaults when the card is clicked. */
+	props: Record<string, unknown>;
+}
+
 /** The contract every overlay element fulfils:
  *   - `labelKey` / `icon` / `order`: its entry in the editor's "add" toolbar
  *     (no toolbar entry when `labelKey` is omitted, e.g. a structural type)
@@ -308,6 +321,11 @@ export interface OverlayElementDef {
 	 * `props.<key>`, e.g. text → "props.text". */
 	readonly propKeys: readonly string[];
 	readonly defaultSize: { width: number; height: number };
+	/** Optional per-variant catalog cards (e.g. ready-made templates): each
+	 * entry adds its own card under the element's entry and inserts the
+	 * element with that variant's `props` preselected. Omit for
+	 * single-variant elements. */
+	readonly listVariants?: () => ElementVariant[];
 	/** Renders the element's contents. `element` is the RESOLVED element —
 	 * its props/transform/visible already carry any binding values. Content
 	 * only; core wraps + positions it via elementStyle(). */

@@ -1,8 +1,7 @@
 import { apiTry } from "@ui/api_client";
-import { elementDef } from "./registry";
 import { uuid } from "@ui/util";
 import m from "mithril";
-import { overlayElementSchema } from "../overlay_elements";
+import { serverLive } from "../../../shell/live";
 import type {
     Overlay,
     OverlayElement,
@@ -10,9 +9,10 @@ import type {
     Variable,
     VariableValue,
 } from "../overlay";
-import { serverLive } from "../../../shell/live";
+import { overlayElementSchema } from "../overlay_elements";
 import type { ElementContext } from "./overlay_render";
 import { resolveElement } from "./overlay_render";
+import { elementDef } from "./registry";
 
 /** A user's overlay as the list page renders it (no element payload). */
 export interface OverlaySummary {
@@ -145,7 +145,8 @@ const libraryMisses = new Set<string>();
 function libraryAssetIds(o: Overlay): string[] {
     const ids = new Set<string>();
     for (const e of o.elements)
-        for (const key of overlayElementSchema(e.type)?.serverAssetProps ?? []) {
+        for (const key of overlayElementSchema(e.type)?.serverAssetProps ??
+            []) {
             const id = e.props[key];
             if (typeof id === "string" && id) ids.add(id);
         }
@@ -165,13 +166,12 @@ export function loadLibraryAssets(o: Overlay): void {
             try {
                 const res = await fetch(
                     `/api/assets/files/${encodeURIComponent(id)}`,
-                    { credentials: "same-origin" },
+                    {
+                        credentials: "same-origin",
+                    },
                 );
                 if (res.ok)
-                    libraryUrls.set(
-                        id,
-                        URL.createObjectURL(await res.blob()),
-                    );
+                    libraryUrls.set(id, URL.createObjectURL(await res.blob()));
                 else libraryMisses.add(id);
             } catch {
                 // a file removed from the library shows as missing, as it
@@ -381,7 +381,10 @@ export async function createOverlay(): Promise<void> {
 }
 
 /** An overlay id from a full/summary frame, kept in sync with the list. */
-export function upsertListEntry(id: string, patch: Partial<OverlaySummary>): void {
+export function upsertListEntry(
+    id: string,
+    patch: Partial<OverlaySummary>,
+): void {
     const i = state.overlays.findIndex((x) => x.id === id);
     if (i >= 0) state.overlays[i] = { ...state.overlays[i], ...patch };
 }
@@ -395,7 +398,10 @@ export async function renameOverlay(id: string, name: string): Promise<void> {
         { method: "PUT", body: { name: s.name } },
     );
     if (body?.overlay) {
-        upsertListEntry(id, { name: body.overlay.name, elementCount: body.overlay.elements.length });
+        upsertListEntry(id, {
+            name: body.overlay.name,
+            elementCount: body.overlay.elements.length,
+        });
         if (state.selectedOverlayId === id && state.overlay)
             state.overlay.name = body.overlay.name;
         m.redraw();
@@ -516,8 +522,12 @@ export function setElementLocked(elementId: string, locked: boolean): void {
 
 /** Types the user can create from the canvas toolbar. Each type's default
  * props and size come from its `OverlayElementDef` — the core never
- * hardcodes element-specific defaults. */
-export function addElement(type: string): void {
+ * hardcodes element-specific defaults. `initialProps` (catalog card picks,
+ * e.g. a preselected template) win over both. */
+export function addElement(
+    type: string,
+    initialProps?: Record<string, unknown>,
+): void {
     const o = state.overlay;
     if (!o) return;
     const def = elementDef(type);
@@ -525,7 +535,7 @@ export function addElement(type: string): void {
     snapshot();
     const el: OverlayElement = {
         id: uuid(),
-        name: type + " " + (o.elements.length + 1),
+        name: `${type} ${o.elements.length + 1}`,
         type,
         transform: {
             x: 120,
@@ -539,9 +549,14 @@ export function addElement(type: string): void {
         locked: false,
         parentId: null,
         bindings: {},
-        // `createProps` (when present) overrides `defaultProps`: elements that
-        // need a UNIQUE id per instance (a WebRTC stream id) generate it here.
-        props: { ...def.defaultProps, ...(def.createProps?.() ?? {}) },
+        // `createProps` (when present) overrides `defaultProps`: elements
+        // that need a UNIQUE id per instance (a WebRTC stream id) generate
+        // it here; `initialProps` win over both.
+        props: {
+            ...def.defaultProps,
+            ...(def.createProps?.() ?? {}),
+            ...(initialProps ?? {}),
+        },
     };
     o.elements.push(el);
     state.selectedElementId = el.id;
@@ -730,10 +745,11 @@ serverLive.rpc.on("overlays.overlays", (data) => {
 });
 
 serverLive.rpc.on("overlays.overlay", (data) => {
-    const { overlayId, overlay: o } = (data as {
-        overlayId?: string;
-        overlay?: Overlay;
-    }) ?? {};
+    const { overlayId, overlay: o } =
+        (data as {
+            overlayId?: string;
+            overlay?: Overlay;
+        }) ?? {};
     if (!overlayId || !o) return;
     syncListFromOverlay(overlayId, o);
     if (overlayId === state.selectedOverlayId && state.overlay) {

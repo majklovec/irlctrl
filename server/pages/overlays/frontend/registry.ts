@@ -6,7 +6,7 @@
  * elements only through this module.
  */
 import MANIFEST from "../../../../generated/overlay_elements";
-import type { OverlayElementDef } from "../../../../../shared/ui/overlay/element";
+import type { OverlayElementDef } from "@ui/overlay/element";
 
 const byType = new Map<string, OverlayElementDef>();
 for (const contribution of MANIFEST as unknown[]) {
