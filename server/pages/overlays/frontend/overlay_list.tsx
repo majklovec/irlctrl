@@ -9,12 +9,12 @@ import {
 	Table,
 	Toolbar,
 } from "@ui/components/";
-import { ServerNav } from "../../../shell/nav";
 import { confirmDialog } from "@ui/components/confirm";
 import { Icon } from "@ui/components/icons";
 import { t } from "@ui/i18n";
 import { mountPage } from "@ui/util";
 import m from "mithril";
+import { ServerNav } from "../../../shell/nav";
 import {
 	copyOverlayUrl,
 	createOverlay,
@@ -87,13 +87,7 @@ export function overlayList(): m.Vnode {
 		<Card>
 			{overlays.length ? (
 				[
-					<Table
-						columns={[
-							{ key: "name", header: t("overlay.name") },
-							{ key: "url", header: t("overlay.url") },
-							{ key: "elements", header: t("overlay.elements") },
-						]}
-					>
+					<Table columns={[{ key: "name", header: t("overlay.name") }]}>
 						{overlays.map((s) => (
 							<tr key={s.id}>
 								<td class="dash-name">
@@ -105,21 +99,11 @@ export function overlayList(): m.Vnode {
 										</a>
 									)}
 								</td>
-								<td class="ov-row-url">
-									<a
-										class="ov-row-url-text"
-										href={runtimeUrl(s.id)}
-										target="_blank"
-										rel="noreferrer"
-										title={runtimeUrl(s.id)}
-									>
-										{runtimeUrl(s.id)}
-									</a>
+
+								<RowActions>
 									<IconButton
 										class={
-											state.copiedOverlayId === s.id
-												? "ov-copied"
-												: undefined
+											state.copiedOverlayId === s.id ? "ov-copied" : undefined
 										}
 										label={
 											state.copiedOverlayId === s.id
@@ -129,11 +113,8 @@ export function overlayList(): m.Vnode {
 										icon={<Icon name="copy" class="role-icon" />}
 										onclick={() => void copyOverlayUrl(s.id)}
 									/>
-								</td>
-								<td class="muted">{s.elementCount}</td>
-								<RowActions>
 									<IconLink
-										href={editorUrl(s.id)}
+										href={runtimeUrl(s.id)}
 										label={t("overlay.open")}
 										icon={<Icon name="view" class="role-icon" />}
 									/>
@@ -157,9 +138,12 @@ export function overlayList(): m.Vnode {
 										icon={<Icon name="delete" class="role-icon" />}
 										onclick={async () => {
 											if (
-												await confirmDialog(t("overlay.confirm_delete_overlay"), {
-													danger: true,
-												})
+												await confirmDialog(
+													t("overlay.confirm_delete_overlay"),
+													{
+														danger: true,
+													},
+												)
 											)
 												void deleteOverlay(s.id);
 										}}
