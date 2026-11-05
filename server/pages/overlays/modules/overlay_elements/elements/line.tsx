@@ -12,7 +12,7 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_LINE_PROPS } from "../overlay_schema";
+import { DEFAULT_LINE_PROPS } from "./line_schema";
 
 /**
  * Which box diagonal a drag delta runs along. The box is stored in min/abs
@@ -110,6 +110,8 @@ function validate(e: OverlayElement): string[] {
 
 export const lineElement: OverlayElementDef = {
 	type: "line",
+	category: "basics",
+
 	labelKey: "overlay.add_line",
 	icon: () => <Icon name="line" class="role-icon" />,
 	order: 40,

@@ -1,5 +1,7 @@
 {
     "overlay.add_html_template": "Plantilla HTML",
+    "overlay.catalog_desc_html_template": "Página HTML lista",
+    "overlay.catalog_templates": "Plantillas",
     "overlay.html_template.accent_color": "Color de acento",
     "overlay.html_template.bg_alpha": "Opacidad del fondo %",
     "overlay.html_template.bg_color": "Fondo",

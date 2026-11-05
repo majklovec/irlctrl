@@ -689,6 +689,8 @@ function validate(element: OverlayElement): string[] {
 
 export const htmlTemplateElement: OverlayElementDef = {
 	type: "html_template",
+	category: "templates",
+
 	labelKey: "overlay.add_html_template",
 	icon: () => <Icon name="iframe" class="role-icon" />,
 	order: 75,

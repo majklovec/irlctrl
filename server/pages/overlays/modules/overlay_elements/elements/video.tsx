@@ -12,7 +12,7 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_VIDEO_PROPS } from "../overlay_schema";
+import { DEFAULT_VIDEO_PROPS } from "./video_schema";
 import { libraryAssetField } from "@ui/overlay/asset_picker";
 
 /** Defensive read of a boolean prop (the contract has no `boolProp`). */
@@ -143,6 +143,8 @@ function validate(e: OverlayElement): string[] {
 
 export const videoElement: OverlayElementDef = {
 	type: "video",
+	category: "media",
+
 	labelKey: "overlay.add_video",
 	icon: () => <Icon name="video" class="role-icon" />,
 	order: 65,

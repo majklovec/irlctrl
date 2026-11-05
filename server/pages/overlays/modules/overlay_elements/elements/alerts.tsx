@@ -33,7 +33,7 @@ import {
 	ALERT_OUTRO_ANIMATIONS,
 	ALERT_TEXT_ANIMATIONS,
 	DEFAULT_ALERT_PROPS,
-} from "../overlay_schema";
+} from "./alerts_schema";
 
 interface AlertUiProps {
 	event: string;
@@ -699,6 +699,8 @@ function validate(e: OverlayElement): string[] {
 
 export const alertsElement: OverlayElementDef = {
 	type: "alert",
+	category: "widgets",
+
 	labelKey: "overlay.add_alert",
 	icon: () => <Icon name="bell" class="role-icon" />,
 	order: 70,

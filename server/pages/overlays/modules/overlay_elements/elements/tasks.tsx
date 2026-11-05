@@ -17,7 +17,7 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_TASKS_PROPS } from "../overlay_schema";
+import { DEFAULT_TASKS_PROPS } from "./tasks_schema";
 import { ListField } from "../lib/list_field";
 
 function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
@@ -149,6 +149,8 @@ function validate(e: OverlayElement): string[] {
 
 export const tasksElement: OverlayElementDef = {
 	type: "tasks",
+	category: "widgets",
+
 	labelKey: "overlay.add_tasks",
 	icon: () => <Icon name="checklist" class="role-icon" />,
 	order: 97,

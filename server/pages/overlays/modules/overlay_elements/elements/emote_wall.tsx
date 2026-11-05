@@ -22,7 +22,7 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_EMOTE_WALL_PROPS } from "../overlay_schema";
+import { DEFAULT_EMOTE_WALL_PROPS } from "./emote_wall_schema";
 import {
 	ChatLine,
 	LiveChatFeed,
@@ -188,6 +188,8 @@ function validate(e: OverlayElement): string[] {
 
 export const emoteWallElement: OverlayElementDef = {
 	type: "emote_wall",
+	category: "widgets",
+
 	labelKey: "overlay.add_emote_wall",
 	icon: () => <Icon name="smile" class="role-icon" />,
 	order: 101,

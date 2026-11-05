@@ -1,12 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import {
-	DEFAULT_CHAT_PROPS,
-	DEFAULT_LINE_PROPS,
-	DEFAULT_PROGRESS_PROPS,
-	DEFAULT_RECTANGLE_PROPS,
-	DEFAULT_TEXT_PROPS,
-	DEFAULT_VIDEO_PROPS,
-} from "../server/pages/overlays/modules/overlay_elements/overlay_schema";
+import { DEFAULT_CHAT_PROPS } from "../server/pages/overlays/modules/overlay_elements/elements/chat_schema";
+import { DEFAULT_LINE_PROPS } from "../server/pages/overlays/modules/overlay_elements/elements/line_schema";
+import { DEFAULT_PROGRESS_PROPS } from "../server/pages/overlays/modules/overlay_elements/elements/progress_schema";
+import { DEFAULT_RECTANGLE_PROPS } from "../server/pages/overlays/modules/overlay_elements/elements/rectangle_schema";
+import { DEFAULT_TEXT_PROPS } from "../server/pages/overlays/modules/overlay_elements/elements/text_schema";
+import { DEFAULT_VIDEO_PROPS } from "../server/pages/overlays/modules/overlay_elements/elements/video_schema";
 import {
 	cssFilterString,
 	defaultOverlay,

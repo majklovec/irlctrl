@@ -36,7 +36,7 @@ import {
 import type { ChatLine } from "../lib/live_chat_feed";
 import { LiveChatFeed, normalizeChannels } from "../lib/live_chat_feed";
 import { ChannelsField } from "../lib/list_field";
-import { type ChatProps, DEFAULT_CHAT_PROPS } from "../overlay_schema";
+import { type ChatProps, DEFAULT_CHAT_PROPS } from "./chat_schema";
 
 /** One inspector field wrapping a `<select>` of fixed choices. `bindField`
  * shows no binding toggle for selects (a fixed choice set can't take a
@@ -419,6 +419,8 @@ function validate(_e: OverlayElement): string[] {
 
 export const chatElement: OverlayElementDef = {
 	type: "chat",
+	category: "widgets",
+
 	labelKey: "overlay.add_chat",
 	icon: () => <Icon name="chat" class="role-icon" />,
 	order: 10,

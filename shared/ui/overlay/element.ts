@@ -280,6 +280,11 @@ export interface OverlayElementDef {
 	readonly icon?: () => Vnode;
 	/** Toolbar position; lower first (defaults to 100). */
 	readonly order?: number;
+	/** Catalog section the element lives in (e.g. "basics", "media",
+	 * "widgets", "templates") — the add-element panel groups by this, so each
+	 * element declares its own placement. Omit to keep the type out of the
+	 * catalog (it must also lack `labelKey`). */
+	readonly category?: string;
 	readonly defaultProps: Record<string, unknown>;
 	/** Prop names that exist on the type; the inspector offers a binding
 	 * toggle on each field the `editForm` wraps in `bindField` — bound as

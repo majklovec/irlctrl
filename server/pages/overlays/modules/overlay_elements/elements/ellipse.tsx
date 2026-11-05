@@ -12,7 +12,7 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_ELLIPSE_PROPS } from "../overlay_schema";
+import { DEFAULT_ELLIPSE_PROPS } from "./ellipse_schema";
 
 function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	// `element` is already resolved by the renderer — props carry binding values.
@@ -96,6 +96,8 @@ function validate(e: OverlayElement): string[] {
 
 export const ellipseElement: OverlayElementDef = {
 	type: "ellipse",
+	category: "basics",
+
 	labelKey: "overlay.add_ellipse",
 	icon: () => <Icon name="ellipse" class="role-icon" />,
 	order: 30,

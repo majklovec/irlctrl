@@ -1,5 +1,7 @@
 {
     "overlay.add_html_template": "HTML šablona",
+    "overlay.catalog_desc_html_template": "Hotová HTML stránka",
+    "overlay.catalog_templates": "Šablony",
     "overlay.html_template.accent_color": "Akcentová barva",
     "overlay.html_template.bg_alpha": "Průhlednost pozadí %",
     "overlay.html_template.bg_color": "Pozadí",

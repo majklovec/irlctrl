@@ -12,7 +12,7 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_PROGRESS_PROPS } from "../overlay_schema";
+import { DEFAULT_PROGRESS_PROPS } from "./progress_schema";
 
 /** Clamp the (possibly bound) value into 0–100 so a bad variable can't widen
  * the fill past the track. */
@@ -153,6 +153,8 @@ function validate(e: OverlayElement): string[] {
 
 export const progressElement: OverlayElementDef = {
 	type: "progress",
+	category: "basics",
+
 	labelKey: "overlay.add_progress",
 	icon: () => <Icon name="progress" class="role-icon" />,
 	order: 50,

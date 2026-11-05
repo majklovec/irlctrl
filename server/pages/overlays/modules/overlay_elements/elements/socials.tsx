@@ -17,7 +17,7 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_SOCIALS_PROPS } from "../overlay_schema";
+import { DEFAULT_SOCIALS_PROPS } from "./socials_schema";
 import { ListField } from "../lib/list_field";
 
 interface SocialEntry {
@@ -173,6 +173,8 @@ function validate(e: OverlayElement): string[] {
 
 export const socialsElement: OverlayElementDef = {
 	type: "socials",
+	category: "widgets",
+
 	labelKey: "overlay.add_socials",
 	icon: () => <Icon name="share" class="role-icon" />,
 	order: 95,

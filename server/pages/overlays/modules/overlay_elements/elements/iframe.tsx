@@ -12,7 +12,7 @@ import { drawIframe } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_IFRAME_PROPS } from "../overlay_schema";
+import { DEFAULT_IFRAME_PROPS } from "./iframe_schema";
 
 function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 	// `element` is already resolved by the renderer — drawIframe reads props.url.
@@ -50,6 +50,8 @@ function validate(e: OverlayElement): string[] {
 
 export const iframeElement: OverlayElementDef = {
 	type: "iframe",
+	category: "media",
+
 	labelKey: "overlay.add_iframe",
 	icon: () => <Icon name="iframe" class="role-icon" />,
 	order: 80,

@@ -1,5 +1,7 @@
 {
     "overlay.add_html_template": "Modello HTML",
+    "overlay.catalog_desc_html_template": "Pagina HTML pronta",
+    "overlay.catalog_templates": "Modelli",
     "overlay.html_template.accent_color": "Colore di accento",
     "overlay.html_template.bg_alpha": "Opacità dello sfondo %",
     "overlay.html_template.bg_color": "Sfondo",

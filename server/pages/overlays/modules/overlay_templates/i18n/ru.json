@@ -1,5 +1,7 @@
 {
     "overlay.add_html_template": "Шаблон HTML",
+    "overlay.catalog_desc_html_template": "Готовая HTML-страница",
+    "overlay.catalog_templates": "Шаблоны",
     "overlay.html_template.accent_color": "Акцентный цвет",
     "overlay.html_template.bg_alpha": "Непрозрачность фона %",
     "overlay.html_template.bg_color": "Фон",

@@ -2,9 +2,10 @@
 /*
  * Countdown widget — counts down a fixed duration, or to a daily clock time.
  * `clock` mode: pure function of the wall clock (today's `HH:MM`, rolling to
- * the next day when it has passed). `duration` mode: counts from `duration`
- * anchored at first draw (a loop re-anchors at each zero crossing). The inner
- * component owns a 1 s interval, cleared on removal.
+ * the next day when it has passed). `duration` mode: sits idle at the full
+ * duration and only counts down once its trigger fires (a loop re-anchors at
+ * each zero crossing). The inner component owns a 1 s interval, cleared on
+ * removal.
  *
  * Like the `spin_wheel` it is trigger-driven and `persistent`: the element
  * stays on screen at runtime and (re)starts its duration countdown when its
@@ -25,7 +26,7 @@ import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import { formatDuration } from "../lib/ticker";
-import { DEFAULT_COUNTDOWN_PROPS } from "../overlay_schema";
+import { DEFAULT_COUNTDOWN_PROPS } from "./countdown_schema";
 
 /** Today's `HH:MM` (tomorrow's when it has already passed). */
 function targetTime(clockTarget: string, now: number): number {
@@ -44,8 +45,10 @@ interface CdB {
 }
 
 interface CdBState {
-	/** duration-mode anchor: the wall time the current cycle started at. */
-	anchor: number;
+	/** duration-mode anchor: the wall time the current cycle started at.
+	 * `undefined` = not started yet — duration mode sits idle at the full
+	 * duration until its trigger event fires. */
+	anchor: number | undefined;
 	now: number;
 	timer: ReturnType<typeof setInterval>;
 }
@@ -62,7 +65,9 @@ let eventLinkCopied = false;
 const CountdownBox: m.Component<CdB, CdBState> = {
 	oncreate(vnode) {
 		const now = Date.now();
-		vnode.state.anchor = now;
+		// Duration mode starts idle (anchor undefined) and only runs once its
+		// trigger fires; clock mode is a pure wall-clock function.
+		vnode.state.anchor = undefined;
 		vnode.state.now = now;
 		vnode.state.timer = setInterval(() => {
 			vnode.state.now = Date.now();
@@ -102,6 +107,11 @@ const CountdownBox: m.Component<CdB, CdBState> = {
 		if (mode === "clock") {
 			rem = targetTime(clockTarget, now) - now;
 			done = rem <= 0;
+		} else if (s.anchor === undefined) {
+			// Idle: the trigger has not fired yet, so hold at the full duration
+			// without counting down.
+			rem = periodMs;
+			done = false;
 		} else {
 			// A looping duration countdown re-anchors at each zero crossing so
 			// it keeps running in whole cycles.
@@ -384,6 +394,8 @@ function validate(e: OverlayElement): string[] {
 
 export const countdownElement: OverlayElementDef = {
 	type: "countdown",
+	category: "widgets",
+
 	labelKey: "overlay.add_countdown",
 	icon: () => <Icon name="clock" class="role-icon" />,
 	order: 92,

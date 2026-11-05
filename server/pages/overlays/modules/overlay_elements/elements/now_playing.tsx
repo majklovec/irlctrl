@@ -19,7 +19,7 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_NOWPLAYING_PROPS } from "../overlay_schema";
+import { DEFAULT_NOWPLAYING_PROPS } from "./now_playing_schema";
 
 const LF_URL = "https://ws.audioscrobbler.com/2.0/";
 
@@ -291,6 +291,8 @@ function validate(e: OverlayElement): string[] {
 
 export const nowPlayingElement: OverlayElementDef = {
 	type: "now_playing",
+	category: "widgets",
+
 	labelKey: "overlay.add_now_playing",
 	icon: () => <Icon name="music" class="role-icon" />,
 	order: 91,

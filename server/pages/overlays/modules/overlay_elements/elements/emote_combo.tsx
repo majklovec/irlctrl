@@ -20,7 +20,7 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_EMOTE_COMBO_PROPS } from "../overlay_schema";
+import { DEFAULT_EMOTE_COMBO_PROPS } from "./emote_combo_schema";
 import {
 	ChatLine,
 	LiveChatFeed,
@@ -187,6 +187,8 @@ function validate(e: OverlayElement): string[] {
 
 export const emoteComboElement: OverlayElementDef = {
 	type: "emote_combo",
+	category: "widgets",
+
 	labelKey: "overlay.add_emote_combo",
 	icon: () => <Icon name="hash" class="role-icon" />,
 	order: 102,

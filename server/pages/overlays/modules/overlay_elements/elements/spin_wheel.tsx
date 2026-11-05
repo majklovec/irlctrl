@@ -29,7 +29,7 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_SPIN_WHEEL_PROPS } from "../overlay_schema";
+import { DEFAULT_SPIN_WHEEL_PROPS } from "./spin_wheel_schema";
 
 /** Deterministic-ish prize pick: uniform random over the prize list. */
 function pickPrize(count: number): number {
@@ -692,6 +692,8 @@ function validate(e: OverlayElement): string[] {
 
 export const spinWheelElement: OverlayElementDef = {
 	type: "spin_wheel",
+	category: "widgets",
+
 	labelKey: "overlay.add_spin_wheel",
 	icon: () => <Icon name="spin" class="role-icon" />,
 	order: 100,

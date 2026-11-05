@@ -12,7 +12,7 @@ const alerts = await import(
     "../server/pages/overlays/modules/overlay_elements/elements/alerts"
 );
 const { DEFAULT_ALERT_PROPS } = await import(
-    "../server/pages/overlays/modules/overlay_elements/overlay_schema"
+    "../server/pages/overlays/modules/overlay_elements/elements/alerts_schema"
 );
 const { triggerPhase } = await import("../shared/ui/overlay/element");
 

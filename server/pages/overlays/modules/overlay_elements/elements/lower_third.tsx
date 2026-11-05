@@ -18,7 +18,7 @@ import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import { ListField } from "../lib/list_field";
-import { DEFAULT_LOWER_THIRD_PROPS } from "../overlay_schema";
+import { DEFAULT_LOWER_THIRD_PROPS } from "./lower_third_schema";
 
 interface LTEntry {
 	name: string;
@@ -259,6 +259,8 @@ function validate(e: OverlayElement): string[] {
 
 export const lowerThirdElement: OverlayElementDef = {
 	type: "lower_third",
+	category: "widgets",
+
 	labelKey: "overlay.add_lower_third",
 	icon: () => <Icon name="subtitles" class="role-icon" />,
 	order: 93,

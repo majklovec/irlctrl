@@ -18,7 +18,7 @@ const { resolveElement, resolveElementProps, elementStyle } = await import(
     "../shared/ui/overlay/element"
 );
 const { DEFAULT_ALERT_PROPS } = await import(
-    "../server/pages/overlays/modules/overlay_elements/overlay_schema"
+    "../server/pages/overlays/modules/overlay_elements/elements/alerts_schema"
 );
 
 import {

@@ -12,7 +12,7 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_TEXT_PROPS } from "../overlay_schema";
+import { DEFAULT_TEXT_PROPS } from "./text_schema";
 
 interface TextProps {
 	text: string;
@@ -171,6 +171,8 @@ function validate(e: OverlayElement): string[] {
 
 export const textElement: OverlayElementDef = {
 	type: "text",
+	category: "basics",
+
 	labelKey: "overlay.add_text",
 	icon: () => <Icon name="text" class="role-icon" />,
 	order: 10,

@@ -20,7 +20,7 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_CREDITS_PROPS } from "../overlay_schema";
+import { DEFAULT_CREDITS_PROPS } from "./credits_schema";
 import { ListField } from "../lib/list_field";
 
 function draw(
@@ -179,6 +179,8 @@ function validate(e: OverlayElement): string[] {
 
 export const creditsElement: OverlayElementDef = {
 	type: "credits",
+	category: "widgets",
+
 	labelKey: "overlay.add_credits",
 	icon: () => <Icon name="credits" class="role-icon" />,
 	order: 96,

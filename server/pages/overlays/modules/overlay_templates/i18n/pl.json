@@ -1,5 +1,7 @@
 {
     "overlay.add_html_template": "Szablon HTML",
+    "overlay.catalog_desc_html_template": "Gotowa strona HTML",
+    "overlay.catalog_templates": "Szablony",
     "overlay.html_template.accent_color": "Kolor akcentu",
     "overlay.html_template.bg_alpha": "Przeźroczystość tła %",
     "overlay.html_template.bg_color": "Tło",

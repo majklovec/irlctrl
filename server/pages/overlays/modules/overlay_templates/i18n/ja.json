@@ -1,5 +1,7 @@
 {
     "overlay.add_html_template": "HTML テンプレート",
+    "overlay.catalog_desc_html_template": "完成したHTMLページ",
+    "overlay.catalog_templates": "テンプレート",
     "overlay.html_template.accent_color": "アクセントカラー",
     "overlay.html_template.bg_alpha": "背景の不透明度 %",
     "overlay.html_template.bg_color": "背景色",

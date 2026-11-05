@@ -19,7 +19,7 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_WEATHER_PROPS } from "../overlay_schema";
+import { DEFAULT_WEATHER_PROPS } from "./weather_schema";
 
 const MET_URL = "https://api.met.no/weatherapi/locationforecast/2.0/compact";
 /** MET Norway's terms require a User-Agent that identifies the app. */
@@ -385,6 +385,8 @@ function validate(e: OverlayElement): string[] {
 
 export const weatherElement: OverlayElementDef = {
 	type: "weather",
+	category: "widgets",
+
 	labelKey: "overlay.add_weather",
 	icon: () => <Icon name="weather" class="role-icon" />,
 	order: 90,

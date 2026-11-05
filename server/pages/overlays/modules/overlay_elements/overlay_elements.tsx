@@ -1,7 +1,7 @@
 /*
  * The built-in overlay elements (browser half): one file per element under
- * elements/, each fulfilling `OverlayElementDef`; their schemas are in
- * overlay_schema.ts.
+ * elements/, each fulfilling `OverlayElementDef` with its schema next to it
+ * in elements/<name>_schema.ts (aggregated in overlay_schema.ts).
  */
 import { alertsElement } from "./elements/alerts";
 import { chatElement } from "./elements/chat";

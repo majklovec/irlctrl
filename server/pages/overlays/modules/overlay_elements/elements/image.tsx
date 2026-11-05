@@ -60,6 +60,8 @@ function validate(e: OverlayElement): string[] {
 
 export const imageElement: OverlayElementDef = {
 	type: "image",
+	category: "media",
+
 	labelKey: "overlay.add_image",
 	icon: () => <Icon name="image" class="role-icon" />,
 	order: 60,

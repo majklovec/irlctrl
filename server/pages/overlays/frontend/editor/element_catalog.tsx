@@ -5,46 +5,15 @@ import m from "mithril";
 import { addElement, closeToolMenus } from "../overlay_store";
 import type { OverlayElementDef } from "../../../../../shared/ui/overlay/element";
 
-/** Catalog sections, in display order. `types` are matched against the
- * registry, so the sections track what the modules register (in `order`
- * within a section). */
-const CATEGORIES: readonly {
-	id: string;
-	labelKey: string;
-	types: readonly string[];
-}[] = [
-	{
-		id: "basics",
-		labelKey: "overlay.catalog_basics",
-		types: ["text", "rectangle", "ellipse", "line", "progress"],
-	},
-	{
-		id: "media",
-		labelKey: "overlay.catalog_media",
-		types: ["image", "video", "iframe"],
-	},
-	{
-		id: "widgets",
-		labelKey: "overlay.catalog_widgets",
-		types: [
-			"chat",
-			"alert",
-			"weather",
-			"now_playing",
-			"countdown",
-			"lower_third",
-			"frame",
-			"socials",
-			"credits",
-			"bool",
-			"number",
-			"goal",
-			"spin_wheel",
-			"emote_wall",
-			"emote_combo",
-			"featured",
-		],
-	},
+/** Catalog sections, in display order. Membership is NOT listed here — each
+ * element declares its own `category` on its `OverlayElementDef`; a section
+ * is just the display slot (id + label) those declarations point at (defs
+ * order within a section by `order`). */
+const CATEGORIES: readonly { id: string; labelKey: string }[] = [
+	{ id: "basics", labelKey: "overlay.catalog_basics" },
+	{ id: "media", labelKey: "overlay.catalog_media" },
+	{ id: "widgets", labelKey: "overlay.catalog_widgets" },
+	{ id: "templates", labelKey: "overlay.catalog_templates" },
 ];
 
 const TABS: readonly { id: string; labelKey: string }[] = [
@@ -60,8 +29,7 @@ const ui = { tab: "all", query: "", collapsed: new Set<string>() };
 
 function matches(def: OverlayElementDef, tab: string, query: string): boolean {
 	if (tab !== "all") {
-		const cat = CATEGORIES.find((c) => c.id === tab);
-		if (!cat?.types.includes(def.type)) return false;
+		if (def.category !== tab) return false;
 	}
 	if (!query) return true;
 	const label = t(def.labelKey ?? def.type);
@@ -129,7 +97,7 @@ export function elementCatalog(): m.Vnode {
 		matches(d, ui.tab, ui.query.trim().toLowerCase()),
 	);
 	const sectionDefs = (cat: (typeof CATEGORIES)[number]): OverlayElementDef[] =>
-		defs.filter((d) => cat.types.includes(d.type));
+		defs.filter((d) => d.category === cat.id);
 	return (
 		<div class="ov-cat" role="menu" aria-label={t("overlay.add_element")}>
 			<div class="ov-cat-bar">

@@ -18,7 +18,7 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_FRAME_PROPS } from "../overlay_schema";
+import { DEFAULT_FRAME_PROPS } from "./frame_schema";
 
 function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 	const p = element.props;
@@ -119,6 +119,8 @@ function validate(e: OverlayElement): string[] {
 
 export const frameElement: OverlayElementDef = {
 	type: "frame",
+	category: "widgets",
+
 	labelKey: "overlay.add_frame",
 	icon: () => <Icon name="frame" class="role-icon" />,
 	order: 94,

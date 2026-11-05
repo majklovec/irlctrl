@@ -1,5 +1,7 @@
 {
     "overlay.add_html_template": "HTML 模板",
+    "overlay.catalog_desc_html_template": "现成的HTML页面",
+    "overlay.catalog_templates": "模板",
     "overlay.html_template.accent_color": "强调色",
     "overlay.html_template.bg_alpha": "背景不透明度 %",
     "overlay.html_template.bg_color": "背景色",

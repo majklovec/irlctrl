@@ -18,7 +18,7 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_FEATURED_PROPS } from "../overlay_schema";
+import { DEFAULT_FEATURED_PROPS } from "./featured_schema";
 import {
 	ChatLine,
 	LiveChatFeed,
@@ -167,6 +167,8 @@ function validate(e: OverlayElement): string[] {
 
 export const featuredElement: OverlayElementDef = {
 	type: "featured",
+	category: "widgets",
+
 	labelKey: "overlay.add_featured",
 	icon: () => <Icon name="star" class="role-icon" />,
 	order: 103,

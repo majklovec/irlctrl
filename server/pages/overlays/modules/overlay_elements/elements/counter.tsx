@@ -17,7 +17,7 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_COUNTER_PROPS } from "../overlay_schema";
+import { DEFAULT_COUNTER_PROPS } from "./counter_schema";
 import { ListField } from "../lib/list_field";
 
 function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
@@ -172,6 +172,8 @@ function validate(e: OverlayElement): string[] {
 
 export const counterElement: OverlayElementDef = {
 	type: "counter",
+	category: "widgets",
+
 	labelKey: "overlay.add_counter",
 	icon: () => <Icon name="hash" class="role-icon" />,
 	order: 99,

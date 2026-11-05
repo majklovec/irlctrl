@@ -12,7 +12,7 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { DEFAULT_RECTANGLE_PROPS } from "../overlay_schema";
+import { DEFAULT_RECTANGLE_PROPS } from "./rectangle_schema";
 
 function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	// `element` is already resolved by the renderer — props carry binding values.
@@ -117,6 +117,8 @@ function validate(e: OverlayElement): string[] {
 
 export const rectangleElement: OverlayElementDef = {
 	type: "rectangle",
+	category: "basics",
+
 	labelKey: "overlay.add_rectangle",
 	icon: () => <Icon name="rectangle" class="role-icon" />,
 	order: 20,
