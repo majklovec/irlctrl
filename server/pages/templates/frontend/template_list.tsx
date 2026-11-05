@@ -491,10 +491,9 @@ function EditorPane() {
 					) : (
 						<div class="tpl-code">
 							<div class="tpl-code-area">
-								<pre
-									class="tpl-code-hl"
-									aria-hidden="true"
-								>{m.trust(highlightHtml(editor.html))}</pre>
+								<pre class="tpl-code-hl" aria-hidden="true">
+									{m.trust(highlightHtml(editor.html))}
+								</pre>
 								<textarea
 									class="tpl-html"
 									wrap="off"
@@ -506,9 +505,8 @@ function EditorPane() {
 									}
 									onscroll={(ev: Event) => {
 										const ta = ev.target as HTMLTextAreaElement;
-										const pre = ta.previousElementSibling as
-											| HTMLPreElement
-											| null;
+										const pre =
+											ta.previousElementSibling as HTMLPreElement | null;
 										if (pre) {
 											pre.scrollTop = ta.scrollTop;
 											pre.scrollLeft = ta.scrollLeft;
@@ -555,7 +553,8 @@ function EditorPane() {
 									disabled={previewSize.fit}
 									oninput={(ev: Event) => {
 										const v = Number((ev.target as HTMLInputElement).value);
-										if (Number.isFinite(v) && v >= 1) previewSize.w = Math.round(v);
+										if (Number.isFinite(v) && v >= 1)
+											previewSize.w = Math.round(v);
 										m.redraw();
 									}}
 								/>
@@ -570,7 +569,8 @@ function EditorPane() {
 									disabled={previewSize.fit}
 									oninput={(ev: Event) => {
 										const v = Number((ev.target as HTMLInputElement).value);
-										if (Number.isFinite(v) && v >= 1) previewSize.h = Math.round(v);
+										if (Number.isFinite(v) && v >= 1)
+											previewSize.h = Math.round(v);
 										m.redraw();
 									}}
 								/>
@@ -605,15 +605,7 @@ const App: m.Component = {
 		void refreshList();
 	},
 	view: () => (
-		<Page
-			nav={<ServerNav active="templates" />}
-			title={t("tpl.title")}
-			toolbar={
-				<Toolbar>
-					<span class="muted tpl-hint">{t("tpl.hint")}</span>
-				</Toolbar>
-			}
-		>
+		<Page nav={<ServerNav active="templates" />} title={t("tpl.title")}>
 			<div class="tpl-layout">
 				{ListPane()}
 				{EditorPane()}
