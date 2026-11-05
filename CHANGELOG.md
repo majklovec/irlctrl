@@ -1,3 +1,15 @@
+# [2.21.0](https://github.com/majklovec/irlctrl/compare/v2.20.0...v2.21.0) (2026-11-05)
+
+
+### Bug Fixes
+
+* **webrtc:** implement room-state synchronization and enhance signaling logic ([7d94fa3](https://github.com/majklovec/irlctrl/commit/7d94fa30d63b04092a9bd781e83efed523eb60a8))
+
+
+### Features
+
+* add WebRTC sender functionality with signaling and media handling ([2541d7a](https://github.com/majklovec/irlctrl/commit/2541d7a58f2f41e8b044a270e3310a15b65c0331))
+
 # [2.20.0](https://github.com/majklovec/irlctrl/compare/v2.19.0...v2.20.0) (2026-11-05)
 
 
