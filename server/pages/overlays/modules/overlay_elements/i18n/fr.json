@@ -168,7 +168,7 @@
     "overlay.gl_fill": "Remplissage",
     "overlay.gl_track": "Piste",
     "overlay.ct_counters": "Compteurs",
-    "overlay.ct_value": "Valeur",
+    "overlay.ct_values": "Valeurs",
     "overlay.ct_add": "Ajouter un compteur",
     "overlay.ct_layout": "Disposition",
     "overlay.sw_duration": "Durée de la rotation (ms)",

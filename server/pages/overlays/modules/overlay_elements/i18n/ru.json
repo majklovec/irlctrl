@@ -168,7 +168,7 @@
     "overlay.gl_fill": "Заполнение",
     "overlay.gl_track": "Дорожка",
     "overlay.ct_counters": "Счётчики",
-    "overlay.ct_value": "Значение",
+    "overlay.ct_values": "Значения",
     "overlay.ct_add": "Добавить счётчик",
     "overlay.ct_layout": "Раскладка",
     "overlay.sw_duration": "Длит. вращения (мс)",

@@ -168,7 +168,7 @@
     "overlay.gl_fill": "进度颜色",
     "overlay.gl_track": "轨道颜色",
     "overlay.ct_counters": "计数器",
-    "overlay.ct_value": "数值",
+    "overlay.ct_values": "数值",
     "overlay.ct_add": "添加计数器",
     "overlay.ct_layout": "布局",
     "overlay.sw_duration": "旋转时长（毫秒）",

@@ -1,12 +1,12 @@
 import { Icon } from "@ui/components/icons";
 import { t } from "@ui/i18n";
-import { addableElements } from "../registry";
 import m from "mithril";
-import { addElement, closeToolMenus } from "../overlay_store";
 import type {
 	ElementVariant,
 	OverlayElementDef,
 } from "../../../../../shared/ui/overlay/element";
+import { addElement, closeToolMenus } from "../overlay_store";
+import { addableElements } from "../registry";
 
 /** Catalog sections, in display order. Membership is NOT listed here — each
  * element declares its own `category` on its `OverlayElementDef`; a section
@@ -132,7 +132,7 @@ function catalogSection(
 				onclick={toggle}
 			>
 				<Icon
-					class={"role-icon ov-cat-chev" + (closed ? " is-closed" : "")}
+					class={`role-icon ov-cat-chev${closed ? " is-closed" : ""}`}
 					name="chevron"
 				/>
 				<span>{t(cat.labelKey)}</span>
@@ -167,7 +167,7 @@ export function elementCatalog(): m.Vnode {
 						<button
 							type="button"
 							role="tab"
-							class={"ov-cat-tab" + (ui.tab === tab.id ? " is-active" : "")}
+							class={`ov-cat-tab${ui.tab === tab.id ? " is-active" : ""}`}
 							aria-selected={ui.tab === tab.id ? "true" : "false"}
 							onclick={() => {
 								ui.tab = tab.id;

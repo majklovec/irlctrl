@@ -168,7 +168,7 @@
     "overlay.gl_fill": "Füllung",
     "overlay.gl_track": "Schiene",
     "overlay.ct_counters": "Zähler",
-    "overlay.ct_value": "Wert",
+    "overlay.ct_values": "Werte",
     "overlay.ct_add": "Zähler hinzufügen",
     "overlay.ct_layout": "Layout",
     "overlay.sw_duration": "Drehdauer (ms)",

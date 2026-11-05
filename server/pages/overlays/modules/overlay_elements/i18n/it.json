@@ -168,7 +168,7 @@
     "overlay.gl_fill": "Riempimento",
     "overlay.gl_track": "Binario",
     "overlay.ct_counters": "Contatori",
-    "overlay.ct_value": "Valore",
+    "overlay.ct_values": "Valori",
     "overlay.ct_add": "Aggiungi contatore",
     "overlay.ct_layout": "Layout",
     "overlay.sw_duration": "Durata rotazione (ms)",

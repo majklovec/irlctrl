@@ -168,7 +168,7 @@
     "overlay.gl_fill": "Wypełnienie",
     "overlay.gl_track": "Tor",
     "overlay.ct_counters": "Liczniki",
-    "overlay.ct_value": "Wartość",
+    "overlay.ct_values": "Wartości",
     "overlay.ct_add": "Dodaj licznik",
     "overlay.ct_layout": "Układ",
     "overlay.sw_duration": "Czas obrotu (ms)",

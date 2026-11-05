@@ -1,8 +1,9 @@
 /** @jsx m */
 /*
  * Counter widget — up to four big number tiles (wins/losses, streaks, money
- * counters…). Each `value` is a bindable scalar by design — bind one to a
- * project variable and the tile tracks it live.
+ * counters…). The tiles' labels are a row table; their values live in ONE
+ * bindable scalar, `values` — a comma-separated list, one entry per counter
+ * ("10,5,0,0"). Bind it to a project variable and every tile tracks it live.
  */
 
 import { Icon } from "@ui/components/icons";
@@ -17,15 +18,17 @@ import { numProp, strProp } from "@ui/overlay/element";
 import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
-import { ListField } from "../lib/list_field";
 import type { OverlayElementSchema } from "../../../../../core/overlay_element";
-import { textRows, cleanNum } from "./schema_utils";
+import { ListField } from "../lib/list_field";
+import { cleanNum, textRows } from "./schema_utils";
 
 /* ── counter ──────────────────────────────────────────────────────────── */
 export interface CounterProps {
 	title: string;
-	/** Up to four counters; `value` is bindable per-counter by variable. */
-	counters: Array<{ label: string; value: number }>;
+	/** Up to four counters; each is a label — its value comes from `values`. */
+	counters: Array<{ label: string }>;
+	/** The counters' values in order, comma-separated (one per counter). */
+	values: string;
 	layout: "row" | "column";
 	color: string;
 	accent: string;
@@ -36,10 +39,8 @@ export interface CounterProps {
 }
 export const DEFAULT_COUNTER_PROPS: Required<CounterProps> = {
 	title: "",
-	counters: [
-		{ label: "Wins", value: 0 },
-		{ label: "Losses", value: 0 },
-	],
+	counters: [{ label: "Wins" }, { label: "Losses" }],
+	values: "0,0",
 	layout: "row",
 	color: "#ffffff",
 	accent: "#f59e0b",
@@ -60,16 +61,26 @@ function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 	const fontSize = numProp(p, "fontSize", 26);
 	const fontFamily = strProp(p, "fontFamily", "Inter, system-ui, sans-serif");
 	const rawCounters = Array.isArray(p.counters) ? p.counters : [];
-	const counters = rawCounters.map((item) => {
-		const rec =
-			typeof item === "object" && item !== null
-				? (item as Record<string, unknown>)
-				: {};
-		return {
-			label: typeof rec.label === "string" ? rec.label : "",
-			value: typeof rec.value === "number" ? rec.value : 0,
-		};
-	}).filter((c) => c.label || c.value !== 0);
+	// `values` is ONE comma-separated list — the i-th counter takes the
+	// i-th entry (0 when the list is shorter); extras are ignored.
+	const values = strProp(p, "values", "")
+		.split(",")
+		.map((s) => {
+			const n = Number(s.trim());
+			return Number.isFinite(n) ? n : 0;
+		});
+	const counters = rawCounters
+		.map((item, i) => {
+			const rec =
+				typeof item === "object" && item !== null
+					? (item as Record<string, unknown>)
+					: {};
+			return {
+				label: typeof rec.label === "string" ? rec.label : "",
+				value: values[i] ?? 0,
+			};
+		})
+		.filter((c) => c.label || c.value !== 0);
 
 	const isRow = layout === "row";
 	return (
@@ -104,7 +115,7 @@ function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 							},
 						},
 						title,
-				  )
+					)
 				: null}
 			{counters.map((c, i) => (
 				<div
@@ -162,35 +173,100 @@ function editForm({ element: e, mutate, variables }: ElementProps): Vnode {
 		});
 	return (
 		<>
-			{bindField(e, "props.title", t("overlay.cr_title"),
-				<input type="text" value={strProp(p, "title", "")} oninput={setStr("title")} />, sp)}
+			{bindField(
+				e,
+				"props.title",
+				t("overlay.cr_title"),
+				<input
+					type="text"
+					value={strProp(p, "title", "")}
+					oninput={setStr("title")}
+				/>,
+				sp,
+			)}
 			<ListField
 				element={e}
 				mutate={mutate}
 				propKey="counters"
 				label={t("overlay.ct_counters")}
-				columns={[
-					{ key: "label", label: t("overlay.label") },
-					{ key: "value", label: t("overlay.ct_value"), type: "number" },
-				]}
-				addRow={() => ({ label: "", value: 0 })}
+				columns={[{ key: "label", label: t("overlay.label") }]}
+				addRow={() => ({ label: "" })}
 				addLabel={t("overlay.ct_add")}
 			/>
-			{bindField(e, "props.layout", t("overlay.ct_layout"),
+			{bindField(
+				e,
+				"props.values",
+				t("overlay.ct_values"),
+				<input
+					type="text"
+					value={strProp(p, "values", "")}
+					oninput={setStr("values")}
+					placeholder="10,5,0"
+				/>,
+				sp,
+			)}
+			{bindField(
+				e,
+				"props.layout",
+				t("overlay.ct_layout"),
 				<select value={strProp(p, "layout", "row")} onchange={setSel("layout")}>
 					<option value="row">row</option>
 					<option value="column">column</option>
-				</select>, sp)}
+				</select>,
+				sp,
+			)}
 			<div class="ov-grid3">
-				{bindField(e, "props.color", t("overlay.color"),
-					<input type="color" value={strProp(p, "color", "#ffffff")} oninput={setStr("color")} />, sp)}
-				{bindField(e, "props.accent", t("overlay.accent"),
-					<input type="color" value={strProp(p, "accent", "#f59e0b")} oninput={setStr("accent")} />, sp)}
-				{bindField(e, "props.background", t("overlay.cd_background"),
-					<input type="color" value={strProp(p, "background", "#111827")} oninput={setStr("background")} />, sp)}
+				{bindField(
+					e,
+					"props.color",
+					t("overlay.color"),
+					<input
+						type="color"
+						value={strProp(p, "color", "#ffffff")}
+						oninput={setStr("color")}
+					/>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.accent",
+					t("overlay.accent"),
+					<input
+						type="color"
+						value={strProp(p, "accent", "#f59e0b")}
+						oninput={setStr("accent")}
+					/>,
+					sp,
+				)}
+				{bindField(
+					e,
+					"props.background",
+					t("overlay.cd_background"),
+					<input
+						type="color"
+						value={strProp(p, "background", "#111827")}
+						oninput={setStr("background")}
+					/>,
+					sp,
+				)}
 			</div>
-			{bindField(e, "props.fontSize", t("overlay.font_size"),
-				<input type="number" min={8} max={200} value={numProp(p, "fontSize", 26)} oninput={(ev: Event) => mutate((el) => { el.props.fontSize = Number((ev.target as HTMLInputElement).value); })} />, sp)}
+			{bindField(
+				e,
+				"props.fontSize",
+				t("overlay.font_size"),
+				<input
+					type="number"
+					min={8}
+					max={200}
+					value={numProp(p, "fontSize", 26)}
+					oninput={(ev: Event) =>
+						mutate((el) => {
+							el.props.fontSize = Number((ev.target as HTMLInputElement).value);
+						})
+					}
+				/>,
+				sp,
+			)}
 		</>
 	);
 }
@@ -210,6 +286,7 @@ export const counterElement: OverlayElementDef & OverlayElementSchema = {
 	/** `counters` is one composite control (a row table), not a bindField scalar. */
 	propKeys: [
 		"title",
+		"values",
 		"layout",
 		"color",
 		"accent",
@@ -223,14 +300,31 @@ export const counterElement: OverlayElementDef & OverlayElementSchema = {
 	handles: "box",
 	normalizeProps(props, read) {
 		const d = DEFAULT_COUNTER_PROPS;
+		// `values` is the single comma-separated list; for pre-`values`
+		// elements (no `values` key) the per-counter numbers migrate into
+		// it, in row order.
+		const raw =
+			typeof props.values === "string"
+				? props.values
+				: (Array.isArray(props.counters) ? props.counters : [])
+						.map((r) =>
+							typeof r === "object" && r !== null
+								? cleanNum((r as Record<string, unknown>).value, 0, -1e12, 1e12)
+								: 0,
+						)
+						.join(",");
+		// Each entry is a clamped number (the same bounds the per-counter
+		// values had), re-joined in order.
+		const values = raw
+			.slice(0, 200)
+			.split(",")
+			.map((s) => String(cleanNum(s, 0, -1e12, 1e12)))
+			.join(",");
 		return {
 			title: read.str("title", d.title, 120),
-			counters: textRows(props.counters, 4, {
-				key: "value",
-				kind: "num",
-			}).map((r) => ({
+			values,
+			counters: textRows(props.counters, 4).map((r) => ({
 				label: String(r.label),
-				value: cleanNum(r.value, 0, -1e12, 1e12),
 			})),
 			layout: read.oneOf("layout", ["row", "column"], d.layout),
 			color: read.hex("color", d.color),

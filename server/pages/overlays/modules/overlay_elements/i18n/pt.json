@@ -168,7 +168,7 @@
     "overlay.gl_fill": "Preenchimento",
     "overlay.gl_track": "Pista",
     "overlay.ct_counters": "Contadores",
-    "overlay.ct_value": "Valor",
+    "overlay.ct_values": "Valores",
     "overlay.ct_add": "Adicionar contador",
     "overlay.ct_layout": "Layout",
     "overlay.sw_duration": "Duração do giro (ms)",

@@ -168,7 +168,7 @@
     "overlay.gl_fill": "塗り色",
     "overlay.gl_track": "トラック",
     "overlay.ct_counters": "カウンター",
-    "overlay.ct_value": "値",
+    "overlay.ct_values": "値",
     "overlay.ct_add": "追加",
     "overlay.ct_layout": "配置",
     "overlay.sw_duration": "回転時間 (ms)",

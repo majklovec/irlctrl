@@ -168,7 +168,7 @@
     "overlay.gl_fill": "Fill",
     "overlay.gl_track": "Track",
     "overlay.ct_counters": "Counters",
-    "overlay.ct_value": "Value",
+    "overlay.ct_values": "Values",
     "overlay.ct_add": "Add counter",
     "overlay.ct_layout": "Layout",
     "overlay.sw_duration": "Spin duration (ms)",
