@@ -1,3 +1,21 @@
+# [2.18.0](https://github.com/majklovec/irlctrl/compare/v2.17.0...v2.18.0) (2026-11-05)
+
+
+### Bug Fixes
+
+* cast component types to unknown for better type safety ([df3c9b9](https://github.com/majklovec/irlctrl/commit/df3c9b9dffa5622d9e6b9951e3c41efd0cba45e0))
+
+
+### Features
+
+* add new overlay elements and schemas for countdown, weather, now playing, and more ([9a59135](https://github.com/majklovec/irlctrl/commit/9a591350a88ca05eeff854285968b108180f2ea3))
+* **countdown:** add trigger event support and localization for countdown element ([a974d21](https://github.com/majklovec/irlctrl/commit/a974d210beae92e93140d6e9c7ab1356874f4873))
+* implement element catalog for overlay editor ([9c3bb60](https://github.com/majklovec/irlctrl/commit/9c3bb6037c5e54cb1bb807112cdaf0e9a395a746))
+* refactor chat overlay element and schema ([d9145bd](https://github.com/majklovec/irlctrl/commit/d9145bde6331e115e4b8379be9a691223d4af9cf))
+* **spin-wheel:** enhance landing point calculation for winner segment ([c672e1a](https://github.com/majklovec/irlctrl/commit/c672e1a04ebf34851f8b6bf3db7a2e69e60f22b7))
+* **spin-wheel:** implement seamless spin animation and highlight winner ([002f89a](https://github.com/majklovec/irlctrl/commit/002f89a44d8325135a5e4604306db4b2fd6f969d))
+* **weather:** add GeoFillButton to auto-fill latitude and longitude from browser location ([478f8dc](https://github.com/majklovec/irlctrl/commit/478f8dcfd0c0e037d3cfcf1d62a8f2ca182d1f2d))
+
 # [2.17.0](https://github.com/majklovec/irlctrl/compare/v2.16.0...v2.17.0) (2026-11-05)
 
 
