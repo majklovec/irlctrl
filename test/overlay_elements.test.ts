@@ -64,6 +64,7 @@ const WELL_FORMED: Array<[OverlayElementType, Record<string, unknown>]> = [
     ["group", {}],
     ["iframe", { url: "https://example.com" }],
     ["chat", { url: "https://example.com/chat" }],
+    ["webrtc", { streamId: "abc-123-def" }],
     ["alert", { ...DEFAULT_ALERT_PROPS }],
 ];
 

@@ -11,6 +11,8 @@
  * server/core/overlay_element.ts, contributed from
  * `<module>/overlay_schema.ts`.
  */
+
+import type { Children, Vnode } from "mithril";
 import m from "mithril";
 import type {
 	OverlayElement,
@@ -19,9 +21,12 @@ import type {
 	Variable,
 	VariableValue,
 } from "../../../server/pages/overlays/overlay";
-import type { Children, Vnode } from "mithril";
 import { t } from "../i18n";
-export type { OverlayElement, OverlayElementType } from "../../../server/pages/overlays/overlay";
+
+export type {
+	OverlayElement,
+	OverlayElementType,
+} from "../../../server/pages/overlays/overlay";
 
 /** Runtime trigger state of one active trigger-driven element (alerts).
  * The payload is the last trigger that fired the element — template tokens
@@ -90,7 +95,10 @@ export interface ResolvedElement {
  * Rejects non-finite values and out-of-range opacity so a bad variable can't
  * break the layout; returns `undefined` to skip the assignment.
  */
-function bindTransformValue(raw: VariableValue, key: string): number | undefined {
+function bindTransformValue(
+	raw: VariableValue,
+	key: string,
+): number | undefined {
 	const n = Number(raw);
 	if (!Number.isFinite(n)) return undefined;
 	if (key === "transform.opacity" && (n < 0 || n > 1)) return undefined;
@@ -150,9 +158,10 @@ export function resolveElementProps(
  * rotation PIVOT, whitespace) — the page stylesheets (overlay.css for the
  * runtime, style.css for the editor) are NOT required to provide it. Both
  * pages must stay pixel-identical, so never move these back to CSS. */
-export function elementStyle(
-	element: { transform: Transform; visible: boolean },
-): CSS {
+export function elementStyle(element: {
+	transform: Transform;
+	visible: boolean;
+}): CSS {
 	const t = element.transform;
 	// Rotated elements get `rotate(deg)` with the origin pinned to the
 	// element center. Unrotated elements must NOT carry a `transform` at
@@ -286,6 +295,14 @@ export interface OverlayElementDef {
 	 * catalog (it must also lack `labelKey`). */
 	readonly category?: string;
 	readonly defaultProps: Record<string, unknown>;
+	/**
+	 * Produce a freshly-created element's props, merged OVER `defaultProps` in
+	 * `addElement`. For elements whose default must be UNIQUE PER INSTANCE
+	 * (a WebRTC `streamId` that seeds the sender URL) — a static
+	 * `defaultProps` value would be shared by every element of the type.
+	 * Omit for the common case; `addElement` falls back to `defaultProps`.
+	 */
+	readonly createProps?: () => Record<string, unknown>;
 	/** Prop names that exist on the type; the inspector offers a binding
 	 * toggle on each field the `editForm` wraps in `bindField` — bound as
 	 * `props.<key>`, e.g. text → "props.text". */

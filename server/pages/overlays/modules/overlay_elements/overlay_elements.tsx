@@ -29,6 +29,7 @@ import { tasksElement } from "./elements/tasks";
 import { textElement } from "./elements/text";
 import { videoElement } from "./elements/video";
 import { weatherElement } from "./elements/weather";
+import { webrtcElement } from "./elements/webrtc";
 
 const elements: (OverlayElementDef & OverlayElementSchema)[] = [
 	textElement,
@@ -39,6 +40,7 @@ const elements: (OverlayElementDef & OverlayElementSchema)[] = [
 	imageElement,
 	videoElement,
 	iframeElement,
+	webrtcElement,
 	groupElement,
 	alertsElement,
 	weatherElement,

@@ -23,7 +23,6 @@ import {
 	TRIGGER_OUTRO_MS,
 	type TriggerState,
 } from "@ui/overlay/element";
-import { elementDef } from "./registry";
 import m from "mithril";
 import { APP_VERSION } from "../../../../shared/app_version";
 import type {
@@ -35,6 +34,7 @@ import type {
 } from "../overlay";
 import { overlayElementSchema } from "../overlay_elements";
 import { sceneElementsView } from "./overlay_render";
+import { elementDef } from "./registry";
 import "./overlay.css";
 
 interface RuntimeState {
@@ -115,9 +115,7 @@ function reloadPage(reason: string): void {
 
 function reloadOnNewVersion(version: string): void {
 	if (version === APP_VERSION) return;
-	reloadPage(
-		`new server version v${version} (this page runs v${APP_VERSION})`,
-	);
+	reloadPage(`new server version v${version} (this page runs v${APP_VERSION})`);
 }
 
 function variableMap(): Map<string, Variable["value"]> {
@@ -134,8 +132,7 @@ function assetMap(): Map<string, string> {
 	// (this page has no session cookie).
 	const map = new Map<string, string>();
 	for (const e of state.overlay?.elements ?? [])
-		for (const key of overlayElementSchema(e.type)?.serverAssetProps ??
-			[]) {
+		for (const key of overlayElementSchema(e.type)?.serverAssetProps ?? []) {
 			const id = e.props[key];
 			if (typeof id === "string" && id && !map.has(id))
 				map.set(

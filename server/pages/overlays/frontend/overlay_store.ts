@@ -539,7 +539,9 @@ export function addElement(type: string): void {
         locked: false,
         parentId: null,
         bindings: {},
-        props: { ...def.defaultProps },
+        // `createProps` (when present) overrides `defaultProps`: elements that
+        // need a UNIQUE id per instance (a WebRTC stream id) generate it here.
+        props: { ...def.defaultProps, ...(def.createProps?.() ?? {}) },
     };
     o.elements.push(el);
     state.selectedElementId = el.id;
