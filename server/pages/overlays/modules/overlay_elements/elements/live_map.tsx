@@ -2,8 +2,8 @@
 /*
  * Interactive Leaflet map. Tile providers: OpenStreetMap (default), ArcGIS
  * satellite, and Mapy.com tourist (only when an API key is set). A custom
- * top-right control switches providers and toggles a B&W filter — the filter
- * is scoped to the tile pane only, so markers (start position) stay coloured.
+ * top-right control switches providers; the configured centre carries a
+ * circle marker.
  *
  * `startPosition` places a marker (e.g. the route start); with
  * `showDistance` on, a badge tracks the geodesic distance from it to the map
@@ -36,8 +36,6 @@ export type LiveMapProvider = "osm" | "arcgis" | "mapy";
 
 export interface LiveMapProps {
 	provider: LiveMapProvider;
-	grayscale: boolean;
-	invert: boolean;
 	zoom: number;
 	centerLat: number;
 	centerLon: number;
@@ -51,8 +49,6 @@ export interface LiveMapProps {
 
 export const DEFAULT_LIVE_MAP_PROPS: Required<LiveMapProps> = {
 	provider: "osm",
-	grayscale: false,
-	invert: false,
 	zoom: 15,
 	centerLat: 50.1635,
 	centerLon: 12.4034,
@@ -123,16 +119,6 @@ function injectStyles(): void {
 	const s = document.createElement("style");
 	s.id = "live-map-styles";
 	s.textContent = `
-    .lm-grayscale.leaflet-container .leaflet-tile-pane {
-      filter: grayscale(100%);
-    }
-    .lm-invert.leaflet-container .leaflet-tile-pane {
-      filter: invert(1);
-    }
-    .lm-grayscale.lm-invert.leaflet-container .leaflet-tile-pane {
-      filter: grayscale(100%) invert(1);
-    }
-    .lm-invert.leaflet-container { background: #0e100f; }
     .live-map-distance {
       background: rgba(0,0,0,.7); color: #fff; font-size: 13px;
       padding: 4px 10px; border-radius: 4px; white-space: nowrap;
@@ -185,8 +171,8 @@ interface MapState {
 	provider: LiveMapProvider | "";
 	// `null` until the first sync has built the layer set.
 	mapyKey: string | null;
-	grayscale: boolean;
-	invert: boolean;
+	// Circle marker pinning the configured map centre.
+	centerMarker: any;
 	centerLat: number;
 	centerLon: number;
 	zoom: number;
@@ -306,15 +292,11 @@ function syncMap(state: MapState, p: LiveMapProps): void {
 	}
 	setProvider(state, p);
 
-	state.grayscale = p.grayscale;
-	state.invert = p.invert;
-	state.container.classList.toggle("lm-grayscale", state.grayscale);
-	state.container.classList.toggle("lm-invert", state.invert);
-
 	if (p.centerLat !== state.centerLat || p.centerLon !== state.centerLon) {
 		state.centerLat = p.centerLat;
 		state.centerLon = p.centerLon;
 		map.panTo([p.centerLat, p.centerLon]);
+		state.centerMarker.setLatLng([p.centerLat, p.centerLon]);
 	}
 	if (p.zoom !== state.zoom) {
 		state.zoom = p.zoom;
@@ -335,13 +317,21 @@ function initMap(container: HTMLElement, props: LiveMapProps): MapState {
 	const resizeObserver = new ResizeObserver(() => map.invalidateSize());
 	resizeObserver.observe(container);
 
+	// A circle marker pinning the configured map centre.
+	const centerMarker = L.circleMarker([props.centerLat, props.centerLon], {
+		radius: 8,
+		color: "#ffffff",
+		weight: 2,
+		fillColor: "#3a7afe",
+		fillOpacity: 0.85,
+	}).addTo(map);
+
 	const state: MapState = {
 		map,
 		resizeObserver,
 		layers: {},
 		container,
-		grayscale: false,
-		invert: false,
+		centerMarker,
 		provider: "",
 		mapyKey: null,
 		centerLat: props.centerLat,
@@ -372,9 +362,6 @@ function safeProps(raw: Record<string, unknown>): LiveMapProps {
 			provider === "osm" || provider === "arcgis" || provider === "mapy"
 				? provider
 				: d.provider,
-		// `blackGrayscale` is the pre-split prop of earlier saved overlays.
-		grayscale: cleanBool(raw.grayscale ?? raw.blackGrayscale),
-		invert: cleanBool(raw.invert),
 		zoom: cleanNum(raw.zoom, d.zoom, 0, 25),
 		centerLat: cleanNum(raw.centerLat, d.centerLat, -90, 90),
 		centerLon: cleanNum(raw.centerLon, d.centerLon, -180, 180),
@@ -487,38 +474,6 @@ function editForm({ element: e, mutate, variables, variableUrl }: ElementProps):
 				</select>,
 				sp,
 			)}
-			<div class="ov-grid2">
-				{bindField(
-					e,
-					"props.grayscale",
-					t("overlay.live_map_grayscale"),
-					<input
-						type="checkbox"
-						checked={p.grayscale === true}
-						onchange={(ev: Event) =>
-							mutate((el) => {
-								el.props.grayscale = (ev.target as HTMLInputElement).checked;
-							})
-						}
-					/>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.invert",
-					t("overlay.live_map_invert"),
-					<input
-						type="checkbox"
-						checked={p.invert === true}
-						onchange={(ev: Event) =>
-							mutate((el) => {
-								el.props.invert = (ev.target as HTMLInputElement).checked;
-							})
-						}
-					/>,
-					sp,
-				)}
-			</div>
 			{num("zoom", null, t("overlay.live_map_zoom"), 0, 25)}
 			{num("centerLat", null, t("overlay.live_map_center_lat"), -90, 90)}
 			{num("centerLon", null, t("overlay.live_map_center_lon"), -180, 180)}
@@ -604,8 +559,6 @@ export const liveMapElement: OverlayElementDef & OverlayElementSchema = {
 	},
 	propKeys: [
 		"provider",
-		"grayscale",
-		"invert",
 		"zoom",
 		"centerLat",
 		"centerLon",
@@ -625,8 +578,6 @@ export const liveMapElement: OverlayElementDef & OverlayElementSchema = {
 			| undefined;
 		return {
 			provider: read.oneOf("provider", ["osm", "arcgis", "mapy"], d.provider),
-			grayscale: read.bool("grayscale"),
-			invert: read.bool("invert"),
 			zoom: read.num("zoom", d.zoom, 0, 25),
 			centerLat: read.num("centerLat", d.centerLat, -90, 90),
 			centerLon: read.num("centerLon", d.centerLon, -180, 180),

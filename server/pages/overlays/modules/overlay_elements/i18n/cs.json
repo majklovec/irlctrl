@@ -55,8 +55,6 @@
     "overlay.live_map_provider.osm": "Mapa",
     "overlay.live_map_provider.arcgis": "Satelit",
     "overlay.live_map_provider.mapy": "Turistická",
-    "overlay.live_map_grayscale": "Odstinit do šedi",
-    "overlay.live_map_invert": "Invertovat barvy",
     "overlay.live_map_center_lat": "Střed (šíř. geogr.)",
     "overlay.live_map_center_lon": "Střed (dél. geogr.)",
     "overlay.live_map_distance": "Vzdálenost",

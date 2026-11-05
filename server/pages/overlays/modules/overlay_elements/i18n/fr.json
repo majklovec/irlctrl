@@ -55,8 +55,6 @@
     "overlay.live_map_provider.osm": "Carte",
     "overlay.live_map_provider.arcgis": "Satellite",
     "overlay.live_map_provider.mapy": "Touristique",
-    "overlay.live_map_grayscale": "Niveaux de gris",
-    "overlay.live_map_invert": "Inverser les couleurs",
     "overlay.live_map_center_lat": "Latitude du centre",
     "overlay.live_map_center_lon": "Longitude du centre",
     "overlay.live_map_distance": "Distance",

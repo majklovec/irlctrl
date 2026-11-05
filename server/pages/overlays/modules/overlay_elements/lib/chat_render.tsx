@@ -364,10 +364,12 @@ function renderBadges(badges: ChatLine["msg"]["badges"]): m.Children {
 					<img
 						class="chat-badge"
 						key={index}
-						// Intrinsic 1em height: the editor page doesn't load
-						// overlay.css, so without this the raw badge art
-						// renders at its natural (huge) size there.
-						height="1em"
+						// Inline mirror of overlay.css `.chat-badge`: the editor
+						// page doesn't load it. An HTML `height="1em"` attribute is
+						// invalid (img height is an integer px), so it collapses the
+						// badge to ~1px in the editor; the CSS form sizes it to the
+						// feed font, matching the emote `img` above.
+						style="display:inline-block;height:1em;width:auto;vertical-align:middle"
 						src={badge.url}
 						alt={label}
 						title={title}
