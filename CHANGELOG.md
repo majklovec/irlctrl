@@ -1,3 +1,16 @@
+# [2.17.0](https://github.com/majklovec/irlctrl/compare/v2.16.0...v2.17.0) (2026-11-05)
+
+
+### Bug Fixes
+
+* **nav:** sort menu items for consistent display order ([c21f0a8](https://github.com/majklovec/irlctrl/commit/c21f0a8b06981e302b9459d673351f2e4754fde2))
+
+
+### Features
+
+* **editor:** add template preview size options and HTML/CSS syntax highlighting ([c6ce712](https://github.com/majklovec/irlctrl/commit/c6ce712aa1db5b9ea89aa6baf1a41cbe1e33a758))
+* **templates:** implement template management system with editor and preview functionality ([8123e85](https://github.com/majklovec/irlctrl/commit/8123e85a7fe467ed2783cb1be46f9345e733773e))
+
 # [2.16.0](https://github.com/majklovec/irlctrl/compare/v2.15.1...v2.16.0) (2026-11-04)
 
 
