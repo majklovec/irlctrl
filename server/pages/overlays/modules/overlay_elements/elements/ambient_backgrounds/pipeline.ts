@@ -8,25 +8,18 @@ import { numProp, type OverlayElement } from "@ui/overlay/element";
 import type { FormField } from "@ui/overlay/fields";
 import type { PropReaders } from "../../../../../../core/overlay_element";
 import {
-	AmbientVariant,
-	type AmbientEnv,
-	type AmbientOptions,
-	createFrameLoop,
+    type AmbientEnv,
+    type AmbientOptions,
+    AmbientVariant,
+    beginFrame,
+    compositeGlow,
+    createFrameLoop,
+    type GlowPass,
 } from "./engine";
-import {
-	fadeCanvas,
-	fadeInOut,
-	HALF_PI,
-	hsla,
-	rand,
-	TAU,
-	TO_RAD,
-	trailFade,
-} from "./utils";
+import { ParticlePool } from "./pool";
+import { fadeInOut, HALF_PI, hsla, rand, TAU, TO_RAD } from "./utils";
 
 const PIPE_COUNT = 30;
-const PIPE_PROP_COUNT = 8;
-const PIPE_PROPS_LENGTH = PIPE_COUNT * PIPE_PROP_COUNT;
 const TURN_COUNT = 8;
 const TURN_AMOUNT = (360 / TURN_COUNT) * TO_RAD;
 const TURN_CHANCE_RANGE = 58;
@@ -53,6 +46,9 @@ const TRAIL_FASTER_MAX = 10;
 const HEAD_BRIGHTNESS_MIN = 0;
 const HEAD_BRIGHTNESS_MAX = 4;
 
+/** The two composite passes: a heavy blur underlayer, then a crisp blit. */
+const GLOW_PASSES: readonly GlowPass[] = [{ filter: "blur(12px)" }, {}];
+
 /** Pipe property stride: x, y, direction, speed, life, ttl, width, hue. */
 const P_X = 0;
 const P_Y = 1;
@@ -64,167 +60,151 @@ const P_WIDTH = 6;
 const P_HUE = 7;
 
 export class Pipeline extends AmbientVariant {
-	readonly id = "pipeline";
-	readonly labelKey = "overlay.ambient_pipeline";
-	override readonly customDefaults: Record<string, number> = {
-		trail_faster: 3,
-		head_brightness: 1,
-	};
+    readonly id = "pipeline";
+    readonly labelKey = "overlay.ambient_pipeline";
+    override readonly customDefaults: Record<string, number> = {
+        trail_faster: 3,
+        head_brightness: 1,
+    };
 
-	/** Coerce the pipeline's custom props to safe values (server-side, same
-	 * `read` API as the element's `normalizeProps`). */
-	override normalizeCustomProps(
-		_props: Readonly<Record<string, unknown>>,
-		read: PropReaders,
-	): Record<string, number> {
-		return {
-			trail_faster: read.num(
-				"trail_faster",
-				this.customDefaults.trail_faster,
-				TRAIL_FASTER_MIN,
-				TRAIL_FASTER_MAX,
-			),
-			head_brightness: read.num(
-				"head_brightness",
-				this.customDefaults.head_brightness,
-				HEAD_BRIGHTNESS_MIN,
-				HEAD_BRIGHTNESS_MAX,
-			),
-		};
-	}
+    /** Coerce the pipeline's custom props to safe values (server-side, same
+     * `read` API as the element's `normalizeProps`). */
+    override normalizeCustomProps(
+        _props: Readonly<Record<string, unknown>>,
+        read: PropReaders,
+    ): Record<string, number> {
+        return {
+            trail_faster: read.num(
+                "trail_faster",
+                this.customDefaults.trail_faster,
+                TRAIL_FASTER_MIN,
+                TRAIL_FASTER_MAX,
+            ),
+            head_brightness: read.num(
+                "head_brightness",
+                this.customDefaults.head_brightness,
+                HEAD_BRIGHTNESS_MIN,
+                HEAD_BRIGHTNESS_MAX,
+            ),
+        };
+    }
 
-	/** The pipeline's rows in the element's edit form (shown when it is the
-	 * selected variant). */
-	override customFormRows(element: OverlayElement): FormField[] {
-		return [
-			{
-				path: "props.trail_faster",
-				labelKey: "overlay.ambient_trail_faster",
-				type: "number",
-				value: numProp(
-					element.props,
-					"trail_faster",
-					this.customDefaults.trail_faster,
-				),
-				min: TRAIL_FASTER_MIN,
-				max: TRAIL_FASTER_MAX,
-				step: 0.5,
-			},
-			{
-				path: "props.head_brightness",
-				labelKey: "overlay.ambient_head_brightness",
-				type: "number",
-				value: numProp(
-					element.props,
-					"head_brightness",
-					this.customDefaults.head_brightness,
-				),
-				min: HEAD_BRIGHTNESS_MIN,
-				max: HEAD_BRIGHTNESS_MAX,
-				step: 0.1,
-			},
-		];
-	}
+    /** The pipeline's rows in the element's edit form (shown when it is the
+     * selected variant). */
+    override customFormRows(element: OverlayElement): FormField[] {
+        return [
+            {
+                path: "props.trail_faster",
+                labelKey: "overlay.ambient_trail_faster",
+                type: "number",
+                value: numProp(
+                    element.props,
+                    "trail_faster",
+                    this.customDefaults.trail_faster,
+                ),
+                min: TRAIL_FASTER_MIN,
+                max: TRAIL_FASTER_MAX,
+                step: 0.5,
+            },
+            {
+                path: "props.head_brightness",
+                labelKey: "overlay.ambient_head_brightness",
+                type: "number",
+                value: numProp(
+                    element.props,
+                    "head_brightness",
+                    this.customDefaults.head_brightness,
+                ),
+                min: HEAD_BRIGHTNESS_MIN,
+                max: HEAD_BRIGHTNESS_MAX,
+                step: 0.1,
+            },
+        ];
+    }
 
-	start(env: AmbientEnv, opts: AmbientOptions): () => void {
-		// The middle band runs along the box's longer axis: horizontal when
-		// the box is wider than tall, vertical otherwise.
-		const horizontal = env.width >= env.height;
-		const cx = 0.5 * env.width;
-		const cy = 0.5 * env.height;
-		let tick = 0;
-		const pipeProps = new Float32Array(PIPE_PROPS_LENGTH);
+    start(env: AmbientEnv, opts: AmbientOptions): () => void {
+        // The middle band runs along the box's longer axis: horizontal when
+        // the box is wider than tall, vertical otherwise.
+        const horizontal = env.width >= env.height;
+        const cx = 0.5 * env.width;
+        const cy = 0.5 * env.height;
+        let tick = 0;
+        const pipes = new ParticlePool(PIPE_COUNT, 8);
 
-		function initPipe(i: number): void {
-			const x = horizontal ? rand(env.width) : cx;
-			const y = horizontal ? cy : rand(env.height);
-			const angle = horizontal ? 0 : HALF_PI;
-			const direction = Math.round(rand(1)) ? angle : angle + 2 * HALF_PI;
-			const speed = (BASE_SPEED + rand(RANGE_SPEED)) * opts.speed;
-			const ttl = BASE_TTL + rand(RANGE_TTL);
-			const width = BASE_WIDTH + rand(RANGE_WIDTH);
-			const hue = BASE_HUE + rand(RANGE_HUE);
-			pipeProps.set([x, y, direction, speed, 0, ttl, width, hue], i);
-		}
+        function initPipe(i: number): void {
+            const x = horizontal ? rand(env.width) : cx;
+            const y = horizontal ? cy : rand(env.height);
+            const angle = horizontal ? 0 : HALF_PI;
+            const direction = Math.round(rand(1)) ? angle : angle + 2 * HALF_PI;
+            const speed = (BASE_SPEED + rand(RANGE_SPEED)) * opts.speed;
+            const ttl = BASE_TTL + rand(RANGE_TTL);
+            const width = BASE_WIDTH + rand(RANGE_WIDTH);
+            const hue = BASE_HUE + rand(RANGE_HUE);
+            pipes.store(i, [x, y, direction, speed, 0, ttl, width, hue]);
+        }
 
-		function drawPipe(i: number): void {
-			const x = pipeProps[i + P_X];
-			const y = pipeProps[i + P_Y];
-			const life = pipeProps[i + P_LIFE];
-			const ttl = pipeProps[i + P_TTL];
-			const width = pipeProps[i + P_WIDTH];
-			const hue = pipeProps[i + P_HUE];
-			env.aw.save();
-			env.aw.strokeStyle = hsla(
-				hue,
-				75,
-				50,
-				fadeInOut(life, ttl) * 0.125 * opts.custom.head_brightness,
-			);
-			env.aw.beginPath();
-			env.aw.arc(x, y, width, 0, TAU);
-			env.aw.stroke();
-			env.aw.closePath();
-			env.aw.restore();
-		}
+        function drawPipe(i: number): void {
+            const x = pipes.at(i, P_X);
+            const y = pipes.at(i, P_Y);
+            const life = pipes.at(i, P_LIFE);
+            const ttl = pipes.at(i, P_TTL);
+            const width = pipes.at(i, P_WIDTH);
+            const hue = pipes.at(i, P_HUE);
+            env.aw.strokeStyle = hsla(
+                hue,
+                75,
+                50,
+                fadeInOut(life, ttl) * 0.125 * opts.custom.head_brightness,
+            );
+            env.aw.beginPath();
+            env.aw.arc(x, y, width, 0, TAU);
+            env.aw.stroke();
+            env.aw.closePath();
+        }
 
-		function updatePipe(i: number): void {
-			let x = pipeProps[i + P_X];
-			let y = pipeProps[i + P_Y];
-			let direction = pipeProps[i + P_DIR];
-			const speed = pipeProps[i + P_SPEED];
-			const life = pipeProps[i + P_LIFE];
-			const ttl = pipeProps[i + P_TTL];
+        function updatePipe(i: number): void {
+            let x = pipes.at(i, P_X);
+            let y = pipes.at(i, P_Y);
+            let direction = pipes.at(i, P_DIR);
+            const speed = pipes.at(i, P_SPEED);
+            const life = pipes.at(i, P_LIFE);
+            const ttl = pipes.at(i, P_TTL);
 
-			drawPipe(i);
+            drawPipe(i);
 
-			x += Math.cos(direction) * speed;
-			y += Math.sin(direction) * speed;
-			const turnChance =
-				!(tick % Math.max(1, Math.round(rand(TURN_CHANCE_RANGE)))) &&
-				(!(Math.round(x) % 6) || !(Math.round(y) % 6));
-			const turnBias = Math.round(rand(1)) ? -1 : 1;
-			if (turnChance) direction += TURN_AMOUNT * turnBias;
+            x += Math.cos(direction) * speed;
+            y += Math.sin(direction) * speed;
+            const turnChance =
+                !(tick % Math.max(1, Math.round(rand(TURN_CHANCE_RANGE)))) &&
+                (!(Math.round(x) % 6) || !(Math.round(y) % 6));
+            const turnBias = Math.round(rand(1)) ? -1 : 1;
+            if (turnChance) direction += TURN_AMOUNT * turnBias;
 
-			// Wrap the dot to the opposite edge (the original recomputed the
-			// coordinates but never wrote them back — keeping its visible
-			// behaviour, fixed to the wrap the bounds check intended).
-			if (x > env.width) x = 0;
-			if (x < 0) x = env.width;
-			if (y > env.height) y = 0;
-			if (y < 0) y = env.height;
+            // Wrap the dot to the opposite edge (the original recomputed the
+            // coordinates but never wrote them back — keeping its visible
+            // behaviour, fixed to the wrap the bounds check intended).
+            if (x > env.width) x = 0;
+            if (x < 0) x = env.width;
+            if (y > env.height) y = 0;
+            if (y < 0) y = env.height;
 
-			const nl = life + 1;
-			pipeProps[i + P_X] = x;
-			pipeProps[i + P_Y] = y;
-			pipeProps[i + P_DIR] = direction;
-			pipeProps[i + P_LIFE] = nl;
-			if (nl > ttl) initPipe(i);
-		}
+            const nl = life + 1;
+            pipes.set(i, P_X, x);
+            pipes.set(i, P_Y, y);
+            pipes.set(i, P_DIR, direction);
+            pipes.set(i, P_LIFE, nl);
+            if (nl > ttl) initPipe(i);
+        }
 
-		for (let i = 0; i < PIPE_PROPS_LENGTH; i += PIPE_PROP_COUNT) initPipe(i);
+        pipes.each(initPipe);
 
-		return createFrameLoop(() => {
-			tick++;
-			// Fade the offscreen layer toward transparent so the circuit trails
-			// linger and dissolve out (never a full clear, the drawing never stops).
-			fadeCanvas(
-				env.aw,
-				env.width,
-				env.height,
-				trailFade(opts.trail / opts.custom.trail_faster),
-			);
-			for (let i = 0; i < PIPE_PROPS_LENGTH; i += PIPE_PROP_COUNT)
-				updatePipe(i);
-			env.bw.fillStyle = opts.background;
-			env.bw.fillRect(0, 0, env.width, env.height);
-			env.bw.save();
-			env.bw.filter = "blur(12px)";
-			env.bw.drawImage(env.a, 0, 0);
-			env.bw.restore();
-			env.bw.save();
-			env.bw.drawImage(env.a, 0, 0);
-			env.bw.restore();
-		});
-	}
+        return createFrameLoop(() => {
+            tick++;
+            // Fade the offscreen N times faster than the shared base so the
+            // circuit lane lingers right behind the head, not far behind it.
+            beginFrame(env, opts, opts.trail / opts.custom.trail_faster);
+            pipes.each(updatePipe);
+            compositeGlow(env, GLOW_PASSES);
+        });
+    }
 }

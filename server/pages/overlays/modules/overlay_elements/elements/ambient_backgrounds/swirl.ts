@@ -4,27 +4,27 @@
  */
 
 import {
-	AmbientVariant,
-	type AmbientEnv,
-	type AmbientOptions,
-	createFrameLoop,
+    type AmbientEnv,
+    type AmbientOptions,
+    AmbientVariant,
+    beginFrame,
+    compositeGlow,
+    createFrameLoop,
+    type GlowPass,
 } from "./engine";
+import { ParticlePool } from "./pool";
 import {
-	createSimplexNoise,
-	fadeCanvas,
-	fadeInOut,
-	hsla,
-	lerp,
-	rand,
-	randRange,
-	type SimplexNoise3D,
-	TAU,
-	trailFade,
+    createSimplexNoise,
+    fadeInOut,
+    hsla,
+    lerp,
+    rand,
+    randRange,
+    type SimplexNoise3D,
+    TAU,
 } from "./utils";
 
 const PARTICLE_COUNT = 700;
-const PARTICLE_PROP_COUNT = 9;
-const PARTICLE_PROPS_LENGTH = PARTICLE_COUNT * PARTICLE_PROP_COUNT;
 const RANGE_Y = 100;
 const BASE_TTL = 50;
 const RANGE_TTL = 150;
@@ -39,7 +39,14 @@ const X_OFF = 0.00125;
 const Y_OFF = 0.00125;
 const Z_OFF = 0.0005;
 
-/** Particle property stride: x, y, vx, vy, life, ttl, speed, radius, hue. */
+/** Glow composite: two blurred additive passes + one crisp pass. */
+const GLOW_PASSES: readonly GlowPass[] = [
+    { filter: "blur(8px) brightness(200%)", lighter: true },
+    { filter: "blur(4px) brightness(200%)", lighter: true },
+    { lighter: true },
+];
+
+/** Particle field ordinals: x, y, vx, vy, life, ttl, speed, radius, hue. */
 const P_X = 0;
 const P_Y = 1;
 const P_VX = 2;
@@ -51,99 +58,81 @@ const P_RADIUS = 7;
 const P_HUE = 8;
 
 export class Swirl extends AmbientVariant {
-	readonly id = "swirl";
-	readonly labelKey = "overlay.ambient_swirl";
+    readonly id = "swirl";
+    readonly labelKey = "overlay.ambient_swirl";
 
-	start(env: AmbientEnv, opts: AmbientOptions): () => void {
-		// Particles spawn in a middle band that runs along the box's longer
-		// axis: horizontal when the box is wider than tall, vertical otherwise.
-		const horizontalBand = env.width >= env.height;
-		const cx = 0.5 * env.width;
-		const cy = 0.5 * env.height;
-		const simplex: SimplexNoise3D = createSimplexNoise();
-		const particleProps = new Float32Array(PARTICLE_PROPS_LENGTH);
-		let tick = 0;
+    start(env: AmbientEnv, opts: AmbientOptions): () => void {
+        // Particles spawn in a middle band that runs along the box's longer
+        // axis: horizontal when the box is wider than tall, vertical otherwise.
+        const horizontalBand = env.width >= env.height;
+        const cx = 0.5 * env.width;
+        const cy = 0.5 * env.height;
+        const simplex: SimplexNoise3D = createSimplexNoise();
+        const particles = new ParticlePool(PARTICLE_COUNT, 9);
+        let tick = 0;
 
-		function initParticle(i: number): void {
-			const x = horizontalBand ? rand(env.width) : cx + randRange(RANGE_Y);
-			const y = horizontalBand ? cy + randRange(RANGE_Y) : rand(env.height);
-			const ttl = BASE_TTL + rand(RANGE_TTL);
-			const speed = (BASE_SPEED + rand(RANGE_SPEED)) * opts.speed;
-			const radius = BASE_RADIUS + rand(RANGE_RADIUS);
-			const hue = BASE_HUE + rand(RANGE_HUE);
-			particleProps.set([x, y, 0, 0, 0, ttl, speed, radius, hue], i);
-		}
+        function initParticle(i: number): void {
+            const x = horizontalBand
+                ? rand(env.width)
+                : cx + randRange(RANGE_Y);
+            const y = horizontalBand
+                ? cy + randRange(RANGE_Y)
+                : rand(env.height);
+            const ttl = BASE_TTL + rand(RANGE_TTL);
+            const speed = (BASE_SPEED + rand(RANGE_SPEED)) * opts.speed;
+            const radius = BASE_RADIUS + rand(RANGE_RADIUS);
+            const hue = BASE_HUE + rand(RANGE_HUE);
+            particles.store(i, [x, y, 0, 0, 0, ttl, speed, radius, hue]);
+        }
 
-		function drawParticle(i: number, x2: number, y2: number): void {
-			const x = particleProps[i + P_X];
-			const y = particleProps[i + P_Y];
-			const life = particleProps[i + P_LIFE];
-			const ttl = particleProps[i + P_TTL];
-			const radius = particleProps[i + P_RADIUS];
-			const hue = particleProps[i + P_HUE];
-			env.aw.save();
-			env.aw.lineCap = "round";
-			env.aw.lineWidth = radius;
-			env.aw.strokeStyle = hsla(hue, 100, 60, fadeInOut(life, ttl));
-			env.aw.beginPath();
-			env.aw.moveTo(x, y);
-			env.aw.lineTo(x2, y2);
-			env.aw.stroke();
-			env.aw.closePath();
-			env.aw.restore();
-		}
+        function drawParticle(i: number, x2: number, y2: number): void {
+            const x = particles.at(i, P_X);
+            const y = particles.at(i, P_Y);
+            const life = particles.at(i, P_LIFE);
+            const ttl = particles.at(i, P_TTL);
+            const radius = particles.at(i, P_RADIUS);
+            const hue = particles.at(i, P_HUE);
+            env.aw.lineCap = "round";
+            env.aw.lineWidth = radius;
+            env.aw.strokeStyle = hsla(hue, 100, 60, fadeInOut(life, ttl));
+            env.aw.beginPath();
+            env.aw.moveTo(x, y);
+            env.aw.lineTo(x2, y2);
+            env.aw.stroke();
+            env.aw.closePath();
+        }
 
-		function updateParticle(i: number): void {
-			const x = particleProps[i + P_X];
-			const y = particleProps[i + P_Y];
-			const n =
-				simplex.noise3D(x * X_OFF, y * Y_OFF, tick * Z_OFF) *
-				NOISE_STEPS *
-				TAU;
-			const vx = lerp(particleProps[i + P_VX], Math.cos(n), 0.5);
-			const vy = lerp(particleProps[i + P_VY], Math.sin(n), 0.5);
-			const speed = particleProps[i + P_SPEED];
-			const x2 = x + vx * speed;
-			const y2 = y + vy * speed;
-			drawParticle(i, x2, y2);
-			const life = particleProps[i + P_LIFE] + 1;
-			const ttl = particleProps[i + P_TTL];
-			particleProps[i + P_X] = x2;
-			particleProps[i + P_Y] = y2;
-			particleProps[i + P_VX] = vx;
-			particleProps[i + P_VY] = vy;
-			particleProps[i + P_LIFE] = life;
-			const out = x > env.width || x < 0 || y > env.height || y < 0;
-			if (out || life > ttl) initParticle(i);
-		}
+        function updateParticle(i: number): void {
+            const x = particles.at(i, P_X);
+            const y = particles.at(i, P_Y);
+            const n =
+                simplex.noise3D(x * X_OFF, y * Y_OFF, tick * Z_OFF) *
+                NOISE_STEPS *
+                TAU;
+            const vx = lerp(particles.at(i, P_VX), Math.cos(n), 0.5);
+            const vy = lerp(particles.at(i, P_VY), Math.sin(n), 0.5);
+            const speed = particles.at(i, P_SPEED);
+            const x2 = x + vx * speed;
+            const y2 = y + vy * speed;
+            drawParticle(i, x2, y2);
+            const life = particles.at(i, P_LIFE) + 1;
+            const ttl = particles.at(i, P_TTL);
+            particles.set(i, P_X, x2);
+            particles.set(i, P_Y, y2);
+            particles.set(i, P_VX, vx);
+            particles.set(i, P_VY, vy);
+            particles.set(i, P_LIFE, life);
+            const out = x > env.width || x < 0 || y > env.height || y < 0;
+            if (out || life > ttl) initParticle(i);
+        }
 
-		for (let i = 0; i < PARTICLE_PROPS_LENGTH; i += PARTICLE_PROP_COUNT)
-			initParticle(i);
+        particles.each(initParticle);
 
-		return createFrameLoop(() => {
-			tick++;
-			// Fade the offscreen layer toward transparent so particle streaks
-			// dissolve out as trails (never a full clear, the drawing never stops).
-			fadeCanvas(env.aw, env.width, env.height, trailFade(opts.trail));
-			env.bw.fillStyle = opts.background;
-			env.bw.fillRect(0, 0, env.width, env.height);
-			for (let i = 0; i < PARTICLE_PROPS_LENGTH; i += PARTICLE_PROP_COUNT)
-				updateParticle(i);
-			// Glow pass: two blurred "lighter" composites + a crisp one.
-			env.bw.save();
-			env.bw.filter = "blur(8px) brightness(200%)";
-			env.bw.globalCompositeOperation = "lighter";
-			env.bw.drawImage(env.a, 0, 0);
-			env.bw.restore();
-			env.bw.save();
-			env.bw.filter = "blur(4px) brightness(200%)";
-			env.bw.globalCompositeOperation = "lighter";
-			env.bw.drawImage(env.a, 0, 0);
-			env.bw.restore();
-			env.bw.save();
-			env.bw.globalCompositeOperation = "lighter";
-			env.bw.drawImage(env.a, 0, 0);
-			env.bw.restore();
-		});
-	}
+        return createFrameLoop(() => {
+            tick++;
+            beginFrame(env, opts);
+            particles.each(updateParticle);
+            compositeGlow(env, GLOW_PASSES);
+        });
+    }
 }
