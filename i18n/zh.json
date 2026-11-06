@@ -1,4 +1,8 @@
 {
+    "dynamic_form.missing_key": "缺少翻译：{{key}}",
+    "dynamic_form.required": "必填字段",
+    "dynamic_form.invalid_number": "请输入有效的数字",
+    "dynamic_form.invalid_iso": "请输入有效的日期和时间",
     "ui.cancel": "取消",
     "assets.move_would_cycle": "此操作会在文件夹之间产生循环。",
     "assets.confirm_delete_file": "删除“{{name}}”？文件将无法恢复。",
@@ -339,3 +343,4 @@
     "ui.stop": "停止",
     "ui.title_suffix": "- IRLCTRL"
 }
+

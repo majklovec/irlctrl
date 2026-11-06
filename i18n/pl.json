@@ -1,4 +1,8 @@
 {
+    "dynamic_form.missing_key": "Brak tłumaczenia: {{key}}",
+    "dynamic_form.required": "Pole wymagane",
+    "dynamic_form.invalid_number": "Wpisz poprawną liczbę",
+    "dynamic_form.invalid_iso": "Wpisz poprawną datę i czas",
     "ui.cancel": "Anuluj",
     "assets.move_would_cycle": "To przeniesienie stworzyłoby cykl między folderami.",
     "assets.confirm_delete_file": "Usunąć „{{name}}”? Pliku nie da się przywrócić.",
@@ -339,3 +343,4 @@
     "ui.stop": "Zatrzymaj",
     "ui.title_suffix": "- IRLCTRL"
 }
+

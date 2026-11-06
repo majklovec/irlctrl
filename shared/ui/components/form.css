@@ -72,6 +72,20 @@ input[type="color"] {
     block-size: calc(1lh + 1rem + 2px);
     cursor: pointer;
 }
+
+/* DynamicForm rows: label / help / validation under the control. */
+label.df-field .df-help {
+    font-size: 0.75rem;
+    color: var(--muted);
+}
+label.df-field .df-error {
+    font-size: 0.75rem;
+    color: var(--bad, #e5484d);
+}
+label.df-field .df-req {
+    color: var(--bad, #e5484d);
+    font-weight: 600;
+}
 input[type="color"]::-webkit-color-swatch-wrapper {
     padding: 0;
 }

@@ -1,4 +1,8 @@
 {
+    "dynamic_form.missing_key": "Traduzione mancante: {{key}}",
+    "dynamic_form.required": "Campo obbligatorio",
+    "dynamic_form.invalid_number": "Inserisci un numero valido",
+    "dynamic_form.invalid_iso": "Inserisci una data e un'ora valide",
     "ui.cancel": "Annulla",
     "assets.move_would_cycle": "Questo spostamento creerebbe un ciclo tra le cartelle.",
     "assets.confirm_delete_file": "Eliminare “{{name}}”? Il file non potrà essere ripristinato.",
@@ -339,3 +343,4 @@
     "ui.stop": "Arresta",
     "ui.title_suffix": "- IRLCTRL"
 }
+

@@ -1,4 +1,8 @@
 {
+    "dynamic_form.missing_key": "Traduction manquante : {{key}}",
+    "dynamic_form.required": "Champ obligatoire",
+    "dynamic_form.invalid_number": "Saisissez un nombre valide",
+    "dynamic_form.invalid_iso": "Saisissez une date et une heure valides",
     "ui.cancel": "Annuler",
     "assets.move_would_cycle": "Ce déplacement créerait un cycle entre les dossiers.",
     "assets.confirm_delete_file": "Supprimer « {{name}} » ? Le fichier ne pourra pas être restauré.",
@@ -339,3 +343,4 @@
     "ui.stop": "Arrêter",
     "ui.title_suffix": "- IRLCTRL"
 }
+

@@ -1,4 +1,8 @@
 {
+    "dynamic_form.missing_key": "Übersetzung fehlt: {{key}}",
+    "dynamic_form.required": "Pflichtfeld",
+    "dynamic_form.invalid_number": "Geben Sie eine gültige Zahl ein",
+    "dynamic_form.invalid_iso": "Geben Sie ein gültiges Datum und eine Uhrzeit ein",
     "ui.cancel": "Abbrechen",
     "assets.move_would_cycle": "Dieser Vorgang würde einen Kreislauf zwischen Ordnern erzeugen.",
     "assets.confirm_delete_file": "„{{name}}“ löschen? Die Datei kann nicht wiederhergestellt werden.",
@@ -339,3 +343,4 @@
     "ui.stop": "Stoppen",
     "ui.title_suffix": "- IRLCTRL"
 }
+

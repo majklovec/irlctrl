@@ -5,14 +5,28 @@ export type { Child } from "../util";
 export { Badge, type BadgeKind, ConnectionBadge } from "./badge";
 export { Actions, Button, IconButton, IconLink } from "./button";
 export { Card, type CardProps } from "./card";
-export { confirmDialog, type ConfirmOptions } from "./confirm";
+export { type ConfirmOptions, confirmDialog } from "./confirm";
 export { DefinitionList, WidgetTable } from "./data";
+export {
+	DynamicForm,
+	type DynamicFormAttrs,
+	type FieldOption,
+	type FieldSchema,
+	type FieldType,
+	type FormFieldSchema,
+	type FormSchema,
+	type GroupSchema,
+	getPath,
+	resolve,
+	setPath,
+	type Translate,
+} from "./dynamic_form";
 export { EmptyState } from "./empty_state";
 export {
 	type BoundProps,
 	Break,
-	CheckField,
 	Checkbox,
+	CheckField,
 	Field,
 	FieldGroup,
 	Form,
