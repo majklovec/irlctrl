@@ -1,11 +1,11 @@
 /*
  * The entrypoints regenerate generated/ before loading the application, so a
  * source run works without the manifests on disk (Docker images, a fresh
- * clone, CI). Pinned by booting both processes against a copy of the tree
- * whose generated/ directory is absent.
+ * clone, CI). Pinned by booting both processes and generating compiled UI
+ * assets against copies of the tree whose generated/ directory is absent.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { cpSync, existsSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -39,9 +39,9 @@ async function waitFor(url: string, proc: ReturnType<typeof Bun.spawn>) {
 	throw new Error(`${url} did not come up`);
 }
 
-beforeAll(() => {
+function createSourceTree(): string {
 	// a copy of the sources without generated/ (node_modules is shared by symlink)
-	tree = mkdtempSync(join(tmpdir(), "irlctrl-nogen-"));
+	const tree = mkdtempSync(join(tmpdir(), "irlctrl-nogen-"));
 	expect(existsSync(join(tree, "generated"))).toBe(false);
 	for (const dir of [
 		"client",
@@ -61,12 +61,16 @@ beforeAll(() => {
 		"css.d.ts",
 	])
 		cpSync(join(projectRoot, file), join(tree, file));
-	Bun.spawnSync([
-		"ln",
-		"-s",
+	symlinkSync(
 		join(projectRoot, "node_modules"),
 		join(tree, "node_modules"),
-	]);
+		"dir",
+	);
+	return tree;
+}
+
+beforeAll(() => {
+	tree = createSourceTree();
 });
 
 afterAll(() => {
@@ -74,6 +78,26 @@ afterAll(() => {
 });
 
 describe("source runs without generated/", () => {
+	test("the asset generator creates page manifests before bundling", () => {
+		const assetTree = createSourceTree();
+		try {
+			const result = Bun.spawnSync(
+				[process.execPath, "scripts/gen_control_server_assets.ts"],
+				{ cwd: assetTree, stdout: "pipe", stderr: "pipe", timeout: 30_000 },
+			);
+			expect(result.exitCode, result.stderr.toString()).toBe(0);
+			for (const file of ["pages.ts", "pages.server.ts", "frontend-assets.ts"])
+				expect(existsSync(join(assetTree, "generated", file)), file).toBe(true);
+			const source = readFileSync(
+				join(assetTree, "generated", "frontend-assets.ts"),
+				"utf8",
+			);
+			expect(source.includes('"dashboard_list":'), "embedded dashboard page").toBe(true);
+		} finally {
+			rmSync(assetTree, { recursive: true, force: true });
+		}
+	}, 30_000);
+
 	test("the control server regenerates the manifests and serves its pages", async () => {
 		const port = await freePort();
 		const proc = Bun.spawn(
