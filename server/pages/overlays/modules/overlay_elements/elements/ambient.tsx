@@ -1,9 +1,9 @@
 /** @jsx m */
 /*
- * The ambient background element: an animated canvas background (aurora,
- * coalesce, pipeline, shift, swirl) ported from crnacura/AmbientCanvasBackgrounds.
- * The animation lives in the `ambient/` subfolder — one file per background
- * over a shared engine; this file only wires the element contract around it.
+ * The ambient background element: an animated canvas background. The set of
+ * backgrounds is open-ended — see `ambient_backgrounds/` (one class per
+ * background over a shared engine); this file only wires the element
+ * contract around the `AMBIENT_VARIANTS` catalog.
  */
 
 import { Icon } from "@ui/components/icons";

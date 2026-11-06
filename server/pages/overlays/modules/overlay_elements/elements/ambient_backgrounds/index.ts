@@ -15,9 +15,14 @@
  */
 
 import { Aurora } from "./aurora";
+import { Bubbles } from "./bubbles";
+import { Constellation } from "./constellation";
 import { Coalesce } from "./coalesce";
+import { Embers } from "./embers";
+import { Fireflies } from "./fireflies";
 import { AmbientVariant } from "./engine";
 import { Pipeline } from "./pipeline";
+import { Ripple } from "./ripple";
 import { Shift } from "./shift";
 import { Swirl } from "./swirl";
 
@@ -27,8 +32,13 @@ export { AmbientVariant };
 /** The registered backgrounds, in the order they appear in the edit form. */
 export const AMBIENT_VARIANTS: readonly AmbientVariant[] = [
 	new Aurora(),
+	new Bubbles(),
+	new Constellation(),
 	new Coalesce(),
+	new Embers(),
+	new Fireflies(),
 	new Pipeline(),
+	new Ripple(),
 	new Shift(),
 	new Swirl(),
 ];
