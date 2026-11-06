@@ -7,7 +7,6 @@
  */
 
 import { Icon } from "@ui/components/icons";
-import { t } from "@ui/i18n";
 import type {
 	ElementContext,
 	ElementProps,
@@ -15,7 +14,7 @@ import type {
 	OverlayElementDef,
 } from "@ui/overlay/element";
 import { numProp, strProp } from "@ui/overlay/element";
-import { bindField } from "@ui/overlay/fields";
+import { bindableForm } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import type { OverlayElementSchema } from "../../../../../core/overlay_element";
@@ -95,48 +94,75 @@ function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 }
 
 function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
-	const p = e.props;
-	const sp = { mutate, variables, variableUrl };
-	const setStr = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLInputElement).value;
-		});
-	const setSel = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLSelectElement).value;
-		});
-	const setNum = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = Number((ev.target as HTMLInputElement).value);
-		});
-	return (
-		<>
-			<div class="ov-grid2">
-				{bindField(e, "props.border", t("overlay.frame_color"),
-					<input type="color" value={strProp(p, "border", "#f59e0b")} oninput={setStr("border")} />, sp)}
-				{bindField(e, "props.borderWidth", t("overlay.frame_width"),
-					<input type="number" min={0} max={80} value={numProp(p, "borderWidth", 8)} oninput={setNum("borderWidth")} />, sp)}
-			</div>
-			<div class="ov-grid2">
-				{bindField(e, "props.borderStyle", t("overlay.frame_style"),
-					<select value={strProp(p, "borderStyle", "solid")} onchange={setSel("borderStyle")}>
-						<option value="solid">solid</option>
-						<option value="dashed">dashed</option>
-						<option value="double">double</option>
-					</select>, sp)}
-				{bindField(e, "props.cornerRadius", t("overlay.frame_radius"),
-					<input type="number" min={0} max={200} value={numProp(p, "cornerRadius", 0)} oninput={setNum("cornerRadius")} />, sp)}
-			</div>
-			{bindField(e, "props.label", t("overlay.frame_label"),
-				<input type="text" value={strProp(p, "label", "LIVE")} oninput={setStr("label")} />, sp)}
-			<div class="ov-grid2">
-				{bindField(e, "props.color", t("overlay.frame_label_color"),
-					<input type="color" value={strProp(p, "color", "#ffffff")} oninput={setStr("color")} />, sp)}
-				{bindField(e, "props.fontSize", t("overlay.frame_label_size"),
-					<input type="number" min={8} max={200} value={numProp(p, "fontSize", 22)} oninput={setNum("fontSize")} />, sp)}
-			</div>
-		</>
-	);
+	return bindableForm({
+		element: e,
+		mutate,
+		variables,
+		variableUrl,
+		rows: [
+			[
+				{
+					path: "props.border",
+					labelKey: "overlay.frame_color",
+					type: "color",
+					value: strProp(e.props, "border", "#f59e0b"),
+				},
+				{
+					path: "props.borderWidth",
+					labelKey: "overlay.frame_width",
+					type: "number",
+					min: 0,
+					max: 80,
+					value: numProp(e.props, "borderWidth", 8),
+				},
+			],
+			[
+				{
+					path: "props.borderStyle",
+					labelKey: "overlay.frame_style",
+					type: "select",
+					value: strProp(e.props, "borderStyle", "solid"),
+					options: [
+						{ value: "solid", label: "solid" },
+						{ value: "dashed", label: "dashed" },
+						{ value: "double", label: "double" },
+					],
+				},
+				{
+					path: "props.cornerRadius",
+					labelKey: "overlay.frame_radius",
+					type: "number",
+					min: 0,
+					max: 200,
+					value: numProp(e.props, "cornerRadius", 0),
+				},
+			],
+			[
+				{
+					path: "props.label",
+					labelKey: "overlay.frame_label",
+					type: "text",
+					value: strProp(e.props, "label", "LIVE"),
+				},
+			],
+			[
+				{
+					path: "props.color",
+					labelKey: "overlay.frame_label_color",
+					type: "color",
+					value: strProp(e.props, "color", "#ffffff"),
+				},
+				{
+					path: "props.fontSize",
+					labelKey: "overlay.frame_label_size",
+					type: "number",
+					min: 8,
+					max: 200,
+					value: numProp(e.props, "fontSize", 22),
+				},
+			],
+		],
+	});
 }
 
 function validate(e: OverlayElement): string[] {

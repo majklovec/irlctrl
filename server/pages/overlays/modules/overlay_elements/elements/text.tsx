@@ -1,15 +1,15 @@
 /** @jsx m */
 
 import { Icon } from "@ui/components/icons";
-import { t } from "@ui/i18n";
 import type {
 	ElementContext,
 	ElementProps,
 	OverlayElement,
 	OverlayElementDef,
 } from "@ui/overlay/element";
+import { t } from "@ui/i18n";
 import { numProp, strProp } from "@ui/overlay/element";
-import { bindField } from "@ui/overlay/fields";
+import { bindField, bindableForm } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import type { OverlayElementSchema } from "../../../../../core/overlay_element";
@@ -84,57 +84,41 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
 	const p = e.props;
 	const sp = { mutate, variables, variableUrl };
-	return (
-		<>
-			{bindField(
-				e,
-				"props.text",
-				t("overlay.text"),
-				<input
-					type="text"
-					value={String(p.text ?? "")}
-					oninput={(ev: Event) =>
-						mutate((el) => {
-							el.props.text = (ev.target as HTMLInputElement).value;
-						})
-					}
-				/>,
-				sp,
-			)}
-			<div class="ov-grid2">
-				{bindField(
-					e,
-					"props.fontSize",
-					t("overlay.font_size"),
-					<input
-						type="number"
-						value={Number(p.fontSize ?? 48)}
-						oninput={(ev: Event) =>
-							mutate((el) => {
-								el.props.fontSize = Number(
-									(ev.target as HTMLInputElement).value,
-								);
-							})
-						}
-					/>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.color",
-					t("overlay.color"),
-					<input
-						type="color"
-						value={String(p.color ?? "#ffffff")}
-						oninput={(ev: Event) =>
-							mutate((el) => {
-								el.props.color = (ev.target as HTMLInputElement).value;
-							})
-						}
-					/>,
-					sp,
-				)}
-			</div>
+	// The text content widget is `inlineEdit`, not a field, so the form only
+	// exposes the typographic properties — never a text slot here.
+	return bindableForm({
+		element: e,
+		mutate,
+		variables,
+		variableUrl,
+		rows: [
+			[
+				{
+					path: "props.text",
+					labelKey: "overlay.text",
+					type: "text",
+					value: String(p.text ?? ""),
+				},
+			],
+			[
+				{
+					path: "props.fontSize",
+					labelKey: "overlay.font_size",
+					type: "number",
+					value: Number(p.fontSize ?? 48),
+				},
+				{
+					path: "props.color",
+					labelKey: "overlay.color",
+					type: "color",
+					value: String(p.color ?? "#ffffff"),
+				},
+			],
+			// `fontWeight` is a number-typed prop edited through a `select`
+			// (the raw control writes `Number(...)`, and `draw` reads it via
+			// `numProp`, which needs a number) — so it stays a raw `bindField`
+			// row; the descriptor `select` would write a string and silently
+			// fall back to the default weight.
 			<div class="ov-grid2">
 				{bindField(
 					e,
@@ -165,7 +149,8 @@ function editForm({ element: e, mutate, variables, variableUrl }: ElementProps):
 						value={String(p.textAlign ?? "left")}
 						onchange={(ev: Event) =>
 							mutate((el) => {
-								el.props.textAlign = (ev.target as HTMLSelectElement).value;
+								el.props.textAlign = (ev.target as HTMLSelectElement)
+									.value;
 							})
 						}
 					>
@@ -175,9 +160,9 @@ function editForm({ element: e, mutate, variables, variableUrl }: ElementProps):
 					</select>,
 					sp,
 				)}
-			</div>
-		</>
-	);
+			</div>,
+		],
+	});
 }
 
 function validate(e: OverlayElement): string[] {

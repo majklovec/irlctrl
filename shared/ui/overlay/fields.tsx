@@ -16,6 +16,7 @@
 import type { Vnode, VnodeDOM } from "mithril";
 import m from "mithril";
 import type { Variable } from "../../../server/pages/overlays/overlay";
+import type { FieldType } from "../components/dynamic_form";
 import { makeControl } from "../components/dynamic_form";
 import { Icon } from "../components/icons";
 import { t } from "../i18n";
@@ -192,13 +193,10 @@ export function bindField(
 // descriptors renders in an `ov-grid<N>`; a raw Vnode row is the escape
 // hatch for custom widgets (rendered verbatim, no binding).
 
-/** Control types `bindableForm` knows how to build. */
-export type FormFieldType =
-	| "text"
-	| "number"
-	| "color"
-	| "select"
-	| "checkbox";
+/** Control types `bindableForm` knows how to build — the full `makeControl`
+ * vocabulary (text/textarea/number/range/select/checkbox/color/asset/
+ * iso-datetime), so every DynamicForm control type is directly usable. */
+export type FormFieldType = FieldType;
 
 /** One choice of a `select` field. */
 export interface FormFieldOption {
@@ -214,8 +212,12 @@ export interface FormFieldOption {
  * current value — the caller reads it with `strProp`/`numProp`. */
 export interface FormField {
 	path: string;
-	/** i18n label key, resolved through `t` at render time. */
-	labelKey: string;
+	/** i18n label key, resolved through `t` at render time. Mutually
+	 * exclusive with `label` (supply one or the other, `label` wins). */
+	labelKey?: string;
+	/** Pre-resolved label text — use when there is no i18n key (e.g. the
+	 * html_template's bespoke text slots, labelled from the slot name). */
+	label?: string;
 	type: FormFieldType;
 	value: unknown;
 	/** Bounds for a `number` field. */
@@ -250,6 +252,12 @@ function controlFor(f: FormField, mutate: ElementProps["mutate"]): Vnode {
 	});
 }
 
+/** The field's display label: a pre-resolved `label` wins, else the
+ * `labelKey` through `t` (an empty string if neither is set). */
+function fieldLabel(f: FormField): string {
+	return f.label ?? (f.labelKey !== undefined ? t(f.labelKey) : "");
+}
+
 /** Bind + group one row of fields into its grid (or a bare field). */
 function rowFields(
 	fields: FormField[],
@@ -257,7 +265,7 @@ function rowFields(
 	sp: Pick<ElementProps, "mutate" | "variables" | "variableUrl">,
 ): Vnode {
 	const bound = fields.map((f) =>
-		bindField(e, f.path, t(f.labelKey), controlFor(f, sp.mutate), sp),
+		bindField(e, f.path, fieldLabel(f), controlFor(f, sp.mutate), sp),
 	);
 	if (bound.length === 1) return bound[0];
 	return <div class={bound.length === 2 ? "ov-grid2" : "ov-grid3"}>{bound}</div>;

@@ -1,7 +1,6 @@
 /** @jsx m */
 
 import { Icon } from "@ui/components/icons";
-import { t } from "@ui/i18n";
 import type {
 	ElementContext,
 	ElementProps,
@@ -9,7 +8,7 @@ import type {
 	OverlayElementDef,
 } from "@ui/overlay/element";
 import { numProp, strProp } from "@ui/overlay/element";
-import { bindField } from "@ui/overlay/fields";
+import { bindableForm } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import type { OverlayElementSchema } from "../../../../../core/overlay_element";
@@ -48,79 +47,43 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 }
 
 function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
-	const p = e.props;
-	const sp = { mutate, variables, variableUrl };
-	return (
-		<>
-			<div class="ov-grid2">
-				{bindField(
-					e,
-					"props.fill",
-					t("overlay.fill"),
-					<input
-						type="color"
-						value={strProp(p, "fill", DEFAULT_RECTANGLE_PROPS.fill)}
-						oninput={(ev: Event) =>
-							mutate((el) => {
-								el.props.fill = (ev.target as HTMLInputElement).value;
-							})
-						}
-					/>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.stroke",
-					t("overlay.stroke"),
-					<input
-						type="color"
-						value={strProp(p, "stroke", DEFAULT_RECTANGLE_PROPS.stroke)}
-						oninput={(ev: Event) =>
-							mutate((el) => {
-								el.props.stroke = (ev.target as HTMLInputElement).value;
-							})
-						}
-					/>,
-					sp,
-				)}
-			</div>
-			<div class="ov-grid2">
-				{bindField(
-					e,
-					"props.strokeWidth",
-					t("overlay.stroke_width"),
-					<input
-						type="number"
-						value={numProp(p, "strokeWidth", 0)}
-						oninput={(ev: Event) =>
-							mutate((el) => {
-								el.props.strokeWidth = Number(
-									(ev.target as HTMLInputElement).value,
-								);
-							})
-						}
-					/>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.radius",
-					t("overlay.radius"),
-					<input
-						type="number"
-						min={0}
-						value={numProp(p, "radius", DEFAULT_RECTANGLE_PROPS.radius)}
-						oninput={(ev: Event) =>
-							mutate((el) => {
-								el.props.radius = Number((ev.target as HTMLInputElement).value);
-							})
-						}
-					/>,
-					sp,
-				)}
-			</div>
-		</>
-	);
+	return bindableForm({
+		element: e,
+		mutate,
+		variables,
+		variableUrl,
+		rows: [
+			[
+				{
+					path: "props.fill",
+					labelKey: "overlay.fill",
+					type: "color",
+					value: strProp(e.props, "fill", DEFAULT_RECTANGLE_PROPS.fill),
+				},
+				{
+					path: "props.stroke",
+					labelKey: "overlay.stroke",
+					type: "color",
+					value: strProp(e.props, "stroke", DEFAULT_RECTANGLE_PROPS.stroke),
+				},
+			],
+			[
+				{
+					path: "props.strokeWidth",
+					labelKey: "overlay.stroke_width",
+					type: "number",
+					value: numProp(e.props, "strokeWidth", 0),
+				},
+				{
+					path: "props.radius",
+					labelKey: "overlay.radius",
+					type: "number",
+					min: 0,
+					value: numProp(e.props, "radius", DEFAULT_RECTANGLE_PROPS.radius),
+				},
+			],
+		],
+	});
 }
 
 function validate(e: OverlayElement): string[] {

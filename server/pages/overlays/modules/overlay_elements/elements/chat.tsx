@@ -25,8 +25,8 @@ import type {
 	OverlayElement,
 	OverlayElementDef,
 } from "@ui/overlay/element";
-import { bindField } from "@ui/overlay/fields";
-import type { Children, Vnode } from "mithril";
+import { bindableForm } from "@ui/overlay/fields";
+import type { Vnode } from "mithril";
 import m from "mithril";
 import {
 	CHAT_BANNED_TYPE,
@@ -91,35 +91,6 @@ export const DEFAULT_CHAT_PROPS: Required<ChatProps> = {
 	textAlign: "left",
 };
 
-/** One inspector field wrapping a `<select>` of fixed choices. `bindField`
- * shows no binding toggle for selects (a fixed choice set can't take a
- * variable binding), so this is purely presentational. */
-function choiceField(
-	e: OverlayElement,
-	path: string,
-	label: string,
-	value: string,
-	options: { value: string; label: string }[],
-	apply: (v: string) => void,
-	props: ElementProps,
-): Vnode {
-	return bindField(
-		e,
-		path,
-		label,
-		<select
-			value={value}
-			oninput={(ev: Event) => apply((ev.target as HTMLSelectElement).value)}
-		>
-			{options.map((o) => (
-				<option key={o.value} value={o.value}>
-					{o.label}
-				</option>
-			))}
-		</select>,
-		props,
-	);
-}
 
 /** The display list for one snapshot of the feed: banned lines filtered
  * (or flagged, per the element's `bannedMessages`), in the element's message
@@ -209,273 +180,184 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	);
 }
 
-function editForm(props: ElementProps): Children {
-	const e = props.element;
+function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
 	const p = e.props as unknown as ChatProps;
-	const mutate = (fn: (el: OverlayElement) => void): void => props.mutate(fn);
 
-	return (
-		<>
-			<ChannelsField element={e} mutate={mutate} variables={props.variables} />
-
-			{choiceField(
-				e,
-				"props.order",
-				t("dash.widget_order"),
-				p.order,
-				[
-					{ value: "top", label: t("dash.widget_order.top") },
-					{
-						value: "bottom",
-						label: t("dash.widget_order.bottom"),
-					},
-				],
-				(v) =>
-					mutate((el) => {
-						el.props.order = v as ChatProps["order"];
-					}),
-				props,
-			)}
-			{choiceField(
-				e,
-				"props.bannedMessages",
-				t("dash.widget_bannedMessages"),
-				p.bannedMessages,
-				[
-					{
-						value: "strike",
-						label: t("dash.widget_bannedMessages.strike"),
-					},
-					{
-						value: "hide",
-						label: t("dash.widget_bannedMessages.hide"),
-					},
-				],
-				(v) =>
-					mutate((el) => {
-						el.props.bannedMessages = v as ChatProps["bannedMessages"];
-					}),
-				props,
-			)}
-			{choiceField(
-				e,
-				"props.timestamps",
-				t("dash.widget_timestamps"),
-				p.timestamps,
-				[
-					{
-						value: "off",
-						label: t("dash.widget_timestamps.off"),
-					},
-					{ value: "on", label: t("dash.widget_timestamps.on") },
-				],
-				(v) =>
-					mutate((el) => {
-						el.props.timestamps = v as ChatProps["timestamps"];
-					}),
-				props,
-			)}
-			{choiceField(
-				e,
-				"props.badges",
-				t("dash.widget_badges"),
-				p.badges,
-				[
-					{
-						value: "on",
-						label: t("dash.widget_badges.on"),
-					},
-					{
-						value: "off",
-						label: t("dash.widget_badges.off"),
-					},
-				],
-				(v) =>
-					mutate((el) => {
-						el.props.badges = v as ChatProps["badges"];
-					}),
-				props,
-			)}
-			{choiceField(
-				e,
-				"props.platformIcons",
-				t("dash.widget_platformIcons"),
-				p.platformIcons,
-				[
-					{
-						value: "auto",
-						label: t("dash.widget_platformIcons.auto"),
-					},
-					{ value: "on", label: t("dash.widget_platformIcons.on") },
-					{
-						value: "off",
-						label: t("dash.widget_platformIcons.off"),
-					},
-				],
-				(v) =>
-					mutate((el) => {
-						el.props.platformIcons = v as ChatProps["platformIcons"];
-					}),
-				props,
-			)}
-
-			{bindField(
-				e,
-				"props.fontSize",
-				t("overlay.font_size"),
-				<input
-					type="number"
-					min={8}
-					value={p.fontSize}
-					oninput={(ev: Event) =>
-						mutate((el) => {
-							el.props.fontSize =
-								Number((ev.target as HTMLInputElement).value) || 8;
-						})
-					}
-				/>,
-				props,
-			)}
-			{bindField(
-				e,
-				"props.fontWeight",
-				t("overlay.font_weight"),
-				<select
-					value={p.fontWeight}
-					oninput={(ev: Event) =>
-						mutate((el) => {
-							el.props.fontWeight = Number(
-								(ev.target as HTMLSelectElement).value,
-							);
-						})
-					}
-				>
-					<option value={400}>400</option>
-					<option value={500}>500</option>
-					<option value={700}>700</option>
-				</select>,
-				props,
-			)}
-			{bindField(
-				e,
-				"props.color",
-				t("overlay.color"),
-				<input
-					type="color"
-					value={p.color}
-					oninput={(ev: Event) =>
-						mutate((el) => {
-							el.props.color = (ev.target as HTMLInputElement).value;
-						})
-					}
-				/>,
-				props,
-			)}
-			{bindField(
-				e,
-				"props.lineHeight",
-				t("overlay.line_height"),
-				<input
-					type="number"
-					step={0.1}
-					min={0.5}
-					value={p.lineHeight}
-					oninput={(ev: Event) =>
-						mutate((el) => {
-							el.props.lineHeight =
-								Number((ev.target as HTMLInputElement).value) || 1;
-						})
-					}
-				/>,
-				props,
-			)}
-			{bindField(
-				e,
-				"props.messageSpacing",
-				t("overlay.message_spacing"),
-				<input
-					type="number"
-					min={0}
-					value={p.messageSpacing}
-					oninput={(ev: Event) =>
-						mutate((el) => {
-							el.props.messageSpacing =
-								Number((ev.target as HTMLInputElement).value) || 0;
-						})
-					}
-				/>,
-				props,
-			)}
-			{choiceField(
-				e,
-				"props.fadeDirection",
-				t("overlay.fade_direction"),
-				p.fadeDirection,
-				[
-					{
-						value: "off",
-						label: t("overlay.fade_direction.off"),
-					},
-					{
-						value: "top",
-						label: t("overlay.fade_direction.top"),
-					},
-					{
-						value: "bottom",
-						label: t("overlay.fade_direction.bottom"),
-					},
-				],
-				(v) =>
-					mutate((el) => {
-						el.props.fadeDirection = v as ChatProps["fadeDirection"];
-					}),
-				props,
-			)}
-			{bindField(
-				e,
-				"props.fadeSize",
-				t("overlay.fade_size"),
-				<input
-					type="number"
-					min={0}
-					value={p.fadeSize}
-					oninput={(ev: Event) =>
-						mutate((el) => {
-							el.props.fadeSize =
-								Number((ev.target as HTMLInputElement).value) || 0;
-						})
-					}
-				/>,
-				props,
-			)}
-			{choiceField(
-				e,
-				"props.textAlign",
-				t("overlay.text_align"),
-				p.textAlign,
-				[
-					{ value: "left", label: t("overlay.text_align.left") },
-					{
-						value: "center",
-						label: t("overlay.text_align.center"),
-					},
-					{
-						value: "right",
-						label: t("overlay.text_align.right"),
-					},
-					{
-						value: "justify",
-						label: t("overlay.text_align.justify"),
-					},
-				],
-				(v) =>
-					mutate((el) => {
-						el.props.textAlign = v as ChatProps["textAlign"];
-					}),
-				props,
-			)}
-		</>
-	);
+	return bindableForm({
+		element: e,
+		mutate,
+		variables,
+		variableUrl,
+		rows: [
+			// The channel rows are a composite list widget, not a descriptor
+			// per row, so it stays a raw Vnode (never gets a binding toggle).
+			<ChannelsField element={e} mutate={mutate} variables={variables} />,
+			[
+				{
+					path: "props.order",
+					labelKey: "dash.widget_order",
+					type: "select",
+					value: p.order,
+					options: [
+						{ value: "top", label: t("dash.widget_order.top") },
+						{ value: "bottom", label: t("dash.widget_order.bottom") },
+					],
+				},
+			],
+			[
+				{
+					path: "props.bannedMessages",
+					labelKey: "dash.widget_bannedMessages",
+					type: "select",
+					value: p.bannedMessages,
+					options: [
+						{
+							value: "strike",
+							label: t("dash.widget_bannedMessages.strike"),
+						},
+						{
+							value: "hide",
+							label: t("dash.widget_bannedMessages.hide"),
+						},
+					],
+				},
+			],
+			[
+				{
+					path: "props.timestamps",
+					labelKey: "dash.widget_timestamps",
+					type: "select",
+					value: p.timestamps,
+					options: [
+						{ value: "off", label: t("dash.widget_timestamps.off") },
+						{ value: "on", label: t("dash.widget_timestamps.on") },
+					],
+				},
+			],
+			[
+				{
+					path: "props.badges",
+					labelKey: "dash.widget_badges",
+					type: "select",
+					value: p.badges,
+					options: [
+						{ value: "on", label: t("dash.widget_badges.on") },
+						{ value: "off", label: t("dash.widget_badges.off") },
+					],
+				},
+			],
+			[
+				{
+					path: "props.platformIcons",
+					labelKey: "dash.widget_platformIcons",
+					type: "select",
+					value: p.platformIcons,
+					options: [
+						{
+							value: "auto",
+							label: t("dash.widget_platformIcons.auto"),
+						},
+						{ value: "on", label: t("dash.widget_platformIcons.on") },
+						{ value: "off", label: t("dash.widget_platformIcons.off") },
+					],
+				},
+			],
+			[
+				{
+					path: "props.fontSize",
+					labelKey: "overlay.font_size",
+					type: "number",
+					value: p.fontSize,
+					min: 8,
+				},
+			],
+			[
+				{
+					path: "props.fontWeight",
+					labelKey: "overlay.font_weight",
+					type: "select",
+					value: p.fontWeight,
+					options: [
+						{ value: "400", label: "400" },
+						{ value: "500", label: "500" },
+						{ value: "700", label: "700" },
+					],
+				},
+			],
+			[
+				{
+					path: "props.color",
+					labelKey: "overlay.color",
+					type: "color",
+					value: p.color,
+				},
+			],
+			[
+				{
+					path: "props.lineHeight",
+					labelKey: "overlay.line_height",
+					type: "number",
+					value: p.lineHeight,
+					min: 0.5,
+					step: 0.1,
+				},
+			],
+			[
+				{
+					path: "props.messageSpacing",
+					labelKey: "overlay.message_spacing",
+					type: "number",
+					value: p.messageSpacing,
+					min: 0,
+				},
+			],
+			[
+				{
+					path: "props.fadeDirection",
+					labelKey: "overlay.fade_direction",
+					type: "select",
+					value: p.fadeDirection,
+					options: [
+						{
+							value: "off",
+							label: t("overlay.fade_direction.off"),
+						},
+						{
+							value: "top",
+							label: t("overlay.fade_direction.top"),
+						},
+						{
+							value: "bottom",
+							label: t("overlay.fade_direction.bottom"),
+						},
+					],
+				},
+			],
+			[
+				{
+					path: "props.fadeSize",
+					labelKey: "overlay.fade_size",
+					type: "number",
+					value: p.fadeSize,
+					min: 0,
+				},
+			],
+			[
+				{
+					path: "props.textAlign",
+					labelKey: "overlay.text_align",
+					type: "select",
+					value: p.textAlign,
+					options: [
+						{ value: "left", label: t("overlay.text_align.left") },
+						{ value: "center", label: t("overlay.text_align.center") },
+						{ value: "right", label: t("overlay.text_align.right") },
+						{ value: "justify", label: t("overlay.text_align.justify") },
+					],
+				},
+			],
+		],
+	});
 }
 
 function validate(_e: OverlayElement): string[] {

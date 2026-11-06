@@ -14,7 +14,7 @@ import type {
 	OverlayElementDef,
 } from "@ui/overlay/element";
 import { numProp, strProp } from "@ui/overlay/element";
-import { bindField } from "@ui/overlay/fields";
+import { bindableForm, type FormRow } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import { ListField } from "../lib/list_field";
@@ -174,110 +174,74 @@ function draw(element: OverlayElement, _ctx: ElementContext): Vnode<any, any> {
 
 function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
 	const p = e.props;
-	const sp = { mutate, variables, variableUrl };
-	const setBool = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLInputElement).checked;
-		});
-	const setNum = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = Number((ev.target as HTMLInputElement).value);
-		});
-	const setStr = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLInputElement).value;
-		});
-	return (
-		<>
-			<ListField
-				element={e}
-				mutate={mutate}
-				propKey="entries"
-				label={t("overlay.lt_entries")}
-				columns={[
-					{ key: "name", label: t("overlay.lt_name") },
-					{ key: "topic", label: t("overlay.lt_topic") },
-				]}
-				addRow={() => ({ name: "", topic: "" })}
-				addLabel={t("overlay.lt_add_entry")}
-			/>
-			{bindField(
-				e,
-				"props.rotate",
-				t("overlay.lt_rotate"),
-				<input
-					type="checkbox"
-					checked={p.rotate === true}
-					onchange={setBool("rotate")}
-				/>,
-				sp,
-			)}
-			{p.rotate === true
-				? bindField(
-						e,
-						"props.interval",
-						t("overlay.interval"),
-						<input
-							type="number"
-							min={1000}
-							max={600000}
-							step={500}
-							value={numProp(p, "interval", 6000)}
-							oninput={setNum("interval")}
-						/>,
-						sp,
-					)
-				: null}
-			<div class="ov-grid3">
-				{bindField(
-					e,
-					"props.color",
-					t("overlay.color"),
-					<input
-						type="color"
-						value={strProp(p, "color", "#ffffff")}
-						oninput={setStr("color")}
-					/>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.background",
-					t("overlay.cd_background"),
-					<input
-						type="color"
-						value={strProp(p, "background", "#111827")}
-						oninput={setStr("background")}
-					/>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.accent",
-					t("overlay.accent"),
-					<input
-						type="color"
-						value={strProp(p, "accent", "#38bdf8")}
-						oninput={setStr("accent")}
-					/>,
-					sp,
-				)}
-			</div>
-			{bindField(
-				e,
-				"props.fontSize",
-				t("overlay.font_size"),
-				<input
-					type="number"
-					min={8}
-					max={300}
-					value={numProp(p, "fontSize", 30)}
-					oninput={setNum("fontSize")}
-				/>,
-				sp,
-			)}
-		</>
-	);
+	// `interval` is only meaningful while rotating, so it is a conditional
+	// row — present in `rows` only when `rotate` is on (mirrors the original
+	// `p.rotate === true ? <input> : null`).
+	const intervalRow: FormRow = [
+		{
+			path: "props.interval",
+			labelKey: "overlay.interval",
+			type: "number",
+			value: numProp(p, "interval", 6000),
+			min: 1000,
+			max: 600000,
+			step: 500,
+		},
+	];
+	const rows: FormRow[] = [
+		<ListField
+			element={e}
+			mutate={mutate}
+			propKey="entries"
+			label={t("overlay.lt_entries")}
+			columns={[
+				{ key: "name", label: t("overlay.lt_name") },
+				{ key: "topic", label: t("overlay.lt_topic") },
+			]}
+			addRow={() => ({ name: "", topic: "" })}
+			addLabel={t("overlay.lt_add_entry")}
+		/>,
+		[
+			{
+				path: "props.rotate",
+				labelKey: "overlay.lt_rotate",
+				type: "checkbox",
+				value: p.rotate === true,
+			},
+		],
+		...(p.rotate === true ? [intervalRow] : []),
+		[
+			{
+				path: "props.color",
+				labelKey: "overlay.color",
+				type: "color",
+				value: strProp(p, "color", "#ffffff"),
+			},
+			{
+				path: "props.background",
+				labelKey: "overlay.cd_background",
+				type: "color",
+				value: strProp(p, "background", "#111827"),
+			},
+			{
+				path: "props.accent",
+				labelKey: "overlay.accent",
+				type: "color",
+				value: strProp(p, "accent", "#38bdf8"),
+			},
+		],
+		[
+			{
+				path: "props.fontSize",
+				labelKey: "overlay.font_size",
+				type: "number",
+				value: numProp(p, "fontSize", 30),
+				min: 8,
+				max: 300,
+			},
+		],
+	];
+	return bindableForm({ element: e, mutate, variables, variableUrl, rows });
 }
 
 function validate(e: OverlayElement): string[] {

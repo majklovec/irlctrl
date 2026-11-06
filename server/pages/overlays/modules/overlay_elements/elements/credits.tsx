@@ -17,7 +17,7 @@ import type {
 	OverlayElementDef,
 } from "@ui/overlay/element";
 import { numProp, strProp } from "@ui/overlay/element";
-import { bindField } from "@ui/overlay/fields";
+import { bindableForm } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import { ListField } from "../lib/list_field";
@@ -150,24 +150,20 @@ function draw(
 }
 
 function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
-	const p = e.props;
-	const sp = { mutate, variables, variableUrl };
-	const setStr = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLInputElement).value;
-		});
-	const setNum = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = Number((ev.target as HTMLInputElement).value);
-		});
-	const setBool = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLInputElement).checked;
-		});
-	return (
-		<>
-			{bindField(e, "props.title", t("overlay.cr_title"),
-				<input type="text" value={strProp(p, "title", "With special thanks to")} oninput={setStr("title")} />, sp)}
+	return bindableForm({
+		element: e,
+		mutate,
+		variables,
+		variableUrl,
+		rows: [
+			[
+				{
+					path: "props.title",
+					labelKey: "overlay.cr_title",
+					type: "text",
+					value: strProp(e.props, "title", "With special thanks to"),
+				},
+			],
 			<ListField
 				element={e}
 				mutate={mutate}
@@ -179,25 +175,56 @@ function editForm({ element: e, mutate, variables, variableUrl }: ElementProps):
 				]}
 				addRow={() => ({ name: "", role: "" })}
 				addLabel={t("overlay.cr_add")}
-			/>
-			<div class="ov-grid2">
-				{bindField(e, "props.speed", t("overlay.cr_speed"),
-					<input type="number" min={0.1} max={20} step={0.5} value={numProp(p, "speed", 1)} oninput={setNum("speed")} />, sp)}
-				{bindField(e, "props.loop", t("overlay.loop"),
-					<input type="checkbox" checked={p.loop === true} onchange={setBool("loop")} />, sp)}
-			</div>
-			<div class="ov-grid3">
-				{bindField(e, "props.color", t("overlay.color"),
-					<input type="color" value={strProp(p, "color", "#ffffff")} oninput={setStr("color")} />, sp)}
-				{bindField(e, "props.accent", t("overlay.accent"),
-					<input type="color" value={strProp(p, "accent", "#ffd700")} oninput={setStr("accent")} />, sp)}
-				{bindField(e, "props.background", t("overlay.cd_background"),
-					<input type="color" value={strProp(p, "background", "#000000")} oninput={setStr("background")} />, sp)}
-			</div>
-			{bindField(e, "props.fontSize", t("overlay.font_size"),
-				<input type="number" min={8} max={200} value={numProp(p, "fontSize", 24)} oninput={setNum("fontSize")} />, sp)}
-		</>
-	);
+			/>,
+			[
+				{
+					path: "props.speed",
+					labelKey: "overlay.cr_speed",
+					type: "number",
+					value: numProp(e.props, "speed", 1),
+					min: 0.1,
+					max: 20,
+					step: 0.5,
+				},
+				{
+					path: "props.loop",
+					labelKey: "overlay.loop",
+					type: "checkbox",
+					value: e.props.loop === true,
+				},
+			],
+			[
+				{
+					path: "props.color",
+					labelKey: "overlay.color",
+					type: "color",
+					value: strProp(e.props, "color", "#ffffff"),
+				},
+				{
+					path: "props.accent",
+					labelKey: "overlay.accent",
+					type: "color",
+					value: strProp(e.props, "accent", "#ffd700"),
+				},
+				{
+					path: "props.background",
+					labelKey: "overlay.cd_background",
+					type: "color",
+					value: strProp(e.props, "background", "#000000"),
+				},
+			],
+			[
+				{
+					path: "props.fontSize",
+					labelKey: "overlay.font_size",
+					type: "number",
+					value: numProp(e.props, "fontSize", 24),
+					min: 8,
+					max: 200,
+				},
+			],
+		],
+	});
 }
 
 function validate(e: OverlayElement): string[] {

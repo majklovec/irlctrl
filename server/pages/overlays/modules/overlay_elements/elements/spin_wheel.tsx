@@ -26,7 +26,7 @@ import type {
 	OverlayElementDef,
 } from "@ui/overlay/element";
 import { numProp, strProp } from "@ui/overlay/element";
-import { bindField } from "@ui/overlay/fields";
+import { bindableForm } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import type { OverlayElementSchema } from "../../../../../core/overlay_element";
@@ -532,108 +532,91 @@ function editForm({
 	variableUrl,
 }: ElementProps): Vnode {
 	const p = e.props;
-	const sp = { mutate, variables, variableUrl };
 	const eventName = strProp(p, "event", "spin");
-	const setStr = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLInputElement).value;
-		});
-	const setNum = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = Number((ev.target as HTMLInputElement).value);
-		});
-	return (
-		<>
-			{bindField(
-				e,
-				"props.event",
-				t("overlay.event"),
-				<input type="text" value={eventName} oninput={setStr("event")} />,
-				sp,
-			)}
-			{eventUrl ? (
-				<button
-					class={eventLinkCopied ? "ov-var-copy ov-copied" : "ov-var-copy"}
-					type="button"
-					style={{ marginTop: "2px" }}
-					title={
-						eventLinkCopied
-							? t("overlay.copied")
-							: eventUrl(eventName) + " — " + t("overlay.event_link")
-					}
-					aria-label={t("overlay.event_link")}
-					onclick={() => {
-						void navigator.clipboard.writeText(eventUrl(eventName)).then(() => {
-							eventLinkCopied = true;
-							m.redraw();
-							setTimeout(() => {
-								eventLinkCopied = false;
-								m.redraw();
-							}, 1500);
-						});
-					}}
-				>
-					<Icon name="copy" class="role-icon" />
-				</button>
-			) : null}
-			{bindField(
-				e,
-				"props.duration",
-				t("overlay.sw_duration"),
-				<input
-					type="number"
-					min={500}
-					max={60000}
-					step={250}
-					value={numProp(p, "duration", 4000)}
-					oninput={setNum("duration")}
-				/>,
-				sp,
-			)}
-			<PrizesField element={e} mutate={mutate} />
-			<div class="ov-grid3">
-				{bindField(
-					e,
-					"props.color",
-					t("overlay.color"),
-					<input
-						type="color"
-						value={strProp(p, "color", "#ffffff")}
-						oninput={setStr("color")}
-					/>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.accent",
-					t("overlay.accent"),
-					<input
-						type="color"
-						value={strProp(p, "accent", "#f59e0b")}
-						oninput={setStr("accent")}
-					/>,
-					sp,
-				)}
-			</div>
-			{bindField(
-				e,
-				"props.fontSize",
-				t("overlay.font_size"),
-				<input
-					type="number"
-					min={8}
-					max={200}
-					value={numProp(p, "fontSize", 16)}
-					oninput={(ev: Event) =>
-						mutate((el) => {
-							el.props.fontSize = Number((ev.target as HTMLInputElement).value);
-						})
-					}
-				/>,
-				sp,
-			)}
-		</>
-	);
+	// copy-link for the trigger event — a custom widget, so a raw Vnode row
+	// (rendered verbatim, never gets a binding toggle)
+	const copyRow = eventUrl ? (
+		<button
+			class={eventLinkCopied ? "ov-var-copy ov-copied" : "ov-var-copy"}
+			type="button"
+			style={{ marginTop: "2px" }}
+			title={
+				eventLinkCopied
+					? t("overlay.copied")
+					: eventUrl(eventName) + " — " + t("overlay.event_link")
+			}
+			aria-label={t("overlay.event_link")}
+			onclick={() => {
+				void navigator.clipboard.writeText(eventUrl(eventName)).then(() => {
+					eventLinkCopied = true;
+					m.redraw();
+					setTimeout(() => {
+						eventLinkCopied = false;
+						m.redraw();
+					}, 1500);
+				});
+			}}
+		>
+			<Icon name="copy" class="role-icon" />
+		</button>
+	) : null;
+	return bindableForm({
+		element: e,
+		mutate,
+		variables,
+		variableUrl,
+		rows: [
+			[
+				{
+					path: "props.event",
+					labelKey: "overlay.event",
+					type: "text",
+					value: eventName,
+				},
+			],
+			// `FormRow` cannot be null, so the copy-link row is included
+			// conditionally (the original `{eventUrl ? <button/> : null}`)
+			...(copyRow ? [copyRow] : []),
+			[
+				{
+					path: "props.duration",
+					labelKey: "overlay.sw_duration",
+					type: "number",
+					min: 500,
+					max: 60000,
+					step: 250,
+					value: numProp(p, "duration", 4000),
+				},
+			],
+			// the prize list editor (string-array prop) — one composite
+			// control, so a raw Vnode row (never gets a binding toggle)
+			<PrizesField element={e} mutate={mutate} />,
+			[
+				{
+					path: "props.color",
+					labelKey: "overlay.color",
+					type: "color",
+					value: strProp(p, "color", "#ffffff"),
+				},
+				{
+					path: "props.accent",
+					labelKey: "overlay.accent",
+					type: "color",
+					value: strProp(p, "accent", "#f59e0b"),
+				},
+			],
+			[
+				{
+					path: "props.fontSize",
+					labelKey: "overlay.font_size",
+					type: "number",
+					min: 8,
+					max: 200,
+					value: numProp(p, "fontSize", 16),
+				},
+			],
+		],
+	});
 }
 
 /** The prize list editor (a string-array prop): one text input per prize +

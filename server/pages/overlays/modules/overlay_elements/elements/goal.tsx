@@ -6,7 +6,6 @@
  */
 
 import { Icon } from "@ui/components/icons";
-import { t } from "@ui/i18n";
 import type {
 	ElementContext,
 	ElementProps,
@@ -14,7 +13,7 @@ import type {
 	OverlayElementDef,
 } from "@ui/overlay/element";
 import { numProp, strProp } from "@ui/overlay/element";
-import { bindField } from "@ui/overlay/fields";
+import { bindableForm } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import type { OverlayElementSchema } from "../../../../../core/overlay_element";
@@ -116,44 +115,76 @@ function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 }
 
 function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
-	const p = e.props;
-	const sp = { mutate, variables, variableUrl };
-	const setStr = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLInputElement).value;
-		});
-	const setNum = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = Number((ev.target as HTMLInputElement).value);
-		});
-	const setBool = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLInputElement).checked;
-		});
-	return (
-		<>
-			{bindField(e, "props.label", t("overlay.label"),
-				<input type="text" value={strProp(p, "label", "Sub goal")} oninput={setStr("label")} />, sp)}
-			<div class="ov-grid2">
-				{bindField(e, "props.target", t("overlay.gl_target"),
-					<input type="number" min={1} value={numProp(p, "target", 100)} oninput={setNum("target")} />, sp)}
-				{bindField(e, "props.value", t("overlay.gl_value"),
-					<input type="number" min={0} value={numProp(p, "value", 0)} oninput={setNum("value")} />, sp)}
-			</div>
-			{bindField(e, "props.showValue", t("overlay.gl_show_value"),
-				<input type="checkbox" checked={p.showValue === true} onchange={setBool("showValue")} />, sp)}
-			<div class="ov-grid3">
-				{bindField(e, "props.color", t("overlay.color"),
-					<input type="color" value={strProp(p, "color", "#ffffff")} oninput={setStr("color")} />, sp)}
-				{bindField(e, "props.fill", t("overlay.gl_fill"),
-					<input type="color" value={strProp(p, "fill", "#22c55e")} oninput={setStr("fill")} />, sp)}
-				{bindField(e, "props.background", t("overlay.gl_track"),
-					<input type="color" value={strProp(p, "background", "#e5e7eb")} oninput={setStr("background")} />, sp)}
-			</div>
-			{bindField(e, "props.fontSize", t("overlay.font_size"),
-				<input type="number" min={8} max={200} value={numProp(p, "fontSize", 20)} oninput={setNum("fontSize")} />, sp)}
-		</>
-	);
+	return bindableForm({
+		element: e,
+		mutate,
+		variables,
+		variableUrl,
+		rows: [
+			[
+				{
+					path: "props.label",
+					labelKey: "overlay.label",
+					type: "text",
+					value: strProp(e.props, "label", "Sub goal"),
+				},
+			],
+			[
+				{
+					path: "props.target",
+					labelKey: "overlay.gl_target",
+					type: "number",
+					min: 1,
+					value: numProp(e.props, "target", 100),
+				},
+				{
+					path: "props.value",
+					labelKey: "overlay.gl_value",
+					type: "number",
+					min: 0,
+					value: numProp(e.props, "value", 0),
+				},
+			],
+			[
+				{
+					path: "props.showValue",
+					labelKey: "overlay.gl_show_value",
+					type: "checkbox",
+					value: e.props.showValue === true,
+				},
+			],
+			[
+				{
+					path: "props.color",
+					labelKey: "overlay.color",
+					type: "color",
+					value: strProp(e.props, "color", "#ffffff"),
+				},
+				{
+					path: "props.fill",
+					labelKey: "overlay.gl_fill",
+					type: "color",
+					value: strProp(e.props, "fill", "#22c55e"),
+				},
+				{
+					path: "props.background",
+					labelKey: "overlay.gl_track",
+					type: "color",
+					value: strProp(e.props, "background", "#e5e7eb"),
+				},
+			],
+			[
+				{
+					path: "props.fontSize",
+					labelKey: "overlay.font_size",
+					type: "number",
+					min: 8,
+					max: 200,
+					value: numProp(e.props, "fontSize", 20),
+				},
+			],
+		],
+	});
 }
 
 function validate(e: OverlayElement): string[] {

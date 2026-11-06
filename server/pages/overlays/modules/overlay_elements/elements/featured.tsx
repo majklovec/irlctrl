@@ -15,7 +15,7 @@ import type {
 	OverlayElementDef,
 } from "@ui/overlay/element";
 import { numProp, strProp } from "@ui/overlay/element";
-import { bindField } from "@ui/overlay/fields";
+import { bindableForm } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import type { OverlayElementSchema } from "../../../../../core/overlay_element";
@@ -168,93 +168,65 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode<any, any> {
 
 function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
 	const p = e.props;
-	const sp = { mutate, variables, variableUrl };
-	const setSel = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLSelectElement).value;
-		});
-	const setStr = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLInputElement).value;
-		});
-	const setNum = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = Number((ev.target as HTMLInputElement).value);
-		});
-	return (
-		<>
-			<ChannelsField element={e} mutate={mutate} variables={variables} />
-			{bindField(
-				e,
-				"props.kind",
-				t("overlay.ft_kind"),
-				<select value={strProp(p, "kind", "message")} onchange={setSel("kind")}>
-					<option value="message">{t("overlay.ft_kind.message")}</option>
-					<option value="user">{t("overlay.ft_kind.user")}</option>
-				</select>,
-				sp,
-			)}
-			{bindField(
-				e,
-				"props.title",
-				t("overlay.ft_title"),
-				<input
-					type="text"
-					value={strProp(p, "title", "")}
-					oninput={setStr("title")}
-				/>,
-				sp,
-			)}
-			<div class="ov-grid3">
-				{bindField(
-					e,
-					"props.color",
-					t("overlay.color"),
-					<input
-						type="color"
-						value={strProp(p, "color", "#ffffff")}
-						oninput={setStr("color")}
-					/>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.accent",
-					t("overlay.accent"),
-					<input
-						type="color"
-						value={strProp(p, "accent", "#38bdf8")}
-						oninput={setStr("accent")}
-					/>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.background",
-					t("overlay.cd_background"),
-					<input
-						type="color"
-						value={strProp(p, "background", "#111827")}
-						oninput={setStr("background")}
-					/>,
-					sp,
-				)}
-			</div>
-			{bindField(
-				e,
-				"props.fontSize",
-				t("overlay.font_size"),
-				<input
-					type="number"
-					min={8}
-					max={200}
-					value={numProp(p, "fontSize", 26)}
-					oninput={setNum("fontSize")}
-				/>,
-				sp,
-			)}
-		</>
-	);
+	return bindableForm({
+		element: e,
+		mutate,
+		variables,
+		variableUrl,
+		rows: [
+			<ChannelsField element={e} mutate={mutate} variables={variables} />,
+			[
+				{
+					path: "props.kind",
+					labelKey: "overlay.ft_kind",
+					type: "select",
+					value: strProp(p, "kind", "message"),
+					options: [
+						{ value: "message", label: t("overlay.ft_kind.message") },
+						{ value: "user", label: t("overlay.ft_kind.user") },
+					],
+				},
+			],
+			[
+				{
+					path: "props.title",
+					labelKey: "overlay.ft_title",
+					type: "text",
+					value: strProp(p, "title", ""),
+				},
+			],
+			[
+				{
+					path: "props.color",
+					labelKey: "overlay.color",
+					type: "color",
+					value: strProp(p, "color", "#ffffff"),
+				},
+				{
+					path: "props.accent",
+					labelKey: "overlay.accent",
+					type: "color",
+					value: strProp(p, "accent", "#38bdf8"),
+				},
+				{
+					path: "props.background",
+					labelKey: "overlay.cd_background",
+					type: "color",
+					value: strProp(p, "background", "#111827"),
+				},
+			],
+			[
+				{
+					path: "props.fontSize",
+					labelKey: "overlay.font_size",
+					type: "number",
+					min: 8,
+					max: 200,
+					value: numProp(p, "fontSize", 26),
+				},
+			],
+		],
+	});
 }
 
 function validate(e: OverlayElement): string[] {

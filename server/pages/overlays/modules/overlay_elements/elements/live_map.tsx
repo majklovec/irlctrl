@@ -24,7 +24,7 @@ import type {
 	OverlayElement,
 	OverlayElementDef,
 } from "@ui/overlay/element";
-import { bindField } from "@ui/overlay/fields";
+import { bindField, bindableForm, type FormRow } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import type { OverlayElementSchema } from "../../../../../core/overlay_element";
@@ -562,49 +562,77 @@ function editForm({
 			sp,
 		);
 	};
-	return (
-		<>
-			{bindField(
-				e,
-				"props.provider",
-				t("overlay.live_map_provider"),
-				<select
-					value={p.provider}
-					onchange={(ev: Event) =>
-						mutate((el) => {
-							el.props.provider = (ev.target as HTMLSelectElement).value;
-						})
-					}
-				>
-					<option value="osm">{t("overlay.live_map_provider.osm")}</option>
-					<option value="arcgis">
-						{t("overlay.live_map_provider.arcgis")}
-					</option>
-					<option value="mapy">{t("overlay.live_map_provider.mapy")}</option>
-				</select>,
-				sp,
-			)}
-			{num("zoom", null, t("overlay.live_map_zoom"), 0, 25)}
-			{num("centerLat", null, t("overlay.live_map_center_lat"), -90, 90)}
-			{num("centerLon", null, t("overlay.live_map_center_lon"), -180, 180)}
-			<div class="ov-grid2">
-				{bindField(
-					e,
-					"props.markerColor",
-					t("overlay.live_map_marker_color"),
-					<input
-						type="color"
-						value={p.markerColor}
-						oninput={(ev: Event) =>
-							mutate((el) => {
-								el.props.markerColor = (ev.target as HTMLInputElement).value;
-							})
-						}
-					/>,
-					sp,
-				)}
-				{num("markerSize", null, t("overlay.live_map_marker_size"), 1, 100)}
-			</div>
+	return bindableForm({
+		element: e,
+		mutate,
+		variables,
+		variableUrl,
+		// `startPosition` writes into a nested object, so it stays a raw Vnode
+		// row (the descriptor builder performs flat `props.<key>` writes only).
+		rows: [
+			[
+				{
+					path: "props.provider",
+					labelKey: "overlay.live_map_provider",
+					type: "select",
+					value: p.provider,
+					options: [
+						{ value: "osm", label: t("overlay.live_map_provider.osm") },
+						{ value: "arcgis", label: t("overlay.live_map_provider.arcgis") },
+						{ value: "mapy", label: t("overlay.live_map_provider.mapy") },
+					],
+				},
+			],
+			[
+				{
+					path: "props.zoom",
+					labelKey: "overlay.live_map_zoom",
+					type: "number",
+					value: p.zoom,
+					min: 0,
+					max: 25,
+					step: 1,
+				},
+			],
+			[
+				{
+					path: "props.centerLat",
+					labelKey: "overlay.live_map_center_lat",
+					type: "number",
+					value: p.centerLat,
+					min: -90,
+					max: 90,
+					step: 0.0001,
+				},
+			],
+			[
+				{
+					path: "props.centerLon",
+					labelKey: "overlay.live_map_center_lon",
+					type: "number",
+					value: p.centerLon,
+					min: -180,
+					max: 180,
+					step: 0.0001,
+				},
+			],
+			[
+				{
+					path: "props.markerColor",
+					labelKey: "overlay.live_map_marker_color",
+					type: "color",
+					value: p.markerColor,
+				},
+				{
+					path: "props.markerSize",
+					labelKey: "overlay.live_map_marker_size",
+					type: "number",
+					value: p.markerSize,
+					min: 1,
+					max: 100,
+					step: 1,
+				},
+			],
 			<div class="ov-grid2">
 				{num("startPosition", "lat", t("overlay.live_map_start_lat"), -90, 90)}
 				{num(
@@ -614,95 +642,63 @@ function editForm({
 					-180,
 					180,
 				)}
-			</div>
-			{bindField(
-				e,
-				"props.showDistance",
-				t("overlay.live_map_show_distance"),
-				<input
-					type="checkbox"
-					checked={p.showDistance === true}
-					onchange={(ev: Event) =>
-						mutate((el) => {
-							el.props.showDistance = (ev.target as HTMLInputElement).checked;
-						})
-					}
-				/>,
-				sp,
-			)}
-			{p.showDistance && (
-				<>
-					<div class="ov-grid2">
-						{num(
-							"distanceFontSize",
-							null,
-							t("overlay.live_map_distance_font_size"),
-							8,
-							96,
-						)}
-						{num(
-							"distancePadding",
-							null,
-							t("overlay.live_map_distance_padding"),
-							0,
-							48,
-						)}
-					</div>
-					<div class="ov-grid2">
-						{bindField(
-							e,
-							"props.distanceColor",
-							t("overlay.live_map_distance_color"),
-							<input
-								type="color"
-								value={p.distanceColor}
-								oninput={(ev: Event) =>
-									mutate((el) => {
-										el.props.distanceColor = (
-											ev.target as HTMLInputElement
-										).value;
-									})
-								}
-							/>,
-							sp,
-						)}
-						{bindField(
-							e,
-							"props.distanceBackground",
-							t("overlay.live_map_distance_background"),
-							<input
-								type="color"
-								value={p.distanceBackground}
-								oninput={(ev: Event) =>
-									mutate((el) => {
-										el.props.distanceBackground = (
-											ev.target as HTMLInputElement
-										).value;
-									})
-								}
-							/>,
-							sp,
-						)}
-					</div>
-				</>
-			)}
-			{bindField(
-				e,
-				"props.mapyKey",
-				t("overlay.live_map_mapy_key"),
-				<input
-					type="text"
-					value={p.mapyKey}
-					oninput={(ev: Event) =>
-						mutate((el) => {
-							el.props.mapyKey = (ev.target as HTMLInputElement).value;
-						})
-					}
-				/>,
-				sp,
-			)}
-		</>
-	);
+			</div>,
+			[
+				{
+					path: "props.showDistance",
+					labelKey: "overlay.live_map_show_distance",
+					type: "checkbox",
+					value: p.showDistance === true,
+				},
+			],
+			...(p.showDistance
+				? ([
+						[
+							{
+								path: "props.distanceFontSize",
+								labelKey: "overlay.live_map_distance_font_size",
+								type: "number",
+								value: p.distanceFontSize,
+								min: 8,
+								max: 96,
+								step: 1,
+							},
+							{
+								path: "props.distancePadding",
+								labelKey: "overlay.live_map_distance_padding",
+								type: "number",
+								value: p.distancePadding,
+								min: 0,
+								max: 48,
+								step: 1,
+							},
+						],
+						[
+							{
+								path: "props.distanceColor",
+								labelKey: "overlay.live_map_distance_color",
+								type: "color",
+								value: p.distanceColor,
+							},
+							{
+								path: "props.distanceBackground",
+								labelKey: "overlay.live_map_distance_background",
+								type: "color",
+								value: p.distanceBackground,
+							},
+						],
+					] as FormRow[])
+				: ([] as FormRow[])),
+			[
+				{
+					path: "props.mapyKey",
+					labelKey: "overlay.live_map_mapy_key",
+					type: "text",
+					value: p.mapyKey,
+				},
+			],
+		],
+	});
 }
 
 function validate(e: OverlayElement): string[] {

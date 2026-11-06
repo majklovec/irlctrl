@@ -9,7 +9,7 @@ import type {
 	OverlayElementDef,
 } from "@ui/overlay/element";
 import { numProp, strProp } from "@ui/overlay/element";
-import { bindField } from "@ui/overlay/fields";
+import { bindableForm } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import { libraryAssetField } from "@ui/overlay/asset_picker";
@@ -94,67 +94,50 @@ function editForm({
 	variableUrl,
 }: ElementProps): Vnode {
 	const d = DEFAULT_VIDEO_PROPS;
-	const sp = { mutate, variables, variableUrl };
-	const setBool = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLInputElement).checked;
-		});
-	const setNum = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = Number((ev.target as HTMLInputElement).value);
-		});
-	return (
-		<>
-			{libraryAssetField(e, mutate, "video")}
-			{bindField(
-				e,
-				"props.volume",
-				t("overlay.video_volume"),
-				<input
-					type="number"
-					min={0}
-					max={1}
-					step={0.05}
-					value={numProp(e.props, "volume", d.volume)}
-					oninput={setNum("volume")}
-				/>,
-				sp,
-			)}
-			{bindField(
-				e,
-				"props.muted",
-				t("overlay.video_muted"),
-				<input
-					type="checkbox"
-					checked={boolProp(e.props, "muted", d.muted)}
-					onchange={setBool("muted")}
-				/>,
-				sp,
-			)}
-			{bindField(
-				e,
-				"props.loop",
-				t("overlay.video_loop"),
-				<input
-					type="checkbox"
-					checked={boolProp(e.props, "loop", d.loop)}
-					onchange={setBool("loop")}
-				/>,
-				sp,
-			)}
-			{bindField(
-				e,
-				"props.autoplay",
-				t("overlay.video_autoplay"),
-				<input
-					type="checkbox"
-					checked={boolProp(e.props, "autoplay", d.autoplay)}
-					onchange={setBool("autoplay")}
-				/>,
-				sp,
-			)}
-		</>
-	);
+	return bindableForm({
+		element: e,
+		mutate,
+		variables,
+		variableUrl,
+		rows: [
+			libraryAssetField(e, mutate, "video"),
+			[
+				{
+					path: "props.volume",
+					labelKey: "overlay.video_volume",
+					type: "number",
+					value: numProp(e.props, "volume", d.volume),
+					min: 0,
+					max: 1,
+					step: 0.05,
+				},
+			],
+			[
+				{
+					path: "props.muted",
+					labelKey: "overlay.video_muted",
+					type: "checkbox",
+					value: boolProp(e.props, "muted", d.muted),
+				},
+			],
+			[
+				{
+					path: "props.loop",
+					labelKey: "overlay.video_loop",
+					type: "checkbox",
+					value: boolProp(e.props, "loop", d.loop),
+				},
+			],
+			[
+				{
+					path: "props.autoplay",
+					labelKey: "overlay.video_autoplay",
+					type: "checkbox",
+					value: boolProp(e.props, "autoplay", d.autoplay),
+				},
+			],
+		],
+	});
 }
 
 function validate(e: OverlayElement): string[] {

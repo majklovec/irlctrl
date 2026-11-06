@@ -22,7 +22,7 @@ import type {
 	OverlayElementDef,
 } from "@ui/overlay/element";
 import { numProp, strProp } from "@ui/overlay/element";
-import { bindField } from "@ui/overlay/fields";
+import { bindField, bindableForm } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import { formatDuration } from "../lib/ticker";
@@ -232,80 +232,70 @@ function editForm({
 	variableUrl,
 }: ElementProps): Vnode {
 	const p = e.props;
-	const sp = { mutate, variables, variableUrl };
 	const eventName = strProp(p, "event", "countdown");
-	const setStr = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLInputElement).value;
-		});
-	const setSel = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLSelectElement).value;
-		});
-	const setBool = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLInputElement).checked;
-		});
-	const setNum = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = Number((ev.target as HTMLInputElement).value);
-		});
-	return (
-		<>
-			{bindField(
-				e,
-				"props.event",
-				t("overlay.event"),
-				<input
-					type="text"
-					value={eventName}
-					oninput={setStr("event")}
-				/>,
-				sp,
-			)}
-			{eventUrl ? (
-				<button
-					class={
-						eventLinkCopied ? "ov-var-copy ov-copied" : "ov-var-copy"
-					}
-					type="button"
-					style={{ marginTop: "2px" }}
-					title={
-						eventLinkCopied
-							? t("overlay.copied")
-							: eventUrl(eventName) + " — " + t("overlay.event_link")
-					}
-					aria-label={t("overlay.event_link")}
-					onclick={() => {
-						void navigator.clipboard.writeText(eventUrl(eventName)).then(
-							() => {
-								eventLinkCopied = true;
-								m.redraw();
-								setTimeout(() => {
-									eventLinkCopied = false;
-									m.redraw();
-								}, 1500);
-							},
-						);
-					}}
-				>
-					<Icon name="copy" class="role-icon" />
-				</button>
-			) : null}
-			{bindField(
-				e,
-				"props.mode",
-				t("overlay.cd_mode"),
-				<select
-					value={strProp(p, "mode", "duration")}
-					onchange={setSel("mode")}
-				>
-					<option value="duration">{t("overlay.cd_mode.duration")}</option>
-					<option value="clock">{t("overlay.cd_mode.clock")}</option>
-				</select>,
-				sp,
-			)}
-			{strProp(p, "mode", "duration") === "duration"
+	return bindableForm({
+		element: e,
+		mutate,
+		variables,
+		variableUrl,
+		rows: [
+			[
+				{
+					path: "props.event",
+					labelKey: "overlay.event",
+					type: "text",
+					value: eventName,
+				},
+			],
+			// copy-link for the trigger event — a custom widget, so a raw Vnode
+			// row (rendered verbatim, never gets a binding toggle)
+			...(eventUrl
+				? [
+						<button
+							class={
+								eventLinkCopied ? "ov-var-copy ov-copied" : "ov-var-copy"
+							}
+							type="button"
+							style={{ marginTop: "2px" }}
+							title={
+								eventLinkCopied
+									? t("overlay.copied")
+									: eventUrl(eventName) + " — " + t("overlay.event_link")
+							}
+							aria-label={t("overlay.event_link")}
+							onclick={() => {
+								void navigator.clipboard
+									.writeText(eventUrl(eventName))
+									.then(() => {
+										eventLinkCopied = true;
+										m.redraw();
+										setTimeout(() => {
+											eventLinkCopied = false;
+											m.redraw();
+										}, 1500);
+									});
+							}}
+						>
+							<Icon name="copy" class="role-icon" />
+						</button>,
+					]
+				: []),
+			[
+				{
+					path: "props.mode",
+					labelKey: "overlay.cd_mode",
+					type: "select",
+					value: strProp(p, "mode", "duration"),
+					options: [
+						{ value: "duration", label: t("overlay.cd_mode.duration") },
+						{ value: "clock", label: t("overlay.cd_mode.clock") },
+					],
+				},
+			],
+			// mode-dependent field (duration vs. time picker) — a raw Vnode row,
+			// kept verbatim (the time input is not a `bindableForm` control type,
+			// and both variants keep their binding toggle via `bindField`)
+			strProp(p, "mode", "duration") === "duration"
 				? bindField(
 						e,
 						"props.duration",
@@ -315,9 +305,15 @@ function editForm({
 							min={1}
 							max={100000}
 							value={numProp(p, "duration", 60)}
-							oninput={setNum("duration")}
+							oninput={(ev: Event) =>
+								mutate((el) => {
+									el.props.duration = Number(
+										(ev.target as HTMLInputElement).value,
+									);
+								})
+							}
 						/>,
-						sp,
+						{ mutate, variables, variableUrl },
 					)
 				: bindField(
 						e,
@@ -326,95 +322,70 @@ function editForm({
 						<input
 							type="time"
 							value={strProp(p, "clockTarget", "20:00")}
-							oninput={setStr("clockTarget")}
+							oninput={(ev: Event) =>
+								mutate((el) => {
+									el.props.clockTarget = (
+										ev.target as HTMLInputElement
+									).value;
+								})
+							}
 						/>,
-						sp,
-					)}
-			<div class="ov-grid2">
-				{bindField(
-					e,
-					"props.label",
-					t("overlay.label"),
-					<input
-						type="text"
-						value={strProp(p, "label", "Starting in")}
-						oninput={setStr("label")}
-					/>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.labelDone",
-					t("overlay.cd_label_done"),
-					<input
-						type="text"
-						value={strProp(p, "labelDone", "Start now!")}
-						oninput={setStr("labelDone")}
-					/>,
-					sp,
-				)}
-			</div>
-			{bindField(
-				e,
-				"props.loop",
-				t("overlay.loop"),
-				<input
-					type="checkbox"
-					checked={p.loop === true}
-					onchange={setBool("loop")}
-				/>,
-				sp,
-			)}
-			<div class="ov-grid3">
-				{bindField(
-					e,
-					"props.color",
-					t("overlay.color"),
-					<input
-						type="color"
-						value={strProp(p, "color", "#ffffff")}
-						oninput={setStr("color")}
-					/>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.background",
-					t("overlay.cd_background"),
-					<input
-						type="color"
-						value={strProp(p, "background", "#111827")}
-						oninput={setStr("background")}
-					/>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.accent",
-					t("overlay.accent"),
-					<input
-						type="color"
-						value={strProp(p, "accent", "#f59e0b")}
-						oninput={setStr("accent")}
-					/>,
-					sp,
-				)}
-			</div>
-			{bindField(
-				e,
-				"props.fontSize",
-				t("overlay.font_size"),
-				<input
-					type="number"
-					min={8}
-					max={300}
-					value={numProp(p, "fontSize", 40)}
-					oninput={setNum("fontSize")}
-				/>,
-				sp,
-			)}
-		</>
-	);
+						{ mutate, variables, variableUrl },
+					),
+			[
+				{
+					path: "props.label",
+					labelKey: "overlay.label",
+					type: "text",
+					value: strProp(p, "label", "Starting in"),
+				},
+				{
+					path: "props.labelDone",
+					labelKey: "overlay.cd_label_done",
+					type: "text",
+					value: strProp(p, "labelDone", "Start now!"),
+				},
+			],
+			[
+				{
+					path: "props.loop",
+					labelKey: "overlay.loop",
+					type: "checkbox",
+					value: p.loop === true,
+				},
+			],
+			[
+				{
+					path: "props.color",
+					labelKey: "overlay.color",
+					type: "color",
+					value: strProp(p, "color", "#ffffff"),
+				},
+				{
+					path: "props.background",
+					labelKey: "overlay.cd_background",
+					type: "color",
+					value: strProp(p, "background", "#111827"),
+				},
+				{
+					path: "props.accent",
+					labelKey: "overlay.accent",
+					type: "color",
+					value: strProp(p, "accent", "#f59e0b"),
+				},
+			],
+			[
+				{
+					path: "props.fontSize",
+					labelKey: "overlay.font_size",
+					type: "number",
+					min: 8,
+					max: 300,
+					value: numProp(p, "fontSize", 40),
+				},
+			],
+		],
+	});
 }
 
 function validate(e: OverlayElement): string[] {

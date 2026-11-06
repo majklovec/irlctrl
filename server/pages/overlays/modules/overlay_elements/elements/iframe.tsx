@@ -1,15 +1,14 @@
 /** @jsx m */
 
 import { Icon } from "@ui/components/icons";
-import { t } from "@ui/i18n";
 import type {
 	ElementContext,
 	ElementProps,
 	OverlayElement,
 	OverlayElementDef,
 } from "@ui/overlay/element";
-import { drawIframe } from "@ui/overlay/element";
-import { bindField } from "@ui/overlay/fields";
+import { drawIframe, strProp } from "@ui/overlay/element";
+import { bindableForm } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import type { OverlayElementSchema } from "../../../../../core/overlay_element";
@@ -27,26 +26,22 @@ function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 }
 
 function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
-	const current = String(e.props.url ?? "");
-	return (
-		<>
-			{bindField(
-				e,
-				"props.url",
-				t("overlay.iframe_url"),
-				<input
-					type="text"
-					value={current}
-					oninput={(ev: Event) =>
-						mutate((el) => {
-							el.props.url = (ev.target as HTMLInputElement).value;
-						})
-					}
-				/>,
-				{ mutate, variables },
-			)}
-		</>
-	);
+	return bindableForm({
+		element: e,
+		mutate,
+		variables,
+		variableUrl,
+		rows: [
+			[
+				{
+					path: "props.url",
+					labelKey: "overlay.iframe_url",
+					type: "text",
+					value: strProp(e.props, "url", DEFAULT_IFRAME_PROPS.url),
+				},
+			],
+		],
+	});
 }
 
 function validate(e: OverlayElement): string[] {

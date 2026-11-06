@@ -16,7 +16,7 @@ import type {
 	OverlayElementDef,
 } from "@ui/overlay/element";
 import { numProp, strProp } from "@ui/overlay/element";
-import { bindField } from "@ui/overlay/fields";
+import { bindableForm } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import type { OverlayElementSchema } from "../../../../../core/overlay_element";
@@ -346,68 +346,115 @@ const GeoFillButton: m.Component<
 };
 
 function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
-	const p = e.props;
-	const sp = { mutate, variables, variableUrl };
-	const setNum = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = Number((ev.target as HTMLInputElement).value);
-		});
-	const setStr = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLInputElement).value;
-		});
-	const setBool = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLInputElement).checked;
-		});
-	return (
-		<>
-			<div class="ov-grid2">
-				{bindField(e, "props.latitude", t("overlay.weather_latitude"),
-					<input type="number" step={0.0001} value={numProp(p, "latitude", 50.0755)} oninput={setNum("latitude")} />, sp)}
-				{bindField(e, "props.longitude", t("overlay.weather_longitude"),
-					<input type="number" step={0.0001} value={numProp(p, "longitude", 14.4378)} oninput={setNum("longitude")} />, sp)}
-			</div>
-			<GeoFillButton
-				onFill={(lat, lon) =>
+	return bindableForm({
+		element: e,
+		mutate,
+		variables,
+		variableUrl,
+		rows: [
+			[
+				{
+					path: "props.latitude",
+					labelKey: "overlay.weather_latitude",
+					type: "number",
+					step: 0.0001,
+					value: numProp(e.props, "latitude", 50.0755),
+				},
+				{
+					path: "props.longitude",
+					labelKey: "overlay.weather_longitude",
+					type: "number",
+					step: 0.0001,
+					value: numProp(e.props, "longitude", 14.4378),
+				},
+			],
+			m(GeoFillButton, {
+				onFill: (lat, lon) =>
 					mutate((el) => {
 						el.props.latitude = lat;
 						el.props.longitude = lon;
-					})
-				}
-			/>
-			{bindField(e, "props.place", t("overlay.weather_place"),
-				<input type="text" value={strProp(p, "place", "")} oninput={setStr("place")} />, sp)}
-			<div class="ov-grid2">
-				{bindField(e, "props.format", t("overlay.weather_format"),
-					<select value={strProp(p, "format", "card")}
-						onchange={(ev: Event) => mutate((el) => { el.props.format = (ev.target as HTMLSelectElement).value; })}>
-						<option value="card">card</option>
-						<option value="pill">pill</option>
-					</select>, sp)}
-				{bindField(e, "props.refreshSec", t("overlay.weather_refresh"),
-					<input type="number" min={60} max={3600} value={numProp(p, "refreshSec", 900)} oninput={setNum("refreshSec")} />, sp)}
-			</div>
-			<div class="ov-grid3">
-				{bindField(e, "props.showTemp", t("overlay.weather_show_temp"),
-					<input type="checkbox" checked={p.showTemp === true} onchange={setBool("showTemp")} />, sp)}
-				{bindField(e, "props.showWind", t("overlay.weather_show_wind"),
-					<input type="checkbox" checked={p.showWind === true} onchange={setBool("showWind")} />, sp)}
-				{bindField(e, "props.showHumidity", t("overlay.weather_show_humidity"),
-					<input type="checkbox" checked={p.showHumidity === true} onchange={setBool("showHumidity")} />, sp)}
-			</div>
-			<div class="ov-grid3">
-				{bindField(e, "props.color", t("overlay.color"),
-					<input type="color" value={strProp(p, "color", "#ffffff")} oninput={setStr("color")} />, sp)}
-				{bindField(e, "props.background", t("overlay.cd_background"),
-					<input type="color" value={strProp(p, "background", "#1f2937")} oninput={setStr("background")} />, sp)}
-				{bindField(e, "props.accent", t("overlay.accent"),
-					<input type="color" value={strProp(p, "accent", "#38bdf8")} oninput={setStr("accent")} />, sp)}
-			</div>
-			{bindField(e, "props.fontSize", t("overlay.font_size"),
-				<input type="number" min={8} max={200} value={numProp(p, "fontSize", 24)} oninput={setNum("fontSize")} />, sp)}
-		</>
-	);
+					}),
+			}) as Vnode,
+			[
+				{
+					path: "props.place",
+					labelKey: "overlay.weather_place",
+					type: "text",
+					value: strProp(e.props, "place", ""),
+				},
+			],
+			[
+				{
+					path: "props.format",
+					labelKey: "overlay.weather_format",
+					type: "select",
+					value: strProp(e.props, "format", "card"),
+					options: [
+						{ value: "card", label: "card" },
+						{ value: "pill", label: "pill" },
+					],
+				},
+				{
+					path: "props.refreshSec",
+					labelKey: "overlay.weather_refresh",
+					type: "number",
+					min: 60,
+					max: 3600,
+					value: numProp(e.props, "refreshSec", 900),
+				},
+			],
+			[
+				{
+					path: "props.showTemp",
+					labelKey: "overlay.weather_show_temp",
+					type: "checkbox",
+					value: e.props.showTemp === true,
+				},
+				{
+					path: "props.showWind",
+					labelKey: "overlay.weather_show_wind",
+					type: "checkbox",
+					value: e.props.showWind === true,
+				},
+				{
+					path: "props.showHumidity",
+					labelKey: "overlay.weather_show_humidity",
+					type: "checkbox",
+					value: e.props.showHumidity === true,
+				},
+			],
+			[
+				{
+					path: "props.color",
+					labelKey: "overlay.color",
+					type: "color",
+					value: strProp(e.props, "color", "#ffffff"),
+				},
+				{
+					path: "props.background",
+					labelKey: "overlay.cd_background",
+					type: "color",
+					value: strProp(e.props, "background", "#1f2937"),
+				},
+				{
+					path: "props.accent",
+					labelKey: "overlay.accent",
+					type: "color",
+					value: strProp(e.props, "accent", "#38bdf8"),
+				},
+			],
+			[
+				{
+					path: "props.fontSize",
+					labelKey: "overlay.font_size",
+					type: "number",
+					min: 8,
+					max: 200,
+					value: numProp(e.props, "fontSize", 24),
+				},
+			],
+		],
+	});
 }
 
 function validate(e: OverlayElement): string[] {

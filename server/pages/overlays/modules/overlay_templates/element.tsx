@@ -40,7 +40,7 @@ import type {
 	OverlayElement,
 	OverlayElementDef,
 } from "@ui/overlay/element";
-import { bindField } from "@ui/overlay/fields";
+import { bindField, bindableForm, type FormRow } from "@ui/overlay/fields";
 import { templateText } from "@ui/overlay/template_tokens";
 import type { Vnode, VnodeDOM } from "mithril";
 import m from "mithril";
@@ -401,30 +401,6 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 
 // ── edit form ────────────────────────────────────────────────────────────
 
-function propControl(
-	propKey: string,
-	p: HtmlTemplateProps,
-	mutate: ElementProps["mutate"],
-): Vnode {
-	const set = (v: unknown) =>
-		mutate((el) => {
-			el.props[propKey] = v;
-		});
-	// Text slots (the template's data-bind names — title/subtitle plus any
-	// free-form slot like `label`) are plain text fields; the value carries
-	// the {token} template. Style knobs render via varsFields instead.
-	if (isTextSlot(propKey)) {
-		return (
-			<input
-				type="text"
-				value={String((p as unknown as Record<string, unknown>)[propKey] ?? "")}
-				oninput={(ev: Event) => set((ev.target as HTMLInputElement).value)}
-			/>
-		);
-	}
-	return <></>;
-}
-
 const PROP_LABELS: Record<string, string> = {
 	title: "overlay.html_template.title",
 	subtitle: "overlay.html_template.subtitle",
@@ -581,92 +557,101 @@ function editForm({ element: e, mutate, variables, variableUrl }: ElementProps):
 	const template = catalogMetas?.find((m) => m.id === p.templateId);
 	const catalogMissing = catalogMetas !== undefined && template === undefined;
 
-	const body = template ? (
-		template.uses.map((propKey) => {
-			// the style knobs: one field per `:root` variable the template
-			// declares (rendered inline, at the "vars" position)
-			if (propKey === "vars") return varsFields(template.id, p, mutate);
-			if (propKey === "logoAssetId")
-				return libraryAssetField(e, mutate, "image");
-			if (propKey === "mode")
-				return bindField(
-					e,
-					"props.mode",
-					t("overlay.html_template.mode"),
-					<select
-						value={p.mode ?? "static"}
-						onchange={(ev: Event) =>
-							mutate((el) => {
-								el.props.mode = (ev.target as HTMLSelectElement).value;
-							})
-						}
-					>
-						<option value="static">
-							{t("overlay.html_template.mode_static")}
-						</option>
-						<option value="countdown">
-							{t("overlay.html_template.mode_countdown")}
-						</option>
-					</select>,
-					sp,
-				);
-			if (propKey === "targetIso")
-				return bindField(
-					e,
-					"props.targetIso",
-					t("overlay.html_template.target"),
-					<input
-						type="datetime-local"
-						value={(p.targetIso ?? "").slice(0, 16)}
-						oninput={(ev: Event) =>
-							mutate((el) => {
-								el.props.targetIso = (ev.target as HTMLInputElement).value;
-							})
-						}
-					/>,
-					sp,
-				);
-			// Text slots: title/subtitle keep their i18n labels, any other
-			// data-bind slot is labelled from its name (no i18n entry needed).
-			return bindField(
-				e,
-				`props.${propKey}`,
-				PROP_LABELS[propKey] ? t(PROP_LABELS[propKey]) : textSlotLabel(propKey),
-				propControl(propKey, p, mutate),
-				sp,
-			);
-		})
-	) : catalogMissing ? (
-		<span class="ov-lbl">{t("overlay.html_template.unknown_template")}</span>
-	) : // catalog not loaded yet — the fields appear on the m.redraw
-	null;
-
-	return (
-		<>
-			{bindField(
-				e,
-				"props.templateId",
-				t("overlay.html_template.template"),
-				<select
-					value={p.templateId}
-					oncreate={loadCatalog}
-					onchange={(ev: Event) =>
-						mutate((el) => {
-							el.props.templateId = (ev.target as HTMLSelectElement).value;
-						})
-					}
-				>
-					{(catalogMetas ?? []).map((tpl) => (
-						<option key={tpl.id} value={tpl.id}>
-							{t(tpl.name)}
-						</option>
-					))}
-				</select>,
-				sp,
-			)}
-			{body}
-		</>
+	// The async templateId `<select>` stays a raw-Vnode row: it kicks the
+	// memoized catalog fetch on `oncreate` (a lifecycle `bindableForm`'s
+	// data fields don't carry) and keeps its binding affordance via
+	// `bindField` (a select is not chain-bindable, so no toggle — same as
+	// before).
+	const templateRow = bindField(
+		e,
+		"props.templateId",
+		t("overlay.html_template.template"),
+		<select
+			value={p.templateId}
+			oncreate={loadCatalog}
+			onchange={(ev: Event) =>
+				mutate((el) => {
+					el.props.templateId = (ev.target as HTMLSelectElement).value;
+				})
+			}
+		>
+			{(catalogMetas ?? []).map((tpl) => (
+				<option key={tpl.id} value={tpl.id}>
+					{t(tpl.name)}
+				</option>
+			))}
+		</select>,
+		sp,
 	);
+
+	// One row per `uses` entry, in the template's declared order. The style
+	// knobs (`vars` — async `:root` fields) and the logo (`logoAssetId` —
+	// the asset library picker) are raw-Vnode widgets; `mode`, `targetIso`
+	// and the text slots are data-driven fields (title/subtitle keep their
+	// i18n label keys, any other data-bind slot is labelled from its name).
+	const body: FormRow[] = template
+		? template.uses.map<FormRow>((propKey) => {
+				if (propKey === "vars") return varsFields(template.id, p, mutate);
+				if (propKey === "logoAssetId")
+					return libraryAssetField(e, mutate, "image");
+				if (propKey === "mode")
+					return [
+						{
+							path: "props.mode",
+							labelKey: "overlay.html_template.mode",
+							type: "select",
+							value: p.mode ?? "static",
+							options: [
+								{
+									value: "static",
+									label: t("overlay.html_template.mode_static"),
+								},
+								{
+									value: "countdown",
+									label: t("overlay.html_template.mode_countdown"),
+								},
+							],
+						},
+					];
+				if (propKey === "targetIso")
+					return [
+						{
+							path: "props.targetIso",
+							labelKey: "overlay.html_template.target",
+							type: "iso-datetime",
+							value: p.targetIso ?? "",
+						},
+					];
+				return [
+					{
+						path: `props.${propKey}`,
+						labelKey: PROP_LABELS[propKey],
+						label: PROP_LABELS[propKey]
+							? undefined
+							: textSlotLabel(propKey),
+						type: "text",
+						value: String(
+							(p as unknown as Record<string, unknown>)[propKey] ?? "",
+						),
+					},
+				];
+			})
+		: catalogMissing
+			? [
+					<span class="ov-lbl">
+						{t("overlay.html_template.unknown_template")}
+					</span>,
+				]
+			: // catalog not loaded yet — the fields appear on the m.redraw
+				[];
+
+	return bindableForm({
+		element: e,
+		mutate,
+		variables,
+		variableUrl,
+		rows: [templateRow, ...body],
+	});
 }
 
 // ── validate ─────────────────────────────────────────────────────────────

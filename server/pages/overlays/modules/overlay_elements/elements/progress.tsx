@@ -1,7 +1,6 @@
 /** @jsx m */
 
 import { Icon } from "@ui/components/icons";
-import { t } from "@ui/i18n";
 import type {
 	ElementContext,
 	ElementProps,
@@ -9,7 +8,7 @@ import type {
 	OverlayElementDef,
 } from "@ui/overlay/element";
 import { numProp, strProp } from "@ui/overlay/element";
-import { bindField } from "@ui/overlay/fields";
+import { bindableForm } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import type { OverlayElementSchema } from "../../../../../core/overlay_element";
@@ -87,77 +86,51 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 }
 
 function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
-	const p = e.props;
-	const sp = { mutate, variables, variableUrl };
-	return (
-		<>
-			{bindField(
-				e,
-				"props.value",
-				t("overlay.value"),
-				<input
-					type="number"
-					min={0}
-					max={100}
-					value={numProp(p, "value", DEFAULT_PROGRESS_PROPS.value)}
-					oninput={(ev: Event) =>
-						mutate((el) => {
-							el.props.value = Number((ev.target as HTMLInputElement).value);
-						})
-					}
-				/>,
-				sp,
-			)}
-			<div class="ov-grid2">
-				{bindField(
-					e,
-					"props.fill",
-					t("overlay.fill"),
-					<input
-						type="color"
-						value={strProp(p, "fill", DEFAULT_PROGRESS_PROPS.fill)}
-						oninput={(ev: Event) =>
-							mutate((el) => {
-								el.props.fill = (ev.target as HTMLInputElement).value;
-							})
-						}
-					/>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.background",
-					t("overlay.background"),
-					<input
-						type="color"
-						value={strProp(p, "background", DEFAULT_PROGRESS_PROPS.background)}
-						oninput={(ev: Event) =>
-							mutate((el) => {
-								el.props.background = (ev.target as HTMLInputElement).value;
-							})
-						}
-					/>,
-					sp,
-				)}
-			</div>
-			{bindField(
-				e,
-				"props.radius",
-				t("overlay.radius"),
-				<input
-					type="number"
-					min={0}
-					value={numProp(p, "radius", DEFAULT_PROGRESS_PROPS.radius)}
-					oninput={(ev: Event) =>
-						mutate((el) => {
-							el.props.radius = Number((ev.target as HTMLInputElement).value);
-						})
-					}
-				/>,
-				sp,
-			)}
-		</>
-	);
+	return bindableForm({
+		element: e,
+		mutate,
+		variables,
+		variableUrl,
+		rows: [
+			[
+				{
+					path: "props.value",
+					labelKey: "overlay.value",
+					type: "number",
+					min: 0,
+					max: 100,
+					value: numProp(e.props, "value", DEFAULT_PROGRESS_PROPS.value),
+				},
+			],
+			[
+				{
+					path: "props.fill",
+					labelKey: "overlay.fill",
+					type: "color",
+					value: strProp(e.props, "fill", DEFAULT_PROGRESS_PROPS.fill),
+				},
+				{
+					path: "props.background",
+					labelKey: "overlay.background",
+					type: "color",
+					value: strProp(
+						e.props,
+						"background",
+						DEFAULT_PROGRESS_PROPS.background,
+					),
+				},
+			],
+			[
+				{
+					path: "props.radius",
+					labelKey: "overlay.radius",
+					type: "number",
+					min: 0,
+					value: numProp(e.props, "radius", DEFAULT_PROGRESS_PROPS.radius),
+				},
+			],
+		],
+	});
 }
 
 function validate(e: OverlayElement): string[] {

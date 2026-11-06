@@ -24,7 +24,7 @@ import type {
 	OverlayElementDef,
 } from "@ui/overlay/element";
 import { numProp, strProp, triggerPhase } from "@ui/overlay/element";
-import { bindField } from "@ui/overlay/fields";
+import { bindableForm } from "@ui/overlay/fields";
 import { libraryAssetField } from "@ui/overlay/asset_picker";
 import type { Vnode } from "mithril";
 import m from "mithril";
@@ -416,23 +416,10 @@ function editForm({
 	variableUrl,
 }: ElementProps): Vnode {
 	const p = e.props;
-	const sp = { mutate, variables, variableUrl };
-	const str = (key: string, fallback: string) => strProp(p, key, fallback);
-	const num = (key: string, fallback: number) => numProp(p, key, fallback);
 	const set = (key: string) => (ev: Event) =>
 		mutate((el) => {
 			el.props[key] = (ev.target as HTMLInputElement | HTMLSelectElement).value;
 		});
-	const setNum = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = Number((ev.target as HTMLInputElement).value);
-		});
-	const setBool = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLInputElement).checked;
-		});
-
-	const event = str("event", "");
 
 	return (
 		<div
@@ -442,333 +429,259 @@ function editForm({
 					window.speechSynthesis.onvoiceschanged = () => m.redraw();
 			}}
 		>
-			{/* 1. structure & trigger */}
-			{bindField(
-				e,
-				"props.event",
-				t("overlay.alert_event"),
-				<input
-					type="text"
-					value={event}
-					placeholder={t("overlay.alert_event_hint")}
-					oninput={set("event")}
-				/>,
-				sp,
-			)}
-			<div class="ov-grid2">
-				{bindField(
-					e,
-					"props.duration",
-					t("overlay.alert_duration"),
-					<input
-						type="number"
-						min={500}
-						max={60000}
-						step={100}
-						value={num("duration", 5000)}
-						oninput={setNum("duration")}
-					/>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.layoutType",
-					t("overlay.alert_layout"),
-					<select
-						value={str("layoutType", "stack")}
-						onchange={set("layoutType")}
-					>
-						<option value="stack">stack</option>
-						<option value="row">row</option>
-						<option value="overlay">overlay</option>
-					</select>,
-					sp,
-				)}
-			</div>
-			{/* 2. media */}
-			{bindField(
-				e,
-				"props.assetType",
-				t("overlay.alert_media_type"),
-				<select
-					value={str("assetType", "image")}
-					onchange={set("assetType")}
-				>
-					<option value="image">image</option>
-					<option value="video">video</option>
-				</select>,
-				sp,
-			)}
-			{libraryAssetField(
-				e,
+			{bindableForm({
+				element: e,
 				mutate,
-				str("assetType", "image") === "video" ? "video" : "image",
-				"mediaAssetId",
-			)}
-			{bindField(
-				e,
-				"props.videoVolume",
-				t("overlay.alert_video_volume"),
-				<input
-					type="number"
-					min={0}
-					max={1}
-					step={0.05}
-					value={num("videoVolume", 1)}
-					oninput={setNum("videoVolume")}
-				/>,
-				sp,
-			)}
-			{/* 3. audio sting */}
-			{libraryAssetField(e, mutate, "audio", "audioAssetId")}
-			{bindField(
-				e,
-				"props.audioVolume",
-				t("overlay.alert_audio_volume"),
-				<input
-					type="number"
-					min={0}
-					max={1}
-					step={0.05}
-					value={num("audioVolume", 1)}
-					oninput={setNum("audioVolume")}
-				/>,
-				sp,
-			)}
-			{/* 4. text */}
-			{bindField(
-				e,
-				"props.titleTemplate",
-				t("overlay.ft_title"),
-				<input
-					type="text"
-					value={str("titleTemplate", "Hello {name}!")}
-					oninput={set("titleTemplate")}
-				/>,
-				sp,
-			)}
-			{bindField(
-				e,
-				"props.messageTemplate",
-				t("overlay.alert_message"),
-				<input
-					type="text"
-					value={str("messageTemplate", "{message}")}
-					oninput={set("messageTemplate")}
-				/>,
-				sp,
-			)}
-			{bindField(
-				e,
-				"props.fontFamily",
-				t("overlay.alert_font_family"),
-				<input
-					type="text"
-					value={str("fontFamily", "system-ui, sans-serif")}
-					oninput={set("fontFamily")}
-				/>,
-				sp,
-			)}
-			<div class="ov-grid2">
-				{bindField(
-					e,
-					"props.fontSize",
-					t("overlay.alert_font_size"),
-					<input
-						type="number"
-						min={8}
-						max={400}
-						value={num("fontSize", 28)}
-						oninput={setNum("fontSize")}
-					/>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.fontWeight",
-					t("overlay.font_weight"),
-					<input
-						type="number"
-						min={100}
-						max={900}
-						step={100}
-						value={num("fontWeight", 700)}
-						oninput={setNum("fontWeight")}
-					/>,
-					sp,
-				)}
-			</div>
-			<div class="ov-grid2">
-				{bindField(
-					e,
-					"props.fontColor",
-					t("overlay.alert_font_color"),
-					<input
-						type="color"
-						value={str("fontColor", "#ffffff")}
-						oninput={set("fontColor")}
-					/>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.accentColor",
-					t("overlay.alert_accent_color"),
-					<input
-						type="color"
-						value={str("accentColor", "#ffd700")}
-						oninput={set("accentColor")}
-					/>,
-					sp,
-				)}
-			</div>
-			{/* 5. animations */}
-			<div class="ov-grid2">
-				{bindField(
-					e,
-					"props.introAnimation",
-					t("overlay.alert_intro_animation"),
-					<select
-						value={str("introAnimation", "slideDown")}
-						onchange={set("introAnimation")}
-					>
-						{ALERT_INTRO_ANIMATIONS.map((name) => (
-							<option key={name} value={name}>
-								{name}
+				variables,
+				variableUrl,
+				rows: [
+					// 1. structure & trigger
+					[
+						{
+							path: "props.event",
+							labelKey: "overlay.alert_event",
+							type: "text",
+							value: strProp(p, "event", ""),
+						},
+					],
+					[
+						{
+							path: "props.duration",
+							labelKey: "overlay.alert_duration",
+							type: "number",
+							value: numProp(p, "duration", 5000),
+							min: 500,
+							max: 60000,
+							step: 100,
+						},
+						{
+							path: "props.layoutType",
+							labelKey: "overlay.alert_layout",
+							type: "select",
+							value: strProp(p, "layoutType", "stack"),
+							options: [
+								{ value: "stack", label: "stack" },
+								{ value: "row", label: "row" },
+								{ value: "overlay", label: "overlay" },
+							],
+						},
+					],
+					// 2. media
+					[
+						{
+							path: "props.assetType",
+							labelKey: "overlay.alert_media_type",
+							type: "select",
+							value: strProp(p, "assetType", "image"),
+							options: [
+								{ value: "image", label: "image" },
+								{ value: "video", label: "video" },
+							],
+						},
+					],
+					libraryAssetField(
+						e,
+						mutate,
+						strProp(p, "assetType", "image") === "video"
+							? "video"
+							: "image",
+						"mediaAssetId",
+					),
+					[
+						{
+							path: "props.videoVolume",
+							labelKey: "overlay.alert_video_volume",
+							type: "number",
+							value: numProp(p, "videoVolume", 1),
+							min: 0,
+							max: 1,
+							step: 0.05,
+						},
+					],
+					// 3. audio sting
+					libraryAssetField(e, mutate, "audio", "audioAssetId"),
+					[
+						{
+							path: "props.audioVolume",
+							labelKey: "overlay.alert_audio_volume",
+							type: "number",
+							value: numProp(p, "audioVolume", 1),
+							min: 0,
+							max: 1,
+							step: 0.05,
+						},
+					],
+					// 4. text
+					[
+						{
+							path: "props.titleTemplate",
+							labelKey: "overlay.ft_title",
+							type: "text",
+							value: strProp(p, "titleTemplate", "Hello {name}!"),
+						},
+					],
+					[
+						{
+							path: "props.messageTemplate",
+							labelKey: "overlay.alert_message",
+							type: "text",
+							value: strProp(p, "messageTemplate", "{message}"),
+						},
+					],
+					[
+						{
+							path: "props.fontFamily",
+							labelKey: "overlay.alert_font_family",
+							type: "text",
+							value: strProp(p, "fontFamily", "system-ui, sans-serif"),
+						},
+					],
+					[
+						{
+							path: "props.fontSize",
+							labelKey: "overlay.alert_font_size",
+							type: "number",
+							value: numProp(p, "fontSize", 28),
+							min: 8,
+							max: 400,
+						},
+						{
+							path: "props.fontWeight",
+							labelKey: "overlay.font_weight",
+							type: "number",
+							value: numProp(p, "fontWeight", 700),
+							min: 100,
+							max: 900,
+							step: 100,
+						},
+					],
+					[
+						{
+							path: "props.fontColor",
+							labelKey: "overlay.alert_font_color",
+							type: "color",
+							value: strProp(p, "fontColor", "#ffffff"),
+						},
+						{
+							path: "props.accentColor",
+							labelKey: "overlay.alert_accent_color",
+							type: "color",
+							value: strProp(p, "accentColor", "#ffd700"),
+						},
+					],
+					// 5. animations
+					[
+						{
+							path: "props.introAnimation",
+							labelKey: "overlay.alert_intro_animation",
+							type: "select",
+							value: strProp(p, "introAnimation", "slideDown"),
+							options: ALERT_INTRO_ANIMATIONS.map((name) => ({
+								value: name,
+								label: name,
+							})),
+						},
+						{
+							path: "props.outroAnimation",
+							labelKey: "overlay.alert_outro_animation",
+							type: "select",
+							value: strProp(p, "outroAnimation", "fadeOut"),
+							options: ALERT_OUTRO_ANIMATIONS.map((name) => ({
+								value: name,
+								label: name,
+							})),
+						},
+					],
+					[
+						{
+							path: "props.textAnimation",
+							labelKey: "overlay.alert_text_animation",
+							type: "select",
+							value: strProp(p, "textAnimation", "none"),
+							options: ALERT_TEXT_ANIMATIONS.map((name) => ({
+								value: name,
+								label: name,
+							})),
+						},
+					],
+					// 6. variation
+					[
+						{
+							path: "props.isVariation",
+							labelKey: "overlay.alert_variation",
+							type: "checkbox",
+							value: p.isVariation === true,
+						},
+						{
+							path: "props.conditionType",
+							labelKey: "overlay.alert_condition",
+							type: "select",
+							value: strProp(p, "conditionType", "min"),
+							options: [
+								{ value: "exact", label: "exact" },
+								{ value: "min", label: "min" },
+							],
+						},
+						{
+							path: "props.conditionValue",
+							labelKey: "overlay.alert_condition_value",
+							type: "number",
+							value: numProp(p, "conditionValue", 0),
+							min: 0,
+						},
+					],
+					// 7. TTS
+					[
+						{
+							path: "props.ttsEnabled",
+							labelKey: "overlay.alert_tts",
+							type: "checkbox",
+							value: p.ttsEnabled === true,
+						},
+					],
+					// the voice list builds from the async `speechSynthesis.getVoices()`
+					// (loaded by the oncreate hook above), so it stays a raw widget —
+					// it can't be expressed as a static descriptor `options`
+					<div class="ov-field">
+						<span class="ov-lbl">{t("overlay.alert_tts_voice")}</span>
+						<select
+							value={strProp(p, "ttsVoice", "")}
+							onchange={set("ttsVoice")}
+						>
+							<option value="">
+								{t("overlay.alert_tts_default_voice")}
 							</option>
-						))}
-					</select>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.outroAnimation",
-					t("overlay.alert_outro_animation"),
-					<select
-						value={str("outroAnimation", "fadeOut")}
-						onchange={set("outroAnimation")}
-					>
-						{ALERT_OUTRO_ANIMATIONS.map((name) => (
-							<option key={name} value={name}>
-								{name}
-							</option>
-						))}
-					</select>,
-					sp,
-				)}
-			</div>
-			{bindField(
-				e,
-				"props.textAnimation",
-				t("overlay.alert_text_animation"),
-				<select
-					value={str("textAnimation", "none")}
-					onchange={set("textAnimation")}
-				>
-					{ALERT_TEXT_ANIMATIONS.map((name) => (
-						<option key={name} value={name}>
-							{name}
-						</option>
-					))}
-				</select>,
-				sp,
-			)}
-			{/* 6. variation */}
-			<div class="ov-grid3">
-				{bindField(
-					e,
-					"props.isVariation",
-					t("overlay.alert_variation"),
-					<input
-						type="checkbox"
-						checked={p.isVariation === true}
-						onchange={setBool("isVariation")}
-					/>,
-					sp,
-				)}
-
-				{bindField(
-					e,
-					"props.conditionType",
-					t("overlay.alert_condition"),
-					<select
-						value={str("conditionType", "min")}
-						onchange={set("conditionType")}
-					>
-						<option value="exact">exact</option>
-						<option value="min">min</option>
-					</select>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.conditionValue",
-					t("overlay.alert_condition_value"),
-					<input
-						type="number"
-						min={0}
-						value={num("conditionValue", 0)}
-						oninput={setNum("conditionValue")}
-					/>,
-					sp,
-				)}
-			</div>
-			{/* 7. TTS */}
-			<div class="ov-grid3">
-				{bindField(
-					e,
-					"props.ttsEnabled",
-					t("overlay.alert_tts"),
-					<input
-						type="checkbox"
-						checked={p.ttsEnabled === true}
-						onchange={setBool("ttsEnabled")}
-					/>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.ttsVoice",
-					t("overlay.alert_tts_voice"),
-					<select value={str("ttsVoice", "")} onchange={set("ttsVoice")}>
-						<option value="">{t("overlay.alert_tts_default_voice")}</option>
-						{typeof window !== "undefined" && "speechSynthesis" in window
-							? window.speechSynthesis.getVoices().map((v) => (
-									<option value={v.name}>
-										{v.name} ({v.lang})
-									</option>
-								))
-							: []}
-					</select>,
-					sp,
-				)}
-				{bindField(
-					e,
-					"props.ttsVolume",
-					t("overlay.alert_tts_volume"),
-					<input
-						type="number"
-						min={0}
-						max={1}
-						step={0.05}
-						value={num("ttsVolume", 1)}
-						oninput={setNum("ttsVolume")}
-					/>,
-					sp,
-				)}
-			</div>
-			{bindField(
-				e,
-				"props.ttsMinAmount",
-				t("overlay.alert_tts_min_amount"),
-				<input
-					type="number"
-					min={0}
-					value={num("ttsMinAmount", 0)}
-					oninput={setNum("ttsMinAmount")}
-				/>,
-				sp,
-			)}
+							{typeof window !== "undefined" && "speechSynthesis" in window
+								? window.speechSynthesis.getVoices().map((v) => (
+										<option value={v.name}>
+											{v.name} ({v.lang})
+										</option>
+									))
+								: []}
+						</select>
+					</div>,
+					[
+						{
+							path: "props.ttsVolume",
+							labelKey: "overlay.alert_tts_volume",
+							type: "number",
+							value: numProp(p, "ttsVolume", 1),
+							min: 0,
+							max: 1,
+							step: 0.05,
+						},
+					],
+					[
+						{
+							path: "props.ttsMinAmount",
+							labelKey: "overlay.alert_tts_min_amount",
+							type: "number",
+							value: numProp(p, "ttsMinAmount", 0),
+							min: 0,
+						},
+					],
+				],
+			})}
 		</div>
 	);
 }

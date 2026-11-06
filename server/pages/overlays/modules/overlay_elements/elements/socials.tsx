@@ -14,7 +14,7 @@ import type {
 	OverlayElementDef,
 } from "@ui/overlay/element";
 import { numProp, strProp } from "@ui/overlay/element";
-import { bindField } from "@ui/overlay/fields";
+import { bindableForm } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import { ListField } from "../lib/list_field";
@@ -145,21 +145,12 @@ function draw(element: OverlayElement, _ctx: ElementContext): Vnode<any, any> {
 
 function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
 	const p = e.props;
-	const sp = { mutate, variables, variableUrl };
-	const setBool = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLInputElement).checked;
-		});
-	const setNum = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = Number((ev.target as HTMLInputElement).value);
-		});
-	const setStr = (key: string) => (ev: Event) =>
-		mutate((el) => {
-			el.props[key] = (ev.target as HTMLInputElement).value;
-		});
-	return (
-		<>
+	return bindableForm({
+		element: e,
+		mutate,
+		variables,
+		variableUrl,
+		rows: [
 			<ListField
 				element={e}
 				mutate={mutate}
@@ -171,27 +162,65 @@ function editForm({ element: e, mutate, variables, variableUrl }: ElementProps):
 				]}
 				addRow={() => ({ label: "", handle: "" })}
 				addLabel={t("overlay.so_add")}
-			/>
-			<div class="ov-grid2">
-				{bindField(e, "props.slide", t("overlay.so_slide"),
-					<input type="checkbox" checked={p.slide === true} onchange={setBool("slide")} />, sp)}
-				{p.slide === true ? (
-					bindField(e, "props.interval", t("overlay.interval"),
-						<input type="number" min={1000} max={600000} step={500} value={numProp(p, "interval", 4000)} oninput={setNum("interval")} />, sp)
-				) : null}
-			</div>
-			<div class="ov-grid3">
-				{bindField(e, "props.color", t("overlay.color"),
-					<input type="color" value={strProp(p, "color", "#ffffff")} oninput={setStr("color")} />, sp)}
-				{bindField(e, "props.background", t("overlay.cd_background"),
-					<input type="color" value={strProp(p, "background", "#1f2937")} oninput={setStr("background")} />, sp)}
-				{bindField(e, "props.accent", t("overlay.accent"),
-					<input type="color" value={strProp(p, "accent", "#38bdf8")} oninput={setStr("accent")} />, sp)}
-			</div>
-			{bindField(e, "props.fontSize", t("overlay.font_size"),
-				<input type="number" min={8} max={200} value={numProp(p, "fontSize", 20)} oninput={setNum("fontSize")} />, sp)}
-		</>
-	);
+			/>,
+			p.slide === true
+				? [
+						{
+							path: "props.slide",
+							labelKey: "overlay.so_slide",
+							type: "checkbox",
+							value: p.slide === true,
+						},
+						{
+							path: "props.interval",
+							labelKey: "overlay.interval",
+							type: "number",
+							value: numProp(p, "interval", 4000),
+							min: 1000,
+							max: 600000,
+							step: 500,
+						},
+					]
+				: [
+						{
+							path: "props.slide",
+							labelKey: "overlay.so_slide",
+							type: "checkbox",
+							value: p.slide === true,
+						},
+					],
+			[
+				{
+					path: "props.color",
+					labelKey: "overlay.color",
+					type: "color",
+					value: strProp(p, "color", "#ffffff"),
+				},
+				{
+					path: "props.background",
+					labelKey: "overlay.cd_background",
+					type: "color",
+					value: strProp(p, "background", "#1f2937"),
+				},
+				{
+					path: "props.accent",
+					labelKey: "overlay.accent",
+					type: "color",
+					value: strProp(p, "accent", "#38bdf8"),
+				},
+			],
+			[
+				{
+					path: "props.fontSize",
+					labelKey: "overlay.font_size",
+					type: "number",
+					value: numProp(p, "fontSize", 20),
+					min: 8,
+					max: 200,
+				},
+			],
+		],
+	});
 }
 
 function validate(e: OverlayElement): string[] {

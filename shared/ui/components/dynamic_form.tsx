@@ -312,7 +312,10 @@ export function makeControl(c: ControlValue): m.Vnode {
 				name,
 				disabled: c.disabled,
 				value: (value as string) ?? "#000000",
-				onchange: (e: Event) =>
+				// `oninput`, not `onchange`: a color picker emits `input` while
+				// dragging — matching every element editor, so the preview
+				// updates live instead of only on palette-commit.
+				oninput: (e: Event) =>
 					write((e.target as HTMLInputElement).value),
 			});
 		case "iso-datetime":
