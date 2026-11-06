@@ -16,6 +16,10 @@ export const cleanNum = (
     return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : def;
 };
 export const cleanBool = (v: unknown): boolean => v === true;
+export const cleanHex = (v: unknown, def: string): string =>
+    typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v)
+        ? v.toLowerCase()
+        : def;
 
 /** A platform channel a chat-driven widget displays (mirrors the chat
  * element's `channels`). */

@@ -6,8 +6,8 @@
  * circle marker.
  *
  * `startPosition` places a marker (e.g. the route start); with
- * `showDistance` on, a badge tracks the geodesic distance from it to the map
- * centre as the camera moves.
+ * `showDistance` on, a badge below the map tracks the geodesic distance
+ * from it to the map centre as the camera moves.
  *
  * Leaflet (JS + CSS) is lazy-loaded from a CDN on first render — it is NOT
  * assumed globally available. The `L` global is created by the script; the
@@ -28,7 +28,7 @@ import { bindField } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
 import type { OverlayElementSchema } from "../../../../../core/overlay_element";
-import { cleanBool, cleanNum, cleanStr } from "./schema_utils";
+import { cleanBool, cleanHex, cleanNum, cleanStr } from "./schema_utils";
 
 /* ── Props ────────────────────────────────────────────────────────── */
 
@@ -40,11 +40,23 @@ export interface LiveMapProps {
 	centerLat: number;
 	centerLon: number;
 	mapyKey: string;
+	/** Fill colour of the circle marking the current map centre. */
+	markerColor: string;
+	/** Radius of the current-centre circle marker, in pixels. */
+	markerSize: number;
 	/** Marker position, e.g. the route start point. */
 	startPosition: { lat: number; lon: number };
 	/** Draw a badge with the geodesic distance from the start position to
 	 * the map centre; the badge follows the camera while panning. */
 	showDistance: boolean;
+	/** Distance-badge font size, in pixels. */
+	distanceFontSize: number;
+	/** Distance-badge padding, in pixels. */
+	distancePadding: number;
+	/** Distance-badge text colour. */
+	distanceColor: string;
+	/** Distance-badge background colour. */
+	distanceBackground: string;
 }
 
 export const DEFAULT_LIVE_MAP_PROPS: Required<LiveMapProps> = {
@@ -53,16 +65,14 @@ export const DEFAULT_LIVE_MAP_PROPS: Required<LiveMapProps> = {
 	centerLat: 50.1635,
 	centerLon: 12.4034,
 	mapyKey: "",
+	markerColor: "#3a7afe",
+	markerSize: 8,
 	startPosition: { lat: 50.1635, lon: 12.4034 },
 	showDistance: false,
-};
-
-/** On-map control names stay English (spec) — the Leaflet control is built
- * with raw HTML outside the UI i18n cycle. */
-const PROVIDER_NAME: Record<LiveMapProvider, string> = {
-	osm: "Map",
-	arcgis: "Satellite",
-	mapy: "Tourist",
+	distanceFontSize: 13,
+	distancePadding: 6,
+	distanceColor: "#ffffff",
+	distanceBackground: "#000000",
 };
 
 function providerUrl(key: LiveMapProvider): string {
@@ -79,7 +89,7 @@ function providerUrl(key: LiveMapProvider): string {
 function providerAttribution(key: LiveMapProvider): string {
 	switch (key) {
 		case "arcgis":
-			return "&copy; Esri, Maxar, Earthstar Geographics";
+			return '&copy; Powered by <a href="https://www.esri.com/">Esri</a>';
 		case "mapy":
 			return '&copy; <a href="https://api.mapy.com/copyright">Seznam.cz</a>';
 		default:
@@ -119,9 +129,11 @@ function injectStyles(): void {
 	const s = document.createElement("style");
 	s.id = "live-map-styles";
 	s.textContent = `
+    /* The distance badge is a full-width row BELOW the map, right-aligned.
+     * Font size, padding, and colours are per-element props (inline). */
     .live-map-distance {
-      background: rgba(0,0,0,.7); color: #fff; font-size: 13px;
-      padding: 4px 10px; border-radius: 4px; white-space: nowrap;
+      box-sizing: border-box; width: 100%; text-align: right;
+      border-radius: 4px; white-space: nowrap;
     }
     .live-map-distance b { font-weight: 600; }
     /* The start marker is plain (not a Leaflet image marker) so the B&W tile
@@ -175,8 +187,14 @@ interface MapState {
 	centerMarker: any;
 	centerLat: number;
 	centerLon: number;
+	markerColor: string;
+	markerSize: number;
 	zoom: number;
 	showDistance: boolean;
+	// Distance-badge node rendered below the map; `null` until (re)mounted.
+	badge: HTMLElement | null;
+	// Refreshes the badge from the live camera centre.
+	updateBadge: null | (() => void);
 	// Latest resolved props; the distance badge reads from it live.
 	lastProps: LiveMapProps;
 }
@@ -219,8 +237,9 @@ function setProvider(state: MapState, p: LiveMapProps): void {
 	}
 }
 
-/** Add/remove the start marker and the live distance badge to follow the
- * `showDistance` prop. */
+/** Add/remove the start marker to follow the `showDistance` prop. The
+ * distance badge is Mithril-rendered below the map (see `draw`) and is
+ * refreshed by the map's move/zoom events via `state.badge`. */
 function syncDistance(state: MapState, p: LiveMapProps): void {
 	const { map } = state;
 	state.showDistance = p.showDistance;
@@ -247,28 +266,6 @@ function syncDistance(state: MapState, p: LiveMapProps): void {
 			p.startPosition.lon,
 		]);
 		map._liveMapStartMarker._icon?.setAttribute("id", "live-map-start");
-	}
-	if (want && !map._liveMapBadge) {
-		const badge = L.DomUtil.create("div", "live-map-distance");
-		// Reads `state.lastProps` so the badge follows start-position edits.
-		const updateBadge = (): void => {
-			const c = map.getCenter();
-			const s = state.lastProps.startPosition;
-			badge.innerHTML = `<b>Distance</b> ${formatDistance(
-				distanceMeters(s.lat, s.lon, c.lat, c.lng),
-			)}`;
-		};
-		map._liveMapBadge = badge;
-		map.on("movestart", updateBadge);
-		map.on("movend", updateBadge);
-		map.on("zoomend", updateBadge);
-		const dctrl = L.control({ position: "bottomleft" });
-		dctrl.onAdd = () => badge;
-		map._liveMapBadgeCtrl = dctrl.addTo(map);
-	} else if (!want && map._liveMapBadgeCtrl) {
-		map.removeControl(map._liveMapBadgeCtrl);
-		map._liveMapBadgeCtrl = null;
-		map._liveMapBadge = null;
 	}
 }
 
@@ -302,16 +299,29 @@ function syncMap(state: MapState, p: LiveMapProps): void {
 		state.zoom = p.zoom;
 		map.setZoom(p.zoom);
 	}
+	if (
+		p.markerColor !== state.markerColor ||
+		p.markerSize !== state.markerSize
+	) {
+		state.markerColor = p.markerColor;
+		state.markerSize = p.markerSize;
+		state.centerMarker.setStyle({ fillColor: p.markerColor });
+		state.centerMarker.setRadius(p.markerSize);
+	}
 
 	syncDistance(state, p);
 }
 
 function initMap(container: HTMLElement, props: LiveMapProps): MapState {
-	const map = L.map(container, { zoomControl: false }).setView(
-		[props.centerLat, props.centerLon],
-		props.zoom,
-	);
-
+	const map = L.map(container, {
+		zoomControl: false,
+		attributionControl: false,
+	}).setView([props.centerLat, props.centerLon], props.zoom);
+	L.control
+		.attribution({
+			position: "topright",
+		})
+		.addTo(map);
 	// Leaflet does not reflow when the container size changes (overlay
 	// elements are drag-resizable) — invalidate the size to re-tile.
 	const resizeObserver = new ResizeObserver(() => map.invalidateSize());
@@ -319,10 +329,10 @@ function initMap(container: HTMLElement, props: LiveMapProps): MapState {
 
 	// A circle marker pinning the configured map centre.
 	const centerMarker = L.circleMarker([props.centerLat, props.centerLon], {
-		radius: 8,
+		radius: props.markerSize,
 		color: "#ffffff",
 		weight: 2,
-		fillColor: "#3a7afe",
+		fillColor: props.markerColor,
 		fillOpacity: 0.85,
 	}).addTo(map);
 
@@ -336,10 +346,35 @@ function initMap(container: HTMLElement, props: LiveMapProps): MapState {
 		mapyKey: null,
 		centerLat: props.centerLat,
 		centerLon: props.centerLon,
+		markerColor: props.markerColor,
+		markerSize: props.markerSize,
 		zoom: props.zoom,
 		showDistance: false,
+		badge: null,
+		updateBadge: null,
 		lastProps: props,
 	};
+
+	// Reads `state.lastProps` so the badge follows start-position edits.
+	const updateBadge = (): void => {
+		const badge = state.badge;
+		if (!badge) return;
+		const c = map.getCenter();
+		const s = state.lastProps.startPosition;
+		badge.innerHTML = `<b>${t("overlay.live_map_distance")}</b> ${formatDistance(
+			distanceMeters(s.lat, s.lon, c.lat, c.lng),
+		)}`;
+	};
+	state.updateBadge = updateBadge;
+	map.on("movestart", updateBadge);
+	map.on("movend", updateBadge);
+	map.on("zoomend", updateBadge);
+	// The badge may already be in the DOM — Mithril renders it before the
+	// async Leaflet load finishes.
+	state.badge = (container.parentElement?.querySelector(
+		":scope > .live-map-distance",
+	) ?? null) as HTMLElement | null;
+	if (state.badge) updateBadge();
 
 	state.lastProps = props;
 	syncMap(state, props);
@@ -366,60 +401,128 @@ function safeProps(raw: Record<string, unknown>): LiveMapProps {
 		centerLat: cleanNum(raw.centerLat, d.centerLat, -90, 90),
 		centerLon: cleanNum(raw.centerLon, d.centerLon, -180, 180),
 		mapyKey: cleanStr(raw.mapyKey, 200),
+		markerColor: cleanHex(raw.markerColor, d.markerColor),
+		markerSize: cleanNum(raw.markerSize, d.markerSize, 1, 100),
 		startPosition: {
 			lat: cleanNum(rawStart.lat, d.startPosition.lat, -90, 90),
 			lon: cleanNum(rawStart.lon, d.startPosition.lon, -180, 180),
 		},
 		showDistance: cleanBool(raw.showDistance),
+		distanceFontSize: cleanNum(raw.distanceFontSize, d.distanceFontSize, 8, 96),
+		distancePadding: cleanNum(raw.distancePadding, d.distancePadding, 0, 48),
+		distanceColor: cleanHex(raw.distanceColor, d.distanceColor),
+		distanceBackground: cleanHex(raw.distanceBackground, d.distanceBackground),
 	};
 }
 
 /* ── Mithril draw ─────────────────────────────────────────────────── */
 
 function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
-	return m("div", {
-		style: { width: "100%", height: "100%" },
-		oncreate: (vnode) => {
-			const container = vnode.dom as HTMLElement;
-			// A map (or an in-flight init) already exists for this node.
-			if (maps.get(container) || starting.has(container)) return;
-			starting.add(container);
-			injectStyles();
-			void ensureLeaflet().then(() => {
-				starting.delete(container);
-				// The node was removed while Leaflet was loading.
-				if (maps.get(container)) return;
-				// `element.props` is mutated in place, so this is the latest
-				// state even if props changed while Leaflet was loading.
-				maps.set(container, initMap(container, safeProps(element.props)));
-			});
+	const p = safeProps(element.props);
+	// The badge is a sibling of the map div — their shared state lives on
+	// the outer wrapper's first child (the map container).
+	const stateFor = (node: HTMLElement): MapState | undefined =>
+		maps.get(node.parentElement?.firstElementChild as HTMLElement);
+	return m(
+		"div",
+		{
+			style: {
+				width: "100%",
+				height: "100%",
+				display: "flex",
+				flexDirection: "column",
+			},
 		},
-		// Prop changes re-render into the same DOM node (oncreate does not
-		// re-run) — apply them to the live map in place.
-		onupdate: (vnode) => {
-			const state = maps.get(vnode.dom as HTMLElement);
-			if (state) syncMap(state, safeProps(element.props));
-		},
-		onremove: (vnode) => {
-			const container = vnode.dom as HTMLElement;
-			starting.delete(container);
-			const state = maps.get(container);
-			if (state) {
-				maps.delete(container);
-				state.resizeObserver.disconnect();
-				state.map.remove();
-			}
-		},
-	});
+		[
+			m("div", {
+				style: { flex: "1 1 auto", minHeight: "0" },
+				oncreate: (vnode) => {
+					const container = vnode.dom as HTMLElement;
+					// A map (or an in-flight init) already exists for this node.
+					if (maps.get(container) || starting.has(container)) return;
+					starting.add(container);
+					injectStyles();
+					void ensureLeaflet().then(() => {
+						starting.delete(container);
+						// The node was removed while Leaflet was loading.
+						if (maps.get(container)) return;
+						// `element.props` is mutated in place, so this is the
+						// latest state even if props changed while Leaflet was
+						// loading.
+						maps.set(container, initMap(container, safeProps(element.props)));
+					});
+				},
+				// Prop changes re-render into the same DOM node (oncreate does
+				// not re-run) — apply them to the live map in place.
+				onupdate: (vnode) => {
+					const state = maps.get(vnode.dom as HTMLElement);
+					if (state) syncMap(state, safeProps(element.props));
+				},
+				onremove: (vnode) => {
+					const container = vnode.dom as HTMLElement;
+					starting.delete(container);
+					const state = maps.get(container);
+					if (state) {
+						maps.delete(container);
+						state.resizeObserver.disconnect();
+						state.map.remove();
+					}
+				},
+			}),
+			// The distance badge sits BELOW the map — the map's move/zoom
+			// events refresh its text via `state.badge` (see `initMap`).
+			p.showDistance
+				? m("div", {
+						class: "live-map-distance",
+						style: {
+							fontSize: `${p.distanceFontSize}px`,
+							padding: `${p.distancePadding}px`,
+							color: p.distanceColor,
+							background: p.distanceBackground,
+						},
+						oncreate: (vnode) => {
+							const st = stateFor(vnode.dom as HTMLElement);
+							if (st) {
+								st.badge = vnode.dom as HTMLElement;
+								st.updateBadge?.();
+							}
+						},
+						onupdate: (vnode) => {
+							const st = stateFor(vnode.dom as HTMLElement);
+							if (st && st.badge !== vnode.dom) {
+								st.badge = vnode.dom as HTMLElement;
+								st.updateBadge?.();
+							}
+						},
+						onremove: (vnode) => {
+							const st = stateFor(vnode.dom as HTMLElement);
+							if (st) st.badge = null;
+						},
+					})
+				: null,
+		],
+	);
 }
 
 /* ── Edit form ────────────────────────────────────────────────────── */
 
-function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
+function editForm({
+	element: e,
+	mutate,
+	variables,
+	variableUrl,
+}: ElementProps): Vnode {
 	const p = safeProps(e.props);
 	const sp = { mutate, variables, variableUrl };
 	const num = (
-		key: "zoom" | "centerLat" | "centerLon" | "startPosition",
+		key:
+			| "zoom"
+			| "centerLat"
+			| "centerLon"
+			| "markerSize"
+			| "distanceFontSize"
+			| "distancePadding"
+			| "startPosition",
 		sub: "lat" | "lon" | null,
 		title: string,
 		min: number,
@@ -432,7 +535,14 @@ function editForm({ element: e, mutate, variables, variableUrl }: ElementProps):
 			title,
 			<input
 				type="number"
-				step={key === "zoom" ? 1 : 0.0001}
+				step={
+					key === "zoom" ||
+					key === "distanceFontSize" ||
+					key === "distancePadding" ||
+					key === "markerSize"
+						? 1
+						: 0.0001
+				}
 				min={min}
 				max={max}
 				value={typeof value === "number" && Number.isFinite(value) ? value : 0}
@@ -478,6 +588,24 @@ function editForm({ element: e, mutate, variables, variableUrl }: ElementProps):
 			{num("centerLat", null, t("overlay.live_map_center_lat"), -90, 90)}
 			{num("centerLon", null, t("overlay.live_map_center_lon"), -180, 180)}
 			<div class="ov-grid2">
+				{bindField(
+					e,
+					"props.markerColor",
+					t("overlay.live_map_marker_color"),
+					<input
+						type="color"
+						value={p.markerColor}
+						oninput={(ev: Event) =>
+							mutate((el) => {
+								el.props.markerColor = (ev.target as HTMLInputElement).value;
+							})
+						}
+					/>,
+					sp,
+				)}
+				{num("markerSize", null, t("overlay.live_map_marker_size"), 1, 100)}
+			</div>
+			<div class="ov-grid2">
 				{num("startPosition", "lat", t("overlay.live_map_start_lat"), -90, 90)}
 				{num(
 					"startPosition",
@@ -501,6 +629,62 @@ function editForm({ element: e, mutate, variables, variableUrl }: ElementProps):
 					}
 				/>,
 				sp,
+			)}
+			{p.showDistance && (
+				<>
+					<div class="ov-grid2">
+						{num(
+							"distanceFontSize",
+							null,
+							t("overlay.live_map_distance_font_size"),
+							8,
+							96,
+						)}
+						{num(
+							"distancePadding",
+							null,
+							t("overlay.live_map_distance_padding"),
+							0,
+							48,
+						)}
+					</div>
+					<div class="ov-grid2">
+						{bindField(
+							e,
+							"props.distanceColor",
+							t("overlay.live_map_distance_color"),
+							<input
+								type="color"
+								value={p.distanceColor}
+								oninput={(ev: Event) =>
+									mutate((el) => {
+										el.props.distanceColor = (
+											ev.target as HTMLInputElement
+										).value;
+									})
+								}
+							/>,
+							sp,
+						)}
+						{bindField(
+							e,
+							"props.distanceBackground",
+							t("overlay.live_map_distance_background"),
+							<input
+								type="color"
+								value={p.distanceBackground}
+								oninput={(ev: Event) =>
+									mutate((el) => {
+										el.props.distanceBackground = (
+											ev.target as HTMLInputElement
+										).value;
+									})
+								}
+							/>,
+							sp,
+						)}
+					</div>
+				</>
 			)}
 			{bindField(
 				e,
@@ -563,8 +747,14 @@ export const liveMapElement: OverlayElementDef & OverlayElementSchema = {
 		"centerLat",
 		"centerLon",
 		"mapyKey",
+		"markerColor",
+		"markerSize",
 		"startPosition",
 		"showDistance",
+		"distanceFontSize",
+		"distancePadding",
+		"distanceColor",
+		"distanceBackground",
 	],
 	defaultSize: { width: 640, height: 420 },
 	draw,
@@ -582,12 +772,18 @@ export const liveMapElement: OverlayElementDef & OverlayElementSchema = {
 			centerLat: read.num("centerLat", d.centerLat, -90, 90),
 			centerLon: read.num("centerLon", d.centerLon, -180, 180),
 			mapyKey: read.str("mapyKey", d.mapyKey, 200),
+			markerColor: read.hex("markerColor", d.markerColor),
+			markerSize: read.num("markerSize", d.markerSize, 1, 100),
 			// No object reader in PropReaders — complete a partial object from the defaults.
 			startPosition: {
 				lat: cleanNum(rawStart?.lat, d.startPosition.lat, -90, 90),
 				lon: cleanNum(rawStart?.lon, d.startPosition.lon, -180, 180),
 			},
 			showDistance: read.bool("showDistance"),
+			distanceFontSize: read.num("distanceFontSize", d.distanceFontSize, 8, 96),
+			distancePadding: read.num("distancePadding", d.distancePadding, 0, 48),
+			distanceColor: read.hex("distanceColor", d.distanceColor),
+			distanceBackground: read.hex("distanceBackground", d.distanceBackground),
 		};
 	},
 };
