@@ -8,7 +8,7 @@
     "dev.balancer.adaptive": "Adaptivní (RTT + buffer)",
     "dev.balancer.aimd": "AIMD (v duchu TCP)",
     "dev.balancer.fixed": "Fixní bitrate",
-    "dev.card.encoder": "Enkodér",
+    "wtype.encoder": "Encoder",
     "dev.cera_section": "Ceracoder řízení bitrate",
     "dev.field.audio_codec": "Audio kodek",
     "dev.field.audio_delay": "Zpoždění audio (ms)",

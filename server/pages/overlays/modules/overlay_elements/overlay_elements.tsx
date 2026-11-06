@@ -5,6 +5,7 @@
 import type { OverlayElementDef } from "@ui/overlay/element";
 import type { OverlayElementSchema } from "../../../../core/overlay_element";
 import { alertsElement } from "./elements/alerts";
+import { ambientElement } from "./elements/ambient";
 import { chatElement } from "./elements/chat";
 import { countdownElement } from "./elements/countdown";
 import { counterElement } from "./elements/counter";
@@ -54,6 +55,7 @@ const elements: (OverlayElementDef & OverlayElementSchema)[] = [
 	featuredElement,
 	chatElement,
 	liveMapElement,
+	ambientElement,
 ];
 
 export default elements;

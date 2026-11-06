@@ -15,6 +15,7 @@ import { addableElements } from "../registry";
 const CATEGORIES: readonly { id: string; labelKey: string }[] = [
 	{ id: "basics", labelKey: "overlay.catalog_basics" },
 	{ id: "media", labelKey: "overlay.catalog_media" },
+	{ id: "backgrounds", labelKey: "overlay.catalog_backgrounds" },
 	{ id: "widgets", labelKey: "overlay.catalog_widgets" },
 	{ id: "templates", labelKey: "overlay.catalog_templates" },
 ];
