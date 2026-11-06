@@ -55,6 +55,7 @@
     "overlay.live_map_provider.osm": "Map",
     "overlay.live_map_provider.arcgis": "Satellite",
     "overlay.live_map_provider.mapy": "Tourist",
+    "overlay.live_map_zoom": "Zoom",  
     "overlay.live_map_center_lat": "Center latitude",
     "overlay.live_map_center_lon": "Center longitude",
     "overlay.live_map_distance": "Distance",

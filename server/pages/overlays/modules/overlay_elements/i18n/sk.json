@@ -55,6 +55,7 @@
     "overlay.live_map_provider.osm": "Mapa",
     "overlay.live_map_provider.arcgis": "Satelit",
     "overlay.live_map_provider.mapy": "Turistická",
+    "overlay.live_map_zoom": "Zoom",  
     "overlay.live_map_center_lat": "Stred (šír. geogr.)",
     "overlay.live_map_center_lon": "Stred (dĺž. geogr.)",
     "overlay.live_map_distance": "Vzdialenosť",
