@@ -119,7 +119,7 @@ function runFrames(v: (typeof AMBIENT_VARIANTS)[number]): {
 		width,
 		height,
 	};
-	v.create(env as unknown as AmbientEnv, {
+	v.start(env as unknown as AmbientEnv, {
 		speed: 1.5,
 		trail: 1,
 		background: "#05070d",
@@ -135,6 +135,39 @@ describe("ambient backgrounds (headless run)", () => {
 			const { visibleDraws, shapeCalls } = runFrames(v);
 			expect(visibleDraws, `${v.id}: composites frames`).toBeGreaterThan(0);
 			expect(shapeCalls, `${v.id}: draws shapes`).toBeGreaterThan(0);
+		}
+	});
+});
+
+describe("variant registration (class shape)", () => {
+	const byId = (id: string) => {
+		const v = AMBIENT_VARIANTS.find((v) => v.id === id);
+		if (!v) throw new Error(`variant missing: ${id}`);
+		return v;
+	};
+	// `customFormRows` receives the element (it reads `element.props` for the
+	// current values); an empty-props stub is enough for the shape checks.
+	const el = { props: {} } as never;
+
+	test("every variant is an AmbientVariant with a stable id, label and start", () => {
+		for (const v of AMBIENT_VARIANTS) {
+			expect(v.id.length).toBeGreaterThan(0);
+			expect(v.labelKey).toMatch(/^overlay\.ambient_/);
+			expect(typeof v.start).toBe("function");
+			expect(v.customDefaults).toBeTypeOf("object");
+		}
+	});
+
+	test("pipeline owns its custom props; the other backgrounds have none", () => {
+		expect(byId("pipeline").customDefaults).toEqual({
+			trail_faster: 3,
+			head_brightness: 1,
+		});
+		expect(byId("pipeline").customFormRows(el).length).toBe(2);
+
+		for (const id of ["aurora", "coalesce", "shift", "swirl"]) {
+			expect(byId(id).customDefaults).toEqual({});
+			expect(byId(id).customFormRows(el)).toEqual([]);
 		}
 	});
 });

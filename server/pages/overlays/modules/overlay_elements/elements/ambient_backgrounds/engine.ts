@@ -6,10 +6,13 @@
  * paint into, and the VISIBLE canvas `b` the composited (blurred / glow)
  * frame is drawn to. The engine creates and sizes the canvases, hands a
  * background its contexts, and gives it one rAF loop helper. A background
- * implements `CreateAmbient` and returns a stop function — adding a new
- * background is one file + one entry in index.ts, nothing touches the
- * element itself.
+ * is a concrete `AmbientVariant` subclass (one class per file) — adding one
+ * is a class + one entry in index.ts, nothing touches the element itself.
  */
+
+import type { OverlayElement } from "@ui/overlay/element";
+import type { FormField } from "@ui/overlay/fields";
+import type { PropReaders } from "../../../../../../core/overlay_element";
 
 /** One running background's canvases + geometry. `b` is the canvas the
  * element's Mithril vnode owns (visible); `a` is kept out of the DOM. */
@@ -37,19 +40,43 @@ export interface AmbientOptions {
 	trail: number;
 	/** Solid back colour painted under each frame */
 	background: string;
-	/** This background's own props (see `customDefaults` on the catalog
-	 * entry) — merged over its defaults by the element before calling
-	 * `create`, so backgrounds may tune themselves beyond the shared trio. */
+	/** This background's own props (see `customDefaults` on the variant) —
+	 * merged over its defaults by the element before calling `start`, so
+	 * backgrounds may tune themselves beyond the shared trio. */
 	custom: Record<string, number>;
 }
 
-/** A background: start the animation on `env` and return its stop function
- * (cancels the rAF loop). All background-internal state lives in the
- * closure, so several instances can run side by side. */
-export type CreateAmbient = (
-	env: AmbientEnv,
-	opts: AmbientOptions,
-) => () => void;
+/** A background: one class per variant. Subclasses set `id`/`labelKey` and
+ * implement `start`; they may also declare their own props
+ * (`customDefaults` + `normalizeCustomProps` + `customFormRows`) for the
+ * element to render and normalize. All animation-internal state lives in
+ * `start`'s closure, so several instances run side by side. */
+export abstract class AmbientVariant {
+	/** Stable id stored in `props.kind`. */
+	abstract readonly id: string;
+	/** i18n key of the variant's label in the edit form. */
+	abstract readonly labelKey: string;
+	/** Defaults of this background's own props — stored flat in
+	 * `element.props`. Empty for backgrounds that only use the shared
+	 * `speed`/`trail`/`background` trio. */
+	readonly customDefaults: Record<string, number> = {};
+	/** Start the animation on `env` and return its stop function (cancels the
+	 * rAF loop). */
+	abstract start(env: AmbientEnv, opts: AmbientOptions): () => void;
+	/** Coerce this background's custom props to safe values (server-side).
+	 * The base has none and returns an empty record. */
+	normalizeCustomProps(
+		_props: Readonly<Record<string, unknown>>,
+		_read: PropReaders,
+	): Record<string, number> {
+		return {};
+	}
+	/** This background's rows in the element's edit form (rendered only when
+	 * it is the selected variant; one row per field). The base has none. */
+	customFormRows(_element: OverlayElement): FormField[] {
+		return [];
+	}
+}
 
 /** Size the canvas pair. `b` is the already-mounted visible canvas; `a`
  * is a fresh offscreen canvas. Sizing a canvas clears it, so this doubles

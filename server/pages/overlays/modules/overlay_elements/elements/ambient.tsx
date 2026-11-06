@@ -89,7 +89,7 @@ function startAnimation(
 		height,
 	);
 	vnode.state.key = key;
-	vnode.state.stop = def.create(env, opts);
+	vnode.state.stop = def.start(env, opts);
 }
 
 function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
@@ -155,9 +155,7 @@ function editForm({
 			],
 			// The selected background's own props get their own rows below the
 			// kind select (backgrounds without custom props add nothing).
-			...(variant?.customFormRow
-				? variant.customFormRow(e).map((field) => [field])
-				: []),
+			...variant?.customFormRows(e).map((field) => [field]) ?? [],
 			[
 				{
 					path: "props.speed",
@@ -219,11 +217,7 @@ export const ambientElement: OverlayElementDef & OverlayElementSchema = {
 		// Normalize the selected background's own props too (stored flat in
 		// element.props); unknown/other variants keep only their defaults.
 		const variant = ambientVariant(kind);
-		const custom = variant?.normalizeCustomProps
-			? variant.normalizeCustomProps(props, read)
-			: variant?.customDefaults
-				? { ...variant.customDefaults }
-				: {};
+		const custom = variant?.normalizeCustomProps(props, read) ?? {};
 		return {
 			kind,
 			speed: read.num("speed", d.speed, 0.1, 4),
