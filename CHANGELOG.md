@@ -1,3 +1,16 @@
+# [2.25.0](https://github.com/majklovec/irlctrl/compare/v2.24.0...v2.25.0) (2026-11-06)
+
+
+### Bug Fixes
+
+* **overlay:** add missing referrer meta tag and ensure newline at end of file ([3b6f0db](https://github.com/majklovec/irlctrl/commit/3b6f0dbb5d0624660285c8a382d141db42eb4267))
+
+
+### Features
+
+* **live_map:** add customizable marker properties and distance badge options ([6ab534e](https://github.com/majklovec/irlctrl/commit/6ab534e9f3d8e127c6a70e31e896acb78fe55d41))
+* **overlay:** add variableUrl support for bound fields and copy functionality ([814ec62](https://github.com/majklovec/irlctrl/commit/814ec62db109313583798fb48401c96d0c273ef7))
+
 # [2.24.0](https://github.com/majklovec/irlctrl/compare/v2.23.0...v2.24.0) (2026-11-05)
 
 
