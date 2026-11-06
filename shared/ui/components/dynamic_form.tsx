@@ -209,7 +209,126 @@ const isEmpty = (v: unknown): boolean =>
 	v === "" ||
 	(Array.isArray(v) && v.length === 0);
 
-/** Build the control for a single field, bound to `getState` / `handleChange`. */
+/** Fully-resolved control value for `makeControl`. The caller owns schema /
+ * state / i18n semantics: it resolves the current value, pre-resolves option
+ * labels to plain strings, and supplies the single write path. This keeps the
+ * builder (shared by `DynamicForm` and `overlay/fields.tsx`'s `bindableForm`)
+ * free of both. */
+export interface ControlValue {
+	type: FieldType;
+	/** Control identity (html `name`); also the key the control is bound to. */
+	name: string;
+	/** Already-resolved current value. */
+	value: unknown;
+	min?: number;
+	max?: number;
+	step?: number;
+	/** Already-resolved option labels (no translation keys). */
+	options?: { value: string; label: string }[];
+	placeholder?: string;
+	disabled?: boolean;
+	/** Single write path: receive the control's new value. */
+	write: (v: unknown) => void;
+}
+
+/** Build the raw control for one field. The ONLY place the per-type
+ * `<input>` / `<select>` markup lives — shared by `DynamicForm` and
+ * `bindableForm` so the two never drift. */
+export function makeControl(c: ControlValue): m.Vnode {
+	const { type, name, value, write, min, max, step } = c;
+	switch (type) {
+		case "text":
+			return m("input", {
+				type: "text",
+				name,
+				disabled: c.disabled,
+				placeholder: c.placeholder,
+				value: (value as string) ?? "",
+				oninput: (e: Event) => write((e.target as HTMLInputElement).value),
+			});
+		case "textarea":
+			return m("textarea", {
+				name,
+				disabled: c.disabled,
+				placeholder: c.placeholder,
+				value: (value as string) ?? "",
+				oninput: (e: Event) =>
+					write((e.target as HTMLTextAreaElement).value),
+			});
+		case "number":
+			return m("input", {
+				type: "number",
+				name,
+				disabled: c.disabled,
+				placeholder: c.placeholder,
+				min,
+				max,
+				step,
+				value: value === undefined ? "" : (value as number),
+				oninput: (e: Event) => {
+					const n = Number((e.target as HTMLInputElement).value);
+					write(Number.isFinite(n) ? n : 0);
+				},
+			});
+		case "range":
+			return m("input", {
+				type: "range",
+				name,
+				disabled: c.disabled,
+				min: min ?? 0,
+				max: max ?? 100,
+				step: step ?? 1,
+				value: value === undefined ? (min ?? 0) : (value as number),
+				oninput: (e: Event) =>
+					write(Number((e.target as HTMLInputElement).value)),
+			});
+		case "select":
+		case "asset":
+			return m(
+				"select",
+				{
+					name,
+					disabled: c.disabled,
+					value: (value as string) ?? "",
+					onchange: (e: Event) =>
+						write((e.target as HTMLSelectElement).value),
+				},
+				(c.options ?? []).map((opt) =>
+					m("option", { key: opt.value, value: opt.value }, opt.label),
+				),
+			);
+		case "checkbox":
+			return m("input", {
+				type: "checkbox",
+				name,
+				disabled: c.disabled,
+				checked: Boolean(value),
+				onchange: (e: Event) =>
+					write((e.target as HTMLInputElement).checked),
+			});
+		case "color":
+			return m("input", {
+				type: "color",
+				name,
+				disabled: c.disabled,
+				value: (value as string) ?? "#000000",
+				onchange: (e: Event) =>
+					write((e.target as HTMLInputElement).value),
+			});
+		case "iso-datetime":
+			return m("input", {
+				type: "datetime-local",
+				name,
+				disabled: c.disabled,
+				value: toLocalInput(value),
+				onchange: (e: Event) =>
+					write(toIso((e.target as HTMLInputElement).value)),
+			});
+	}
+}
+
+/** Build the control for a `FieldSchema`, bound to `getState` /
+ * `handleChange` — a thin adapter over the shared `makeControl`. */
 function controlFor(
 	f: FieldSchema,
 	getState: () => Record<string, unknown>,
@@ -218,103 +337,21 @@ function controlFor(
 	t: Translate,
 	placeholder?: string,
 ): m.Vnode {
-	const current = () => getPath(getState(), f.name);
-	const name = f.name;
-	switch (f.type) {
-		case "text":
-			return m("input", {
-				type: "text",
-				name,
-				disabled,
-				placeholder,
-				value: (current() as string) ?? "",
-				oninput: (e: Event) =>
-					handleChange(name, (e.target as HTMLInputElement).value),
-			});
-		case "textarea":
-			return m("textarea", {
-				name,
-				disabled,
-				placeholder,
-				value: (current() as string) ?? "",
-				oninput: (e: Event) =>
-					handleChange(name, (e.target as HTMLTextAreaElement).value),
-			});
-		case "number":
-			return m("input", {
-				type: "number",
-				name,
-				disabled,
-				placeholder,
-				min: f.min,
-				max: f.max,
-				step: f.step,
-				value: current() === undefined ? "" : (current() as number),
-				oninput: (e: Event) => {
-					const raw = (e.target as HTMLInputElement).value;
-					const n = Number(raw);
-					handleChange(name, Number.isFinite(n) ? n : 0);
-				},
-			});
-		case "range":
-			return m("input", {
-				type: "range",
-				name,
-				disabled,
-				min: f.min ?? 0,
-				max: f.max ?? 100,
-				step: f.step ?? 1,
-				value: current() === undefined ? (f.min ?? 0) : (current() as number),
-				oninput: (e: Event) =>
-					handleChange(name, Number((e.target as HTMLInputElement).value)),
-			});
-		case "select":
-		case "asset":
-			return m(
-				"select",
-				{
-					name,
-					disabled,
-					value: (current() as string) ?? "",
-					onchange: (e: Event) =>
-						handleChange(name, (e.target as HTMLSelectElement).value),
-				},
-				(f.options ?? []).map((opt) =>
-					m(
-						"option",
-						{ key: opt.value, value: opt.value },
-						resolve(t, opt.labelKey, opt.labelParams),
-					),
-				),
-			);
-		case "checkbox":
-			return m("input", {
-				type: "checkbox",
-				name,
-				disabled,
-				checked: Boolean(current()),
-				onchange: (e: Event) =>
-					handleChange(name, (e.target as HTMLInputElement).checked),
-			});
-		case "color":
-			return m("input", {
-				type: "color",
-				name,
-				disabled,
-				value: (current() as string) ?? "#000000",
-				onchange: (e: Event) =>
-					handleChange(name, (e.target as HTMLInputElement).value),
-			});
-		case "iso-datetime":
-			return m("input", {
-				type: "datetime-local",
-				name,
-				disabled,
-				value: toLocalInput(current()),
-				onchange: (e: Event) =>
-					handleChange(name, toIso((e.target as HTMLInputElement).value)),
-			});
-	}
+	return makeControl({
+		type: f.type,
+		name: f.name,
+		value: getPath(getState(), f.name),
+		min: f.min,
+		max: f.max,
+		step: f.step,
+		options: (f.options ?? []).map((o) => ({
+			value: o.value,
+			label: resolve(t, o.labelKey, o.labelParams),
+		})),
+		placeholder,
+		disabled,
+		write: (v) => handleChange(f.name, v),
+	});
 }
 
 /** Render one `FieldSchema` as a labelled row (label, control, help, error). */

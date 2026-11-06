@@ -16,6 +16,7 @@
 import type { Vnode, VnodeDOM } from "mithril";
 import m from "mithril";
 import type { Variable } from "../../../server/pages/overlays/overlay";
+import { makeControl } from "../components/dynamic_form";
 import { Icon } from "../components/icons";
 import { t } from "../i18n";
 import type { ElementProps, OverlayElement } from "./element";
@@ -181,4 +182,106 @@ export function bindField(
 			</div>
 		</div>
 	);
+}
+
+// ── bindableForm ────────────────────────────────────────────────────────
+// A form-shaped descriptor → a fully-wired inspector form. Each data field
+// is built into its raw control and wrapped in `bindField`, so the variable
+// binding affordance is applied exactly where `isBindable` allows (chain
+// toggle on text/number/color; never on select/checkbox). A row of field
+// descriptors renders in an `ov-grid<N>`; a raw Vnode row is the escape
+// hatch for custom widgets (rendered verbatim, no binding).
+
+/** Control types `bindableForm` knows how to build. */
+export type FormFieldType =
+	| "text"
+	| "number"
+	| "color"
+	| "select"
+	| "checkbox";
+
+/** One choice of a `select` field. */
+export interface FormFieldOption {
+	value: string;
+	/** Display text (already translated by the caller). */
+	label: string;
+}
+
+/** One data-driven inspector field.
+ * `path` is the full binding key the schema accepts (`props.<name>`); the
+ * written prop is `path` with the `props.` prefix stripped (the convention
+ * every per-element `editForm` uses). `value` is the *already-resolved*
+ * current value — the caller reads it with `strProp`/`numProp`. */
+export interface FormField {
+	path: string;
+	/** i18n label key, resolved through `t` at render time. */
+	labelKey: string;
+	type: FormFieldType;
+	value: unknown;
+	/** Bounds for a `number` field. */
+	min?: number;
+	max?: number;
+	step?: number;
+	/** Choices for a `select` field. */
+	options?: FormFieldOption[];
+}
+
+/** One form row: a group of fields (laid out in a grid) or a raw Vnode
+ * rendered verbatim (custom widget — never bound). */
+export type FormRow = FormField[] | Vnode;
+
+/** The raw control for one field, wired to write its prop on change.
+ * Delegates the per-type `<input>` / `<select>` markup to the shared
+ * `makeControl` (also used by `DynamicForm`) so the two never drift; this
+ * only supplies the binding write path. */
+function controlFor(f: FormField, mutate: ElementProps["mutate"]): Vnode {
+	const key = f.path.startsWith("props.")
+		? f.path.slice("props.".length)
+		: f.path;
+	return makeControl({
+		type: f.type,
+		name: key,
+		value: f.value,
+		min: f.min,
+		max: f.max,
+		step: f.step,
+		options: f.options,
+		write: (v) => mutate((el) => void (el.props[key] = v)),
+	});
+}
+
+/** Bind + group one row of fields into its grid (or a bare field). */
+function rowFields(
+	fields: FormField[],
+	e: OverlayElement,
+	sp: Pick<ElementProps, "mutate" | "variables" | "variableUrl">,
+): Vnode {
+	const bound = fields.map((f) =>
+		bindField(e, f.path, t(f.labelKey), controlFor(f, sp.mutate), sp),
+	);
+	if (bound.length === 1) return bound[0];
+	return <div class={bound.length === 2 ? "ov-grid2" : "ov-grid3"}>{bound}</div>;
+}
+
+/** Render a form-shaped descriptor as an inspector form. See `FormRow` for
+ * the row contract; every data field is wrapped in `bindField`, so binding
+ * is applied where `isBindable` allows and the chain toggle + picker + copy
+ * button behave exactly like the per-element `editForm`s. Returns a
+ * fragment, the same shape an `editForm` returns today. */
+export function bindableForm(attrs: {
+	element: OverlayElement;
+	mutate: ElementProps["mutate"];
+	variables: ElementProps["variables"];
+	variableUrl?: ElementProps["variableUrl"];
+	rows: FormRow[];
+}): Vnode {
+	const { element, mutate, variables, variableUrl, rows } = attrs;
+	const sp = { mutate, variables, variableUrl };
+	const out: Vnode[] = [];
+	for (const row of rows) {
+		if (typeof row === "object" && Array.isArray(row))
+			out.push(rowFields(row, element, sp));
+		else out.push(row);
+	}
+	return <>{out}</>;
 }
