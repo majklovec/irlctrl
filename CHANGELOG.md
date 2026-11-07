@@ -1,3 +1,24 @@
+# [3.0.0](https://github.com/majklovec/irlctrl/compare/v2.25.0...v3.0.0) (2026-11-07)
+
+
+### Features
+
+*  status ([17f12a4](https://github.com/majklovec/irlctrl/commit/17f12a49daa5618fd00f27b028fc35737ef0edb5))
+* Add ambient background feature and related tests ([3bc233f](https://github.com/majklovec/irlctrl/commit/3bc233f42717024a2930d13c16c9b5131e02acb0))
+* Add new ambient background variants: Constellation, Embers, Fireflies, and Ripple ([dd6ed14](https://github.com/majklovec/irlctrl/commit/dd6ed145c08506e25ead9cd234a6e5f7e3c13b0d))
+* **bindableForm:** implement control rendering and binding logic for dynamic fields ([155f828](https://github.com/majklovec/irlctrl/commit/155f828df388b18bfbf09fe265428e66b9c1f8f8))
+* dynamic form ([6e69f16](https://github.com/majklovec/irlctrl/commit/6e69f16da8fd2672e2f4410707972c49feec09e8))
+* enhance asset generation and testing for dynamic forms ([cbc595a](https://github.com/majklovec/irlctrl/commit/cbc595a1b1c45583218c8092e4de13fb98293d63))
+* **i18n:** add "overlay.live_map_zoom" translations for multiple languages ([ed7f881](https://github.com/majklovec/irlctrl/commit/ed7f8810c860cd07c8f2b68117fedefa502b0a2b))
+* **live-map:** add gps route history and markers ([4569ee4](https://github.com/majklovec/irlctrl/commit/4569ee47f3f0b0fef01e2084e0c0c14c41936540))
+* **live-map:** fetch history on new centre fixes ([8083663](https://github.com/majklovec/irlctrl/commit/80836635aff545566fc3c39502af25e9e4c421e2))
+* **live-map:** vendor leaflet and animate moves ([1062407](https://github.com/majklovec/irlctrl/commit/10624075d36f91cecb146588f4b38e4b3c434a00))
+
+
+### BREAKING CHANGES
+
+* **live-map:** live-map elements now use centerPosition and markerPositions/markerIcons/markerColors; centerLat, centerLon, and startPosition props are removed.
+
 # [2.25.0](https://github.com/majklovec/irlctrl/compare/v2.24.0...v2.25.0) (2026-11-06)
 
 
