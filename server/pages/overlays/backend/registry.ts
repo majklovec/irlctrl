@@ -31,6 +31,7 @@ import {
     type Variable,
 } from "../overlay";
 import { overlayElementSchema } from "../overlay_elements";
+import { parsePosition } from "../../../../shared/ui/overlay/geo";
 import { event, overlayRuntimeTopic, type Publish } from "../../../core/runtime";
 export { overlayRuntimeTopic };
 
@@ -134,6 +135,24 @@ export interface Overlays {
         values: Record<string, unknown>,
     ): { status: number; body: Record<string, unknown> } | null;
     /**
+     * Owner-authenticated live-map route history for
+     * `GET /overlay/:id/map-history?token=…` (TODO/09-map.md `keep_history`;
+     * `token` the owner's user token): every route of an overlay in start
+     * order with its recorded GPS points in time order (the live route
+     * carries `endedAt: null`). Recording is server-side: a variables batch
+     * that updates a keep_history live_map's bound centerPosition variable
+     * records a point into the live `default` route, opening it on the first
+     * fix (a live trace is always visible); a `path.end/<name>` event renames
+     * the live `default` route to `name` (archiving the segment), and the
+     * next fix then starts a fresh `default` route. `null` when the user does
+     * not own an overlay with `overlayId` (the route 404s, no-leak contract
+     * like the other token endpoints).
+     */
+    mapHistory(
+        user: string,
+        overlayId: string,
+    ): { status: number; body: Record<string, unknown> } | null;
+    /**
      * The runtime page's `overlays.applyEvent` WS uplink: writes an on-air
      * event's payload values into the overlay variables (one commit + one
      * `overlays.overlay` frame). Only reachable from a runtime WS whose open
@@ -178,10 +197,13 @@ export function createOverlays({
         }
     }
 
-    /** Remove an overlay's row (the in-memory removal is done by the caller). */
+    /** Remove an overlay's row plus its live-map history (the in-memory
+     * removal is done by the caller). */
     function prune(id: string): void {
         if (!db) return;
         try {
+            db.prepare("DELETE FROM map_points WHERE overlay_id = ?").run(id);
+            db.prepare("DELETE FROM map_paths WHERE overlay_id = ?").run(id);
             db.prepare("DELETE FROM overlays WHERE id = ?").run(id);
         } catch (err: unknown) {
             console.error(`[overlays] prune ${DB_FILE}:`, err);
@@ -796,6 +818,77 @@ export function createOverlays({
         }
     }
 
+    // ── live-map route history (TODO/09-map.md `keep_history`) ──
+    /** A variable id → the variable (bindings reference variables by id). */
+    function variableById(
+        overlay: Overlay,
+        id: unknown,
+    ): Variable | undefined {
+        if (typeof id !== "string" || !id) return undefined;
+        return overlay.variables.find((v) => v.id === id);
+    }
+
+    function keepHistoryMaps(overlay: Overlay): OverlayElement[] {
+        return overlay.elements.filter(
+            (e) => e.type === "live_map" && e.props.keepHistory === true,
+        );
+    }
+
+    /** The variable name a keep_history live_map binds its centre to
+     * (`props.centerPosition`, a `"lon,lat"` string); `null` when no such
+     * map is bound to a position variable. */
+    function gpsVariableName(overlay: Overlay): string | null {
+        for (const e of keepHistoryMaps(overlay)) {
+            const pos = variableById(
+                overlay,
+                e.bindings["props.centerPosition"]?.variableId,
+            );
+            if (pos) return pos.name;
+        }
+        return null;
+    }
+
+    /** `path.end/<name>`: rename the live `default` route to `name` and close
+     * it, archiving that recorded segment. A no-op without a keep_history
+     * map, for an empty name, or when no `default` route is currently open
+     * (the next fix re-opens one). */
+    function mapEnd(store: Store, name: string): void {
+        if (!db || !name || keepHistoryMaps(store.overlay).length === 0) return;
+        db.prepare(
+            "UPDATE map_paths SET name = ?, ended_at = ? WHERE overlay_id = ? AND name = 'default' AND ended_at IS NULL",
+        ).run(name, Date.now(), store.id);
+    }
+
+    /** Every keep_history live map whose bound centre variable this batch
+     * updated records one point into the live `default` route — opened on the
+     * first fix if none is open — so a live trace is ALWAYS visible while
+     * keep_history is on. Called from `setVariables` after the values are
+     * applied, so the read value is the one the map will render. */
+    function recordMapFix(store: Store, values: Record<string, unknown>): void {
+        if (!db) return;
+        const posName = gpsVariableName(store.overlay);
+        if (!posName || !(posName in values)) return;
+        const pos = store.overlay.variables.find((v) => v.name === posName)
+            ?.value;
+        const point = parsePosition(pos);
+        if (!point) return;
+        let open = db
+            .prepare(
+                "SELECT id FROM map_paths WHERE overlay_id = ? AND name = 'default' AND ended_at IS NULL LIMIT 1",
+            )
+            .get(store.id) as { id: string } | null;
+        if (!open) {
+            const id = randomUUID();
+            db.prepare(
+                "INSERT INTO map_paths (id, overlay_id, name, started_at) VALUES (?, ?, ?, ?)",
+            ).run(id, store.id, "default", Date.now());
+            open = { id };
+        }
+        db.prepare(
+            "INSERT INTO map_points (overlay_id, path_id, lat, lon, recorded_at) VALUES (?, ?, ?, ?, ?)",
+        ).run(store.id, open.id, point.lat, point.lon, Date.now());
+    }
+
     function setVariables(
         user: string,
         overlayId: string,
@@ -806,6 +899,7 @@ export function createOverlays({
         if (Object.keys(values).length === 0)
             throw new ApiError("at least one variable is required", 400);
         applyTokenValues(store, values);
+        recordMapFix(store, values);
         // one commit + one frame for the whole batch, so a live overlay sees
         // all the new values in a single render
         try {
@@ -846,8 +940,66 @@ export function createOverlays({
         // validate + coerce without touching the overlay: the values travel
         // with the event and land when an element plays it
         const payload = resolveTokenValues(store, values);
+        // path.end/<name> also manages the live-map route history server-side
+        // (TODO/09-map.md): it renames the live default route; the frame below
+        // still reaches the runtime page (the element stamps its status from it)
+        if (name.startsWith("path.end/")) mapEnd(store, name.slice(9));
         runtime(store.id, "overlays.event", { name, payload });
         return { status: 200, body: { ok: true, name } };
+    }
+
+    /** The live-map route history: open and closed routes in start order,
+     * points in time order (a global newest-20k cap keeps a long-running
+     * overlay's response bounded). */
+    function mapHistory(
+        user: string,
+        overlayId: string,
+    ): { status: number; body: Record<string, unknown> } | null {
+        if (!db) return null;
+        const store = runtimeStore(user, overlayId);
+        if (!store) return null;
+        const paths = (
+            db
+                .prepare(
+                    "SELECT id, name, started_at, ended_at FROM map_paths WHERE overlay_id = ? ORDER BY started_at, name",
+                )
+                .all(store.id) as {
+                id: string;
+                name: string;
+                started_at: number;
+                ended_at: number | null;
+            }[]
+        ).map((p) => ({ ...p, points: [] as { lat: number; lon: number; at: number }[] }));
+        const points = db
+            .prepare(
+                "SELECT path_id, lat, lon, recorded_at FROM map_points WHERE overlay_id = ? ORDER BY recorded_at DESC LIMIT 20000",
+            )
+            .all(store.id) as {
+            path_id: string;
+            lat: number;
+            lon: number;
+            recorded_at: number;
+        }[];
+        const byPath = new Map(paths.map((p) => [p.id, p]));
+        for (const pt of points.reverse())
+            byPath.get(pt.path_id)?.points.push({
+                lat: pt.lat,
+                lon: pt.lon,
+                at: pt.recorded_at,
+            });
+        return {
+            status: 200,
+            body: {
+                ok: true,
+                paths: paths.map((p) => ({
+                    id: p.id,
+                    name: p.name,
+                    startedAt: p.started_at,
+                    endedAt: p.ended_at,
+                    points: p.points,
+                })),
+            },
+        };
     }
 
     /** The runtime page's `overlays.applyEvent` WS uplink: writes an on-air
@@ -922,6 +1074,7 @@ export function createOverlays({
         },
         setVariables,
         triggerEvent,
+        mapHistory,
         applyEventValues,
     };
 }

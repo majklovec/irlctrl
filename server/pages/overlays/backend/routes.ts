@@ -15,8 +15,16 @@
  *                                  wheel, …) whose event prop matches <name>
  *                                  reacts; optional ?<name>=<value> pairs ride
  *                                  with the event and land in overlay
- *                                  variables when an element plays it (owner
+ *                                  variables when an element plays it; a
+ *                                  name of `path.end/<route>` also renames
+ *                                  that overlay's live-map default route to
+ *                                  <route> (archiving the segment) (owner
  *                                  user-token auth)
+ *   GET  /overlay/:id/map-history?token=…
+ *                                  the overlay's live-map route history
+ *                                  (JSON: named routes with their recorded
+ *                                  GPS points; open routes have endedAt
+ *                                  null) (owner user-token auth)
  *   GET  /overlay/:id/files/:fileId?token=…
  *                                  the bytes of an asset-library file an
  *                                  image/video element references
@@ -104,6 +112,17 @@ const RUNTIME_HEADERS = {
 const RUNTIME_WS_RE = /^\/overlay\/([^/]+)\/ws\/?$/;
 const TOKEN_PARAM = "token";
 
+/** A wildcard `*` param arrives URL-decoded by the router, so a client-side
+ * literal `/` (e.g. `path.end/les` sent as `path.end%2Fles`) needs one
+ * more decode; a plain decode throws on stray `%`, so keep the raw value. */
+function safeDecodeURIComponent(value: string): string {
+    try {
+        return decodeURIComponent(value);
+    } catch {
+        return value;
+    }
+}
+
 function runtimeToken(request: Request): string {
     return new URL(request.url).searchParams.get(TOKEN_PARAM) ?? "";
 }
@@ -189,8 +208,11 @@ export function mountOverlayRoutes(
                     );
                 }),
         )
+        // a wildcard (not `:name`): the event name may carry a path segment
+        // of its own — `path.end/<route>` renames the live-map default route
+        // to <route> (TODO/09-map.md)
         .get(
-            "/overlay/:id/event/:name",
+            "/overlay/:id/event/*",
             ({ request, params }) =>
                 ownerJson(() => {
                     const user = runtimeUser(request);
@@ -200,8 +222,24 @@ export function mountOverlayRoutes(
                     return overlays.triggerEvent(
                         user,
                         decodeURIComponent(params.id),
-                        decodeURIComponent(params.name),
+                        safeDecodeURIComponent(
+                            (params as Record<string, string>)["*"] ?? "",
+                        ),
                         queryValues(request),
+                    );
+                }),
+        )
+        // Live-map route history (keep_history): the OBS runtime page polls
+        // this while a keep_history map element renders active paths.
+        .get(
+            "/overlay/:id/map-history",
+            ({ request, params }) =>
+                ownerJson(() => {
+                    const user = runtimeUser(request);
+                    if (!user) return null;
+                    return overlays.mapHistory(
+                        user,
+                        decodeURIComponent(params.id),
                     );
                 }),
         )

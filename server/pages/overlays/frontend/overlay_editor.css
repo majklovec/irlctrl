@@ -610,6 +610,22 @@ identically here and on the runtime page */
     flex: 1;
     min-width: 0;
 }
+/* per-marker icon select, inline in a marker row (position input, select
+   and remove button share the row) — fixed, compact, glyph-centered */
+.ov-marker-icon {
+    flex: 0 0 auto;
+    width: 42px;
+    text-align: center;
+    text-align-last: center;
+}
+/* compact per-marker colour swatch, next to the per-row icon select */
+.ov-marker-color {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 30px;
+    padding: 2px;
+    cursor: pointer;
+}
 /* the chain-icon binding toggle, in place of the old checkbox. Muted when
    unbound; yellow (`.on`) while the picker is open or the field is bound,
    so bound fields are recognizable at a glance */
@@ -657,6 +673,25 @@ identically here and on the runtime page */
    while the picker is open) */
 .ov-var-sel {
     width: 100%;
+}
+/* the live-map "Add marker" button under the marker-position list: a
+   compact, left-aligned icon+text affordance matching the muted field style */
+.ov-add-marker {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 0 0;
+    padding: 4px 8px;
+    background: none;
+    border: 1px solid var(--border, color-mix(in srgb, var(--muted) 40%, transparent));
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+}
+.ov-add-marker:hover {
+    color: var(--text);
+    border-color: var(--accent);
 }
 .ov-check {
     display: flex;

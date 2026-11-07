@@ -14,6 +14,9 @@ const { elementRegistry, elementDef } = await import(
 const { lineFlipFromDelta } = await import(
 	"../server/pages/overlays/modules/overlay_elements/elements/line"
 );
+const { liveMapElement } = await import(
+	"../server/pages/overlays/modules/overlay_elements/elements/live_map"
+);
 const { resolveElement, resolveElementProps, elementStyle } = await import(
 	"../shared/ui/overlay/element"
 );
@@ -325,5 +328,55 @@ describe("element registry contract", () => {
 	test("unknown / legacy types resolve to undefined", () => {
 		expect(elementDef("banana")).toBeUndefined();
 		expect(elementDef("shape")).toBeUndefined();
+	});
+});
+
+describe("live_map per-marker icons and colors", () => {
+	// The same `read` shim the other element tests use — enough surface for
+	// live_map's normalizeProps (str/num/oneOf/hex/bool).
+	const readFor = (props: Record<string, unknown>) => ({
+		str: (k: string, fb: string, max = Infinity) =>
+			k in props ? String(props[k] ?? "").slice(0, max) : fb,
+		num: (k: string, fb: number, min: number, max: number) => {
+			const v = props[k];
+			if (typeof v === "number" && Number.isFinite(v))
+				return Math.min(max, Math.max(min, v));
+			return fb;
+		},
+		oneOf: <T extends string>(
+			k: string,
+			allowed: readonly T[],
+			fb: T,
+		): T =>
+			allowed.includes(props[k] as T) ? (props[k] as T) : fb,
+		hex: (k: string, fb: string) =>
+			typeof props[k] === "string"
+				? (props[k] as string)
+				: fb,
+		bool: (k: string) => props[k] === true,
+	});
+
+	test("propKeys exposes markerIcons/markerColors and normalizeProps keeps them verbatim", () => {
+		expect(liveMapElement.propKeys).toContain("markerIcons");
+		expect(liveMapElement.propKeys).toContain("markerColors");
+		const props = {
+			markerPositions: "12.4047,50.2046;12.4560,50.2160",
+			markerIcons: "★;;", // one glyph, then two empty (default) slots
+			markerColors: "#112233;;", // one colour, then two default slots
+		};
+		const out = liveMapElement.normalizeProps(props, readFor(props));
+		// The parallel icon/colour strings are preserved index-aligned: the
+		// empty slots must NOT collapse or fall back — that means "use the
+		// built-in default".
+		expect(out.markerIcons).toBe("★;;");
+		expect(out.markerColors).toBe("#112233;;");
+		expect(out.markerPositions).toBe("12.4047,50.2046;12.4560,50.2160");
+	});
+
+	test("a missing markerIcons/markerColors falls back to the empty string (all default)", () => {
+		const props = { markerPositions: "12.4,50.2;12.5,50.3" };
+		const out = liveMapElement.normalizeProps(props, readFor(props));
+		expect(out.markerIcons).toBe("");
+		expect(out.markerColors).toBe("");
 	});
 });

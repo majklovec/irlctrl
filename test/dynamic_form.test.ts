@@ -35,6 +35,7 @@ import type {
 let win: HappyWindow;
 let mithril: typeof import("mithril");
 let DynamicForm: typeof import("../shared/ui/components/dynamic_form")["DynamicForm"];
+let makeControl: typeof import("../shared/ui/components/dynamic_form")["makeControl"];
 
 // bun test shares globalThis across files — restore what we set afterward.
 const savedGlobals: [string, unknown][] = [];
@@ -87,6 +88,7 @@ beforeAll(async () => {
 		await import("mithril")
 	).default as unknown as typeof import("mithril");
 	DynamicForm = df.DynamicForm;
+	makeControl = df.makeControl;
 }, 15000);
 
 /** Mount DynamicForm reading the live `cfg`; returns the root element. */
@@ -500,5 +502,56 @@ describe("DynamicForm groups and validation", () => {
 			(root as HTMLElement).querySelector(".df-error")?.textContent ===
 			"Required field",
 		);
+	});
+});
+
+describe("makeControl: grouped select options render as optgroup", () => {
+	test("group entries render <optgroup>, flat entries render plain <option>", async () => {
+		const el = win.document.createElement("div");
+		win.document.body.appendChild(el);
+		mithril.mount(el, {
+			view: () =>
+				makeControl({
+					type: "select",
+					name: "icon",
+					value: "a",
+					write: () => {},
+					options: [
+						{
+							label: "Color",
+							options: [
+								{ value: "pin", label: "📍" },
+								{ value: "flag", label: "🏁" },
+							],
+						},
+						{
+							label: "Single color",
+							options: [
+								{ value: "dot", label: "●" },
+								{ value: "star", label: "★" },
+							],
+						},
+					],
+				}) as m.Vnode,
+		});
+		mithril.redraw();
+		await until(() => el.querySelectorAll("optgroup").length === 2);
+
+		const groups = Array.from(el.querySelectorAll("optgroup")).map((g) => ({
+			label: g.getAttribute("label"),
+			options: Array.from(g.querySelectorAll("option")).map(
+				(o) => o.getAttribute("value"),
+			),
+		}));
+		expect(groups).toEqual([
+			{ label: "Color", options: ["pin", "flag"] },
+			{ label: "Single color", options: ["dot", "star"] },
+		]);
+		// every option lives inside an optgroup (none loose in the select)
+		const loose = Array.from(el.querySelectorAll("option")).filter(
+			(o) => o.parentElement?.tagName !== "OPTGROUP",
+		);
+		expect(loose.length).toBe(0);
+		el.remove();
 	});
 });

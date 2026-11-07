@@ -16,7 +16,10 @@
 import type { Vnode, VnodeDOM } from "mithril";
 import m from "mithril";
 import type { Variable } from "../../../server/pages/overlays/overlay";
-import type { FieldType } from "../components/dynamic_form";
+import type {
+	ControlOption,
+	FieldType,
+} from "../components/dynamic_form";
 import { makeControl } from "../components/dynamic_form";
 import { Icon } from "../components/icons";
 import { t } from "../i18n";
@@ -224,8 +227,9 @@ export interface FormField {
 	min?: number;
 	max?: number;
 	step?: number;
-	/** Choices for a `select` field. */
-	options?: FormFieldOption[];
+	/** Choices for a `select` field; a group entry renders as an
+	 * `<optgroup>`. */
+	options?: ControlOption[];
 }
 
 /** One form row: a group of fields (laid out in a grid) or a raw Vnode

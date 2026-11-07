@@ -4,20 +4,28 @@
  * (default), ArcGIS satellite, and Mapy.com tourist (only when an API key
  * is set).
  *
- * Both markers are plain divs (UTF-8 glyphs, never Leaflet image markers):
- * the configured centre — colour/size/glyph props — and the start position
- * (e.g. the route start), its own glyph/colour/size props.
+ * The centre marker and any number of extra markers are plain divs (UTF-8
+ * glyphs, never Leaflet image markers): the configured centre, plus zero or
+ * more markers (e.g. the route start) sharing one glyph/colour/size.
  *
  * An optional info box below the map renders a `{token}` template. Computed
- * tokens: `{distance}` (geodesic start→centre, follows the camera while
- * panning), `{time}` (since the centre last moved) and `{status}` (idle/
+ * tokens: `{distance1}`…`{distanceN}` (geodesic distance, camera centre →
+ * each marker in `markerPositions` order, follows the camera while
+ * panning), `{distance}` (the first marker's distance, kept for older
+ * templates), `{time}` (since the centre last moved) and `{status}` (idle/
  * live/stale from the last move against `liveThreshold` seconds, with the
  * texts taken from the comma-separated `status` prop when provided). Any
  * other token resolves to a project variable
- * of that name, so the same box can show battery, coordinates, … The
- * runtime `path.start/{name}` / `path.end/{name}` events stamp the centre
- * position time (the phone pipeline posts them after pushing a GPS fix);
- * the history/persistence half of 09-map.md lands with the backend.
+ * of that name, so the same box can show battery, coordinates, …
+ *
+ * `keepHistory` (TODO/09-map.md) records the route server-side: the phone
+ * pushes GPS fixes as the variable bound to `centerPosition` (a `"lon,lat"`
+ * string); the server stores every fix into the live `default` route and a
+ * `path.end/{name}` event (which also stamps the centre position time)
+ * renames that route to `{name}`, archiving the segment — the next fix starts
+ * a fresh `default`. On the runtime page the element then polls the
+ * owner-token `map-history` endpoint and draws the live `default` route as a
+ * bold `historyColor` path under the live markers.
  *
  * Leaflet (JS + CSS) is lazy-loaded from a CDN on first render — it is NOT
  * assumed globally available. The `L` global is created by the script; the
@@ -26,6 +34,7 @@
 
 declare const L: any;
 
+import type { ControlOption } from "@ui/components/dynamic_form";
 import { Icon } from "@ui/components/icons";
 import { t } from "@ui/i18n";
 import type {
@@ -35,6 +44,7 @@ import type {
 	OverlayElementDef,
 } from "@ui/overlay/element";
 import { bindableForm, bindField, type FormRow } from "@ui/overlay/fields";
+import { type Position, parsePosition, parsePositions } from "@ui/overlay/geo";
 import { parseTemplate } from "@ui/overlay/template_tokens";
 import type { Vnode } from "mithril";
 import m from "mithril";
@@ -45,8 +55,8 @@ import { cleanBool, cleanHex, cleanNum, cleanStr } from "./schema_utils";
 
 export type LiveMapProvider = "osm" | "arcgis" | "mapy";
 
-/** Marker glyphs offered in the icon selects (both markers share the set). */
-export const LIVE_MAP_ICONS: readonly string[] = [
+/** Single-colour text glyphs — they inherit the marker's `color` prop. */
+const SINGLE_COLOR_ICONS: readonly string[] = [
 	"●",
 	"▲",
 	"■",
@@ -57,22 +67,30 @@ export const LIVE_MAP_ICONS: readonly string[] = [
 	"♥",
 	"☀",
 	"⚡",
-	"📍",
-	"🏁",
-	"🏠",
-	"🚗",
 ];
 
-/** The icon-select options (labels are the glyphs themselves). */
-const ICON_OPTIONS: { value: string; label: string }[] = LIVE_MAP_ICONS.map(
-	(g) => ({ value: g, label: g }),
-);
+/** Full-colour emoji — rendered in their own colours regardless of `color`. */
+const COLOR_ICONS: readonly string[] = ["📍", "🏁", "🏠", "🚗"];
+
+/** Marker glyphs offered in the icon selects (both markers share the set).
+ * The flat union of the two presentational groups; `LIVE_MAP_ICONS` is the
+ * single source of truth for validation, the group split is for the selects. */
+export const LIVE_MAP_ICONS: readonly string[] = [
+	...SINGLE_COLOR_ICONS,
+	...COLOR_ICONS,
+];
+
+/** Built-in fallback for a marker slot left without its own glyph/colour in
+ * `markerIcons`/`markerColors` (there is no shared "default marker" prop). */
+const DEFAULT_MARKER_ICON = "▶";
+const DEFAULT_MARKER_COLOR = "#d6007f";
 
 export interface LiveMapProps {
 	provider: LiveMapProvider;
 	zoom: number;
-	centerLat: number;
-	centerLon: number;
+	/** Centre map position as a `"lon,lat"` string (e.g. `"12.4034,50.1635"`)
+	 * — a single bindable prop a GPS variable can update. */
+	centerPosition: string;
 	mapyKey: string;
 	/** UTF-8 glyph of the centre marker (one of `LIVE_MAP_ICONS`). */
 	centerIcon: string;
@@ -80,14 +98,20 @@ export interface LiveMapProps {
 	centerColor: string;
 	/** Centre marker glyph size, in pixels. */
 	centerSize: number;
-	/** Marker position, e.g. the route start point. */
-	startPosition: { lat: number; lon: number };
-	/** UTF-8 glyph of the start marker (one of `LIVE_MAP_ICONS`). */
-	startIcon: string;
-	/** Colour of the start marker. */
-	startColor: string;
-	/** Start marker glyph size, in pixels. */
-	startSize: number;
+	/** Extra markers as `"lon,lat"` pairs joined with `";"` (e.g. the route
+	 * start point); empty = no markers. One bindable string, so a variable
+	 * can push a whole multi-marker set. */
+	markerPositions: string;
+	/** Per-marker UTF-8 glyphs joined with `";"`, index-aligned with
+	 * `markerPositions` (a missing/empty slot falls back to the built-in
+	 * default glyph). */
+	markerIcons: string;
+	/** Per-marker hex colours joined with `";"`, index-aligned with
+	 * `markerPositions` (a missing/empty slot falls back to the built-in
+	 * default colour). */
+	markerColors: string;
+	/** Extra-marker glyph size, in pixels. */
+	markerSize: number;
 	/** Draw the templated info box below the map. */
 	showInfo: boolean;
 	/** Info-box `{token}` template. */
@@ -106,29 +130,36 @@ export interface LiveMapProps {
 	status: string;
 	/** Seconds the computed status stays "live" after the centre last moved. */
 	liveThreshold: number;
+	/** Record the route in the server database and draw the live `default`
+	 * path (bound to the centre variable; a `path.end/{name}` event renames
+	 * it, archiving the segment); the runtime page polls and renders it. */
+	keepHistory: boolean;
+	/** Colour of the recorded live `default` path on the map. */
+	historyColor: string;
 }
 
 export const DEFAULT_LIVE_MAP_PROPS: Required<LiveMapProps> = {
 	provider: "osm",
 	zoom: 15,
-	centerLat: 50.1635,
-	centerLon: 12.4034,
+	centerPosition: "12.4034,50.1635",
 	mapyKey: "",
 	centerIcon: "●",
 	centerColor: "#3a7afe",
 	centerSize: 26,
-	startPosition: { lat: 50.1635, lon: 12.4034 },
-	startIcon: "▶",
-	startColor: "#d6007f",
-	startSize: 22,
+	markerPositions: "",
+	markerIcons: "",
+	markerColors: "",
+	markerSize: 22,
 	showInfo: false,
 	infoTemplate: "{distance} · {status}",
 	infoFontSize: 14,
 	infoPadding: 8,
 	infoColor: "#ffffff",
 	infoBackground: "#000000",
-	status: "",
+	status: "🟢,🟠,🟤",
 	liveThreshold: 20,
+	keepHistory: false,
+	historyColor: "#d6007f",
 };
 
 function providerUrl(key: LiveMapProvider): string {
@@ -254,12 +285,24 @@ interface MapState {
 	// `null` until the first sync has built the layer set.
 	mapyKey: string | null;
 	centerMarker: any;
-	startMarker: any;
+	// The `markerPositions` entries, in prop order; rebuilt only when the
+	// string changed (the glyph refresh below restyles them every sync).
+	markers: any[];
+	markerPos: Position[];
+	markerPositions: string;
+	// Keep-history routes (open + closed) as polylines, under the markers.
+	historyLayer: any;
+	// 5 s `map-history` poll while `keepHistory` is on; 0 while off.
+	historyTimer: 0 | ReturnType<typeof setInterval>;
+	// Last `centerPosition` strings applied (change detection; an unparseable
+	// string leaves the view where it is).
+	centerPos: string;
+	// The camera centre; `trackCenter` updates it while panning.
 	centerLat: number;
 	centerLon: number;
 	zoom: number;
 	// When the centre last moved (a pan, a prop change, or a runtime
-	// path.start / path.end event); `null` = it never moved. Feeds `{time}`
+	// path.end event); `null` = it never moved. Feeds `{time}`
 	// and `{status}`.
 	lastAt: number | null;
 	// Latest render context; the info box resolves `{token}`s against it.
@@ -356,16 +399,22 @@ function refreshInfo(state: MapState): void {
 	if (!box) return;
 	const p = state.lastProps;
 	const c = state.map.getCenter();
+	const markers = parsePositions(p.markerPositions);
 	const computed: Record<string, string> = {
-		distance: formatDistance(
-			distanceMeters(p.startPosition.lat, p.startPosition.lon, c.lat, c.lng),
-		),
+		// One distance token per marker (1-based), camera centre → marker,
+		// following the pan. `{distance}` stays the first marker's distance
+		// (back-compat with existing templates).
 		time:
 			state.lastAt === null
 				? "–"
 				: formatClock((Date.now() - state.lastAt) / 1000),
 		status: statusText(state, p),
 	};
+	for (const [i, m] of markers.entries())
+		computed[`distance${i + 1}`] = formatDistance(
+			distanceMeters(m.lat, m.lon, c.lat, c.lng),
+		);
+	if (markers[0]) computed.distance = computed.distance1;
 	// A project variable of a token's name wins over the computed tokens —
 	// the same precedence the other templated elements use.
 	box.textContent = parseTemplate(p.infoTemplate)
@@ -376,6 +425,105 @@ function refreshInfo(state: MapState): void {
 			return computed[seg.text] ?? "";
 		})
 		.join("");
+}
+
+/* ── Keep-history routes (server-recorded, TODO/09-map.md) ─────────── */
+
+/** How often the runtime page re-fetches the recorded routes. */
+const HISTORY_POLL_MS = 5000;
+
+interface MapHistoryPath {
+	id: string;
+	name: string;
+	startedAt: number;
+	endedAt: number | null;
+	points: { lat: number; lon: number; at: number }[];
+}
+
+/** The owner-token history endpoint this overlay polls (`null` off the
+ * runtime page — the editor renders the map without history). */
+function mapHistoryUrl(ctx: ElementContext): string | null {
+	if (!ctx.overlayId || !ctx.token || !ctx.activeTriggers) return null;
+	return (
+		"/overlay/" +
+		encodeURIComponent(ctx.overlayId) +
+		"/map-history?token=" +
+		encodeURIComponent(ctx.token)
+	);
+}
+
+/** Draw the live `default` route: bold in `historyColor` with a white
+ * casing, like the live trace. The runtime page renders only the `default`
+ * route — segments archived by `path.end/<name>` are kept server-side,
+ * not drawn. */
+function drawHistory(state: MapState, paths: MapHistoryPath[]): void {
+	const layer = state.historyLayer;
+	layer.clearLayers();
+	const path = paths.find((p) => p.name === "default" && p.endedAt === null);
+	if (!path || path.points.length < 2) return;
+	const ll = path.points.map((p) => [p.lat, p.lon] as [number, number]);
+	const color = state.lastProps.historyColor;
+	L.polyline(ll, {
+		color: "#fff",
+		weight: 7,
+		opacity: 0.9,
+		interactive: false,
+		lineJoin: "round",
+		lineCap: "butt",
+	}).addTo(layer);
+	L.polyline(ll, {
+		color,
+		weight: 4,
+		opacity: 1,
+		interactive: false,
+		lineJoin: "round",
+		lineCap: "round",
+		title: "Route: default",
+	}).addTo(layer);
+}
+
+/** One `map-history` fetch + redraw; `false` off the runtime page or on a
+ * failed fetch (the poll retries, a path event triggers a fresh try). */
+async function fetchHistory(state: MapState): Promise<boolean> {
+	const url = mapHistoryUrl(state.ctx);
+	if (!url) return false;
+	try {
+		const res = await fetch(url);
+		if (!res.ok) return false;
+		const body = (await res.json()) as { paths?: MapHistoryPath[] };
+		drawHistory(state, Array.isArray(body.paths) ? body.paths : []);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+function startHistoryTimer(state: MapState): void {
+	if (state.historyTimer) return;
+	state.historyTimer = setInterval(() => {
+		void fetchHistory(state);
+	}, HISTORY_POLL_MS);
+	state.historyTimer.unref?.();
+	void fetchHistory(state);
+}
+
+function stopHistoryTimer(state: MapState): void {
+	if (!state.historyTimer) return;
+	clearInterval(state.historyTimer);
+	state.historyTimer = 0;
+	state.historyLayer.clearLayers();
+}
+
+/** Start/stop/restyle the history feed when `keepHistory`/`historyColor`
+ * change between syncs. */
+function syncHistory(state: MapState, p: LiveMapProps): void {
+	if (p.keepHistory) {
+		if (!state.historyTimer) startHistoryTimer(state);
+		else if (state.lastProps.historyColor !== p.historyColor)
+			void fetchHistory(state);
+	} else if (state.historyTimer) {
+		stopHistoryTimer(state);
+	}
 }
 
 /** The centre follows panning: move the marker, stamp the position time,
@@ -414,32 +562,69 @@ function syncMap(state: MapState, p: LiveMapProps): void {
 	}
 	setProvider(state, p);
 
-	if (p.centerLat !== state.centerLat || p.centerLon !== state.centerLon) {
-		state.centerLat = p.centerLat;
-		state.centerLon = p.centerLon;
-		state.centerMarker.setLatLng([p.centerLat, p.centerLon]);
+	// A new `centerPosition` string repoints the camera; an unparseable one
+	// (e.g. an in-flight variable update) leaves the view where it is.
+	const center = parsePosition(p.centerPosition);
+	if (p.centerPosition !== state.centerPos && center) {
+		state.centerPos = p.centerPosition;
+		state.centerLat = center.lat;
+		state.centerLon = center.lon;
+		state.centerMarker.setLatLng([center.lat, center.lon]);
 		// A prop-driven move IS a new position — stamp it (trackCenter does).
 		state.lastAt = Date.now();
-		map.panTo([p.centerLat, p.centerLon]);
+		map.panTo([center.lat, center.lon]);
 	}
 	if (p.zoom !== state.zoom) {
 		state.zoom = p.zoom;
 		map.setZoom(p.zoom);
 	}
 
+	// Marker list: rebuild only when the string changed; restyle when the
+	// shared glyph props changed (rebuilds already carry the new style).
+	const positions = parsePositions(p.markerPositions);
+	if (p.markerPositions !== state.markerPositions) {
+		for (const marker of state.markers) map.removeLayer(marker);
+		state.markers = positions.map((pos, i) =>
+			L.marker([pos.lat, pos.lon], {
+				interactive: false,
+				keyboard: false,
+				title: "Marker",
+			})
+				.setIcon(
+					glyphIcon(
+						markerIconAt(p.markerIcons, i, DEFAULT_MARKER_ICON),
+						markerColorAt(p.markerColors, i, DEFAULT_MARKER_COLOR),
+						p.markerSize,
+					),
+				)
+				.addTo(map),
+		);
+		state.markerPos = positions;
+		state.markerPositions = p.markerPositions;
+	} else if (
+		p.markerIcons !== state.lastProps.markerIcons ||
+		p.markerColors !== state.lastProps.markerColors ||
+		p.markerSize !== state.lastProps.markerSize
+	) {
+		state.markers.forEach((marker, i) => {
+			const pos = state.markerPos[i];
+			if (pos)
+				setGlyph(
+					marker,
+					[pos.lat, pos.lon],
+					markerIconAt(p.markerIcons, i, DEFAULT_MARKER_ICON),
+					markerColorAt(p.markerColors, i, DEFAULT_MARKER_COLOR),
+					p.markerSize,
+				);
+		});
+	}
+
 	setGlyph(
 		state.centerMarker,
-		[p.centerLat, p.centerLon],
+		[state.centerLat, state.centerLon],
 		p.centerIcon,
 		p.centerColor,
 		p.centerSize,
-	);
-	setGlyph(
-		state.startMarker,
-		[p.startPosition.lat, p.startPosition.lon],
-		p.startIcon,
-		p.startColor,
-		p.startSize,
 	);
 
 	if (
@@ -453,6 +638,7 @@ function syncMap(state: MapState, p: LiveMapProps): void {
 		p.liveThreshold !== state.lastProps.liveThreshold
 	)
 		refreshInfo(state);
+	syncHistory(state, p);
 	state.lastProps = p;
 }
 
@@ -462,10 +648,15 @@ function initMap(
 	elementId: string,
 	ctx: ElementContext,
 ): MapState {
+	// `safeProps` guarantees a parseable `centerPosition`; the fallback only
+	// guards direct (test) calls with a raw record.
+	const center =
+		parsePosition(props.centerPosition) ??
+		parsePosition(DEFAULT_LIVE_MAP_PROPS.centerPosition);
 	const map = L.map(container, {
 		zoomControl: false,
 		attributionControl: false,
-	}).setView([props.centerLat, props.centerLon], props.zoom);
+	}).setView([center!.lat, center!.lon], props.zoom);
 	L.control
 		.attribution({
 			position: "topright",
@@ -476,15 +667,30 @@ function initMap(
 	const resizeObserver = new ResizeObserver(() => map.invalidateSize());
 	resizeObserver.observe(container);
 
-	// Glyph markers: the configured centre and the start position.
-	const centerMarker = L.marker([props.centerLat, props.centerLon], {
+	// Glyph markers: the configured centre plus the `markerPositions` set.
+	const centerMarker = L.marker([center!.lat, center!.lon], {
 		interactive: false,
 		keyboard: false,
 	}).addTo(map);
-	const startMarker = L.marker(
-		[props.startPosition.lat, props.startPosition.lon],
-		{ interactive: false, keyboard: false, title: "Start position" },
-	).addTo(map);
+	const markerPos = parsePositions(props.markerPositions);
+	const markers = markerPos.map((pos, i) =>
+		L.marker([pos.lat, pos.lon], {
+			interactive: false,
+			keyboard: false,
+			title: "Marker",
+		})
+			.setIcon(
+				glyphIcon(
+					markerIconAt(props.markerIcons, i, DEFAULT_MARKER_ICON),
+					markerColorAt(props.markerColors, i, DEFAULT_MARKER_COLOR),
+					props.markerSize,
+				),
+			)
+			.addTo(map),
+	);
+	// Recorded routes render below the marker panes — the layer group is
+	// added first, so the polyline z-order keeps the markers on top.
+	const historyLayer = L.layerGroup().addTo(map);
 
 	const state: MapState = {
 		map,
@@ -495,9 +701,14 @@ function initMap(
 		provider: "",
 		mapyKey: null,
 		centerMarker,
-		startMarker,
-		centerLat: props.centerLat,
-		centerLon: props.centerLon,
+		markers,
+		markerPos,
+		markerPositions: props.markerPositions,
+		historyLayer,
+		historyTimer: 0,
+		centerPos: props.centerPosition,
+		centerLat: center!.lat,
+		centerLon: center!.lon,
 		zoom: props.zoom,
 		lastAt: null,
 		ctx,
@@ -522,25 +733,24 @@ function initMap(
 	return state;
 }
 
-/** Runtime trigger: a `path.start/…` / `path.end/…` event named for this
- * element stamps the centre position time, flipping `{status}` live. The
- * element is persistent — it renders all the time and only reacts; the
- * claim itself is declined (no trigger state). */
+/** Runtime trigger: a `path.end/…` event named for this element stamps the
+ * centre position time, flipping `{status}` live. The element is persistent
+ * — it renders all the time and only reacts; the claim itself is declined
+ * (no trigger state). */
 function onTrigger(
 	element: OverlayElement,
 	eventName: string,
 	_payload: Record<string, unknown>,
 	_ctx: ElementContext,
 ): number | undefined {
-	if (
-		!eventName.startsWith("path.start/") &&
-		!eventName.startsWith("path.end/")
-	)
-		return undefined;
+	if (!eventName.startsWith("path.end/")) return undefined;
 	const state = [...maps.values()].find((s) => s.elementId === element.id);
 	if (state) {
 		state.lastAt = Date.now();
 		refreshInfo(state);
+		// The server has just archived the live route — re-fetch so the map
+		// shows it without waiting for the next 5 s poll.
+		if (state.lastProps.keepHistory) void fetchHistory(state);
 	}
 	return undefined;
 }
@@ -601,6 +811,7 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 					if (state) {
 						maps.delete(container);
 						if (state.interval) clearInterval(state.interval);
+						stopHistoryTimer(state);
 						state.resizeObserver.disconnect();
 						state.map.remove();
 					}
@@ -644,42 +855,145 @@ function editForm({
 }: ElementProps): Vnode {
 	const p = safeProps(e.props);
 	const sp = { mutate, variables, variableUrl };
-	// `startPosition` writes into a nested object, so it stays a raw Vnode
-	// row (the descriptor builder performs flat `props.<key>` writes only).
-	const num = (
-		key: "zoom" | "centerLat" | "centerLon" | "startPosition",
-		sub: "lat" | "lon" | null,
-		title: string,
-		min: number,
-		max: number,
-	): Vnode => {
-		const value = sub ? p.startPosition?.[sub] : (p[key] as number | undefined);
-		return bindField(
-			e,
-			`props.${key}${sub ? `.${sub}` : ""}`,
-			title,
-			<input
-				type="number"
-				step={key === "zoom" ? 1 : 0.0001}
-				min={min}
-				max={max}
-				value={typeof value === "number" && Number.isFinite(value) ? value : 0}
-				oninput={(ev: Event) =>
-					mutate((el) => {
-						const raw = Number((ev.target as HTMLInputElement).value);
-						const safe = Number.isFinite(raw) ? raw : 0;
-						if (sub)
-							el.props.startPosition = {
-								...((el.props.startPosition as object) ?? {}),
-								[sub]: safe,
-							};
-						else el.props[key] = safe;
-					})
-				}
-			/>,
-			sp,
-		);
-	};
+	// The icon selects are grouped into "Color" (emoji) and "Single color"
+	// (glyph) via `<optgroup>`. `t()` runs at render time (not module load).
+	const iconGroups: ControlOption[] = [
+		{
+			label: t("overlay.live_map_icon_group_color"),
+			options: COLOR_ICONS.map((g) => ({ value: g, label: g })),
+		},
+		{
+			label: t("overlay.live_map_icon_group_single"),
+			options: SINGLE_COLOR_ICONS.map((g) => ({ value: g, label: g })),
+		},
+	];
+	// `markerPositions` is one bindable string (`lon,lat;lon,lat`) — the
+	// marker count (and the rows below) is derived from its `";"` slots.
+	// `markerIcons` / `markerColors` are parallel `";"`-separated strings,
+	// index-aligned with the position slots; an empty slot uses the built-in
+	// default glyph/colour.
+	const posSlots = p.markerPositions ? p.markerPositions.split(";") : [];
+	const iconSlots = p.markerIcons.split(";");
+	const colorSlots = p.markerColors.split(";");
+	const writeIconSlot = (i: number, value: string) =>
+		mutate((el) => {
+			const icons = String(el.props.markerIcons).split(";");
+			while (icons.length <= i) icons.push("");
+			icons[i] = value;
+			el.props.markerIcons = icons.join(";");
+		});
+	const writeColorSlot = (i: number, value: string) =>
+		mutate((el) => {
+			const colors = String(el.props.markerColors).split(";");
+			while (colors.length <= i) colors.push("");
+			colors[i] = value;
+			el.props.markerColors = colors.join(";");
+		});
+	// The whole multi-marker position set, bound so a variable can replace it.
+	const markerPositionsField: Vnode = bindField(
+		e,
+		"props.markerPositions",
+		t("overlay.live_map_marker_positions"),
+		<input
+			type="text"
+			placeholder="lon,lat;lon,lat"
+			value={p.markerPositions}
+			oninput={(ev: Event) =>
+				mutate((el) => {
+					el.props.markerPositions = (ev.target as HTMLInputElement).value;
+				})
+			}
+		/>,
+		sp,
+	);
+	// One row per position slot — each marker owns its icon + colour (no
+	// position input here; that lives in the bindable field above).
+	const markerList: Vnode = (
+		<div class="ov-field">
+			<span class="ov-lbl">{t("overlay.live_map_marker_list")}</span>
+			<div>
+				{posSlots.map((_, i) => (
+					<div class="ov-grid3" key={i}>
+						<select
+							class="ov-marker-icon"
+							value={iconSlots[i] ?? ""}
+							onchange={(ev: Event) =>
+								writeIconSlot(i, (ev.target as HTMLSelectElement).value)
+							}
+						>
+							<option value="">
+								{t("overlay.live_map_marker_icon_default")}
+							</option>
+							{iconGroups.map((group) =>
+								"options" in group ? (
+									<optgroup key={group.label} label={group.label}>
+										{group.options.map((o) => (
+											<option value={o.value} key={o.value}>
+												{o.label}
+											</option>
+										))}
+									</optgroup>
+								) : (
+									<option value={group.value} key={group.value}>
+										{group.label}
+									</option>
+								),
+							)}
+						</select>
+						<input
+							type="color"
+							class="ov-marker-color"
+							value={colorSlots[i] || DEFAULT_MARKER_COLOR}
+							oninput={(ev: Event) =>
+								writeColorSlot(i, (ev.target as HTMLInputElement).value)
+							}
+						/>
+						<button
+							class="ov-bind-chk"
+							type="button"
+							title={t("overlay.live_map_remove_marker")}
+							aria-label={t("overlay.live_map_remove_marker")}
+							onclick={() =>
+								mutate((el) => {
+									const slots = String(el.props.markerPositions).split(";");
+									slots.splice(i, 1);
+									el.props.markerPositions = slots.join(";");
+									const icons = String(el.props.markerIcons).split(";");
+									icons.splice(i, 1);
+									el.props.markerIcons = icons.join(";");
+									const colors = String(el.props.markerColors).split(";");
+									colors.splice(i, 1);
+									el.props.markerColors = colors.join(";");
+								})
+							}
+						>
+							<Icon name="close" class="role-icon" />
+						</button>
+					</div>
+				))}
+				<div class="ov-field-row">
+					<button
+						class="ov-add-marker"
+						type="button"
+						title={t("overlay.live_map_add_marker")}
+						onclick={() =>
+							mutate((el) => {
+								const s = String(el.props.markerPositions);
+								el.props.markerPositions = s ? `${s};` : "";
+								const icons = String(el.props.markerIcons);
+								el.props.markerIcons = icons ? `${icons};` : "";
+								const colors = String(el.props.markerColors);
+								el.props.markerColors = colors ? `${colors};` : "";
+							})
+						}
+					>
+						<Icon name="plus" class="role-icon" />
+						<span>{t("overlay.live_map_add_marker")}</span>
+					</button>
+				</div>
+			</div>
+		</div>
+	);
 	return bindableForm({
 		element: e,
 		mutate,
@@ -710,22 +1024,10 @@ function editForm({
 			],
 			[
 				{
-					path: "props.centerLat",
-					labelKey: "overlay.live_map_center_lat",
-					type: "number",
-					value: p.centerLat,
-					min: -90,
-					max: 90,
-					step: 0.0001,
-				},
-				{
-					path: "props.centerLon",
-					labelKey: "overlay.live_map_center_lon",
-					type: "number",
-					value: p.centerLon,
-					min: -180,
-					max: 180,
-					step: 0.0001,
+					path: "props.centerPosition",
+					labelKey: "overlay.live_map_center_position",
+					type: "text",
+					value: p.centerPosition,
 				},
 			],
 			[
@@ -734,7 +1036,7 @@ function editForm({
 					labelKey: "overlay.live_map_center_icon",
 					type: "select",
 					value: p.centerIcon,
-					options: ICON_OPTIONS,
+					options: iconGroups,
 				},
 				{
 					path: "props.centerColor",
@@ -752,38 +1054,14 @@ function editForm({
 					step: 1,
 				},
 			],
-			<div class="ov-field">
-				<span class="ov-lbl">{t("overlay.live_map_start_position")}</span>
-			</div>,
-			<div class="ov-grid2">
-				{num("startPosition", "lat", t("overlay.live_map_start_lat"), -90, 90)}
-				{num(
-					"startPosition",
-					"lon",
-					t("overlay.live_map_start_lon"),
-					-180,
-					180,
-				)}
-			</div>,
+			markerPositionsField,
+			markerList,
 			[
 				{
-					path: "props.startIcon",
-					labelKey: "overlay.live_map_start_icon",
-					type: "select",
-					value: p.startIcon,
-					options: ICON_OPTIONS,
-				},
-				{
-					path: "props.startColor",
-					labelKey: "overlay.live_map_start_color",
-					type: "color",
-					value: p.startColor,
-				},
-				{
-					path: "props.startSize",
-					labelKey: "overlay.live_map_start_size",
+					path: "props.markerSize",
+					labelKey: "overlay.live_map_marker_size",
 					type: "number",
-					value: p.startSize,
+					value: p.markerSize,
 					min: 8,
 					max: 96,
 					step: 1,
@@ -862,6 +1140,26 @@ function editForm({
 			],
 			[
 				{
+					path: "props.keepHistory",
+					labelKey: "overlay.live_map_keep_history",
+					type: "checkbox",
+					value: p.keepHistory === true,
+				},
+			],
+			...(p.keepHistory
+				? ([
+						[
+							{
+								path: "props.historyColor",
+								labelKey: "overlay.live_map_history_color",
+								type: "color",
+								value: p.historyColor,
+							},
+						],
+					] as FormRow[])
+				: ([] as FormRow[])),
+			[
+				{
 					path: "props.mapyKey",
 					labelKey: "overlay.live_map_mapy_key",
 					type: "text",
@@ -875,13 +1173,13 @@ function editForm({
 function validate(e: OverlayElement): string[] {
 	const problems: string[] = [];
 	const p = safeProps(e.props);
-	if (p.centerLat < -90 || p.centerLat > 90)
-		problems.push("centerLat out of range (-90–90)");
-	if (p.centerLon < -180 || p.centerLon > 180)
-		problems.push("centerLon out of range (-180–180)");
-	const sp = p.startPosition;
-	if (sp.lat < -90 || sp.lat > 90 || sp.lon < -180 || sp.lon > 180)
-		problems.push("startPosition out of range");
+	if (!parsePosition(p.centerPosition))
+		problems.push('centerPosition is not a valid "lon,lat" string');
+	for (const [i, entry] of p.markerPositions.split(";").entries()) {
+		if (!entry.trim()) continue;
+		if (!parsePosition(entry))
+			problems.push(`marker ${i + 1} is not a valid "lon,lat" string`);
+	}
 	return problems;
 }
 
@@ -898,6 +1196,26 @@ function iconOf(value: unknown, fallback: string): string {
 	return LIVE_MAP_ICONS.includes(s) ? s : fallback;
 }
 
+/** The glyph for marker `index` (one of `LIVE_MAP_ICONS`); the slot is
+ * index-aligned with `markerPositions`, and a missing/empty/unknown one
+ * falls back to `fallback` (the built-in default glyph). */
+function markerIconAt(icons: string, index: number, fallback: string): string {
+	const entry = icons.split(";")[index] ?? "";
+	return LIVE_MAP_ICONS.includes(entry) ? entry : fallback;
+}
+
+/** The hex colour for marker `index`; the slot is index-aligned with
+ * `markerPositions`, and a missing/empty/invalid one falls back to
+ * `fallback` (the built-in default colour). */
+function markerColorAt(
+	colors: string,
+	index: number,
+	fallback: string,
+): string {
+	const entry = cleanHex(colors.split(";")[index] ?? "", fallback);
+	return entry;
+}
+
 function safeProps(rawInput: unknown): LiveMapProps {
 	const d = DEFAULT_LIVE_MAP_PROPS;
 	const raw: Record<string, unknown> =
@@ -905,29 +1223,26 @@ function safeProps(rawInput: unknown): LiveMapProps {
 			? (rawInput as Record<string, unknown>)
 			: {};
 	const provider = raw.provider as LiveMapProvider;
-	const rawStart = (raw.startPosition ?? {}) as {
-		lat?: unknown;
-		lon?: unknown;
-	};
 	return {
 		provider:
 			provider === "osm" || provider === "arcgis" || provider === "mapy"
 				? provider
 				: d.provider,
 		zoom: cleanNum(raw.zoom, d.zoom, 0, 25),
-		centerLat: cleanNum(raw.centerLat, d.centerLat, -90, 90),
-		centerLon: cleanNum(raw.centerLon, d.centerLon, -180, 180),
+		// The raw string is kept verbatim (in-flight edits, in-progress
+		// variable updates) — parsing happens at render time; an unparseable
+		// value leaves the view where it is (initMap falls back to the
+		// default position, syncMap keeps the current one). An empty
+		// `markerPositions` means "no markers" — never the default marker.
+		centerPosition: cleanStr(raw.centerPosition, 50) || d.centerPosition,
 		mapyKey: cleanStr(raw.mapyKey, 200),
 		centerIcon: iconOf(raw.centerIcon, d.centerIcon),
 		centerColor: cleanHex(raw.centerColor, d.centerColor),
 		centerSize: cleanNum(raw.centerSize, d.centerSize, 8, 96),
-		startPosition: {
-			lat: cleanNum(rawStart.lat, d.startPosition.lat, -90, 90),
-			lon: cleanNum(rawStart.lon, d.startPosition.lon, -180, 180),
-		},
-		startIcon: iconOf(raw.startIcon, d.startIcon),
-		startColor: cleanHex(raw.startColor, d.startColor),
-		startSize: cleanNum(raw.startSize, d.startSize, 8, 96),
+		markerPositions: cleanStr(raw.markerPositions, 1000),
+		markerIcons: cleanStr(raw.markerIcons, 1000),
+		markerColors: cleanStr(raw.markerColors, 1000),
+		markerSize: cleanNum(raw.markerSize, d.markerSize, 8, 96),
 		showInfo: cleanBool(raw.showInfo),
 		infoTemplate: cleanStr(raw.infoTemplate, 400) || d.infoTemplate,
 		infoFontSize: cleanNum(raw.infoFontSize, d.infoFontSize, 8, 96),
@@ -936,6 +1251,8 @@ function safeProps(rawInput: unknown): LiveMapProps {
 		infoBackground: cleanHex(raw.infoBackground, d.infoBackground),
 		status: cleanStr(raw.status, 100),
 		liveThreshold: cleanNum(raw.liveThreshold, d.liveThreshold, 0, 3600),
+		keepHistory: cleanBool(raw.keepHistory),
+		historyColor: cleanHex(raw.historyColor, d.historyColor),
 	};
 }
 
@@ -946,24 +1263,19 @@ export const liveMapElement: OverlayElementDef & OverlayElementSchema = {
 	labelKey: "overlay.add_live_map",
 	icon: () => <Icon name="target" class="role-icon" />,
 	order: 100,
-	// Deep clone: `startPosition` is a nested object shared by reference.
-	defaultProps: {
-		...DEFAULT_LIVE_MAP_PROPS,
-		startPosition: { ...DEFAULT_LIVE_MAP_PROPS.startPosition },
-	},
+	defaultProps: { ...DEFAULT_LIVE_MAP_PROPS },
 	propKeys: [
 		"provider",
 		"zoom",
-		"centerLat",
-		"centerLon",
+		"centerPosition",
 		"mapyKey",
 		"centerIcon",
 		"centerColor",
 		"centerSize",
-		"startPosition",
-		"startIcon",
-		"startColor",
-		"startSize",
+		"markerPositions",
+		"markerIcons",
+		"markerColors",
+		"markerSize",
 		"showInfo",
 		"infoTemplate",
 		"infoFontSize",
@@ -972,6 +1284,8 @@ export const liveMapElement: OverlayElementDef & OverlayElementSchema = {
 		"infoBackground",
 		"status",
 		"liveThreshold",
+		"keepHistory",
+		"historyColor",
 	],
 	defaultSize: { width: 640, height: 420 },
 	draw,
@@ -983,14 +1297,13 @@ export const liveMapElement: OverlayElementDef & OverlayElementSchema = {
 	onTrigger,
 	normalizeProps(props, read) {
 		const d = DEFAULT_LIVE_MAP_PROPS;
-		const rawStart = props.startPosition as
-			| { lat?: unknown; lon?: unknown }
-			| undefined;
 		return {
 			provider: read.oneOf("provider", ["osm", "arcgis", "mapy"], d.provider),
 			zoom: read.num("zoom", d.zoom, 0, 25),
-			centerLat: read.num("centerLat", d.centerLat, -90, 90),
-			centerLon: read.num("centerLon", d.centerLon, -180, 180),
+			// Kept verbatim (render-time parsing); an empty/missing value
+			// falls back to the default position.
+			centerPosition:
+				read.str("centerPosition", d.centerPosition, 50) || d.centerPosition,
 			mapyKey: read.str("mapyKey", d.mapyKey, 200),
 			centerIcon: iconOf(
 				read.str("centerIcon", d.centerIcon, 10),
@@ -998,14 +1311,14 @@ export const liveMapElement: OverlayElementDef & OverlayElementSchema = {
 			),
 			centerColor: read.hex("centerColor", d.centerColor),
 			centerSize: read.num("centerSize", d.centerSize, 8, 96),
-			// No object reader in PropReaders — complete a partial object from the defaults.
-			startPosition: {
-				lat: cleanNum(rawStart?.lat, d.startPosition.lat, -90, 90),
-				lon: cleanNum(rawStart?.lon, d.startPosition.lon, -180, 180),
-			},
-			startIcon: iconOf(read.str("startIcon", d.startIcon, 10), d.startIcon),
-			startColor: read.hex("startColor", d.startColor),
-			startSize: read.num("startSize", d.startSize, 8, 96),
+			// A stored value is kept verbatim — including the empty string
+			// (no markers), which must not fall back to the default marker.
+			markerPositions: read.str("markerPositions", d.markerPositions, 1000),
+			// Kept verbatim (like markerPositions): slots are index-aligned
+			// and an empty slot must mean "use the built-in default".
+			markerIcons: read.str("markerIcons", d.markerIcons, 1000),
+			markerColors: read.str("markerColors", d.markerColors, 1000),
+			markerSize: read.num("markerSize", d.markerSize, 8, 96),
 			showInfo: read.bool("showInfo"),
 			infoTemplate: read.str("infoTemplate", d.infoTemplate, 400),
 			infoFontSize: read.num("infoFontSize", d.infoFontSize, 8, 96),
@@ -1014,6 +1327,8 @@ export const liveMapElement: OverlayElementDef & OverlayElementSchema = {
 			infoBackground: read.hex("infoBackground", d.infoBackground),
 			status: read.str("status", d.status, 100),
 			liveThreshold: read.num("liveThreshold", d.liveThreshold, 0, 3600),
+			keepHistory: read.bool("keepHistory"),
+			historyColor: read.hex("historyColor", d.historyColor),
 		};
 	},
 };

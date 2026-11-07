@@ -90,7 +90,9 @@ async function login(): Promise<string> {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ username, password }),
     });
-    expect(registration.status).toBe(201);
+    // 201 on first use; a reused user name 403s — the login below is what
+    // matters, so both are fine
+    expect([201, 403]).toContain(registration.status);
     const response = await fetch(`${baseUrl}/api/login`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -1455,5 +1457,182 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
             await fetch(`${baseUrl}/api/overlays`, { headers: { cookie } })
         ).json()) as { overlays: OverlaySummary[] };
         expect(after.overlays).toEqual([]);
+    }, 30_000);
+
+    test("live-map route history: path.end renames the live default route", async () => {
+        const cookie = await login();
+        const tokenRes = await fetch(`${baseUrl}/api/profile/tokens`, {
+            method: "POST",
+            headers: { cookie },
+        });
+        const tokenBody = (await tokenRes.json()) as {
+            ok: boolean;
+            token: { token: string };
+        };
+        const token = tokenBody.token.token;
+
+        const createRes = await fetch(`${baseUrl}/api/overlays`, {
+            method: "POST",
+            headers: { cookie, "content-type": "application/json" },
+            body: JSON.stringify({ name: "Route" }),
+        });
+        expect(createRes.status).toBe(201);
+        const overlayId = ((await createRes.json()) as { id: string }).id;
+
+        type HistoryPath = {
+            id: string;
+            name: string;
+            startedAt: number;
+            endedAt: number | null;
+            points: { lat: number; lon: number; at: number }[];
+        };
+        type HistoryBody = { ok: boolean; paths: HistoryPath[] };
+        const history = async (): Promise<HistoryBody> => {
+            const res = await fetch(
+                `${baseUrl}/overlay/${overlayId}/map-history?token=${token}`,
+            );
+            expect(res.status).toBe(200);
+            return (await res.json()) as HistoryBody;
+        };
+        const pushFix = async (lat: number, lon: number): Promise<void> => {
+            const res = await fetch(
+                `${baseUrl}/overlay/${overlayId}/variables?token=${token}&pos=${lon},${lat}`,
+            );
+            expect(res.status).toBe(200);
+        };
+        const trigger = async (name: string): Promise<void> => {
+            const res = await fetch(
+                `${baseUrl}/overlay/${overlayId}/event/${name}?token=${token}`,
+            );
+            expect(res.status).toBe(200);
+            expect(await res.json()).toMatchObject({ ok: true, name });
+        };
+
+        // the one variable the map centre is bound to — the phone pushes
+        // fixes as `pos` in the `"lon,lat"` wire format and the server
+        // records them into the open routes
+        const varRes = await fetch(
+            `${baseUrl}/api/overlays/${overlayId}/variables`,
+            {
+                method: "POST",
+                headers: { cookie, "content-type": "application/json" },
+                body: JSON.stringify({ name: "pos", type: "string" }),
+            },
+        );
+        expect(varRes.status).toBe(201);
+        const positionId = (
+            (await varRes.json()) as { variable: { id: string } }
+        ).variable.id;
+        const mapElement: OverlayElement = {
+            id: crypto.randomUUID(),
+            name: "map",
+            type: "live_map",
+            transform: {
+                x: 0,
+                y: 0,
+                width: 640,
+                height: 420,
+                rotation: 0,
+                opacity: 1,
+            },
+            visible: true,
+            locked: false,
+            parentId: null,
+            bindings: {
+                "props.centerPosition": {
+                    kind: "variable",
+                    variableId: positionId,
+                },
+            },
+            props: { keepHistory: true },
+        };
+        const mapRes = await fetch(
+            `${baseUrl}/api/overlays/${overlayId}/elements`,
+            {
+                method: "PUT",
+                headers: { cookie, "content-type": "application/json" },
+                body: JSON.stringify({ element: mapElement }),
+            },
+        );
+        expect(mapRes.status).toBe(200);
+
+        // no routes yet
+        expect(await history()).toEqual({ ok: true, paths: [] });
+
+        // the first fix opens the implicit `default` route — a live trace is
+        // visible from the very first position
+        await pushFix(50.1, 12.4);
+        let body = await history();
+        expect(body.paths).toHaveLength(1);
+        expect(body.paths[0].name).toBe("default");
+        expect(body.paths[0].endedAt).toBeNull();
+        expect(body.paths[0].startedAt).toBeGreaterThan(0);
+        expect(body.paths[0].points[0]).toMatchObject({
+            lat: 50.1,
+            lon: 12.4,
+        });
+
+        // more fixes keep landing in the single live `default` route
+        await Bun.sleep(5);
+        await pushFix(50.1001, 12.4001);
+        await Bun.sleep(5);
+        await pushFix(50.1002, 12.4002);
+        body = await history();
+        expect(body.paths).toHaveLength(1);
+        expect(body.paths[0].endedAt).toBeNull();
+        expect(body.paths[0].points).toHaveLength(3);
+        expect(body.paths[0].points[2]).toMatchObject({
+            lat: 50.1002,
+            lon: 12.4002,
+        });
+
+        // path.end/les RENAMES the live `default` route and closes it
+        await trigger("path.end/les");
+        body = await history();
+        expect(body.paths).toHaveLength(1);
+        expect(body.paths[0].name).toBe("les");
+        expect(body.paths[0].endedAt).not.toBeNull();
+        expect(body.paths[0].points).toHaveLength(3);
+
+        // ending again with no live `default` open is a no-op (no duplicate)
+        await trigger("path.end/les");
+        expect((await history()).paths).toHaveLength(1);
+
+        // the next fix opens a FRESH `default` route, alongside the archived
+        // one (which keeps its points)
+        await pushFix(50.101, 12.401);
+        body = await history();
+        expect(body.paths.map((p) => p.name)).toEqual(["les", "default"]);
+        expect(body.paths[0].endedAt).not.toBeNull();
+        expect(body.paths[0].points).toHaveLength(3);
+        expect(body.paths[1].endedAt).toBeNull();
+        expect(body.paths[1].points).toHaveLength(1);
+        expect(body.paths[1].points[0]).toMatchObject({
+            lat: 50.101,
+            lon: 12.401,
+        });
+
+        // probes: a bad token or a foreign overlay id 404s (no leak)
+        expect(
+            (
+                await fetch(
+                    `${baseUrl}/overlay/${overlayId}/map-history?token=deadbeef`,
+                )
+            ).status,
+        ).toBe(404);
+        expect(
+            (
+                await fetch(
+                    `${baseUrl}/overlay/nope/map-history?token=${token}`,
+                )
+            ).status,
+        ).toBe(404);
+
+        // tidying up drops the overlay's history rows with it
+        const del = await fetch(`${baseUrl}/api/overlays/${overlayId}`, {
+            method: "DELETE",
+            headers: { cookie },
+        });
+        expect(del.status).toBe(200);
     }, 30_000);
 });

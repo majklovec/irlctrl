@@ -1,4 +1,11 @@
 /** @jsx m */
+
+/** A `select` option: a single choice, or a labelled group of choices
+ * (rendered as an `<optgroup>`). Shared by `DynamicForm` and
+ * `bindableForm` (via `FormField`). */
+export type ControlOption =
+	| { value: string; label: string }
+	| { label: string; options: { value: string; label: string }[] };
 /*
  * DynamicForm — a schema-driven form generator.
  *
@@ -223,8 +230,9 @@ export interface ControlValue {
 	min?: number;
 	max?: number;
 	step?: number;
-	/** Already-resolved option labels (no translation keys). */
-	options?: { value: string; label: string }[];
+	/** Already-resolved options (no translation keys); a group entry renders
+	 * as an `<optgroup>`. */
+	options?: ControlOption[];
 	placeholder?: string;
 	disabled?: boolean;
 	/** Single write path: receive the control's new value. */
@@ -294,7 +302,19 @@ export function makeControl(c: ControlValue): m.Vnode {
 						write((e.target as HTMLSelectElement).value),
 				},
 				(c.options ?? []).map((opt) =>
-					m("option", { key: opt.value, value: opt.value }, opt.label),
+					"options" in opt
+						? m(
+								"optgroup",
+								{ key: "group:" + opt.label, label: opt.label },
+								opt.options.map((o) =>
+									m(
+										"option",
+										{ key: o.value, value: o.value },
+										o.label,
+									),
+								),
+							)
+						: m("option", { key: opt.value, value: opt.value }, opt.label),
 				),
 			);
 		case "checkbox":
