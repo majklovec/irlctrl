@@ -23,9 +23,9 @@ import { t } from "@ui/i18n";
 import { RpcClient, socketUrl } from "@ui/services/rpc";
 import { HOSTNAME_PATTERN, mountPage, setHeaderColor } from "@ui/util";
 import m from "mithril";
-import type { ModulesView, Settings } from "../../../shared/contracts/wire";
-import { errorMessage } from "../../../shared/util";
-import { DEFAULT_COLOR } from "../../../shared/validate";
+import type { ModulesView, Settings } from "../../shared/contracts/wire";
+import { errorMessage } from "../../shared/util";
+import { DEFAULT_COLOR } from "../../shared/validate";
 import {
 	bind,
 	refreshDevice,

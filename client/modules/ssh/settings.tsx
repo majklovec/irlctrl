@@ -20,7 +20,7 @@ import { Actions, Button, Field, Input } from "@ui/components/";
 import { confirmDialog } from "@ui/components/confirm";
 import { t } from "@ui/i18n";
 import m from "mithril";
-import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
+import type { ModuleContext, ModuleDef } from "../../frontend/modules";
 import log from "./log";
 import "./styles.css";
 import type { SshSliceView } from "./types";

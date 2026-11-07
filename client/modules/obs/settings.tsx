@@ -3,7 +3,7 @@
 import { Actions, Break, Button, Field, Form, Input } from "@ui/components/";
 import { t } from "@ui/i18n";
 import m from "mithril";
-import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
+import type { ModuleContext, ModuleDef } from "../../frontend/modules";
 import type { ObsModuleView } from "./types";
 
 /**

@@ -17,6 +17,7 @@
 
 import { Icon } from "@ui/components/icons";
 import { t } from "@ui/i18n";
+import { libraryAssetField } from "@ui/overlay/asset_picker";
 import type {
 	ElementContext,
 	ElementProps,
@@ -25,7 +26,6 @@ import type {
 } from "@ui/overlay/element";
 import { numProp, strProp, triggerPhase } from "@ui/overlay/element";
 import { bindableForm } from "@ui/overlay/fields";
-import { libraryAssetField } from "@ui/overlay/asset_picker";
 import type { Vnode } from "mithril";
 import m from "mithril";
 
@@ -221,9 +221,9 @@ export const DEFAULT_ALERT_PROPS: Required<AlertProps> = {
 };
 export {
 	parseTemplate,
-	tokenValue,
-	templateText,
 	type TemplateSegment,
+	templateText,
+	tokenValue,
 } from "@ui/overlay/template_tokens";
 
 function renderTemplate(
@@ -482,9 +482,7 @@ function editForm({
 					libraryAssetField(
 						e,
 						mutate,
-						strProp(p, "assetType", "image") === "video"
-							? "video"
-							: "image",
+						strProp(p, "assetType", "image") === "video" ? "video" : "image",
 						"mediaAssetId",
 					),
 					[
@@ -648,9 +646,7 @@ function editForm({
 							value={strProp(p, "ttsVoice", "")}
 							onchange={set("ttsVoice")}
 						>
-							<option value="">
-								{t("overlay.alert_tts_default_voice")}
-							</option>
+							<option value="">{t("overlay.alert_tts_default_voice")}</option>
 							{typeof window !== "undefined" && "speechSynthesis" in window
 								? window.speechSynthesis.getVoices().map((v) => (
 										<option value={v.name}>
@@ -709,7 +705,7 @@ function validate(e: OverlayElement): string[] {
 
 export const alertsElement: OverlayElementDef & OverlayElementSchema = {
 	type: "alert",
-	category: "widgets",
+	category: "basics",
 
 	labelKey: "overlay.add_alert",
 	icon: () => <Icon name="bell" class="role-icon" />,
@@ -765,11 +761,7 @@ export const alertsElement: OverlayElementDef & OverlayElementSchema = {
 			audioAssetId: read.str("audioAssetId", ""),
 			audioVolume: read.num("audioVolume", d.audioVolume, 0, 1),
 			titleTemplate: read.str("titleTemplate", d.titleTemplate, 500),
-			messageTemplate: read.str(
-				"messageTemplate",
-				d.messageTemplate,
-				2000,
-			),
+			messageTemplate: read.str("messageTemplate", d.messageTemplate, 2000),
 			fontFamily: read.str("fontFamily", d.fontFamily, 300),
 			fontSize: read.num("fontSize", d.fontSize, 8, 400),
 			fontWeight: read.num("fontWeight", d.fontWeight, 100, 900),
@@ -796,12 +788,7 @@ export const alertsElement: OverlayElementDef & OverlayElementSchema = {
 				["exact", "min"],
 				d.conditionType,
 			),
-			conditionValue: read.num(
-				"conditionValue",
-				d.conditionValue,
-				0,
-				1e12,
-			),
+			conditionValue: read.num("conditionValue", d.conditionValue, 0, 1e12),
 			ttsEnabled: read.bool("ttsEnabled"),
 			ttsVoice: read.str("ttsVoice", "", 200),
 			ttsVolume: read.num("ttsVolume", d.ttsVolume, 0, 1),

@@ -15,19 +15,19 @@ import { Card } from "@ui/components/";
 import { t } from "@ui/i18n";
 import type { RpcClient } from "@ui/services/rpc";
 import m from "mithril";
-import SETTINGS_MANIFEST from "../../../generated/modules.settings";
+import SETTINGS_MANIFEST from "../../generated/modules.settings";
 import type {
 	ModuleContext,
 	ModuleDef,
-} from "../../../shared/contracts/frontend_module";
-import type { ModulesView, Settings } from "../../../shared/contracts/wire";
-import { registerLogWording } from "../../../shared/log_messages";
-import { errorMessage } from "../../../shared/util";
+} from "../../shared/contracts/frontend_module";
+import type { ModulesView, Settings } from "../../shared/contracts/wire";
+import { registerLogWording } from "../../shared/log_messages";
+import { errorMessage } from "../../shared/util";
 
 export type {
 	ModuleContext,
 	ModuleDef,
-} from "../../../shared/contracts/frontend_module";
+} from "../../shared/contracts/frontend_module";
 
 interface moduleState {
 	message: string;

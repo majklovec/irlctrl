@@ -19,11 +19,11 @@ import { roleIcon, setupStepsForRole } from "@ui/module_registry";
 import { RpcClient, socketUrl } from "@ui/services/rpc";
 import { HOSTNAME_PATTERN, mountPage, setHeaderColor } from "@ui/util";
 import m from "mithril";
-import roleDiagrams from "../../../generated/role_diagrams";
-import type { ModuleSetupStep } from "../../../shared/contracts/frontend_module";
-import type { Role, SetupInfo } from "../../../shared/contracts/wire";
-import { errorMessage } from "../../../shared/util";
-import { DEFAULT_COLOR, HOSTNAME_RE } from "../../../shared/validate";
+import roleDiagrams from "../../generated/role_diagrams";
+import type { ModuleSetupStep } from "../../shared/contracts/frontend_module";
+import type { Role, SetupInfo } from "../../shared/contracts/wire";
+import { errorMessage } from "../../shared/util";
+import { DEFAULT_COLOR, HOSTNAME_RE } from "../../shared/validate";
 
 interface WizardStep {
 	id: string;

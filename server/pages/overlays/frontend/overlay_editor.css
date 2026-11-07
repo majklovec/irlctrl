@@ -1140,7 +1140,7 @@ instead of truncating */
     z-index: 100;
     display: flex;
     flex-direction: column;
-    width: min(580px, calc(100vw - 32px));
+    width: min(700px, calc(100vw - 32px));
     max-height: min(560px, calc(100vh - 150px));
     background: var(--card-solid);
     border: 1px solid var(--border-strong);

@@ -30,7 +30,7 @@ import { confirmDialog } from "@ui/components/confirm";
 import { Icon } from "@ui/components/icons";
 import { t } from "@ui/i18n";
 import m from "mithril";
-import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
+import type { ModuleContext, ModuleDef } from "../../frontend/modules";
 import "./styles.css";
 import type { EncoderSettings, Pipeline } from "./types";
 

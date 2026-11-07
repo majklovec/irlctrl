@@ -14,7 +14,7 @@ import { t } from "@ui/i18n";
 import type { MithrilJSXComponent } from "@ui/jsx";
 import m from "mithril";
 import type { ModuleSliceView } from "../../../shared/contracts/wire";
-import type { ModuleContext, ModuleDef } from "../../frontend/ts/modules";
+import type { ModuleContext, ModuleDef } from "../../frontend/modules";
 import {
 	SRTLA_CUSTOM_SERVICE,
 	SRTLA_SERVICES,

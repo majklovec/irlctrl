@@ -85,7 +85,12 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	);
 }
 
-function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
+function editForm({
+	element: e,
+	mutate,
+	variables,
+	variableUrl,
+}: ElementProps): Vnode {
 	return bindableForm({
 		element: e,
 		mutate,
@@ -144,7 +149,7 @@ function validate(e: OverlayElement): string[] {
 
 export const progressElement: OverlayElementDef & OverlayElementSchema = {
 	type: "progress",
-	category: "basics",
+	category: "widgets",
 
 	labelKey: "overlay.add_progress",
 	icon: () => <Icon name="progress" class="role-icon" />,

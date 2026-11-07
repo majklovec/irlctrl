@@ -155,7 +155,7 @@ function editForm({
 			],
 			// The selected background's own props get their own rows below the
 			// kind select (backgrounds without custom props add nothing).
-			...variant?.customFormRows(e).map((field) => [field]) ?? [],
+			...(variant?.customFormRows(e).map((field) => [field]) ?? []),
 			[
 				{
 					path: "props.speed",
@@ -199,15 +199,24 @@ function validate(e: OverlayElement): string[] {
 
 export const ambientElement: OverlayElementDef & OverlayElementSchema = {
 	type: "ambient",
-	category: "backgrounds",
+	category: "media",
 
 	labelKey: "overlay.add_ambient",
 	icon: () => <Icon name="sync" class="role-icon" />,
 	order: 10,
 	defaultProps: { ...DEFAULT_AMBIENT_PROPS },
 	propKeys: [
-		"kind", "speed", "trail", "background", "trail_faster", "head_brightness",
-		"circle_count", "base_hue", "range_hue", "base_radius", "range_radius",
+		"kind",
+		"speed",
+		"trail",
+		"background",
+		"trail_faster",
+		"head_brightness",
+		"circle_count",
+		"base_hue",
+		"range_hue",
+		"base_radius",
+		"range_radius",
 	],
 	defaultSize: { width: 960, height: 540 },
 	draw,

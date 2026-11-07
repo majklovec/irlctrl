@@ -28,16 +28,16 @@ import type {
 import { bindableForm } from "@ui/overlay/fields";
 import type { Vnode } from "mithril";
 import m from "mithril";
+import type { OverlayElementSchema } from "../../../../../core/overlay_element";
 import {
 	CHAT_BANNED_TYPE,
 	ChatFeedView,
 	type FeedLine,
 } from "../lib/chat_render";
+import { ChannelsField } from "../lib/list_field";
 import type { ChatLine } from "../lib/live_chat_feed";
 import { LiveChatFeed, normalizeChannels } from "../lib/live_chat_feed";
-import { ChannelsField } from "../lib/list_field";
-import type { OverlayElementSchema } from "../../../../../core/overlay_element";
-import { normalizeChannelRows, type ChannelRow } from "./schema_utils";
+import { type ChannelRow, normalizeChannelRows } from "./schema_utils";
 
 /* ── chat (full live feed) ────────────────────────────────────────────── */
 export interface ChatProps {
@@ -91,7 +91,6 @@ export const DEFAULT_CHAT_PROPS: Required<ChatProps> = {
 	textAlign: "left",
 };
 
-
 /** The display list for one snapshot of the feed: banned lines filtered
  * (or flagged, per the element's `bannedMessages`), in the element's message
  * order (top: newest first; bottom: oldest first). */
@@ -106,7 +105,11 @@ function shownLines(p: ChatProps, lines: ChatLine[]): FeedLine[] {
 
 /** The feed content for one (re)render: the auto-fit container with the
  * element's display options. */
-function feedView(element: OverlayElement, p: ChatProps, lines: ChatLine[]): m.Children {
+function feedView(
+	element: OverlayElement,
+	p: ChatProps,
+	lines: ChatLine[],
+): m.Children {
 	const cut = shownLines(p, lines);
 	if (!cut.length) return null;
 
@@ -180,7 +183,12 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	);
 }
 
-function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
+function editForm({
+	element: e,
+	mutate,
+	variables,
+	variableUrl,
+}: ElementProps): Vnode {
 	const p = e.props as unknown as ChatProps;
 
 	return bindableForm({
@@ -368,7 +376,7 @@ function validate(_e: OverlayElement): string[] {
 
 export const chatElement: OverlayElementDef & OverlayElementSchema = {
 	type: "chat",
-	category: "widgets",
+	category: "basics",
 
 	labelKey: "overlay.add_chat",
 	icon: () => <Icon name="chat" class="role-icon" />,

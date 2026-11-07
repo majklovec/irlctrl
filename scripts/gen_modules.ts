@@ -12,7 +12,7 @@
 //   generated/modules.frontend.ts — one import per <root>/<id>/frontend.tsx;
 //   the browser bundle statically resolves every import (no runtime Glob).
 //   generated/modules.settings.ts — one import per <root>/<id>/settings.tsx;
-//   the settings framework (client/frontend/ts/modules.tsx) registers each module's
+//   the settings framework (client/frontend/modules.tsx) registers each module's
 //   settings card from this manifest.
 //   generated/overlay_schemas.ts  — one import per <root>/<id>/overlay_schema.ts
 //   (overlay element schemas, used by the scene validator on both sides).
