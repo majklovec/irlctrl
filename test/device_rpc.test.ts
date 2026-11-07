@@ -160,6 +160,18 @@ describe("device RPC surface", () => {
         expect(response.result?.state).toHaveProperty("encoder");
     });
 
+    test("setup.get returns encoder resources on a relay process", async () => {
+        // The wizard lets the user pick any role, but the process role stays
+        // what it started as (relay here). The encoder's setup step reads
+        // `pipelines`/`audioSources` from this response, so they must be
+        // present even when the encoder is not applicable to the process role.
+        state.settings = { ...originalSettings, role: "relay" };
+        const response = await request("setup.get");
+        expect(response.ok).toBe(true);
+        expect(Array.isArray(response.result?.pipelines)).toBe(true);
+        expect(Array.isArray(response.result?.audioSources)).toBe(true);
+    });
+
     test.each([
         ["relay", "encoder.start"],
         ["relay", "pipelines.list"],

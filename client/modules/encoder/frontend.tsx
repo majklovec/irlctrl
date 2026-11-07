@@ -207,7 +207,9 @@ const encoderSetupStep: ModuleSetupStep = {
 					label={t("dev.row.pipeline")}
 					control={
 						<Select target={setupFields} prop="pipeline" required={true}>
-							<Options pairs={info.pipelines.map((p) => [p.id, p.id])} />
+							<Options
+								pairs={(info.pipelines ?? []).map((p) => [p.id, p.id])}
+							/>
 						</Select>
 					}
 				/>
@@ -226,8 +228,14 @@ const encoderSetupStep: ModuleSetupStep = {
 				<Field
 					label={t("dev.field.audio_source")}
 					control={
-						<Select target={setupFields} prop="audioSource" required={true}>
-							<Options pairs={info.audioSources.map((a) => [a.id, a.name])} />
+						<Select
+							target={setupFields}
+							prop="audioSource"
+							required={true}
+						>
+							<Options
+								pairs={(info.audioSources ?? []).map((a) => [a.id, a.name])}
+							/>
 						</Select>
 					}
 				/>
