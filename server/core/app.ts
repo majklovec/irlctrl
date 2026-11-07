@@ -15,24 +15,20 @@ import { notFound } from "../../shared/http";
 import { i18nReady } from "../../shared/i18n";
 import { pwaRoutes } from "../../shared/pwa";
 import {
-    acquireWidgetChannels,
     ALL_MODULES,
+    acquireWidgetChannels,
     releaseWidgetChannels,
     widgetHubSnapshot,
 } from "../../shared/registry";
-import {
-    discoverPages,
-    getPages,
-    mountRoutes,
-} from "./registry";
-import { liveFeedRoutes } from "./live_routes";
-import { createServices, type Services } from "./services";
 import type { createDashboards } from "../pages/dashboards/backend/registry";
 import type { createOverlays } from "../pages/overlays/backend/registry";
 import { accountRoutes } from "./auth/account_routes";
 import { authenticatedHandler } from "./auth/authenticated";
 import { publicRoutes } from "./auth/public_routes";
+import { liveFeedRoutes } from "./live_routes";
+import { discoverPages, getPages, mountRoutes } from "./registry";
 import { WIDGET_HUB_TOPIC } from "./runtime";
+import { createServices, type Services } from "./services";
 import { staticRoutes } from "./static_routes";
 
 type Dashboards = ReturnType<typeof createDashboards>;
@@ -74,9 +70,7 @@ export async function createControlServer(options: ControlServerOptions) {
      * The module control routes cross pages: they read the dashboards and
      * overlays stores, now reached through their capabilities.
      */
-    const dashboards = services.capabilities.require<Dashboards>(
-        "dashboards",
-    );
+    const dashboards = services.capabilities.require<Dashboards>("dashboards");
     const overlays = services.capabilities.require<Overlays>("overlays");
     for (const mod of ALL_MODULES) {
         if (mod.controlRoutes)
@@ -93,10 +87,7 @@ export async function createControlServer(options: ControlServerOptions) {
                     overlayChatOverlaySpecs: (token, overlayId) => {
                         const user = auth.userForToken(token);
                         return user
-                            ? overlays.runtimeOverlayChatSpecs(
-                                  user,
-                                  overlayId,
-                              )
+                            ? overlays.runtimeOverlayChatSpecs(user, overlayId)
                             : null;
                     },
                 }),
@@ -124,8 +115,7 @@ export async function createControlServer(options: ControlServerOptions) {
      * The server is live now — start the pages' background work (the
      * devices page runs its maintenance sweep).
      */
-    for (const page of getPages())
-        await page.backend.start?.(services);
+    for (const page of getPages()) await page.backend.start?.(services);
 
     return app;
 }
