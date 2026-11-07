@@ -1,3 +1,10 @@
+## [3.2.1](https://github.com/majklovec/irlctrl/compare/v3.2.0...v3.2.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **setup:** return all module setup info ([44ad9bd](https://github.com/majklovec/irlctrl/commit/44ad9bd75469e3f33e484f8609aaa3cbf005fdfc))
+
 # [3.2.0](https://github.com/majklovec/irlctrl/compare/v3.1.0...v3.2.0) (2026-11-07)
 
 
