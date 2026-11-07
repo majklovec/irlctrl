@@ -19,7 +19,8 @@
  * client code. Runs in Bun (not the browser) and is re-invoked by the
  * entrypoints, the web-UI bundling and package.json `predev`/`pretest`/
  * `prebuild:*`; only rewrites a file when the output actually changes
- * so watch loops don't churn it.
+ * so watch loops don't churn it. Glob paths are normalised to forward
+ * slashes so generated imports are identical on Windows and POSIX.
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -36,7 +37,7 @@ const menus: string[] = [];
 for await (const p of new Bun.Glob(`${PAGES_ROOT}/*/frontend/menu.ts`).scan({
     cwd: baseDir,
 }))
-    menus.push(p);
+    menus.push(p.replaceAll("\\", "/"));
 menus.sort();
 
 const menusSource = [
@@ -55,7 +56,7 @@ const pageModules: string[] = [];
 for await (const p of new Bun.Glob(`${PAGES_ROOT}/*/index.ts`).scan({
     cwd: baseDir,
 }))
-    pageModules.push(p);
+    pageModules.push(p.replaceAll("\\", "/"));
 pageModules.sort();
 
 const serverSource = [
