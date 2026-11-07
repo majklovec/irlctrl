@@ -23,9 +23,10 @@
  * string); the server stores every fix into the live `default` route and a
  * `path.end/{name}` event (which also stamps the centre position time)
  * renames that route to `{name}`, archiving the segment — the next fix starts
- * a fresh `default`. The element then polls the owner-token `map-history`
- * endpoint (runtime page and editor alike) and draws the live `default`
- * route as a bold `historyColor` path under the live markers.
+ * a fresh `default`. The element then fetches the owner-token `map-history`
+ * endpoint (runtime page and editor alike) — immediately on every new
+ * centre fix and on a schedule as a safety net — and draws the live
+ * `default` route as a bold `historyColor` path under the live markers.
  *
  * Leaflet (JS + CSS) and the Marker.SlideTo plugin are vendored
  * (shared/assets/vendor/leaflet) and lazy-loaded from the server's own
@@ -91,7 +92,9 @@ const DEFAULT_MARKER_COLOR = "#d6007f";
  * companion info node in `oncreate`. */
 const INFO_CLASS = "live-map-info";
 
-/** How often the runtime page re-fetches the recorded routes. */
+/** Safety-net re-fetch interval for the recorded routes; a new
+ * `centerPosition` fix (or a `path.end`) already triggers an immediate
+ * refetch, so the poll only covers pages that didn't get the fix. */
 const HISTORY_POLL_MS = 5000;
 
 /** Provider URLs (with a `{key}` slot for mapy) and attributions. */
@@ -701,6 +704,11 @@ function syncMap(state: MapState, p: LiveMapProps): void {
 			duration: 600,
 			keepAtCenter: true,
 		});
+		// A new fix was also just recorded into the live route server-side —
+		// refetch so the path shows it (a line needs the second point, but
+		// there's no 5 s poll latency for the rest) instead of waiting for
+		// the next poll.
+		if (p.keepHistory) void fetchHistory(state);
 	}
 	if (p.zoom !== state.zoom) {
 		state.zoom = p.zoom;
