@@ -20,7 +20,7 @@ job "[[.DOMAIN]]" {
       user   = "1000:1000"
 
       config {
-        image = "majkl/irlctrl-control:latest"
+        image = "ghcr.io/majklovec/irlctrl-server"
         ports = ["http"]
         mount {
           type     = "bind"
@@ -37,7 +37,7 @@ job "[[.DOMAIN]]" {
       }
 
       env {
-        DB_FILE     = "/config/users.db"
+        DB_FILE     = "/config/db.sqlite"
         STORAGE_DIR = "/assets"
       }
 
