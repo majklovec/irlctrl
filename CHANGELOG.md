@@ -1,3 +1,10 @@
+## [3.2.2](https://github.com/majklovec/irlctrl/compare/v3.2.1...v3.2.2) (2026-11-07)
+
+
+### Bug Fixes
+
+* **overlay:** restore webcam_frame logo slot lost in regroup ([7e15f10](https://github.com/majklovec/irlctrl/commit/7e15f1024543f30dd4ab4ecc3c39d71002a77faf))
+
 ## [3.2.1](https://github.com/majklovec/irlctrl/compare/v3.2.0...v3.2.1) (2026-11-07)
 
 
