@@ -16,7 +16,12 @@ beforeAll(async () => {
             name: "chat-browser-shell",
             setup(build) {
                 build.onLoad({ filter: /shared\/ui\/(?:i18n|components\/ui)\.tsx$/ }, () => ({
-                    contents: "export const currentLanguage = () => 'en'; export const t = (key) => key; export const Badge = {};",
+                    // Stub only the i18n surface the chat bundle imports: t,
+                    // currentLanguage, i18nReady and the <LanguageSelect/> that
+                    // the shared Page shell renders in its header.
+                    contents:
+                        "export const currentLanguage = () => 'en'; export const t = (key) => key; " +
+                        "export const i18nReady = Promise.resolve(); export const LanguageSelect = {};",
                     loader: "js",
                 }));
             },
