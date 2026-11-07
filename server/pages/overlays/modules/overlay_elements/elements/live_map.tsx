@@ -27,9 +27,11 @@
  * owner-token `map-history` endpoint and draws the live `default` route as a
  * bold `historyColor` path under the live markers.
  *
- * Leaflet (JS + CSS) is lazy-loaded from a CDN on first render — it is NOT
- * assumed globally available. The `L` global is created by the script; the
- * `declare` below only satisfies the type checker.
+ * Leaflet (JS + CSS) and the Marker.SlideTo plugin are vendored
+ * (shared/assets/vendor/leaflet) and lazy-loaded from the server's own
+ * `/assets/vendor/leaflet/*` on first render — they are NOT assumed globally
+ * available. The `L` global is created by the script; the `declare` below only
+ * satisfies the type checker.
  */
 
 declare const L: any;
@@ -207,8 +209,12 @@ function loadScript(src: string): Promise<void> {
 
 async function ensureLeaflet(): Promise<void> {
 	if (typeof (window as any).L !== "undefined") return;
-	loadCSS("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css");
-	await loadScript("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js");
+	loadCSS("/assets/vendor/leaflet/leaflet.css");
+	await loadScript("/assets/vendor/leaflet/leaflet.js");
+	// Marker.SlideTo: `marker.slideTo(latlng, {keepAtCenter})` — the centre
+	// glyph slides and the map follows it, so prop-driven repositions never
+	// snap (gitlab.com/IvanSanchez/Leaflet.Marker.SlideTo).
+	await loadScript("/assets/vendor/leaflet/leaflet.marker.slideto.js");
 }
 
 function injectStyles(): void {
@@ -562,17 +568,21 @@ function syncMap(state: MapState, p: LiveMapProps): void {
 	}
 	setProvider(state, p);
 
-	// A new `centerPosition` string repoints the camera; an unparseable one
-	// (e.g. an in-flight variable update) leaves the view where it is.
+	// A new `centerPosition` string slides the centre glyph to it and keeps
+	// the map centred on the glyph (Marker.SlideTo `keepAtCenter`) — no snap.
+	// An unparseable string (e.g. an in-flight variable update) leaves the
+	// view where it is.
 	const center = parsePosition(p.centerPosition);
 	if (p.centerPosition !== state.centerPos && center) {
 		state.centerPos = p.centerPosition;
 		state.centerLat = center.lat;
 		state.centerLon = center.lon;
-		state.centerMarker.setLatLng([center.lat, center.lon]);
 		// A prop-driven move IS a new position — stamp it (trackCenter does).
 		state.lastAt = Date.now();
-		map.panTo([center.lat, center.lon]);
+		state.centerMarker.slideTo([center.lat, center.lon], {
+			duration: 600,
+			keepAtCenter: true,
+		});
 	}
 	if (p.zoom !== state.zoom) {
 		state.zoom = p.zoom;
@@ -619,12 +629,12 @@ function syncMap(state: MapState, p: LiveMapProps): void {
 		});
 	}
 
-	setGlyph(
-		state.centerMarker,
-		[state.centerLat, state.centerLon],
-		p.centerIcon,
-		p.centerColor,
-		p.centerSize,
+	// Centre-marker position is owned by slideTo (prop moves) and
+	// trackCenter (panning) — restyle the glyph only. A setLatLng here would
+	// fire a `move` and cancel an in-flight slide (SlideTo's on('move',
+	// slideCancel) hook).
+	state.centerMarker.setIcon(
+		glyphIcon(p.centerIcon, p.centerColor, p.centerSize),
 	);
 
 	if (

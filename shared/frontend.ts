@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
-import { readdirSync, type Dirent } from "node:fs";
-import { join } from "node:path";
+import { readdirSync, readFileSync, type Dirent } from "node:fs";
+import { extname, join } from "node:path";
 import { CLIENT_PAGES, SERVER_PAGES } from "./frontend_pages";
 import { appPath, MODULE_ROOTS, PAGE_DIRS, PAGES_ROOT } from "./paths";
 import { isCompiledBinary } from "./util";
@@ -8,6 +8,56 @@ import { isCompiledBinary } from "./util";
 export interface FrontendPageEntry {
     name: string;
     path: string;
+}
+
+/**
+ * Vendored third-party browser files (`shared/assets/vendor/*`), served
+ * under `/assets/vendor/*` alongside the bundle output (e.g. Leaflet for
+ * the live-map overlay element). `scripts/gen_control_server_assets.ts`
+ * embeds the same files into generated/frontend-assets.ts for the compiled
+ * binary, so the set is identical in both modes.
+ */
+const VENDOR_DIR = "shared/assets/vendor";
+
+const VENDOR_MIME: Record<string, string> = {
+    ".css": "text/css",
+    ".js": "text/javascript",
+    ".png": "image/png",
+};
+
+export interface VendorAsset {
+    /** Path under `/assets/` (e.g. `vendor/leaflet/leaflet.js`). */
+    path: string;
+    type: string;
+    bytes: Buffer;
+}
+
+/** Every file under `shared/assets/vendor`, recursively, sorted by path.
+ * A missing directory (a stripped tree) yields an empty set. */
+export function vendorAssets(): VendorAsset[] {
+    const out: VendorAsset[] = [];
+    const walk = (dir: string, prefix: string) => {
+        let entries: Dirent[];
+        try {
+            entries = readdirSync(dir, { withFileTypes: true });
+        } catch {
+            return;
+        }
+        for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+            const file = `${prefix}${entry.name}`;
+            if (entry.isDirectory()) walk(join(dir, entry.name), `${file}/`);
+            else
+                out.push({
+                    path: file,
+                    type:
+                        VENDOR_MIME[extname(entry.name)] ??
+                        "application/octet-stream",
+                    bytes: readFileSync(join(dir, entry.name)),
+                });
+        }
+    };
+    walk(appPath(VENDOR_DIR), "vendor/");
+    return out;
 }
 
 /**
@@ -166,6 +216,11 @@ export async function createFrontend() {
         for (const { name } of entries)
             if (!pages[name])
                 throw new Error(`The frontend build omitted ${name}.html`);
+        // Vendored browser files (shared/assets/vendor) are not bundler
+        // outputs: the compiled binary gets them from the embedded assets
+        // instead, the source run reads them from disk here.
+        for (const v of vendorAssets())
+            assets.set(v.path, new Blob([v.bytes], { type: v.type }));
     }
 
     const htmlResponse = (page: string) => {
