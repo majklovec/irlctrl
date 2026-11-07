@@ -82,8 +82,10 @@ afterEach(() => {
 });
 
 describe("twitch badge tag parsing", () => {
-    test("maps set_id/version pairs to their real CDN GUID urls in tag order", () => {
+    test("maps set_ids to their CDN art in tag order (version pinned to 1)", () => {
         const badges = parseTwitchBadges("moderator/1,subscriber/0");
+        // The badge version is pinned to 1 by parseTwitchBadges, so a subscriber
+        // tag resolves to the v1 art regardless of the tier it carries.
         expect(badges).toEqual([
             {
                 type: "moderator",
@@ -93,7 +95,7 @@ describe("twitch badge tag parsing", () => {
             {
                 type: "subscriber",
                 text: "Subscriber",
-                url: "https://static-cdn.jtvnw.net/badges/v1/5d9f2208-5dd8-11e7-8513-2ff4adfae661/0",
+                url: "https://static-cdn.jtvnw.net/badges/v1/5d9f2208-5dd8-11e7-8513-2ff4adfae661/1",
             },
         ]);
     });
@@ -112,14 +114,16 @@ describe("twitch badge tag parsing", () => {
         const badges = parseTwitchBadges(
             "turbo/1,bits/5000,subscriber_badge_3/0,subscriber/6,bits/5001,junk",
         );
-        // subscriber_badge_3 (channel tier), bits/5001 (no such art) and junk
-        // have no catalog entry -> dropped; turbo/bits/subscriber resolve.
+        // subscriber_badge_3 (channel tier) and junk have no catalog entry ->
+        // dropped. The version is pinned to 1, so every known set_id resolves
+        // to its v1 art: turbo, bits (5000), subscriber, bits (5001).
         expect(badges?.map((b) => b.type)).toEqual([
             "turbo",
             "bits",
             "subscriber",
+            "bits",
         ]);
-        expect(badges?.[1]?.text).toBe("cheer 5000");
+        expect(badges?.[1]?.text).toBe("cheer 1");
     });
 
     test("returns undefined when nothing resolves", () => {

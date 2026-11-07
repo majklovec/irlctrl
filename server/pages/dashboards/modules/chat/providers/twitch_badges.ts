@@ -34,16 +34,18 @@ export function twitchBadgeUrl(
 }
 
 /** Parse the `badges` tag (`moderator/1,turbo/1,...`) to wire badges in the
- * order Twitch lists them. The version is the final `/`-separated segment, so
- * `set_id`s that themselves contain a slash are handled; pairs with no known
- * art are skipped, and the list is left out entirely when nothing resolves. */
+ * order Twitch lists them. The version is intentionally pinned to `1` — the
+ * chat feed renders one art per `set_id` rather than per tier/month — so the
+ * tag's own version segment is ignored and only the `set_id` selects the art.
+ * Pairs with no known art are skipped; the list is left out entirely when
+ * nothing resolves. */
 export function parseTwitchBadges(value: string): ChatBadge[] | undefined {
     const out: ChatBadge[] = [];
     for (const pair of value.split(",")) {
         const s = pair.trim();
         const slash = s.lastIndexOf("/");
         if (slash === -1) continue;
-        const resolved = twitchBadgeUrl(s.slice(0, slash), "1"); //s.slice(slash + 1));
+        const resolved = twitchBadgeUrl(s.slice(0, slash), "1");
         if (!resolved) continue;
         out.push({
             type: s.slice(0, slash),
