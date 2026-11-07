@@ -23,9 +23,9 @@
  * string); the server stores every fix into the live `default` route and a
  * `path.end/{name}` event (which also stamps the centre position time)
  * renames that route to `{name}`, archiving the segment — the next fix starts
- * a fresh `default`. On the runtime page the element then polls the
- * owner-token `map-history` endpoint and draws the live `default` route as a
- * bold `historyColor` path under the live markers.
+ * a fresh `default`. The element then polls the owner-token `map-history`
+ * endpoint (runtime page and editor alike) and draws the live `default`
+ * route as a bold `historyColor` path under the live markers.
  *
  * Leaflet (JS + CSS) and the Marker.SlideTo plugin are vendored
  * (shared/assets/vendor/leaflet) and lazy-loaded from the server's own
@@ -53,7 +53,7 @@ import m from "mithril";
 import type { OverlayElementSchema } from "../../../../../core/overlay_element";
 import { cleanBool, cleanHex, cleanNum, cleanStr } from "./schema_utils";
 
-/* ── Props ────────────────────────────────────────────────────────── */
+/* ── Constants ────────────────────────────────────────────────────── */
 
 export type LiveMapProvider = "osm" | "arcgis" | "mapy";
 
@@ -86,6 +86,38 @@ export const LIVE_MAP_ICONS: readonly string[] = [
  * `markerIcons`/`markerColors` (there is no shared "default marker" prop). */
 const DEFAULT_MARKER_ICON = "▶";
 const DEFAULT_MARKER_COLOR = "#d6007f";
+
+/** CSS class of the info box — the map container uses it to find its
+ * companion info node in `oncreate`. */
+const INFO_CLASS = "live-map-info";
+
+/** How often the runtime page re-fetches the recorded routes. */
+const HISTORY_POLL_MS = 5000;
+
+/** Provider URLs (with a `{key}` slot for mapy) and attributions. */
+const PROVIDER_INFO: Record<
+	LiveMapProvider,
+	{ url: string; attribution: string }
+> = {
+	osm: {
+		url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+		attribution:
+			'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+	},
+	arcgis: {
+		url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+		attribution: '&copy; Powered by <a href="https://www.esri.com/">Esri</a>',
+	},
+	mapy: {
+		url: "https://api.mapy.com/v1/maptiles/outdoor/256/{z}/{x}/{y}?apikey={key}",
+		attribution:
+			'&copy; <a href="https://api.mapy.com/copyright">Seznam.cz</a>',
+	},
+};
+
+const PROVIDER_ORDER: LiveMapProvider[] = ["osm", "arcgis", "mapy"];
+
+/* ── Props ────────────────────────────────────────────────────────── */
 
 export interface LiveMapProps {
 	provider: LiveMapProvider;
@@ -164,26 +196,72 @@ export const DEFAULT_LIVE_MAP_PROPS: Required<LiveMapProps> = {
 	historyColor: "#d6007f",
 };
 
-function providerUrl(key: LiveMapProvider): string {
-	switch (key) {
-		case "arcgis":
-			return "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
-		case "mapy":
-			return "https://api.mapy.com/v1/maptiles/outdoor/256/{z}/{x}/{y}?apikey={key}";
-		default:
-			return "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
-	}
+/* ── Prop coercion ────────────────────────────────────────────────── */
+
+/** A marker glyph from `LIVE_MAP_ICONS` (free-typed or stale values fall
+ * back to the default, so the select always has a matching option). */
+function iconOf(value: unknown, fallback: string): string {
+	const s = cleanStr(value, 8);
+	return LIVE_MAP_ICONS.includes(s) ? s : fallback;
 }
 
-function providerAttribution(key: LiveMapProvider): string {
-	switch (key) {
-		case "arcgis":
-			return '&copy; Powered by <a href="https://www.esri.com/">Esri</a>';
-		case "mapy":
-			return '&copy; <a href="https://api.mapy.com/copyright">Seznam.cz</a>';
-		default:
-			return '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
-	}
+/** The glyph for marker `index` (one of `LIVE_MAP_ICONS`); the slot is
+ * index-aligned with `markerPositions`, and a missing/empty/unknown one
+ * falls back to `fallback` (the built-in default glyph). */
+function markerIconAt(icons: string, index: number, fallback: string): string {
+	const entry = icons.split(";")[index] ?? "";
+	return LIVE_MAP_ICONS.includes(entry) ? entry : fallback;
+}
+
+/** The hex colour for marker `index`; the slot is index-aligned with
+ * `markerPositions`, and a missing/empty/invalid one falls back to
+ * `fallback` (the built-in default colour). */
+function markerColorAt(
+	colors: string,
+	index: number,
+	fallback: string,
+): string {
+	return cleanHex(colors.split(";")[index] ?? "", fallback);
+}
+
+function safeProps(rawInput: unknown): LiveMapProps {
+	const d = DEFAULT_LIVE_MAP_PROPS;
+	const raw: Record<string, unknown> =
+		rawInput && typeof rawInput === "object"
+			? (rawInput as Record<string, unknown>)
+			: {};
+	const provider = raw.provider as LiveMapProvider;
+	return {
+		provider:
+			provider === "osm" || provider === "arcgis" || provider === "mapy"
+				? provider
+				: d.provider,
+		zoom: cleanNum(raw.zoom, d.zoom, 0, 25),
+		// The raw string is kept verbatim (in-flight edits, in-progress
+		// variable updates) — parsing happens at render time; an unparseable
+		// value leaves the view where it is (initMap falls back to the
+		// default position, syncMap keeps the current one). An empty
+		// `markerPositions` means "no markers" — never the default marker.
+		centerPosition: cleanStr(raw.centerPosition, 50) || d.centerPosition,
+		mapyKey: cleanStr(raw.mapyKey, 200),
+		centerIcon: iconOf(raw.centerIcon, d.centerIcon),
+		centerColor: cleanHex(raw.centerColor, d.centerColor),
+		centerSize: cleanNum(raw.centerSize, d.centerSize, 8, 96),
+		markerPositions: cleanStr(raw.markerPositions, 1000),
+		markerIcons: cleanStr(raw.markerIcons, 1000),
+		markerColors: cleanStr(raw.markerColors, 1000),
+		markerSize: cleanNum(raw.markerSize, d.markerSize, 8, 96),
+		showInfo: cleanBool(raw.showInfo),
+		infoTemplate: cleanStr(raw.infoTemplate, 400) || d.infoTemplate,
+		infoFontSize: cleanNum(raw.infoFontSize, d.infoFontSize, 8, 96),
+		infoPadding: cleanNum(raw.infoPadding, d.infoPadding, 0, 48),
+		infoColor: cleanHex(raw.infoColor, d.infoColor),
+		infoBackground: cleanHex(raw.infoBackground, d.infoBackground),
+		status: cleanStr(raw.status, 100),
+		liveThreshold: cleanNum(raw.liveThreshold, d.liveThreshold, 0, 3600),
+		keepHistory: cleanBool(raw.keepHistory),
+		historyColor: cleanHex(raw.historyColor, d.historyColor),
+	};
 }
 
 /* ── Lazy-load Leaflet ─────────────────────────────────────────────── */
@@ -274,7 +352,7 @@ function formatClock(totalSeconds: number): string {
 		: `${m}:${String(s % 60).padStart(2, "0")}`;
 }
 
-/* ── Map initialisation ───────────────────────────────────────────── */
+/* ── Map state ────────────────────────────────────────────────────── */
 
 interface MapState {
 	map: any;
@@ -326,22 +404,50 @@ interface MapState {
  * `syncMap` instead of rebuilding; `onremove` disposes it. `starting`
  * tracks containers whose async Leaflet load is in flight. */
 const maps = new Map<HTMLElement, MapState>();
+/** Secondary index for `onTrigger`, which has an element id but no DOM. */
+const elementStates = new Map<string, MapState>();
 const starting = new Set<HTMLElement>();
 
-function makeTileLayer(key: LiveMapProvider, mapyKey: string): any {
-	return L.tileLayer(
-		providerUrl(key).replace("{key}", encodeURIComponent(mapyKey)),
-		{
-			maxNativeZoom: 19,
-			maxZoom: 25,
-			minZoom: 0,
-			attribution: providerAttribution(key),
-			opacity: 1,
-		},
-	);
+/* ── Change detection ─────────────────────────────────────────────── */
+
+type LiveMapKey = keyof LiveMapProps;
+
+const MARKER_STYLE_KEYS: readonly LiveMapKey[] = [
+	"markerIcons",
+	"markerColors",
+	"markerSize",
+];
+const INFO_KEYS: readonly LiveMapKey[] = [
+	"showInfo",
+	"infoTemplate",
+	"infoFontSize",
+	"infoPadding",
+	"infoColor",
+	"infoBackground",
+	"status",
+	"liveThreshold",
+];
+
+function changedProps(
+	a: LiveMapProps,
+	b: LiveMapProps,
+	keys: readonly LiveMapKey[],
+): boolean {
+	return keys.some((k) => a[k] !== b[k]);
 }
 
-const PROVIDER_ORDER: LiveMapProvider[] = ["osm", "arcgis", "mapy"];
+/* ── Map primitives ───────────────────────────────────────────────── */
+
+function makeTileLayer(key: LiveMapProvider, mapyKey: string): any {
+	const info = PROVIDER_INFO[key];
+	return L.tileLayer(info.url.replace("{key}", encodeURIComponent(mapyKey)), {
+		maxNativeZoom: 19,
+		maxZoom: 25,
+		minZoom: 0,
+		attribution: info.attribution,
+		opacity: 1,
+	});
+}
 
 /** A glyph divIcon; the box grows with the glyph so the marker stays
  * centred at any size. Markup-wise unsafe characters are dropped. */
@@ -405,7 +511,6 @@ function refreshInfo(state: MapState): void {
 	if (!box) return;
 	const p = state.lastProps;
 	const c = state.map.getCenter();
-	const markers = parsePositions(p.markerPositions);
 	const computed: Record<string, string> = {
 		// One distance token per marker (1-based), camera centre → marker,
 		// following the pan. `{distance}` stays the first marker's distance
@@ -416,11 +521,14 @@ function refreshInfo(state: MapState): void {
 				: formatClock((Date.now() - state.lastAt) / 1000),
 		status: statusText(state, p),
 	};
-	for (const [i, m] of markers.entries())
+	// `state.markerPos` is the parsed form of `state.markerPositions` —
+	// maintained by `syncMap` — so we don't re-parse here every second.
+	state.markerPos.forEach((m, i) => {
 		computed[`distance${i + 1}`] = formatDistance(
 			distanceMeters(m.lat, m.lon, c.lat, c.lng),
 		);
-	if (markers[0]) computed.distance = computed.distance1;
+	});
+	if (state.markerPos.length > 0) computed.distance = computed.distance1;
 	// A project variable of a token's name wins over the computed tokens —
 	// the same precedence the other templated elements use.
 	box.textContent = parseTemplate(p.infoTemplate)
@@ -435,9 +543,6 @@ function refreshInfo(state: MapState): void {
 
 /* ── Keep-history routes (server-recorded, TODO/09-map.md) ─────────── */
 
-/** How often the runtime page re-fetches the recorded routes. */
-const HISTORY_POLL_MS = 5000;
-
 interface MapHistoryPath {
 	id: string;
 	name: string;
@@ -446,10 +551,11 @@ interface MapHistoryPath {
 	points: { lat: number; lon: number; at: number }[];
 }
 
-/** The owner-token history endpoint this overlay polls (`null` off the
- * runtime page — the editor renders the map without history). */
+/** The owner-token history endpoint this overlay polls. Both contexts carry
+ * what it needs — the runtime page the token from its URL, the editor the
+ * owner's own — and the owner-scoped endpoint serves it to both. */
 function mapHistoryUrl(ctx: ElementContext): string | null {
-	if (!ctx.overlayId || !ctx.token || !ctx.activeTriggers) return null;
+	if (!ctx.overlayId || !ctx.token) return null;
 	return (
 		"/overlay/" +
 		encodeURIComponent(ctx.overlayId) +
@@ -488,8 +594,9 @@ function drawHistory(state: MapState, paths: MapHistoryPath[]): void {
 	}).addTo(layer);
 }
 
-/** One `map-history` fetch + redraw; `false` off the runtime page or on a
- * failed fetch (the poll retries, a path event triggers a fresh try). */
+/** One `map-history` fetch + redraw; `false` when the context can't
+ * address the endpoint or on a failed fetch (the poll retries, a path
+ * event triggers a fresh try). */
 async function fetchHistory(state: MapState): Promise<boolean> {
 	const url = mapHistoryUrl(state.ctx);
 	if (!url) return false;
@@ -522,15 +629,20 @@ function stopHistoryTimer(state: MapState): void {
 
 /** Start/stop/restyle the history feed when `keepHistory`/`historyColor`
  * change between syncs. */
-function syncHistory(state: MapState, p: LiveMapProps): void {
+function syncHistory(
+	state: MapState,
+	p: LiveMapProps,
+	prev: LiveMapProps,
+): void {
 	if (p.keepHistory) {
 		if (!state.historyTimer) startHistoryTimer(state);
-		else if (state.lastProps.historyColor !== p.historyColor)
-			void fetchHistory(state);
+		else if (prev.historyColor !== p.historyColor) void fetchHistory(state);
 	} else if (state.historyTimer) {
 		stopHistoryTimer(state);
 	}
 }
+
+/* ── Sync + init ──────────────────────────────────────────────────── */
 
 /** The centre follows panning: move the marker, stamp the position time,
  * and refresh the info box. */
@@ -551,6 +663,12 @@ function trackCenter(state: MapState): void {
 /** Apply a resolved props object to the live map in place — the single place
  * props changes become visible. */
 function syncMap(state: MapState, p: LiveMapProps): void {
+	// Capture the previous props before updating, so change detection below
+	// compares against the *old* state, while `refreshInfo` (called at the
+	// end) already sees the fresh one.
+	const prev = state.lastProps;
+	state.lastProps = p;
+
 	const { map } = state;
 
 	// Tile layer URLs embed the mapy key — (re)build the layer set when the
@@ -611,11 +729,7 @@ function syncMap(state: MapState, p: LiveMapProps): void {
 		);
 		state.markerPos = positions;
 		state.markerPositions = p.markerPositions;
-	} else if (
-		p.markerIcons !== state.lastProps.markerIcons ||
-		p.markerColors !== state.lastProps.markerColors ||
-		p.markerSize !== state.lastProps.markerSize
-	) {
+	} else if (changedProps(p, prev, MARKER_STYLE_KEYS)) {
 		state.markers.forEach((marker, i) => {
 			const pos = state.markerPos[i];
 			if (pos)
@@ -637,19 +751,8 @@ function syncMap(state: MapState, p: LiveMapProps): void {
 		glyphIcon(p.centerIcon, p.centerColor, p.centerSize),
 	);
 
-	if (
-		p.showInfo !== state.lastProps.showInfo ||
-		p.infoTemplate !== state.lastProps.infoTemplate ||
-		p.infoFontSize !== state.lastProps.infoFontSize ||
-		p.infoPadding !== state.lastProps.infoPadding ||
-		p.infoColor !== state.lastProps.infoColor ||
-		p.infoBackground !== state.lastProps.infoBackground ||
-		p.status !== state.lastProps.status ||
-		p.liveThreshold !== state.lastProps.liveThreshold
-	)
-		refreshInfo(state);
-	syncHistory(state, p);
-	state.lastProps = p;
+	if (changedProps(p, prev, INFO_KEYS)) refreshInfo(state);
+	syncHistory(state, p, prev);
 }
 
 function initMap(
@@ -727,6 +830,7 @@ function initMap(
 		lastProps: props,
 	};
 	maps.set(container, state);
+	elementStates.set(elementId, state);
 
 	// 1 s tick: `{time}`/`{status}` age out between map events.
 	state.interval = setInterval(() => refreshInfo(state), 1000);
@@ -734,11 +838,6 @@ function initMap(
 	map.on("movestart", () => trackCenter(state));
 	map.on("zoomend", () => refreshInfo(state));
 
-	// The info node may already be in the DOM — Mithril renders it before
-	// the async Leaflet load finishes.
-	state.info = (container.parentElement?.querySelector(
-		":scope > .live-map-info",
-	) ?? null) as HTMLElement | null;
 	syncMap(state, props);
 	return state;
 }
@@ -754,7 +853,7 @@ function onTrigger(
 	_ctx: ElementContext,
 ): number | undefined {
 	if (!eventName.startsWith("path.end/")) return undefined;
-	const state = [...maps.values()].find((s) => s.elementId === element.id);
+	const state = elementStates.get(element.id);
 	if (state) {
 		state.lastAt = Date.now();
 		refreshInfo(state);
@@ -765,14 +864,119 @@ function onTrigger(
 	return undefined;
 }
 
-/* ── Mithril draw ─────────────────────────────────────────────────── */
+/* ── Mithril components ──────────────────────────────────────────── */
+
+interface MapContainerAttrs {
+	p: LiveMapProps;
+	element: OverlayElement;
+	ctx: ElementContext;
+}
+
+/** The Leaflet container: owns init, prop-driven sync, and cleanup. */
+const MapContainer: m.Component<MapContainerAttrs> = {
+	view: (v: Vnode<MapContainerAttrs>): Vnode =>
+		m("div", {
+			style: { flex: "1 1 auto", minHeight: "0" },
+			oncreate: (vnode) => {
+				const container = vnode.dom as HTMLElement;
+				// A map (or an in-flight init) already exists for this node.
+				if (maps.get(container) || starting.has(container)) return;
+				const { element, ctx } = v.attrs;
+				starting.add(container);
+				injectStyles();
+				void ensureLeaflet()
+					.then(() => {
+						// Cancelled by onremove while Leaflet was loading — the
+						// element was torn down, drop the work.
+						if (!starting.has(container)) return;
+						starting.delete(container);
+						// `element.props` is mutated in place, so this is the
+						// latest state even if props changed while Leaflet was
+						// loading.
+						const state = initMap(
+							container,
+							safeProps(element.props),
+							element.id,
+							ctx,
+						);
+						// The info box, if rendered, may already be in the DOM
+						// — pick it up so the first tick paints it.
+						const infoEl =
+							container.nextElementSibling as HTMLElement | null;
+						if (infoEl?.classList.contains(INFO_CLASS)) {
+							state.info = infoEl;
+							refreshInfo(state);
+						}
+					})
+					.catch(() => starting.delete(container));
+			},
+			// Prop changes re-render into the same DOM node (oncreate does
+			// not re-run) — apply them to the live map in place.
+			onupdate: (vnode) => {
+				const state = maps.get(vnode.dom as HTMLElement);
+				if (state) {
+					state.ctx = v.attrs.ctx;
+					syncMap(state, v.attrs.p);
+				}
+			},
+			onremove: (vnode) => {
+				const container = vnode.dom as HTMLElement;
+				// In-flight init: signal cancellation and bail — there's no
+				// state to clean up yet.
+				if (starting.has(container)) {
+					starting.delete(container);
+					return;
+				}
+				const state = maps.get(container);
+				if (state) {
+					maps.delete(container);
+					elementStates.delete(state.elementId);
+					if (state.interval) clearInterval(state.interval);
+					stopHistoryTimer(state);
+					state.resizeObserver.disconnect();
+					state.map.remove();
+				}
+			},
+		}),
+};
+
+interface InfoBoxAttrs {
+	p: LiveMapProps;
+}
+
+/** The templated info box below the map. Its text is refreshed by
+ * `refreshInfo` from the companion `MapState` — found via the map container
+ * that immediately precedes this node. */
+const InfoBox: m.Component<InfoBoxAttrs> = {
+	view: (v: Vnode<InfoBoxAttrs>): Vnode => {
+		const { p } = v.attrs;
+		return m("div", {
+			class: INFO_CLASS,
+			style: {
+				fontSize: `${p.infoFontSize}px`,
+				padding: `${p.infoPadding}px`,
+				color: p.infoColor,
+				background: p.infoBackground,
+			},
+			oncreate: (vnode) => {
+				const mapEl = (vnode.dom as HTMLElement).previousElementSibling;
+				const st = mapEl ? maps.get(mapEl as HTMLElement) : undefined;
+				if (st) {
+					st.info = vnode.dom as HTMLElement;
+					refreshInfo(st);
+				}
+			},
+			onremove: (vnode) => {
+				const mapEl = (vnode.dom as HTMLElement).previousElementSibling;
+				const st = mapEl ? maps.get(mapEl as HTMLElement) : undefined;
+				if (st) st.info = null;
+			},
+		});
+	},
+};
 
 function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	const p = safeProps(element.props);
-	// The info box is a sibling of the map div — their shared state lives on
-	// the outer wrapper's first child (the map container).
-	const stateFor = (node: HTMLElement): MapState | undefined =>
-		maps.get(node.parentElement?.firstElementChild as HTMLElement);
 	return m(
 		"div",
 		{
@@ -784,90 +988,20 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 			},
 		},
 		[
-			m("div", {
-				style: { flex: "1 1 auto", minHeight: "0" },
-				oncreate: (vnode) => {
-					const container = vnode.dom as HTMLElement;
-					// A map (or an in-flight init) already exists for this node.
-					if (maps.get(container) || starting.has(container)) return;
-					starting.add(container);
-					injectStyles();
-					void ensureLeaflet().then(() => {
-						starting.delete(container);
-						// The node was removed while Leaflet was loading.
-						if (maps.get(container)) return;
-						// `element.props` is mutated in place, so this is the
-						// latest state even if props changed while Leaflet was
-						// loading.
-						maps.set(
-							container,
-							initMap(container, safeProps(element.props), element.id, ctx),
-						);
-					});
-				},
-				// Prop changes re-render into the same DOM node (oncreate does
-				// not re-run) — apply them to the live map in place.
-				onupdate: (vnode) => {
-					const state = maps.get(vnode.dom as HTMLElement);
-					if (state) {
-						state.ctx = ctx;
-						syncMap(state, safeProps(element.props));
-					}
-				},
-				onremove: (vnode) => {
-					const container = vnode.dom as HTMLElement;
-					starting.delete(container);
-					const state = maps.get(container);
-					if (state) {
-						maps.delete(container);
-						if (state.interval) clearInterval(state.interval);
-						stopHistoryTimer(state);
-						state.resizeObserver.disconnect();
-						state.map.remove();
-					}
-				},
-			}),
+			m(MapContainer, { p, element, ctx }),
 			// The info box sits BELOW the map — the map's move/zoom events and
 			// the 1 s tick refresh its text (see `refreshInfo`).
-			p.showInfo
-				? m("div", {
-						class: "live-map-info",
-						style: {
-							fontSize: `${p.infoFontSize}px`,
-							padding: `${p.infoPadding}px`,
-							color: p.infoColor,
-							background: p.infoBackground,
-						},
-						oncreate: (vnode) => {
-							const st = stateFor(vnode.dom as HTMLElement);
-							if (st) {
-								st.info = vnode.dom as HTMLElement;
-								refreshInfo(st);
-							}
-						},
-						onremove: (vnode) => {
-							const st = stateFor(vnode.dom as HTMLElement);
-							if (st) st.info = null;
-						},
-					})
-				: null,
+			p.showInfo ? m(InfoBox, { p }) : null,
 		],
 	);
 }
 
 /* ── Edit form ────────────────────────────────────────────────────── */
 
-function editForm({
-	element: e,
-	mutate,
-	variables,
-	variableUrl,
-}: ElementProps): Vnode {
-	const p = safeProps(e.props);
-	const sp = { mutate, variables, variableUrl };
-	// The icon selects are grouped into "Color" (emoji) and "Single color"
-	// (glyph) via `<optgroup>`. `t()` runs at render time (not module load).
-	const iconGroups: ControlOption[] = [
+/** The icon `<select>` groups shared by the centre-marker and per-marker
+ * glyph pickers (emoji first, then single-colour glyphs). */
+function iconOptionGroups(): ControlOption[] {
+	return [
 		{
 			label: t("overlay.live_map_icon_group_color"),
 			options: COLOR_ICONS.map((g) => ({ value: g, label: g })),
@@ -877,29 +1011,142 @@ function editForm({
 			options: SINGLE_COLOR_ICONS.map((g) => ({ value: g, label: g })),
 		},
 	];
+}
+
+interface MarkerSlotsAttrs {
+	p: LiveMapProps;
+	mutate: ElementProps["mutate"];
+}
+
+/** Per-marker icon + colour rows, derived from the `";"`-separated slots of
+ * `markerPositions`. Each row owns its icon/colour (`markerIcons`/
+ * `markerColors`, index-aligned); an empty slot uses the built-in default
+ * glyph/colour. Position input itself lives in the bindable field above. */
+const MarkerSlots: m.Component<MarkerSlotsAttrs> = {
+	view: (v: Vnode<MarkerSlotsAttrs>): Vnode => {
+		const { p, mutate } = v.attrs;
+		const posSlots = p.markerPositions ? p.markerPositions.split(";") : [];
+		const iconSlots = p.markerIcons.split(";");
+		const colorSlots = p.markerColors.split(";");
+		const groups = iconOptionGroups();
+
+		const writeIconSlot = (i: number, value: string) =>
+			mutate((el) => {
+				const icons = String(el.props.markerIcons).split(";");
+				while (icons.length <= i) icons.push("");
+				icons[i] = value;
+				el.props.markerIcons = icons.join(";");
+			});
+		const writeColorSlot = (i: number, value: string) =>
+			mutate((el) => {
+				const colors = String(el.props.markerColors).split(";");
+				while (colors.length <= i) colors.push("");
+				colors[i] = value;
+				el.props.markerColors = colors.join(";");
+			});
+
+		return (
+			<div class="ov-field">
+				<span class="ov-lbl">{t("overlay.live_map_marker_list")}</span>
+				<div>
+					{posSlots.map((_, i) => (
+						<div class="ov-grid3" key={i}>
+							<select
+								class="ov-marker-icon"
+								value={iconSlots[i] ?? ""}
+								onchange={(ev: Event) =>
+									writeIconSlot(i, (ev.target as HTMLSelectElement).value)
+								}
+							>
+								<option value="">
+									{t("overlay.live_map_marker_icon_default")}
+								</option>
+								{groups.map((group) =>
+									"options" in group ? (
+										<optgroup key={group.label} label={group.label}>
+											{group.options.map((o) => (
+												<option value={o.value} key={o.value}>
+													{o.label}
+												</option>
+											))}
+										</optgroup>
+									) : (
+										<option value={group.value} key={group.value}>
+											{group.label}
+										</option>
+									),
+								)}
+							</select>
+							<input
+								type="color"
+								class="ov-marker-color"
+								value={colorSlots[i] || DEFAULT_MARKER_COLOR}
+								oninput={(ev: Event) =>
+									writeColorSlot(i, (ev.target as HTMLInputElement).value)
+								}
+							/>
+							<button
+								class="ov-bind-chk"
+								type="button"
+								title={t("overlay.live_map_remove_marker")}
+								aria-label={t("overlay.live_map_remove_marker")}
+								onclick={() =>
+									mutate((el) => {
+										const slots = String(el.props.markerPositions).split(";");
+										slots.splice(i, 1);
+										el.props.markerPositions = slots.join(";");
+										const icons = String(el.props.markerIcons).split(";");
+										icons.splice(i, 1);
+										el.props.markerIcons = icons.join(";");
+										const colors = String(el.props.markerColors).split(";");
+										colors.splice(i, 1);
+										el.props.markerColors = colors.join(";");
+									})
+								}
+							>
+								<Icon name="close" class="role-icon" />
+							</button>
+						</div>
+					))}
+					<div class="ov-field-row">
+						<button
+							class="ov-add-marker"
+							type="button"
+							title={t("overlay.live_map_add_marker")}
+							onclick={() =>
+								mutate((el) => {
+									const s = String(el.props.markerPositions);
+									el.props.markerPositions = s ? `${s};` : "";
+									const icons = String(el.props.markerIcons);
+									el.props.markerIcons = icons ? `${icons};` : "";
+									const colors = String(el.props.markerColors);
+									el.props.markerColors = colors ? `${colors};` : "";
+								})
+							}
+						>
+							<Icon name="plus" class="role-icon" />
+							<span>{t("overlay.live_map_add_marker")}</span>
+						</button>
+					</div>
+				</div>
+			</div>
+		);
+	},
+};
+
+function editForm({
+	element: e,
+	mutate,
+	variables,
+	variableUrl,
+}: ElementProps): Vnode {
+	const p = safeProps(e.props);
+	const sp = { mutate, variables, variableUrl };
+	const groups = iconOptionGroups();
+
 	// `markerPositions` is one bindable string (`lon,lat;lon,lat`) — the
-	// marker count (and the rows below) is derived from its `";"` slots.
-	// `markerIcons` / `markerColors` are parallel `";"`-separated strings,
-	// index-aligned with the position slots; an empty slot uses the built-in
-	// default glyph/colour.
-	const posSlots = p.markerPositions ? p.markerPositions.split(";") : [];
-	const iconSlots = p.markerIcons.split(";");
-	const colorSlots = p.markerColors.split(";");
-	const writeIconSlot = (i: number, value: string) =>
-		mutate((el) => {
-			const icons = String(el.props.markerIcons).split(";");
-			while (icons.length <= i) icons.push("");
-			icons[i] = value;
-			el.props.markerIcons = icons.join(";");
-		});
-	const writeColorSlot = (i: number, value: string) =>
-		mutate((el) => {
-			const colors = String(el.props.markerColors).split(";");
-			while (colors.length <= i) colors.push("");
-			colors[i] = value;
-			el.props.markerColors = colors.join(";");
-		});
-	// The whole multi-marker position set, bound so a variable can replace it.
+	// marker count (and the rows in `MarkerSlots`) is derived from its `";"`
+	// slots.
 	const markerPositionsField: Vnode = bindField(
 		e,
 		"props.markerPositions",
@@ -916,94 +1163,7 @@ function editForm({
 		/>,
 		sp,
 	);
-	// One row per position slot — each marker owns its icon + colour (no
-	// position input here; that lives in the bindable field above).
-	const markerList: Vnode = (
-		<div class="ov-field">
-			<span class="ov-lbl">{t("overlay.live_map_marker_list")}</span>
-			<div>
-				{posSlots.map((_, i) => (
-					<div class="ov-grid3" key={i}>
-						<select
-							class="ov-marker-icon"
-							value={iconSlots[i] ?? ""}
-							onchange={(ev: Event) =>
-								writeIconSlot(i, (ev.target as HTMLSelectElement).value)
-							}
-						>
-							<option value="">
-								{t("overlay.live_map_marker_icon_default")}
-							</option>
-							{iconGroups.map((group) =>
-								"options" in group ? (
-									<optgroup key={group.label} label={group.label}>
-										{group.options.map((o) => (
-											<option value={o.value} key={o.value}>
-												{o.label}
-											</option>
-										))}
-									</optgroup>
-								) : (
-									<option value={group.value} key={group.value}>
-										{group.label}
-									</option>
-								),
-							)}
-						</select>
-						<input
-							type="color"
-							class="ov-marker-color"
-							value={colorSlots[i] || DEFAULT_MARKER_COLOR}
-							oninput={(ev: Event) =>
-								writeColorSlot(i, (ev.target as HTMLInputElement).value)
-							}
-						/>
-						<button
-							class="ov-bind-chk"
-							type="button"
-							title={t("overlay.live_map_remove_marker")}
-							aria-label={t("overlay.live_map_remove_marker")}
-							onclick={() =>
-								mutate((el) => {
-									const slots = String(el.props.markerPositions).split(";");
-									slots.splice(i, 1);
-									el.props.markerPositions = slots.join(";");
-									const icons = String(el.props.markerIcons).split(";");
-									icons.splice(i, 1);
-									el.props.markerIcons = icons.join(";");
-									const colors = String(el.props.markerColors).split(";");
-									colors.splice(i, 1);
-									el.props.markerColors = colors.join(";");
-								})
-							}
-						>
-							<Icon name="close" class="role-icon" />
-						</button>
-					</div>
-				))}
-				<div class="ov-field-row">
-					<button
-						class="ov-add-marker"
-						type="button"
-						title={t("overlay.live_map_add_marker")}
-						onclick={() =>
-							mutate((el) => {
-								const s = String(el.props.markerPositions);
-								el.props.markerPositions = s ? `${s};` : "";
-								const icons = String(el.props.markerIcons);
-								el.props.markerIcons = icons ? `${icons};` : "";
-								const colors = String(el.props.markerColors);
-								el.props.markerColors = colors ? `${colors};` : "";
-							})
-						}
-					>
-						<Icon name="plus" class="role-icon" />
-						<span>{t("overlay.live_map_add_marker")}</span>
-					</button>
-				</div>
-			</div>
-		</div>
-	);
+
 	return bindableForm({
 		element: e,
 		mutate,
@@ -1046,7 +1206,7 @@ function editForm({
 					labelKey: "overlay.live_map_center_icon",
 					type: "select",
 					value: p.centerIcon,
-					options: iconGroups,
+					options: groups,
 				},
 				{
 					path: "props.centerColor",
@@ -1065,7 +1225,7 @@ function editForm({
 				},
 			],
 			markerPositionsField,
-			markerList,
+			m(MarkerSlots, { p, mutate }) as Vnode,
 			[
 				{
 					path: "props.markerSize",
@@ -1194,77 +1354,6 @@ function validate(e: OverlayElement): string[] {
 }
 
 /* ── Element definition ───────────────────────────────────────────── */
-
-/** Runtime-safe prop view: coerces a (resolved) props record to the full
- * LiveMapProps shape. Mirrors `normalizeProps` (the server normalizes on
- * save, binding values resolve at render time) so a partial or stale record
- * can't break the map. */
-/** A marker glyph from `LIVE_MAP_ICONS` (free-typed or stale values fall
- * back to the default, so the select always has a matching option). */
-function iconOf(value: unknown, fallback: string): string {
-	const s = cleanStr(value, 8);
-	return LIVE_MAP_ICONS.includes(s) ? s : fallback;
-}
-
-/** The glyph for marker `index` (one of `LIVE_MAP_ICONS`); the slot is
- * index-aligned with `markerPositions`, and a missing/empty/unknown one
- * falls back to `fallback` (the built-in default glyph). */
-function markerIconAt(icons: string, index: number, fallback: string): string {
-	const entry = icons.split(";")[index] ?? "";
-	return LIVE_MAP_ICONS.includes(entry) ? entry : fallback;
-}
-
-/** The hex colour for marker `index`; the slot is index-aligned with
- * `markerPositions`, and a missing/empty/invalid one falls back to
- * `fallback` (the built-in default colour). */
-function markerColorAt(
-	colors: string,
-	index: number,
-	fallback: string,
-): string {
-	const entry = cleanHex(colors.split(";")[index] ?? "", fallback);
-	return entry;
-}
-
-function safeProps(rawInput: unknown): LiveMapProps {
-	const d = DEFAULT_LIVE_MAP_PROPS;
-	const raw: Record<string, unknown> =
-		rawInput && typeof rawInput === "object"
-			? (rawInput as Record<string, unknown>)
-			: {};
-	const provider = raw.provider as LiveMapProvider;
-	return {
-		provider:
-			provider === "osm" || provider === "arcgis" || provider === "mapy"
-				? provider
-				: d.provider,
-		zoom: cleanNum(raw.zoom, d.zoom, 0, 25),
-		// The raw string is kept verbatim (in-flight edits, in-progress
-		// variable updates) — parsing happens at render time; an unparseable
-		// value leaves the view where it is (initMap falls back to the
-		// default position, syncMap keeps the current one). An empty
-		// `markerPositions` means "no markers" — never the default marker.
-		centerPosition: cleanStr(raw.centerPosition, 50) || d.centerPosition,
-		mapyKey: cleanStr(raw.mapyKey, 200),
-		centerIcon: iconOf(raw.centerIcon, d.centerIcon),
-		centerColor: cleanHex(raw.centerColor, d.centerColor),
-		centerSize: cleanNum(raw.centerSize, d.centerSize, 8, 96),
-		markerPositions: cleanStr(raw.markerPositions, 1000),
-		markerIcons: cleanStr(raw.markerIcons, 1000),
-		markerColors: cleanStr(raw.markerColors, 1000),
-		markerSize: cleanNum(raw.markerSize, d.markerSize, 8, 96),
-		showInfo: cleanBool(raw.showInfo),
-		infoTemplate: cleanStr(raw.infoTemplate, 400) || d.infoTemplate,
-		infoFontSize: cleanNum(raw.infoFontSize, d.infoFontSize, 8, 96),
-		infoPadding: cleanNum(raw.infoPadding, d.infoPadding, 0, 48),
-		infoColor: cleanHex(raw.infoColor, d.infoColor),
-		infoBackground: cleanHex(raw.infoBackground, d.infoBackground),
-		status: cleanStr(raw.status, 100),
-		liveThreshold: cleanNum(raw.liveThreshold, d.liveThreshold, 0, 3600),
-		keepHistory: cleanBool(raw.keepHistory),
-		historyColor: cleanHex(raw.historyColor, d.historyColor),
-	};
-}
 
 export const liveMapElement: OverlayElementDef & OverlayElementSchema = {
 	type: "live_map",
