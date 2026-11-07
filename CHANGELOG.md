@@ -1,3 +1,10 @@
+# [3.2.0](https://github.com/majklovec/irlctrl/compare/v3.1.0...v3.2.0) (2026-11-07)
+
+
+### Features
+
+* **overlay:** add zoom fit and regroup tools ([597aa2a](https://github.com/majklovec/irlctrl/commit/597aa2a5a78a88476c69b7bb3e8cb7594016ec28))
+
 # [3.1.0](https://github.com/majklovec/irlctrl/compare/v3.0.2...v3.1.0) (2026-11-07)
 
 
