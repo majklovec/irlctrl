@@ -226,12 +226,12 @@ describe("module registries", () => {
 
     test("settings framework discovers via the generated manifest (no per-module imports)", () => {
         const settings = readFileSync(
-            join(appDir, "client", "frontend", "ts", "settings.tsx"),
+            join(appDir, "client", "frontend", "settings.tsx"),
             "utf8",
         );
         expect(settings).not.toMatch(/modules\/[\w-]+\/settings/);
         const framework = readFileSync(
-            join(appDir, "client", "frontend", "ts", "modules.tsx"),
+            join(appDir, "client", "frontend", "modules.tsx"),
             "utf8",
         );
         expect(framework).not.toMatch(/modules\/[\w-]+\/settings/);
@@ -273,16 +273,17 @@ describe("module registries", () => {
     // by test/boundaries.test.ts.
 
     test("core frontend pages compose module contributions without feature branches", () => {
-        const readPage = (side: "client" | "server", name: string) =>
-            readFileSync(join(appDir, side, "frontend", "ts", name), "utf8");
-        const app = readPage("client", "device_page.tsx");
-        /* The dashboard widgets page is a page-slice page now (01-refactor).
-         * readPage points at the slice location. */
+        // Client pages live flat in client/frontend/ (the flatten refactor
+        // dropped the old ts/ subdirectory). Server pages are page-slice pages
+        // read by their explicit server/pages/… paths below.
+        const readClientPage = (name: string) =>
+            readFileSync(join(appDir, "client", "frontend", name), "utf8");
+        const app = readClientPage("device_page.tsx");
         const dashboard = readFileSync(
             join(appDir, "server", "pages", "dashboards", "frontend", "dashboard_widgets.tsx"),
             "utf8",
         );
-        const setup = readPage("client", "setup.tsx");
+        const setup = readClientPage("setup.tsx");
         /* The device list page is a page-slice page now (01-refactor):
          * server/pages/devices/frontend/device_list.tsx. */
         const devices = readFileSync(
