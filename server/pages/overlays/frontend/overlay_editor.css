@@ -683,7 +683,8 @@ identically here and on the runtime page */
     margin: 4px 0 0;
     padding: 4px 8px;
     background: none;
-    border: 1px solid var(--border, color-mix(in srgb, var(--muted) 40%, transparent));
+    border: 1px solid
+        var(--border, color-mix(in srgb, var(--muted) 40%, transparent));
     border-radius: 6px;
     color: var(--muted);
     font-size: 12px;
@@ -1088,6 +1089,11 @@ instead of truncating */
     align-items: center;
     gap: 2px;
 }
+.ov-button-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+}
 .ov-tb-divider {
     width: 1px;
     height: 1.6rem;
@@ -1304,19 +1310,11 @@ instead of truncating */
     font-size: 12.5px;
     text-align: center;
 }
-/* Zoom cluster: two icon buttons around the percentage readout. */
+/* Zoom cluster: zoom out, fit, zoom in. */
 .ov-zoom {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-}
-.ov-zoom-val {
-    min-width: 34px;
-    text-align: center;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--muted);
-    user-select: none;
 }
 /* ── asset library picker (image/video elements reuse server assets) ── */
 .ov-lib-field {

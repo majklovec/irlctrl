@@ -219,6 +219,7 @@
     "overlay.w": "Š",
     "overlay.x": "X",
     "overlay.y": "Y",
+    "overlay.zoom_fit": "Přizpůsobit oknu",
     "overlay.zoom_in": "Přiblížit",
     "overlay.zoom_out": "Oddálit",
     "overlay.filters": "Filtry",

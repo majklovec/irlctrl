@@ -5,6 +5,7 @@ import m from "mithril";
 import {
 	clamp,
 	closeToolMenus,
+	fitZoom,
 	LIST_URL,
 	overlay,
 	redo,
@@ -14,8 +15,8 @@ import {
 } from "../overlay_store";
 import { elementCatalog } from "./element_catalog";
 
-/** Toolbar below the main nav: history, the single "+" element-catalog
- * button, then — right-aligned — zoom + the utility dialogs. */
+/** Toolbar below the main nav: history, the "add element" + utility
+ * buttons, then — right-aligned — zoom. */
 export function editorToolbar(): m.Vnode {
 	const setCatalogOpen = (): void => {
 		state.catalogOpen = !state.catalogOpen;
@@ -46,8 +47,8 @@ export function editorToolbar(): m.Vnode {
 			</span>
 			<span class="ov-tb-divider" aria-hidden="true" />
 
-			{/* Group 2: the one "add element" button — opens the catalog. */}
-			<span class="ov-tb-group">
+			{/* Group 2: "add element" (opens the catalog) + utility dialogs. */}
+			<span class="ov-button-group">
 				<span class={["ov-dd", state.catalogOpen ? "is-open" : ""].join(" ")}>
 					<Button
 						label={
@@ -63,9 +64,31 @@ export function editorToolbar(): m.Vnode {
 					/>
 					{state.catalogOpen ? elementCatalog() : null}
 				</span>
+				<Button
+					label={
+						<>
+							<Icon name="link" class="role-icon" />
+							{t("overlay.variables")}
+						</>
+					}
+					class="ov-dd-trigger"
+					title={t("overlay.variables")}
+					onclick={() => (state.variablesDialogOpen = true)}
+				/>
+				<Button
+					label={
+						<>
+							<Icon name="view" class="role-icon" />
+							{t("overlay.runtime_url")}
+						</>
+					}
+					class="ov-dd-trigger"
+					title={t("overlay.runtime_url")}
+					onclick={() => (state.runtimeDialogOpen = true)}
+				/>
 			</span>
 
-			{/* Spacer: pushes the zoom + utility groups to the right edge */}
+			{/* Spacer: pushes the zoom group to the right edge */}
 			<span class="ov-tb-spacer" aria-hidden="true" />
 
 			{/* Group 3: zoom */}
@@ -78,7 +101,12 @@ export function editorToolbar(): m.Vnode {
 						(state.zoom = roundToStep(clamp(state.zoom - 0.05, 0.1, 3), 0.05))
 					}
 				/>
-				<span class="ov-zoom-val">{Math.round(state.zoom * 1000) / 10}%</span>
+				<IconButton
+					label={t("overlay.zoom_fit")}
+					title={t("overlay.zoom_fit")}
+					icon={<Icon name="frame" class="role-icon" />}
+					onclick={fitZoom}
+				/>
 				<IconButton
 					label={t("overlay.zoom_in")}
 					title={t("overlay.zoom_in")}
@@ -86,23 +114,6 @@ export function editorToolbar(): m.Vnode {
 					onclick={() =>
 						(state.zoom = roundToStep(clamp(state.zoom + 0.05, 0.1, 3), 0.05))
 					}
-				/>
-			</span>
-			<span class="ov-tb-divider" aria-hidden="true" />
-
-			{/* Group 4: utilities */}
-			<span class="ov-tb-group">
-				<IconButton
-					label={t("overlay.variables")}
-					title={t("overlay.variables")}
-					icon={<Icon name="link" class="role-icon" />}
-					onclick={() => (state.variablesDialogOpen = true)}
-				/>
-				<IconButton
-					label={t("overlay.runtime_url")}
-					title={t("overlay.runtime_url")}
-					icon={<Icon name="view" class="role-icon" />}
-					onclick={() => (state.runtimeDialogOpen = true)}
 				/>
 			</span>
 		</Toolbar>

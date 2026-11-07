@@ -219,6 +219,7 @@
     "overlay.w": "Ш",
     "overlay.x": "X",
     "overlay.y": "Y",
+    "overlay.zoom_fit": "Zoom to fit",
     "overlay.zoom_in": "Увеличить",
     "overlay.zoom_out": "Уменьшить",
     "overlay.filters": "Фильтры",

@@ -219,6 +219,7 @@
     "overlay.w": "W",
     "overlay.x": "X",
     "overlay.y": "Y",
+    "overlay.zoom_fit": "Zoom to fit",
     "overlay.zoom_in": "Zoom in",
     "overlay.zoom_out": "Zoom out",
     "overlay.filters": "Filters",
