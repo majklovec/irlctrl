@@ -122,16 +122,24 @@ function chatMessage(ws: FakeWebSocket, id: number): void {
     });
 }
 
+/** Poll until the watchdog closes the socket. The SUT fires a wall-clock
+ * `setTimeout`, which is delayed when bun runs the suite with one file per
+ * core; a fixed sleep is not, so wait for the side effect (bounded) instead. */
+async function waitUntilClosed(ws: FakeWebSocket, budgetMs: number): Promise<void> {
+    const started = Date.now();
+    while (!ws.closed && Date.now() - started < budgetMs) await sleep(10);
+}
+
 describe("Kick chat provider staleness watchdog", () => {
     test("rejoins after a full window without chat messages", async () => {
         const { provider, ws } = await startSubscribedProvider();
         expect(provider.connected).toBe(true);
 
-        await sleep(140); // well beyond the 50 ms stale window
+        await waitUntilClosed(ws, 5000); // watchdog drops the socket on silence
         expect(ws.closed).toBe(true);
         expect(provider.connected).toBe(false);
         provider.stop(); // clear the pending reconnect for the next test
-    });
+    }, 15000);
 
     test("chat messages keep resetting the watchdog", async () => {
         const { provider, ws } = await startSubscribedProvider();
@@ -145,11 +153,11 @@ describe("Kick chat provider staleness watchdog", () => {
         expect(ws.closed).toBe(false);
 
         // A second full window of silence after the last message fires it.
-        await sleep(140);
+        await waitUntilClosed(ws, 5000);
         expect(ws.closed).toBe(true);
         expect(provider.connected).toBe(false);
         provider.stop(); // clear the pending reconnect for the next test
-    });
+    }, 15000);
 
     test("stop clears the watchdog", async () => {
         const { provider, ws } = await startSubscribedProvider();
