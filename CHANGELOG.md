@@ -1,3 +1,10 @@
+# [3.1.0](https://github.com/majklovec/irlctrl/compare/v3.0.2...v3.1.0) (2026-11-07)
+
+
+### Features
+
+* **overlay:** export and import, ambient parameters ([0c1fbee](https://github.com/majklovec/irlctrl/commit/0c1fbee7f3a1493358a17ce89c38d7d8e565d3cc))
+
 ## [3.0.2](https://github.com/majklovec/irlctrl/compare/v3.0.1...v3.0.2) (2026-11-07)
 
 
