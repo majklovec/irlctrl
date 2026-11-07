@@ -9,11 +9,9 @@ services:
         container_name: irlctrl-server
         restart: unless-stopped
         user: "1000:1000"
-        command:
-            - "--db"
-            - "/config/users.db"
-            - "--storage"
-            - "/config/assets"
+        environment:
+            - DB_FILE=/config/users.db
+            - STORAGE_DIR=/config/assets
         volumes:
             - ./config/server:/config
         ports:
