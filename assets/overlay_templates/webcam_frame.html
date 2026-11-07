@@ -83,6 +83,21 @@
 			border-top: none;
 			border-bottom-right-radius: var(--radius);
 		}
+
+		/* Badge logo, hidden until a logo asset is set (the renderer bakes the
+		 * URL into src; with no src the element is removed from the layout). */
+		.logo {
+			position: absolute;
+			right: var(--padding);
+			bottom: var(--padding);
+			width: 48px;
+			height: 48px;
+			object-fit: contain;
+		}
+
+		.logo:not([src]) {
+			display: none;
+		}
 	</style>
 </head>
 
@@ -93,6 +108,7 @@
 		<div class="corner corner--tr"></div>
 		<div class="corner corner--bl"></div>
 		<div class="corner corner--br"></div>
+		<img class="logo" data-asset="logo" alt="" />
 	</section>
 
 </body>

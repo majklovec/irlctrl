@@ -91,10 +91,9 @@ describe("overlay_templates: catalog", () => {
 			[
 				"brb",
 				"corner_brackets",
-				"countdown",
-				"footer",
-				"header",
+				"goal_bar",
 				"lower_third_bar",
+				"music_viz",
 				"starting_soon",
 				"ticker",
 				"webcam_frame",
