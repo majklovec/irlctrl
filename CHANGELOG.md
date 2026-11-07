@@ -1,3 +1,10 @@
+## [3.0.1](https://github.com/majklovec/irlctrl/compare/v3.0.0...v3.0.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **gen-pages:** normalize glob paths ([f3c104b](https://github.com/majklovec/irlctrl/commit/f3c104b50e608eb98bb9bda06dc6967daa3e2b98))
+
 # [3.0.0](https://github.com/majklovec/irlctrl/compare/v2.25.0...v3.0.0) (2026-11-07)
 
 
