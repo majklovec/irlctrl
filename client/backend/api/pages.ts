@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import type { createFrontend } from "../../../shared/frontend";
-import { i18nResponse, imageResponse, notFound } from "../../../shared/http";
+import { i18nResponse, notFound } from "../../../shared/http";
 import { catalog } from "../../../shared/i18n";
 import { modulePage } from "../../../shared/registry";
 import { setupRequired } from "../state";
@@ -34,10 +34,6 @@ export function devicePagesPlugin(frontend: Frontend) {
 		.get("/i18n/*", ({ request }) =>
 			i18nResponse(new URL(request.url).pathname, catalog),
 		)
-		.get("/img/*", async ({ request }) => {
-			const response = await imageResponse(new URL(request.url).pathname);
-			return response ?? notFound();
-		})
 		// Module-owned pages (modules/<id>/pages/*.html) at the paths they declare
 		.all("*", ({ request }) => {
 			const path = new URL(request.url).pathname;

@@ -2,6 +2,7 @@
 /* Page skeleton: header (brand, title, nav, language, actions), optional
  * toolbar strip, main content and the version footer. */
 import m from "mithril";
+import logoUrl from "../../assets/img/logo-irlctrl-64.png";
 import { APP_VERSION } from "../../../generated/version";
 import { LanguageSelect } from "../i18n";
 import type { MithrilJSXComponent } from "../jsx";
@@ -25,7 +26,7 @@ export const Page = {
 			<a class="brand" href="/" aria-label="IRLCTRL">
 				<img
 					class="brand-logo"
-					src="/img/logo-irlctrl-64.png"
+					src={logoUrl}
 					alt="IRLCTRL"
 					width={32}
 					height={32}

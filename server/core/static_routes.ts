@@ -1,40 +1,30 @@
 /*
- * Static assets for the control server: `/img/*` (shared/assets/img: brand
- * logo, favicon), `/overlay_templates/*` (assets/overlay_templates: the
- * OBS html_template documents, fetched at runtime by the runtime page; the
- * templates live in the storage dir so the templates page can edit them)
- * plus `/overlay_templates/_catalog.json` (the auto-discovered id list —
- * any `<id>.html` file is a template, no index file is maintained), and
- * `/i18n/*` from the in-memory merged catalogs (core +
- * every module's; see shared/i18n.ts).
+ * Static assets for the control server: `/overlay_templates/*`
+ * (assets/overlay_templates: the OBS html_template documents, fetched at
+ * runtime by the runtime page; the templates live in the storage dir so the
+ * templates page can edit them) plus
+ * `/overlay_templates/_catalog.json` (the auto-discovered id list — any
+ * `<id>.html` file is a template, no index file is maintained), and `/i18n/*`
+ * from the in-memory merged catalogs (core + every module's; see
+ * shared/i18n.ts).
  *
  * @elysia/static reads files from a directory on disk; a compiled binary is a
  * flat file and cannot, so these routes are only mounted unbundled (the files
- * were never embedded).
+ * were never embedded). Brand images travel with the page bundles instead
+ * (hashed under /assets/, embedded in the compiled binary).
  */
 
 import { type Dirent, mkdirSync, readFileSync, statSync } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
-import staticPlugin from "@elysia/static";
 import { Elysia } from "elysia";
 import { i18nResponse } from "../../shared/http";
 import { catalog } from "../../shared/i18n";
-import { ASSETS_DIR, appPath } from "../../shared/paths";
+import { appPath } from "../../shared/paths";
 import { isCompiledBinary } from "../../shared/util";
 
 /** Repo-relative directory of the OBS html_template documents. */
 const OVERLAY_TEMPLATES_DIR = "assets/overlay_templates";
-
-// These assets are tiny and path-stable, so revalidate on every request to
-// match the previous hand-rolled `no-cache` behavior.
-const STATIC_OPTIONS = {
-	directive: "no-cache" as const,
-	maxAge: null,
-	etag: true,
-	indexHTML: false,
-	silent: true,
-};
 
 /**
  * The runtime template catalog: every `*.html` file in
@@ -73,13 +63,6 @@ export async function staticRoutes() {
 	// Registered before the static plugin so it wins over any file at the
 	// same path; no static file is kept for it.
 	app.get("/overlay_templates/_catalog.json", () => templateCatalog());
-	app.use(
-		await staticPlugin({
-			assets: appPath(`${ASSETS_DIR}/img`),
-			prefix: "/img",
-			...STATIC_OPTIONS,
-		}),
-	);
 	// The templates live in the storage dir (user-editable by the templates
 	// page); a fresh deployment has no directory yet — create it eagerly.
 	const templatesDir = appPath(OVERLAY_TEMPLATES_DIR);

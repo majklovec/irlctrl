@@ -1,7 +1,7 @@
 /*
  * HTTP helpers shared by the device API (client/backend/api.ts) and the control server (server/main.ts).
  */
-import { appPath, ASSETS_DIR } from "./paths";
+import faviconUrl from "./assets/img/favicon.ico";
 
 export const text = (
     body: string,
@@ -56,47 +56,16 @@ export async function i18nResponse(
         : notFound();
 }
 
-const IMG_PATH_RE = /^\/img\/[\w-]+\.(svg|png|ico)$/;
-
-const IMG_CONTENT_TYPES: Record<string, string> = {
-    svg: "image/svg+xml",
-    png: "image/png",
-    ico: "image/x-icon",
-};
-
 /**
- * Content type of a `/img/` asset by extension (SVG diagrams, the brand logo
- * is PNG, the tab favicon is ICO); null for any other path.
+ * The browser tab icon (`/favicon.ico`): `faviconUrl` is the asset path in the
+ * source tree and the embedded copy inside a compiled binary (Bun's `file`
+ * loader), so the same route serves both.
  */
-function imgContentType(path: string): string | null {
-    const m = IMG_PATH_RE.exec(path);
-    return m ? IMG_CONTENT_TYPES[m[1]] : null;
-}
-
-/** The browser tab icon (`/favicon.ico`), served from the shared assets; 404 if missing. */
-export async function faviconResponse(): Promise<Response> {
-    const file = Bun.file(appPath(`${ASSETS_DIR}/img/favicon.ico`));
-    return (await file.exists())
-        ? new Response(file, {
-              headers: {
-                  "content-type": "image/x-icon",
-                  "cache-control": "no-cache",
-              },
-          })
-        : notFound();
-}
-
-/** Static images from the shared assets (`/img/<name>.svg|png`); null for other paths. */
-export async function imageResponse(path: string): Promise<Response | null> {
-    const contentType = imgContentType(path);
-    if (!contentType) return null;
-    const file = Bun.file(appPath(`${ASSETS_DIR}${path}`));
-    return (await file.exists())
-        ? new Response(file, {
-              headers: {
-                  "content-type": contentType,
-                  "cache-control": "no-cache",
-              },
-          })
-        : notFound();
+export function faviconResponse(): Response {
+    return new Response(Bun.file(faviconUrl), {
+        headers: {
+            "content-type": "image/x-icon",
+            "cache-control": "no-cache",
+        },
+    });
 }

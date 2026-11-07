@@ -13,9 +13,13 @@ declare module "*.svg" {
     const url: string;
     export default url;
 }
-declare module "*.ico" {
-    const url: string;
-    export default url;
+
+/* The tab favicon is imported with Bun's `file` loader (shared/http.ts): the
+ * import resolves to a path `Bun.file()` can serve, in the compiled binary to
+ * the embedded copy. */
+declare module "*/assets/img/favicon.ico" {
+    const path: string;
+    export default path;
 }
 
 /* The service worker source is imported with Bun's `file` loader (shared/pwa.ts):
