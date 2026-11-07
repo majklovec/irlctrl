@@ -1,4 +1,4 @@
-import { apiTry } from "@ui/api_client";
+import { apiJson, apiTry } from "@ui/api_client";
 import { uuid } from "@ui/util";
 import m from "mithril";
 import { serverLive } from "../../../shell/live";
@@ -428,6 +428,33 @@ export async function duplicateOverlay(id: string): Promise<void> {
         `/api/overlays/${encodeURIComponent(id)}/duplicate`,
         { method: "POST" },
     );
+}
+
+/** Export an overlay as a JSON file: a temporary anchor points at the
+ * server's export endpoint (it sets the download filename from the
+ * overlay's name). */
+export function exportOverlay(id: string): void {
+    const a = document.createElement("a");
+    a.href = `/api/overlays/${encodeURIComponent(id)}/export`;
+    a.download = "";
+    document.body.append(a);
+    a.click();
+    a.remove();
+}
+
+/** Import an overlay from a parsed exported JSON object: the server
+ * validates it (schema migration included) and creates a fresh overlay.
+ * `null` on success, otherwise the server's error message (the list
+ * refreshes through the store's `overlays.overlays` frame). */
+export async function importOverlay(
+    raw: unknown,
+): Promise<string | null> {
+    try {
+        await apiJson("/api/overlays/import", { method: "POST", body: raw });
+        return null;
+    } catch (err) {
+        return err instanceof Error ? err.message : "Import failed";
+    }
 }
 
 export async function saveOverlayElements(o: Overlay): Promise<void> {

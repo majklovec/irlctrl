@@ -74,6 +74,15 @@ shape (see `ElementBase` in [`server/pages/overlays/overlay.ts`](../server/pages
 Every element attribute — props, `transform` fields and `visible` — can be
 bound to a variable (see [Binding](#binding) below).
 
+The `ambient` element's **Shift** background also exposes `circle_count`
+(1–1000, default 150; rounded to an integer), `base_hue` (0–360, default 220),
+`range_hue` (0–360, default 60), `base_radius` (1–1000 px, default 100),
+and `range_radius` (0–2000 px, default 200). Radius is the base plus a random
+value within the range; hue varies around the base, which continues cycling
+over time. Circle speed is 0.1 plus a random addition of 0–1 px/frame, with
+the shared `speed` multiplier applied to the result. These controls support
+variable bindings.
+
 `iframe` and `chat` share one renderer: the embedded page is display-only in
 the editor (`pointer-events: none` so drags/select fall through) and runs
 unsandboxed at runtime, so it can execute its own scripts and authenticated
@@ -83,6 +92,23 @@ fetches.
 
 From `OVERLAY_LIMITS`: ≤ 50 overlays per user; canvas 16…8192 px per axis,
 ≤ 500 elements per overlay, ≤ 200 variables, coordinates ≤ 100 000.
+
+## Export / import
+
+An overlay can be exported as a single JSON file and imported back (the list
+page's **Export as JSON** / **Import JSON** actions):
+
+- **Export** — `GET /api/overlays/<overlay id>/export` (cookie session) serves
+  the raw overlay blob (the same JSON the runtime page renders:
+  `schemaVersion`, `name`, `canvas`, `variables`, `elements`) as a
+  `content-disposition: attachment` download named `<overlay name>.json`. The
+  server-managed `rev` counter is not part of the export.
+- **Import** — `POST /api/overlays/import` (cookie session) with the exported
+  JSON as the body validates and normalizes it (older `schemaVersion`s are
+  migrated; a non-overlay body 400s) and creates a **fresh overlay** with a
+  new id and name collision-free under the user's limits. Elements keep their
+  ids; media is only referenced by asset-library file id, so an import on
+  another account renders those media as missing until the files are added.
 
 ## Variables
 

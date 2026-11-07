@@ -205,7 +205,10 @@ export const ambientElement: OverlayElementDef & OverlayElementSchema = {
 	icon: () => <Icon name="sync" class="role-icon" />,
 	order: 10,
 	defaultProps: { ...DEFAULT_AMBIENT_PROPS },
-	propKeys: ["kind", "speed", "trail", "background", "trail_faster", "head_brightness"],
+	propKeys: [
+		"kind", "speed", "trail", "background", "trail_faster", "head_brightness",
+		"circle_count", "base_hue", "range_hue", "base_radius", "range_radius",
+	],
 	defaultSize: { width: 960, height: 540 },
 	draw,
 	editForm,

@@ -1,4 +1,9 @@
 {
+  "overlay.ambient_circle_count": "Circle count",
+  "overlay.ambient_base_hue": "Base hue (degrees)",
+  "overlay.ambient_range_hue": "Hue range (degrees)",
+  "overlay.ambient_base_radius": "Base radius (px)",
+  "overlay.ambient_range_radius": "Radius range (px)",
   "overlay.add_alert": "Alert",
   "overlay.add_ellipse": "Ellipse",
   "overlay.add_iframe": "iframe",

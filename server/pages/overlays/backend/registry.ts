@@ -442,7 +442,7 @@ export function createOverlays({
     ): Promise<Response> {
         try {
             const m = url.pathname.match(
-                /^\/api\/overlays(\/([\w.-]{1,64})(?:\/(variables|canvas|elements|duplicate)(?:\/([\w.-]{1,64})?)?)?)?$/,
+                /^\/api\/overlays(\/([\w.-]{1,64})(?:\/(variables|canvas|elements|duplicate|export)(?:\/([\w.-]{1,64})?)?)?)?$/,
             );
             if (!m)
                 return Response.json(
@@ -455,8 +455,53 @@ export function createOverlays({
                 | "canvas"
                 | "elements"
                 | "duplicate"
+                | "export"
                 | undefined) ?? null;
             const subId = m[4] as string | undefined;
+
+            // ── import: /api/overlays/import ─────────────────────────────
+            // The regex reads this as `id = "import"`, but ids are
+            // server-generated UUIDs, so the static path is safe to reserve.
+            // The body is an exported overlay file (the raw overlay blob:
+            // schemaVersion, name, canvas, variables, elements, …);
+            // `migrateOverlayBlob` validates and migrates it, and a new
+            // overlay with a fresh id is created for the user.
+            if (id === "import" && !sub) {
+                if (req.method !== "POST") return notAllowed();
+                if (overlaysFor(user).length >= OVERLAY_LIMITS.overlaysMax)
+                    throw new ApiError("Too many overlays");
+                let raw: unknown;
+                try {
+                    raw = await req.json();
+                } catch {
+                    throw new ApiError("body must be valid JSON");
+                }
+                let overlay: Overlay;
+                try {
+                    ({ overlay } = migrateOverlayBlob(raw));
+                } catch (e) {
+                    throw new ApiError(
+                        e instanceof Error
+                            ? e.message
+                            : "not a valid overlay file",
+                    );
+                }
+                // a fresh overlay: its own id, no server-managed rev
+                const store: Store = {
+                    id: randomUUID(),
+                    owner: user,
+                    overlay: { ...overlay, rev: undefined },
+                    updatedAt: Date.now(),
+                };
+                stores.set(store.id, store);
+                commit(store);
+                feedList(user);
+                feedOverlay(store);
+                return Response.json(
+                    { ok: true, id: store.id, overlay: store.overlay },
+                    { status: 201 },
+                );
+            }
 
             // ── collection: /api/overlays ────────────────────────────────
             if (!id) {
@@ -540,6 +585,28 @@ export function createOverlays({
                 return Response.json(
                     { ok: true, id: store.id, overlay: store.overlay },
                     { status: 201 },
+                );
+            }
+
+            if (sub === "export") {
+                if (req.method !== "GET") return notAllowed();
+                const store = storeWithOwner(user, id);
+                // The export file is the raw overlay blob (the same JSON the
+                // runtime page receives), sans the server-managed `rev`
+                // counter; `filename` from the overlay name makes the
+                // download recognizable.
+                const filename =
+                    `${store.overlay.name.replace(/[^\w.-]+/g, "-").slice(0, 80) || "overlay"}.json`;
+                return new Response(
+                    JSON.stringify({ ...store.overlay, rev: undefined }, null, 2),
+                    {
+                        status: 200,
+                        headers: {
+                            "content-type": "application/json; charset=utf-8",
+                            "content-disposition": `attachment; filename="${filename}"`,
+                            "cache-control": "no-store",
+                        },
+                    },
                 );
             }
 

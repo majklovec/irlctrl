@@ -1459,6 +1459,131 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
         expect(after.overlays).toEqual([]);
     }, 30_000);
 
+    test("export and import an overlay as a JSON file", async () => {
+        const cookie = await login();
+
+        // build an overlay with one element to export
+        const createRes = await fetch(`${baseUrl}/api/overlays`, {
+            method: "POST",
+            headers: { cookie, "content-type": "application/json" },
+            body: JSON.stringify({ name: "Export me" }),
+        });
+        expect(createRes.status).toBe(201);
+        const createBody = (await createRes.json()) as {
+            id: string;
+            overlay: Overlay;
+        };
+        const sourceId = createBody.id;
+        const element: OverlayElement = {
+            id: crypto.randomUUID(),
+            name: "headline",
+            type: "text",
+            transform: { x: 40, y: 60, width: 500, height: 100, rotation: 0, opacity: 1 },
+            visible: true,
+            locked: false,
+            parentId: null,
+            bindings: {},
+            props: { text: "Hello export" },
+        };
+        const upsertRes = await fetch(
+            `${baseUrl}/api/overlays/${sourceId}/elements`,
+            {
+                method: "PUT",
+                headers: { cookie, "content-type": "application/json" },
+                body: JSON.stringify({ element }),
+            },
+        );
+        expect(upsertRes.status).toBe(200);
+
+        // export: a JSON attachment named after the overlay
+        const exportRes = await fetch(
+            `${baseUrl}/api/overlays/${sourceId}/export`,
+            { headers: { cookie } },
+        );
+        expect(exportRes.status).toBe(200);
+        expect(exportRes.headers.get("content-type")).toBe(
+            "application/json; charset=utf-8",
+        );
+        expect(exportRes.headers.get("content-disposition")).toBe(
+            'attachment; filename="Export-me.json"',
+        );
+        const exported = (await exportRes.json()) as Overlay;
+        expect(exported.name).toBe("Export me");
+        expect(exported.elements).toHaveLength(1);
+        expect(exported.elements[0].props.text).toBe("Hello export");
+        // the server-managed rev never leaves the server
+        expect(exported.rev).toBeUndefined();
+
+        // import: the exported file becomes a fresh overlay
+        const importRes = await fetch(`${baseUrl}/api/overlays/import`, {
+            method: "POST",
+            headers: { cookie, "content-type": "application/json" },
+            body: JSON.stringify(exported),
+        });
+        expect(importRes.status).toBe(201);
+        const importBody = (await importRes.json()) as {
+            ok: boolean;
+            id: string;
+            overlay: Overlay;
+        };
+        expect(importBody.ok).toBe(true);
+        expect(importBody.id).not.toBe(sourceId);
+        expect(importBody.overlay.name).toBe("Export me");
+        expect(importBody.overlay.elements).toHaveLength(1);
+        expect(importBody.overlay.elements[0].id).toBe(element.id);
+        expect(importBody.overlay.rev).toBeUndefined();
+
+        // the import appears in the list
+        const list = (await (
+            await fetch(`${baseUrl}/api/overlays`, { headers: { cookie } })
+        ).json()) as { overlays: OverlaySummary[] };
+        expect(list.overlays.map((o) => o.id)).toContain(importBody.id);
+        expect(list.overlays).toHaveLength(2);
+
+        // bad bodies are rejected: not JSON, and JSON that is not an overlay
+        const badJson = await fetch(`${baseUrl}/api/overlays/import`, {
+            method: "POST",
+            headers: { cookie, "content-type": "application/json" },
+            body: "not json",
+        });
+        expect(badJson.status).toBe(400);
+        const notAnOverlay = await fetch(`${baseUrl}/api/overlays/import`, {
+            method: "POST",
+            headers: { cookie, "content-type": "application/json" },
+            body: JSON.stringify({ foo: "bar" }),
+        });
+        expect(notAnOverlay.status).toBe(400);
+        // the import path is POST-only
+        expect(
+            (await fetch(`${baseUrl}/api/overlays/import`, { headers: { cookie } })).status,
+        ).toBe(405);
+        // an unknown overlay does not export (no existence leak)
+        expect(
+            (
+                await fetch(
+                    `${baseUrl}/api/overlays/00000000-0000-4000-8000-000000000000/export`,
+                    { headers: { cookie } },
+                )
+            ).status,
+        ).toBe(404);
+
+        // tidy up so the user is back to no overlays
+        for (const id of [sourceId, importBody.id]) {
+            expect(
+                (
+                    await fetch(`${baseUrl}/api/overlays/${id}`, {
+                        method: "DELETE",
+                        headers: { cookie },
+                    })
+                ).status,
+            ).toBe(200);
+        }
+        const after = (await (
+            await fetch(`${baseUrl}/api/overlays`, { headers: { cookie } })
+        ).json()) as { overlays: OverlaySummary[] };
+        expect(after.overlays).toHaveLength(0);
+    }, 30_000);
+
     test("live-map route history: path.end renames the live default route", async () => {
         const cookie = await login();
         const tokenRes = await fetch(`${baseUrl}/api/profile/tokens`, {

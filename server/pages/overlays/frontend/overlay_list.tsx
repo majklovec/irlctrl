@@ -8,6 +8,8 @@ import {
 	RowActions,
 	Table,
 	Toolbar,
+	Toast,
+	useToast,
 } from "@ui/components/";
 import { confirmDialog } from "@ui/components/confirm";
 import { Icon } from "@ui/components/icons";
@@ -21,11 +23,33 @@ import {
 	deleteOverlay,
 	duplicateOverlay,
 	editorUrl,
+	exportOverlay,
+	importOverlay,
 	load,
 	renameOverlay,
 	runtimeUrl,
 	state,
 } from "./overlay_store";
+
+const toast = useToast();
+
+/** Import an exported overlay file (the hidden input's selection is read
+ * here; re-selecting the same file re-triggers `onchange` because the
+ * input's value is reset). */
+async function onImportFile(input: HTMLInputElement): Promise<void> {
+	const file = input.files?.[0];
+	input.value = "";
+	if (!file) return;
+	let raw: unknown;
+	try {
+		raw = JSON.parse(await file.text());
+	} catch {
+		toast.show(t("overlay.import_invalid_file"));
+		return;
+	}
+	const error = await importOverlay(raw);
+	if (error) toast.show(error);
+}
 
 export function listToolbar(): m.Vnode {
 	return (
@@ -43,6 +67,23 @@ export function listToolbar(): m.Vnode {
 				label={t("overlay.new_overlay")}
 				disabled={!state.newOverlayName.trim()}
 				onclick={() => void createOverlay()}
+			/>
+			<input
+				type="file"
+				hidden
+				accept=".json,application/json"
+				data-overlay-import
+				onchange={(ev: Event) =>
+					void onImportFile(ev.target as HTMLInputElement)
+				}
+			/>
+			<Button
+				label={t("overlay.import_overlay")}
+				onclick={() =>
+					document
+						.querySelector<HTMLInputElement>("[data-overlay-import]")
+						?.click()
+				}
 			/>
 		</Toolbar>
 	);
@@ -124,6 +165,11 @@ export function overlayList(): m.Vnode {
 										onclick={() => void duplicateOverlay(s.id)}
 									/>
 									<IconButton
+										label={t("overlay.export_overlay")}
+										icon={<Icon name="download" class="role-icon" />}
+										onclick={() => exportOverlay(s.id)}
+									/>
+									<IconButton
 										label={t("overlay.rename_overlay")}
 										icon={<Icon name="edit" class="role-icon" />}
 										onclick={() => {
@@ -174,6 +220,7 @@ const overlayListPage: m.Component = {
 			) : (
 				<p class="muted">{t("overlay.loading")}</p>
 			)}
+			<Toast message={toast.message} />
 		</Page>
 	),
 };
