@@ -1,3 +1,10 @@
+## [3.5.1](https://github.com/majklovec/irlctrl/compare/v3.5.0...v3.5.1) (2026-11-08)
+
+
+### Bug Fixes
+
+* **i18n:** shorten create overlay label ([e1f8336](https://github.com/majklovec/irlctrl/commit/e1f8336d9f1c13d97ffae16791be9f066febf8db))
+
 # [3.5.0](https://github.com/majklovec/irlctrl/compare/v3.4.0...v3.5.0) (2026-11-08)
 
 
