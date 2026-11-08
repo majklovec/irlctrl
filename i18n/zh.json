@@ -289,6 +289,7 @@
     "setup.review_desc": "可用“返回”检查选择，然后保存配置。",
     "setup.save": "保存配置",
     "setup.saved": "配置已保存。重启服务以应用所选角色、主机名和控制服务器。",
+    "setup.step_invalid": "请填写高亮显示的字段以继续。",
     "setup.step.control": "控制服务器",
     "setup.step.control_sub": "可选连接到中央服务器。",
     "setup.step.identity": "身份",

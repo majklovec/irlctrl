@@ -6,7 +6,7 @@
  * the dry-run aware `ip` runner and atomic writes; the module supplies the
  * ModemManager lookups.
  */
-import { readFile } from "node:fs/promises";
+import { exists, readFile } from "node:fs/promises";
 import { resolve4 } from "node:dns/promises";
 import { createConnection } from "node:net";
 import { tmpdir } from "node:os";
@@ -548,6 +548,23 @@ export async function reconfigure(): Promise<ReconfigureResult> {
     });
 }
 
+/** Create the uplinks file when it is missing (e.g. a wiped /tmp); a no-op otherwise. */
+export async function ensureUplinksFile(): Promise<void> {
+    if (core.config.DRY_RUN || (await exists(UPLINKS_FILE))) return;
+    try {
+        const selected = resolveSelection(await detectInterfaces());
+        if (selected.length === 0)
+            throw new Error("No interfaces selected for bonding.");
+        const ips = selected.map((i) => i.ip);
+        const content = `${ips.join("\n")}\n`;
+        await core.writeFileAtomic(UPLINKS_FILE, content);
+        lastUplinksContent = content;
+        console.log(`Uplinks file created: ${ips.join(", ")}`);
+    } catch (err: unknown) {
+        console.warn(`Could not create ${UPLINKS_FILE}: ${errorMessage(err)}`);
+    }
+}
+
 // ----------------------------------------------------------------------
 // Live interface monitor (netlink via `ip monitor`)
 // ----------------------------------------------------------------------
@@ -611,9 +628,38 @@ async function runReconcile(reason: string): Promise<void> {
 const RELEVANT_EVENT = /inet\s|^\d+:\s+\S+:\s+<.*>|^(Deleted|Added|default)/;
 
 // Route changes inside our own source-routing tables are self-inflicted.
-function isSelfGeneratedEvent(line: string): boolean {
-    const m = line.match(/\btable (\d+)\b/);
-    return m !== null && isManagedTable(parseInt(m[1], 10));
+// `ip monitor` prints the table by *name* when /etc/iproute2/rt_tables names
+// one (e.g. belabox's "100 usb0"), so resolve names to IDs before filtering.
+const RT_TABLES_FILE = "/etc/iproute2/rt_tables";
+let rtTablesFile = RT_TABLES_FILE;
+let rtTableIds: Map<string, number> | null = null;
+
+/** Test seam: point the name → ID lookup at a fixture file (null restores the default). */
+export function setRtTablesFileForTest(path: string | null): void {
+    rtTablesFile = path ?? RT_TABLES_FILE;
+    rtTableIds = null;
+}
+
+async function tableIdByName(name: string): Promise<number | undefined> {
+    if (rtTableIds === null) {
+        rtTableIds = new Map();
+        const text = await readFile(rtTablesFile, "utf8").catch(() => "");
+        for (const line of text.split("\n")) {
+            if (line.trimStart().startsWith("#")) continue;
+            const [id, name] = line.trim().split(/\s+/);
+            if (id === undefined || name === undefined) continue;
+            if (/^\d+$/.test(id)) rtTableIds.set(name, parseInt(id, 10));
+        }
+    }
+    return rtTableIds.get(name);
+}
+
+export async function isSelfGeneratedEvent(line: string): Promise<boolean> {
+    const token = line.match(/\btable (\S+)/)?.[1];
+    if (token === undefined) return false;
+    if (/^\d+$/.test(token)) return isManagedTable(parseInt(token, 10));
+    const id = await tableIdByName(token);
+    return id !== undefined && isManagedTable(id);
 }
 
 /**
@@ -639,7 +685,10 @@ export function startInterfaceMonitor(onChange?: UplinksChangedHandler): void {
     (async () => {
         try {
             for await (const line of readLines(proc.stdout)) {
-                if (RELEVANT_EVENT.test(line) && !isSelfGeneratedEvent(line)) {
+                if (
+                    RELEVANT_EVENT.test(line) &&
+                    !(await isSelfGeneratedEvent(line))
+                ) {
                     scheduleReconcile(line.slice(0, 120));
                 }
             }

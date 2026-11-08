@@ -289,6 +289,7 @@
     "setup.review_desc": "Zvolením Zpět si zkontrolujte své volby, poté konfiguraci uložte.",
     "setup.save": "Uložit konfiguraci",
     "setup.saved": "Konfigurace uložena. Pro aplikaci vybrané role, názvu hostitele a řídicího serveru službu restartujte.",
+    "setup.step_invalid": "Vyplňte zvýrazněná pole, abyste mohli pokračovat.",
     "setup.step.control": "Řídicí server",
     "setup.step.control_sub": "Volitelné připojení k centrálnímu serveru.",
     "setup.step.identity": "Identita",

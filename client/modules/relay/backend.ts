@@ -8,10 +8,13 @@
  */
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ModuleCore } from "../../backend/module_core";
 import { argEnv, argv, enumArgEnv } from "../../../shared/args";
+import type {
+    BackendModule,
+    Emit,
+    Params,
+} from "../../../shared/contracts/backend_module";
 import { t } from "../../../shared/i18n";
-import type { BackendModule, Emit, Params } from "../../../shared/contracts/backend_module";
 import {
     ApiError,
     oneOf,
@@ -23,6 +26,7 @@ import {
     requireString,
 } from "../../../shared/params";
 import { errorMessage } from "../../../shared/util";
+import type { ModuleCore } from "../../backend/module_core";
 import * as control from "./control";
 import log from "./log";
 import {
@@ -35,6 +39,7 @@ import {
     bindRouting,
     defaultRouteDetails,
     detectInterfaces,
+    ensureUplinksFile,
     isMonitorRunning,
     reconfigure,
     resolveSelection,
@@ -47,12 +52,12 @@ import {
     UPLINKS_FILE,
 } from "./routing";
 import {
-    SRTLA_MODES,
     type Iface,
     type ModemConfig,
     type ModemInfo,
     type ReconfigureResult,
     type RelayConfig,
+    SRTLA_MODES,
     type SrtlaOptions,
     type SrtlaOptionsResult,
     type SrtlaState,
@@ -107,7 +112,8 @@ async function selectModems(p: Params) {
         [];
     if (badIfaces.length)
         throw new ApiError(`Unknown interfaces: ${badIfaces.join(", ")}`);
-    const badIps = ips?.filter((ip) => !all.some((iface) => iface.ip === ip)) ?? [];
+    const badIps =
+        ips?.filter((ip) => !all.some((iface) => iface.ip === ip)) ?? [];
     if (badIps.length) throw new ApiError(`Unknown IPs: ${badIps.join(", ")}`);
     return applySelection(
         names?.length ? { modems: names } : ips?.length ? { ips } : {},
@@ -273,6 +279,7 @@ async function startRelay(
     // Save the requested receiver before spawning so failed starts still
     // leave the UI with a complete target to restore.
     await save({ listenPort, remoteHost, remotePort });
+    await ensureUplinksFile();
     const uplinks = uplinksFile();
     console.log(
         `Starting ${bin} listen: ${listenPort} target: ${remoteHost}:${remotePort} ${uplinks}`,

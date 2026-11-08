@@ -784,6 +784,8 @@ const relayModule: FrontendModule = {
 					<>
 						<Field
 							label={t("dev.field.srt_listen_port")}
+							required={true}
+							invalid={!inRange(setupFields.listenPort, 1, 65535)}
 							control={
 								<Input
 									target={setupFields}
@@ -795,23 +797,27 @@ const relayModule: FrontendModule = {
 						/>
 						<Field
 							label={t("dev.field.remote_host")}
+							required={true}
+							invalid={!setupFields.srtlaRemoteHost}
 							control={
 								<Input
 									target={setupFields}
 									prop="srtlaRemoteHost"
 									placeholder="rec.example.com"
-									required={_role !== "encoder"}
+									required={true}
 								/>
 							}
 						/>
 						<Field
 							label={t("dev.field.remote_port")}
+							required={true}
+							invalid={!inRange(setupFields.srtlaRemotePort, 1, 65535)}
 							control={
 								<Input
 									target={setupFields}
 									prop="srtlaRemotePort"
 									{...numberAttrs(1, 65535)}
-									required={_role !== "encoder"}
+									required={true}
 								/>
 							}
 						/>

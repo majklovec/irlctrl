@@ -289,6 +289,7 @@
     "setup.review_desc": "Reveja as escolhas com Voltar e depois guarde a configuração.",
     "setup.save": "Guardar configuração",
     "setup.saved": "Configuração guardada. Reinicie o serviço para aplicar a função, hostname e servidor de controlo selecionados.",
+    "setup.step_invalid": "Preencha os campos destacados para continuar.",
     "setup.step.control": "Servidor de controlo",
     "setup.step.control_sub": "Ligação opcional a um servidor central.",
     "setup.step.identity": "Identidade",

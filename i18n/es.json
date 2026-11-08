@@ -289,6 +289,7 @@
     "setup.review_desc": "Revisa tus opciones con Atrás y guarda la configuración.",
     "setup.save": "Guardar configuración",
     "setup.saved": "Configuración guardada. Reinicia el servicio para aplicar el rol, hostname y servidor de control seleccionados.",
+    "setup.step_invalid": "Complete los campos resaltados para continuar.",
     "setup.step.control": "Servidor de control",
     "setup.step.control_sub": "Conexión opcional a un servidor central.",
     "setup.step.identity": "Identidad",

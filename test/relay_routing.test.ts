@@ -1,10 +1,23 @@
 import { afterAll, describe, expect, test } from "bun:test";
+import { rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { ModuleCore } from "../client/backend/module_core";
-import { bindRouting, defaultRouteDetails } from "../client/modules/relay/routing";
+import {
+    bindRouting,
+    defaultRouteDetails,
+    isSelfGeneratedEvent,
+    setRtTablesFileForTest,
+} from "../client/modules/relay/routing";
 import { defaultRouteRowIndex } from "../client/modules/relay/route_view";
 
 // The tests below bind stub bags into the module singleton; hand the real
 // process bag back so later test files see the device as discovery left it.
+const rtTablesFixture = join(tmpdir(), `irtctrl_rt_tables.${process.pid}`);
+afterAll(() => {
+    rmSync(rtTablesFixture, { force: true });
+    setRtTablesFileForTest(null);
+});
 afterAll(async () => {
     const { bindModules } = await import("../client/backend/modules");
     bindModules();
@@ -53,4 +66,38 @@ describe("SRTLA default-route details", () => {
             { iface: "eth0", ip: "192.168.32.4" },
         ]);
     });
+});
+
+describe("self-generated route event filtering", () => {
+        test("matches managed tables by numeric ID or by rt_tables name", async () => {
+            // belabox images name table 100 in /etc/iproute2/rt_tables ("100 usb0"),
+            // and `ip monitor` then prints "table usb0" — both must be recognised.
+            writeFileSync(
+                rtTablesFixture,
+                ["# reserved kernel routing tables", "255\tlocal", "254\tmain", "100\tusb0"].join("\n"),
+            );
+            setRtTablesFileForTest(rtTablesFixture);
+
+            expect(
+                await isSelfGeneratedEvent(
+                    "default via 10.0.1.138 dev eth0 table 100",
+                ),
+            ).toBe(true);
+            expect(
+                await isSelfGeneratedEvent(
+                    "default via 10.0.1.138 dev eth0 table usb0",
+                ),
+            ).toBe(true);
+
+            // Main-table and foreign-table events stay relevant (failover etc.).
+            expect(
+                await isSelfGeneratedEvent("default via 10.0.1.138 dev eth0"),
+            ).toBe(false);
+            expect(
+                await isSelfGeneratedEvent(
+                    "default via 10.0.1.138 dev eth0 table local",
+                ),
+            ).toBe(false);
+            setRtTablesFileForTest(null);
+        });
 });

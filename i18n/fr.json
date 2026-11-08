@@ -289,6 +289,7 @@
     "setup.review_desc": "Vérifiez vos choix avec Retour, puis enregistrez la configuration.",
     "setup.save": "Enregistrer la configuration",
     "setup.saved": "Configuration enregistrée. Redémarrez le service pour appliquer le rôle, le nom d'hôte et le serveur de contrôle sélectionnés.",
+    "setup.step_invalid": "Veuillez remplir les champs surlignés pour continuer.",
     "setup.step.control": "Serveur de contrôle",
     "setup.step.control_sub": "Connexion facultative à un serveur central.",
     "setup.step.identity": "Identité",

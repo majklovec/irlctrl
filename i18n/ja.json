@@ -289,6 +289,7 @@
     "setup.review_desc": "戻るで選択内容を確認し、設定を保存してください。",
     "setup.save": "設定を保存",
     "setup.saved": "設定を保存しました。選択したロール、ホスト名、制御サーバーを適用するにはサービスを再起動してください。",
+    "setup.step_invalid": "ハイライトされた項目を入力して続行してください。",
     "setup.step.control": "制御サーバー",
     "setup.step.control_sub": "中央サーバーへの任意接続。",
     "setup.step.identity": "識別情報",

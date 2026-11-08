@@ -201,10 +201,16 @@ const encoderSetupStep: ModuleSetupStep = {
 	render(role: Status["role"], setupInfo: SetupInfo) {
 		const info = setupInfo as EncoderSetupInfo;
 		const standalone = role === "encoder";
+		const bitratesValid =
+			setupBitrateValid(setupFields.minBitrate) &&
+			setupBitrateValid(setupFields.maxBitrate) &&
+			Number(setupFields.minBitrate) <= Number(setupFields.maxBitrate);
 		return (
 			<>
 				<Field
 					label={t("dev.row.pipeline")}
+					required={true}
+					invalid={!setupFields.pipeline}
 					control={
 						<Select target={setupFields} prop="pipeline" required={true}>
 							<Options
@@ -215,24 +221,26 @@ const encoderSetupStep: ModuleSetupStep = {
 				/>
 				<Field
 					label={t("dev.field.min_bitrate")}
+					required={true}
+					invalid={!bitratesValid}
 					control={
 						<Input target={setupFields} prop="minBitrate" {...setupBitrate} />
 					}
 				/>
 				<Field
 					label={t("dev.field.max_bitrate")}
+					required={true}
+					invalid={!bitratesValid}
 					control={
 						<Input target={setupFields} prop="maxBitrate" {...setupBitrate} />
 					}
 				/>
 				<Field
 					label={t("dev.field.audio_source")}
+					required={true}
+					invalid={!setupFields.audioSource}
 					control={
-						<Select
-							target={setupFields}
-							prop="audioSource"
-							required={true}
-						>
+						<Select target={setupFields} prop="audioSource" required={true}>
 							<Options
 								pairs={(info.audioSources ?? []).map((a) => [a.id, a.name])}
 							/>
@@ -265,6 +273,8 @@ const encoderSetupStep: ModuleSetupStep = {
 				{standalone && [
 					<Field
 						label={t("dev.field.stream_host")}
+						required={true}
+						invalid={!setupFields.encoderHost}
 						control={
 							<Input
 								target={setupFields}
@@ -276,6 +286,8 @@ const encoderSetupStep: ModuleSetupStep = {
 					/>,
 					<Field
 						label={t("dev.field.stream_srt_port")}
+						required={true}
+						invalid={!inRange(setupFields.encoderPort, 1, 65535)}
 						control={
 							<Input
 								target={setupFields}
@@ -288,6 +300,8 @@ const encoderSetupStep: ModuleSetupStep = {
 				]}
 				<Field
 					label={t("dev.field.srt_latency")}
+					required={true}
+					invalid={!inRange(setupFields.latency, 100, 10000)}
 					control={
 						<Input
 							target={setupFields}

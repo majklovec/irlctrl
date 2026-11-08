@@ -289,6 +289,7 @@
     "setup.review_desc": "Review your choices with Back, then save the configuration.",
     "setup.save": "Save configuration",
     "setup.saved": "Configuration saved. Restart the service to apply the selected role, hostname and control server.",
+    "setup.step_invalid": "Please fill in the highlighted fields to continue.",
     "setup.step.control": "Control server",
     "setup.step.control_sub": "Optional connection to a central server.",
     "setup.step.identity": "Identity",

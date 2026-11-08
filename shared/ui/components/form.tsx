@@ -7,16 +7,36 @@ import { t } from "../i18n";
 import type { MithrilJSXComponent } from "../jsx";
 import type { Child } from "../util";
 
-/** A <label> with a caption above its control; extra attrs (`class`, `hidden`, …) pass through. */
+/** A <label> with a caption above its control; extra attrs (`class`, `hidden`, …) pass through.
+ * `required` marks the caption with a red asterisk; `invalid` flags the row as failed validation. */
 export const Field = {
-	view: ({ attrs: { label, control, ...extra } }) => (
+	view: ({
+		attrs: { label, control, required, invalid, class: extraClass, ...extra },
+	}) => (
 		// biome-ignore lint/a11y/noLabelWithoutControl: <explanation>
-		<label {...extra}>
-			{label}
+		<label
+			{...extra}
+			class={
+				[extraClass, required ? "f-required" : "", invalid ? "f-invalid" : ""]
+					.filter(Boolean)
+					.join(" ") || undefined
+			}
+		>
+			<span class="f-caption">
+				{label}
+				{required ? <b class="f-req"> *</b> : null}
+			</span>
 			{control}
 		</label>
 	),
-} as MithrilJSXComponent<{ label: Child; control: m.Children } & m.Attributes>;
+} as MithrilJSXComponent<
+	{
+		label: Child;
+		control: m.Children;
+		required?: boolean;
+		invalid?: boolean;
+	} & m.Attributes
+>;
 
 /** Numeric bound input wrapped in a standard form Field label/control row. */
 export const NumberField = {

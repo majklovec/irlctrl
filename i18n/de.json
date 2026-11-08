@@ -289,6 +289,7 @@
     "setup.review_desc": "Auswahl mit Zurück prüfen, dann die Konfiguration speichern.",
     "setup.save": "Konfiguration speichern",
     "setup.saved": "Konfiguration gespeichert. Dienst neu starten, um ausgewählte Rolle, Hostname und Steuerungsserver anzuwenden.",
+    "setup.step_invalid": "Bitte füllen Sie die hervorgehobenen Felder aus, um fortzufahren.",
     "setup.step.control": "Steuerungsserver",
     "setup.step.control_sub": "Optionale Verbindung zu einem zentralen Server.",
     "setup.step.identity": "Identität",

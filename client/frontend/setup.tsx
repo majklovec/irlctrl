@@ -91,17 +91,29 @@ const stepFrame = (
 	id: string,
 	heading: string,
 	subtitle: string,
+	opts: { required?: boolean } = {},
 	...children: m.Children[]
 ) => (
-	<fieldset class="wizard-step" data-step={id}>
-		<h2 class="wiz-heading">{heading}</h2>
+	<fieldset
+		class={opts.required ? "wizard-step wiz-required" : "wizard-step"}
+		data-step={id}
+	>
+		<h2 class="wiz-heading">
+			{heading}
+			{opts.required ? <b class="wiz-req"> *</b> : null}
+		</h2>
 		<p class="wiz-desc">{subtitle}</p>
 		{children}
 	</fieldset>
 );
 
-const roleCard = (value: Role, name: string, tagline?: string): m.Vnode => (
-	<label class="role-card">
+const roleCard = (
+	value: Role,
+	name: string,
+	tagline?: string,
+	invalid?: boolean,
+): m.Vnode => (
+	<label class={`role-card${invalid ? " invalid" : ""}`}>
 		<input
 			type="radio"
 			name="role"
@@ -132,6 +144,7 @@ function moduleStep(step: ModuleSetupStep, role: Role): WizardStep {
 				step.id,
 				t(step.title),
 				t(step.subtitle),
+				{ required: true },
 				step.render(role, info),
 			);
 		},
@@ -158,6 +171,7 @@ function coreStep(step: CoreStep): WizardStep {
 						step.id,
 						t("ui.language_label"),
 						t("setup.language_desc"),
+						{},
 						<Field
 							label={t("ui.language_label")}
 							control={
@@ -171,26 +185,34 @@ function coreStep(step: CoreStep): WizardStep {
 							}
 						/>,
 					);
-				case "role":
+				case "role": {
+					const roleInvalid = !f.role;
 					return stepFrame(
 						step.id,
 						t("set.role"),
 						t("setup.step.role_sub"),
+						{ required: true },
 						...(state.info?.roleDefinitions ?? []).map((definition) =>
 							roleCard(
 								definition.id,
 								t(definition.titleKey),
 								definition.taglineKey ? t(definition.taglineKey) : undefined,
+								roleInvalid,
 							),
 						),
 					);
-				case "identity":
+				}
+				case "identity": {
+					const identityInvalid = !HOSTNAME_RE.test(f.hostname);
 					return stepFrame(
 						step.id,
 						t("setup.identity"),
 						t("setup.identity_desc"),
+						{ required: true },
 						<Field
 							label={t("setup.hostname")}
+							required={true}
+							invalid={identityInvalid}
 							control={
 								<Input
 									target={f}
@@ -213,11 +235,13 @@ function coreStep(step: CoreStep): WizardStep {
 							}
 						/>,
 					);
+				}
 				case "control":
 					return stepFrame(
 						step.id,
 						t("setup.step.control"),
 						t("setup.control_desc"),
+						{},
 						<Field
 							label={t("set.remote_url")}
 							control={
@@ -245,6 +269,7 @@ function coreStep(step: CoreStep): WizardStep {
 						step.id,
 						t("setup.step.review"),
 						t("setup.review_desc"),
+						{},
 						<CheckField
 							label={t("setup.autostart")}
 							control={<Checkbox target={f} prop="autostart" />}
@@ -268,8 +293,14 @@ const currentIndex = () => Math.min(state.current, visibleSteps().length - 1);
 function goNext(): void {
 	const steps = visibleSteps();
 	const current = currentIndex();
-	if (steps[current]?.valid())
-		state.current = Math.min(current + 1, steps.length - 1);
+	if (!steps[current]?.valid()) {
+		// Stay on the step; its required fields are already highlighted
+		// red, and this says what is missing.
+		state.message = t("setup.step_invalid");
+		return;
+	}
+	state.message = "";
+	state.current = Math.min(current + 1, steps.length - 1);
 }
 
 function goPrev(): void {

@@ -41,8 +41,8 @@ import {
 	loadForm,
 	nameOptions,
 	StateBadge,
-	toConfig,
 	type SwitcherForm,
+	toConfig,
 } from "./switcher_form";
 import type { ObsStatus, SwitcherStatus } from "./types";
 import { VUMeter, type VuLevels } from "./vu_meter";
@@ -1039,6 +1039,8 @@ const obsSetupStep: ModuleSetupStep = {
 			<>
 				<Field
 					label={t("set.obs_url")}
+					required={true}
+					invalid={!isObsUrl(setupFields.obsUrl)}
 					control={
 						<Input
 							target={setupFields}

@@ -48,6 +48,32 @@ label {
     font-weight: 500;
 }
 
+/* Required marker next to the caption (Field `required`) */
+.f-caption .f-req {
+    color: var(--bad, #e5484d);
+    font-weight: 600;
+}
+
+/* Failed validation: caption and control turn red (Field `invalid`) */
+label.f-invalid {
+    color: var(--bad, #e5484d);
+}
+label.f-invalid > input,
+label.f-invalid > select,
+label.f-invalid > textarea {
+    border-color: var(--bad, #e5484d);
+}
+label.f-invalid
+    > input:focus-visible,
+label.f-invalid
+    > select:focus-visible,
+label.f-invalid
+    > textarea:focus-visible {
+    border-color: var(--bad, #e5484d);
+    box-shadow: 0 0 0 3px
+        color-mix(in srgb, var(--bad, #e5484d) 25%, transparent);
+}
+
 input,
 select,
 button,

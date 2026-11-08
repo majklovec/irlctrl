@@ -289,6 +289,7 @@
     "setup.review_desc": "Sprawdź wybory przyciskiem Wstecz, a potem zapisz konfigurację.",
     "setup.save": "Zapisz konfigurację",
     "setup.saved": "Konfiguracja zapisana. Zrestartuj usługę, aby zastosować wybraną rolę, nazwę hosta i serwer sterowania.",
+    "setup.step_invalid": "Wypełnij zaznaczone pola, aby kontynuować.",
     "setup.step.control": "Serwer sterowania",
     "setup.step.control_sub": "Opcjonalne połączenie z serwerem centralnym.",
     "setup.step.identity": "Tożsamość",
