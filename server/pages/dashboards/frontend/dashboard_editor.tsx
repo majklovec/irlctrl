@@ -2,8 +2,9 @@
  *   dashboard_view.tsx    /dashboards/view/<id>/  read-only
  *   dashboard_update.tsx  /dashboards/edit/<id>/  editing
  * One GridStack grid renders the live widgets; the update page makes the
- * dashboard name and colour editable and lets widgets be dragged/resized,
- * hidden, removed, renamed and re-configured; new widgets are added on the
+ * dashboard colour editable and lets widgets be dragged/resized,
+ * hidden, removed, renamed and re-configured; the dashboard name is renamed
+ * from the list page; new widgets are added on the
  * dedicated page `/dashboards/add/<id>/` (dashboard_add.tsx). "Edit" / "Done"
  * navigate between the two URLs. Layout + name changes autosave (debounced)
  * with optimistic concurrency: a 409 reloads the server copy and toasts the
@@ -212,14 +213,6 @@ const actions: WidgetActions = { remove: removeWidget, hide: hideWidget };
 
 // ------------------------------------------------------------- dashboard ops
 
-function onNameInput(value: string): void {
-	const dash = state.dash;
-	if (!dash) return;
-	dash.name = value;
-	// The API rejects a blank name, so only save once there is one.
-	if (value.trim()) scheduleSave();
-}
-
 function onColorInput(value: string): void {
 	const dash = state.dash;
 	if (!dash) return;
@@ -262,23 +255,7 @@ const App: m.Component = {
 			<Page
 				title={
 					<TitleWithBack href={DASHBOARD_LIST_URL} backLabel={t("dash.back")}>
-						{dash ? (
-							state.editMode ? (
-								<input
-									class="dash-name-input"
-									type="text"
-									value={dash.name}
-									aria-label={t("dash.rename")}
-									oninput={(e: Event) =>
-										onNameInput((e.target as HTMLInputElement).value)
-									}
-								/>
-							) : (
-								dash.name
-							)
-						) : (
-							t("dash.title")
-						)}
+						{dash ? dash.name : t("dash.title")}
 					</TitleWithBack>
 				}
 				nav={

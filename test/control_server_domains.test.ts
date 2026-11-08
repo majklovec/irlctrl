@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createAuth } from "../server/core/auth/auth";
 import { createDashboards } from "../server/pages/dashboards/backend/registry";
+import { createProjects } from "../server/pages/projects/backend/registry";
 import { destroyWidgetHub } from "../shared/registry";
 
 function request(path: string, body?: unknown, cookie?: string): Request {
@@ -17,6 +18,7 @@ function request(path: string, body?: unknown, cookie?: string): Request {
 describe("control-server domain contracts", () => {
     let auth: Awaited<ReturnType<typeof createAuth>>;
     let dashboards: ReturnType<typeof createDashboards>;
+    let projects: ReturnType<typeof createProjects>;
     const published: { topic: string; message: string }[] = [];
 
     beforeAll(async () => {
@@ -27,6 +29,8 @@ describe("control-server domain contracts", () => {
             publish: (topic, message) => published.push({ topic, message }),
             ownsDevice: (id, owner) => id === "relay" && owner === "alice",
         });
+        // Device tokens are project-scoped; the projects store owns them.
+        projects = createProjects(auth.db);
     });
 
     afterAll(() => {
@@ -103,22 +107,14 @@ describe("control-server domain contracts", () => {
             error: "Invitation already used",
         });
 
-        const { token } = await auth
-            .createTokenResponse(request("/api/profile/tokens"), "alice")
-            .json();
+        const aliceProject = projects.personalProjectId("alice");
+        const token = projects.createToken("alice", aliceProject);
         expect(auth.userForToken(token.token)).toBe("alice");
-        const foreignDelete = auth.deleteTokenResponse(
-            new URL(`http://localhost/api/profile/tokens/${token.id}`),
-            "bob",
-        );
-        expect(foreignDelete.status).toBe(404);
+        // A foreign owner/editor cannot delete a token that is not theirs:
+        // bob has no role in alice's project, so the delete 404s.
+        expect(() => projects.removeToken("bob", aliceProject, token.id)).toThrow();
         expect(auth.userForToken(token.token)).toBe("alice");
-        expect(
-            auth.deleteTokenResponse(
-                new URL(`http://localhost/api/profile/tokens/${token.id}`),
-                "alice",
-            ).status,
-        ).toBe(200);
+        projects.removeToken("alice", aliceProject, token.id);
         expect(auth.userForToken(token.token)).toBeNull();
         const logout = auth.logoutResponse(session);
         expect(logout.headers.get("set-cookie")).toBe(

@@ -104,6 +104,27 @@ async function login(): Promise<string> {
     return cookie;
 }
 
+/** Create a device token in the session user's Personal project and return the
+ * raw value. Tokens are project-scoped (`/api/projects/:id/tokens`), so this
+ * resolves the caller's personal project id from their project list first. */
+async function personalProjectToken(cookie: string): Promise<string> {
+    const list = await fetch(`${baseUrl}/api/projects`, { headers: { cookie } });
+    const projects = (await list.json()) as {
+        projects: { id: string; name: string }[];
+    };
+    const personal = projects.projects.find((p) =>
+        p.id.startsWith("personal-"),
+    );
+    if (!personal) throw new Error("No Personal project found");
+    const res = await fetch(`${baseUrl}/api/projects/${personal.id}/tokens`, {
+        method: "POST",
+        headers: { cookie },
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { token: { token: string } };
+    return body.token.token;
+}
+
 /**
  * Frames arrive as soon as the server publishes them, which can be before a
  * matching `nextFrame` call starts listening. Buffer every frame per socket
@@ -278,18 +299,7 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
 
         // every runtime surface authenticates with this user's device token
         // (owner user-token auth), not a per-overlay token
-        const tokenRes = await fetch(`${baseUrl}/api/profile/tokens`, {
-            method: "POST",
-            headers: { cookie },
-        });
-        expect(tokenRes.status).toBe(200);
-        const tokenBody = (await tokenRes.json()) as {
-            ok: boolean;
-            token: { token: string };
-        };
-        expect(tokenBody.ok).toBe(true);
-        expect(tokenBody.token.token).toMatch(/^[0-9a-f]{48}$/);
-        const token = tokenBody.token.token;
+        const token = await personalProjectToken(cookie);
 
         // the list page and the per-overlay editor page are separate,
         // linkable pages
@@ -1586,15 +1596,7 @@ describe("overlays (OBS overlay editor) HTTP + WS contracts", () => {
 
     test("live-map route history: path.end renames the live default route", async () => {
         const cookie = await login();
-        const tokenRes = await fetch(`${baseUrl}/api/profile/tokens`, {
-            method: "POST",
-            headers: { cookie },
-        });
-        const tokenBody = (await tokenRes.json()) as {
-            ok: boolean;
-            token: { token: string };
-        };
-        const token = tokenBody.token.token;
+        const token = await personalProjectToken(cookie);
 
         const createRes = await fetch(`${baseUrl}/api/overlays`, {
             method: "POST",

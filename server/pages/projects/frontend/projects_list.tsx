@@ -13,12 +13,8 @@ import {
 	Card,
 	confirmDialog,
 	EmptyState,
-	Field,
-	FieldGroup,
-	Form,
 	IconButton,
 	Input,
-	Modal,
 	Page,
 	RowActions,
 	Select,
@@ -58,6 +54,12 @@ interface Invite {
 	usedBy: string | null;
 }
 
+interface DeviceToken {
+	id: number;
+	token: string;
+	createdAt: string;
+}
+
 const state = {
 	me: "",
 	projects: undefined as Project[] | undefined,
@@ -67,15 +69,20 @@ const state = {
 	selected: null as Project | null,
 	members: undefined as Member[] | undefined,
 	invites: undefined as Invite[] | undefined,
+	tokens: undefined as DeviceToken[] | undefined,
 	memberBusy: false,
 
-	renameOpen: false,
-	renameName: "",
-	renameBusy: false,
+	// Inline rename (overlay-style): the project row whose name is being
+	// edited and the text currently typed into that row's input.
+	renamingProjectId: null as string | null,
+	renameValue: "",
 
 	newInviteRole: "viewer" as InviteRole,
 	inviteBusy: false,
 	revoking: false,
+
+	tokenBusy: false,
+	removingToken: false,
 
 	// The /projects/join/<token> screen.
 	joinToken: "",
@@ -116,6 +123,7 @@ async function loadProjects(): Promise<void> {
 async function loadDetail(project: Project): Promise<void> {
 	state.members = undefined;
 	state.invites = undefined;
+	state.tokens = undefined;
 	render();
 	try {
 		const body = await apiJson<{ members: Member[] }>(
@@ -126,7 +134,21 @@ async function loadDetail(project: Project): Promise<void> {
 	} catch {
 		render();
 	}
+	void loadTokens(project.id);
 	if (project.role === "owner") await loadInvites(project.id);
+}
+
+/** GET /api/projects/:id/tokens → the project's device tokens (any member). */
+async function loadTokens(projectId: string): Promise<void> {
+	try {
+		const body = await apiJson<{ tokens: DeviceToken[] }>(
+			`/api/projects/${projectId}/tokens`,
+		);
+		if (state.selected?.id === projectId) state.tokens = body.tokens;
+		render();
+	} catch {
+		render();
+	}
 }
 
 async function loadInvites(projectId: string): Promise<void> {
@@ -171,29 +193,61 @@ function createProject(): void {
 		});
 }
 
-function renameProject(): void {
-	if (state.renameBusy || !state.selected) return;
-	const name = state.renameName.trim();
+function renameProject(id: string, rawName: string): void {
+	const name = rawName.trim();
 	if (!name) return;
-	const id = state.selected.id;
-	state.renameBusy = true;
-	render();
+	state.projects = (state.projects ?? []).map((p) =>
+		p.id === id ? { ...p, name } : p,
+	);
+	if (state.selected?.id === id) state.selected = { ...state.selected, name };
 	void apiJson<{ project: Project }>(`/api/projects/${id}`, {
 		method: "PATCH",
 		body: { name },
 	})
 		.then(({ project }) => {
-			if (state.selected?.id === id) state.selected = project;
+			if (state.selected?.id === project.id) state.selected = project;
 			state.projects = (state.projects ?? []).map((p) =>
 				p.id === project.id ? project : p,
 			);
-			state.renameOpen = false;
-		})
-		.catch(() => {})
-		.finally(() => {
-			state.renameBusy = false;
 			render();
-		});
+		})
+		.catch(() => {});
+}
+
+/** The inline name input shown in the row of the project being renamed.
+ * Enter commits (by blurring), Escape cancels, blur commits. */
+function projectRenameInput(projectId: string): m.Vnode {
+	return (
+		<input
+			class="proj-rename"
+			value={state.renameValue}
+			oninput={(ev: Event) => {
+				state.renameValue = (ev.target as HTMLInputElement).value;
+			}}
+			onkeydown={(ev: KeyboardEvent) => {
+				if (ev.key === "Enter") {
+					(ev.target as HTMLInputElement).blur();
+				} else if (ev.key === "Escape") {
+					state.renamingProjectId = null;
+					render();
+				}
+			}}
+			onblur={() => {
+				// Guard the Escape→blur race: if Escape already closed the
+				// row, removing the input fires this blur and we must not
+				// commit.
+				if (state.renamingProjectId !== projectId) return;
+				void renameProject(projectId, state.renameValue);
+				state.renamingProjectId = null;
+				render();
+			}}
+			oncreate={(v) => {
+				const el = v.dom as HTMLInputElement;
+				el.focus();
+				el.select();
+			}}
+		/>
+	);
 }
 
 async function deleteProject(project: Project): Promise<void> {
@@ -293,6 +347,52 @@ function revokeInvite(invite: Invite): void {
 			state.revoking = false;
 			render();
 		});
+}
+
+/** POST /api/projects/:id/tokens — the response carries the full token value
+ * (the only time the server returns one), so it is appended for copying. */
+function addToken(): void {
+	if (state.tokenBusy || !state.selected) return;
+	const id = state.selected.id;
+	state.tokenBusy = true;
+	render();
+	void apiJson<{ token: DeviceToken }>(`/api/projects/${id}/tokens`, {
+		method: "POST",
+	})
+		.then(({ token }) => {
+			if (state.selected?.id === id)
+				state.tokens = [...(state.tokens ?? []), token];
+		})
+		.catch(() => {})
+		.finally(() => {
+			state.tokenBusy = false;
+			render();
+		});
+}
+
+/** DELETE /api/projects/:id/tokens/<tokenId>, then drop the row from the list. */
+function removeToken(token: DeviceToken): void {
+	if (state.removingToken || !state.selected) return;
+	const id = state.selected.id;
+	state.removingToken = true;
+	render();
+	void apiJson(`/api/projects/${id}/tokens/${token.id}`, {
+		method: "DELETE",
+	})
+		.then(() => {
+			if (state.selected?.id === id)
+				state.tokens = (state.tokens ?? []).filter((tk) => tk.id !== token.id);
+		})
+		.catch(() => {})
+		.finally(() => {
+			state.removingToken = false;
+			render();
+		});
+}
+
+/** Copy the token value to the clipboard (best effort, no toast). */
+function copyToken(value: string): void {
+	void navigator.clipboard?.writeText(value).catch(() => {});
 }
 
 function acceptInvite(): void {
@@ -401,7 +501,11 @@ function projectsCard(): m.Children {
 					class={state.selected?.id === p.id ? "active" : undefined}
 					onclick={() => selectProject(p.id)}
 				>
-					<td>{p.name}</td>
+					<td>
+						{state.renamingProjectId === p.id
+							? projectRenameInput(p.id)
+							: p.name}
+					</td>
 					<td>{roleBadge(p.role)}</td>
 					<RowActions>
 						{p.role !== "viewer" ? (
@@ -410,9 +514,8 @@ function projectsCard(): m.Children {
 								icon={<Icon name="edit" class="role-icon" />}
 								onclick={(e: Event) => {
 									e.stopPropagation();
-									selectProject(p.id);
-									state.renameName = state.selected?.name ?? p.name;
-									state.renameOpen = true;
+									state.renamingProjectId = p.id;
+									state.renameValue = p.name;
 									render();
 								}}
 							/>
@@ -595,37 +698,48 @@ const App: m.Component = {
 										</div>
 									</Card>
 								) : null,
-								state.renameOpen ? (
-									<Modal
-										title={t("projects.rename")}
-										onClose={() => {
-											state.renameOpen = false;
-											render();
-										}}
-									>
-										<Form onSubmit={renameProject}>
-											<FieldGroup legend={t("projects.rename")}>
-												<Field
-													label={t("projects.new_name")}
-													control={<Input target={state} prop="renameName" />}
-												/>
-												<div class="actions">
-													<Button
-														label={t("ui.cancel")}
-														class="secondary"
-														onclick={() => {
-															state.renameOpen = false;
-															render();
-														}}
+								<Card
+									title={t("projects.tokens.title")}
+									headActions={
+										state.selected.role !== "viewer" ? (
+											<Button
+												label={t("projects.tokens.add")}
+												disabled={state.tokenBusy}
+												onclick={addToken}
+											/>
+										) : null
+									}
+								>
+									{state.tokens === undefined ? (
+										<p class="muted">{t("mgmt.loading")}</p>
+									) : state.tokens.length === 0 ? (
+										<p class="muted">{t("projects.tokens.empty")}</p>
+									) : (
+										state.tokens.map((tk) => (
+											<div class="token-item" key={tk.id}>
+												<code
+													class="token-value"
+													title={t("projects.tokens.copy")}
+													onclick={() => copyToken(tk.token)}
+												>
+													{tk.token}
+												</code>
+												<span class="muted">
+													{new Date(tk.createdAt).toLocaleString()}
+												</span>
+												{state.selected?.role !== "viewer" ? (
+													<IconButton
+														danger
+														label={t("projects.tokens.remove")}
+														icon={<Icon name="delete" class="role-icon" />}
+														disabled={state.removingToken}
+														onclick={() => removeToken(tk)}
 													/>
-													<button type="submit" disabled={state.renameBusy}>
-														{t("projects.rename")}
-													</button>
-												</div>
-											</FieldGroup>
-										</Form>
-									</Modal>
-								) : null,
+												) : null}
+											</div>
+										))
+									)}
+								</Card>,
 							]
 						: null,
 				]

@@ -385,67 +385,23 @@ export async function createAuth({
     // Profile API: the session user's password and device tokens
     // ----------------------------------------------------------------------
 
-    /** The user's device tokens for one project, as the profile page shows them.
-     * Scoped by both `project_id` and `user_id`, so a project with several
-     * members only ever reveals the caller's own tokens for that project. */
-    function tokensFor(user: string, projectId: string) {
-        return (db
-            ?.prepare(
-                "SELECT id, token, created_at FROM tokens " +
-                    "WHERE project_id = ? AND user_id = (SELECT id FROM users WHERE login = ?) " +
-                    "ORDER BY id",
-            )
-            .all(projectId, user) ?? []) as {
-            id: number;
-            token: string;
-            created_at: string;
-        }[];
-    }
-
     /** GET /api/whoami — the session user's login name (profile dropdown). */
     function whoamiResponse(user: string): Response {
         return Response.json({ ok: true, user });
     }
 
-    /** GET /api/profile — username, admin flag + the user's device tokens for
-     * the `?project=` project (owner/editor/viewer required). Without a project
-     * it falls back to the Personal project, so tokens always resolve to a real
-     * project the user belongs to. */
-    function profileResponse(request: Request, user: string): Response {
+    /** GET /api/profile — just the identity: username + admin flag. Device
+     * tokens live on the project now (see the projects module's token routes). */
+    function profileResponse(user: string): Response {
         if (!db)
             return Response.json(
                 { ok: false, error: "Authentication unavailable" },
                 { status: 503 },
             );
-        const requested = new URL(request.url).searchParams.get("project");
-        let projectId: string;
-        if (requested) {
-            const role =
-                (db
-                    .prepare(
-                        "SELECT role FROM project_members WHERE project_id = ? AND user_id = (SELECT id FROM users WHERE login = ?)",
-                    )
-                    .get(requested, user) as { role: string } | undefined
-                )?.role;
-            if (!role)
-                return Response.json(
-                    { ok: false, error: "No access to that project" },
-                    { status: 404 },
-                );
-            projectId = requested;
-        } else {
-            projectId = ensurePersonalProject(user) ?? "";
-        }
         return Response.json({
             ok: true,
             username: user,
             admin: adminOf(user),
-            project: projectId,
-            tokens: tokensFor(user, projectId).map((t) => ({
-                id: t.id,
-                token: t.token,
-                createdAt: t.created_at,
-            })),
         });
     }
 
@@ -551,87 +507,6 @@ export async function createAuth({
         return Response.json({ ok: true });
     }
 
-    /** POST /api/profile/tokens — add a fresh device token; it is returned in
-     * the body (the only time the full value is ever sent). The token belongs
-     * to the `?project=` project (editor/owner required), defaulting to the
-     * user's Personal project, so a device connecting with it joins that
-     * project (see `projectForToken`). */
-    function createTokenResponse(request: Request, user: string): Response {
-        if (!db) return unauthorized();
-        const requested = new URL(request.url).searchParams.get("project");
-        let projectId: string;
-        if (requested) {
-            const role =
-                (db
-                    .prepare(
-                        "SELECT role FROM project_members WHERE project_id = ? AND user_id = (SELECT id FROM users WHERE login = ?)",
-                    )
-                    .get(requested, user) as { role: string } | undefined
-                )?.role;
-            if (role !== "owner" && role !== "editor")
-                return Response.json(
-                    { ok: false, error: "No access to that project" },
-                    { status: 404 },
-                );
-            projectId = requested;
-        } else {
-            const row = ensurePersonalProject(user);
-            if (!row)
-                return Response.json(
-                    { ok: false, error: "User not found" },
-                    { status: 404 },
-                );
-            projectId = row;
-        }
-        const token = randomBytes(24).toString("hex");
-        const ins = db
-            .prepare(
-                "INSERT INTO tokens (user_id, token, project_id) " +
-                    "SELECT id, ?, ? FROM users WHERE login = ?",
-            )
-            .run(token, projectId, user);
-        const created = db
-            .prepare("SELECT id, token, created_at FROM tokens WHERE id = ?")
-            .get(Number(ins.lastInsertRowid)) as {
-            id: number;
-            token: string;
-            created_at: string;
-        };
-        return Response.json({
-            ok: true,
-            token: {
-                id: created.id,
-                token: created.token,
-                createdAt: created.created_at,
-            },
-        });
-    }
-
-    /** DELETE /api/profile/tokens/<id> — revoke one of the user's tokens. */
-    function deleteTokenResponse(url: URL, user: string): Response {
-        const rawId = url.pathname.split("/").pop() ?? "";
-        const id = Number(rawId);
-        if (!Number.isInteger(id) || id < 1 || !db)
-            return Response.json(
-                { ok: false, error: "Invalid token id" },
-                { status: 400 },
-            );
-        // The token is the user's own; it may belong to any project they own
-        // (created with `?project=`), so scope by ownership, not the Personal
-        // project.
-        const result = db
-            .prepare(
-                "DELETE FROM tokens WHERE id = ? AND user_id = (SELECT id FROM users WHERE login = ?)",
-            )
-            .run(id, user);
-        if (Number(result.changes) === 0)
-            return Response.json(
-                { ok: false, error: "Token not found" },
-                { status: 404 },
-            );
-        return Response.json({ ok: true });
-    }
-
     return {
         db,
         hasUsers,
@@ -647,8 +522,6 @@ export async function createAuth({
         whoamiResponse,
         profileResponse,
         changePasswordResponse,
-        createTokenResponse,
-        deleteTokenResponse,
         listInvitationsResponse,
         createInvitationResponse,
     };

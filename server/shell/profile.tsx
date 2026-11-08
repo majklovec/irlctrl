@@ -1,7 +1,7 @@
-/* Profile page: change the login password and manage the device tokens. */
+/* Profile page: change the login password. (Device tokens live on the
+ * project page now — they are project-scoped, not per-user.) */
 
 import { apiJson } from "@ui/api_client";
-import { getActiveProjectId } from "./project_select";
 import {
 	Actions,
 	Badge,
@@ -10,21 +10,13 @@ import {
 	Field,
 	FieldGroup,
 	Form,
-	IconButton,
 	Input,
 	Page,
 } from "@ui/components/";
-import { Icon } from "@ui/components/icons";
 import { ServerNav } from "./nav";
 import { i18nReady, LanguageSelect, t } from "@ui/i18n";
 import { mountPage } from "@ui/util";
 import m from "mithril";
-
-interface Token {
-	id: number;
-	token: string;
-	createdAt: string;
-}
 
 interface Invitation {
 	code: string;
@@ -37,9 +29,6 @@ interface Invitation {
 
 const state = {
 	username: "",
-	tokens: undefined as Token[] | undefined,
-	/** The project the currently-shown token list belongs to. */
-	scopedProject: null as string | null,
 
 	current: "",
 	next: "",
@@ -47,9 +36,6 @@ const state = {
 	pwBusy: false,
 	pwOk: false,
 	pwError: false,
-
-	tokenBusy: false,
-	removing: false,
 
 	admin: false,
 	invitations: undefined as Invitation[] | undefined,
@@ -60,25 +46,15 @@ function render(): void {
 	m.redraw();
 }
 
-/** Load the profile (username, admin flag) + the device tokens for the active
- * project, and the invitation history when this user is an admin. The token list
- * always reflects `scopedProject` (the project the active list belongs to) so it
- * rescope cleanly when the shell selector switches projects. */
+/** Load the profile (username, admin flag) and, for admins, the invitation
+ * history. Device tokens are project-scoped and live on the project page. */
 async function load(): Promise<void> {
-	const active = getActiveProjectId();
 	try {
-		const path = `/api/profile${
-			active ? `?project=${encodeURIComponent(active)}` : ""
-		}`;
-		const body = await apiJson<{
-			username: string;
-			admin: boolean;
-			tokens: Token[];
-		}>(path);
+		const body = await apiJson<{ username: string; admin: boolean }>(
+			"/api/profile",
+		);
 		state.username = body.username;
 		state.admin = body.admin;
-		state.scopedProject = active;
-		state.tokens = body.tokens;
 		render();
 		if (body.admin) void loadInvitations();
 	} catch {
@@ -149,51 +125,6 @@ function changePassword(): void {
 		});
 }
 
-/** POST /api/profile/tokens: the response carries the full token value (the
- * only time the server ever returns one), so it is shown for copying. The token
- * is created for the shell's active project (devices join that project),
- * falling back to the Personal project when none is selected. */
-function addToken(): void {
-	if (state.tokenBusy) return;
-	state.tokenBusy = true;
-	render();
-	const active = getActiveProjectId();
-	const path = `/api/profile/tokens${
-		active ? `?project=${encodeURIComponent(active)}` : ""
-	}`;
-	void apiJson<{ token: Token }>(path, { method: "POST" })
-		.then(({ token }) => {
-			state.tokens = [...(state.tokens ?? []), token];
-		})
-		.catch(() => {})
-		.finally(() => {
-			state.tokenBusy = false;
-			render();
-		});
-}
-
-/** DELETE /api/profile/tokens/<id>, then drop the row from the list. */
-function removeToken(id: number): void {
-	if (state.removing) return;
-	state.removing = true;
-	render();
-	void apiJson(`/api/profile/tokens/${id}`, { method: "DELETE" })
-		.then(() => {
-			if (state.tokens)
-				state.tokens = state.tokens.filter((tk) => tk.id !== id);
-		})
-		.catch(() => {})
-		.finally(() => {
-			state.removing = false;
-			render();
-		});
-}
-
-/** Copy the token value to the clipboard (best effort, no toast). */
-function copyToken(value: string): void {
-	void navigator.clipboard?.writeText(value).catch(() => {});
-}
-
 const App: m.Component = {
 	oncreate() {
 		void load();
@@ -257,44 +188,6 @@ const App: m.Component = {
 						</Actions>
 					</FieldGroup>
 				</Form>
-			</Card>
-			<Card
-				title={t("profile.tokens.title")}
-				headActions={
-					<Button
-						label={t("profile.tokens.add")}
-						disabled={state.tokenBusy}
-						onclick={addToken}
-					/>
-				}
-			>
-				{state.tokens === undefined ? (
-					<p class="muted">{t("mgmt.loading")}</p>
-				) : state.tokens.length === 0 ? (
-					<p class="muted">{t("profile.tokens.empty")}</p>
-				) : (
-					state.tokens.map((tk) => (
-						<div class="token-item" key={tk.id}>
-							<code
-								class="token-value"
-								title={t("profile.tokens.copy")}
-								onclick={() => copyToken(tk.token)}
-							>
-								{tk.token}
-							</code>
-							<span class="muted">
-								{new Date(tk.createdAt).toLocaleString()}
-							</span>
-							<IconButton
-								danger
-								label={t("profile.tokens.remove")}
-								icon={<Icon name="delete" class="role-icon" />}
-								disabled={state.removing}
-								onclick={() => removeToken(tk.id)}
-							/>
-						</div>
-					))
-				)}
 			</Card>
 			{state.admin ? (
 				<Card
@@ -374,14 +267,6 @@ const App: m.Component = {
 		</Page>
 	),
 };
-
-// Rescope the device-token list to the newly selected project.
-window.addEventListener("project-changed", () => {
-	state.tokens = undefined;
-	state.scopedProject = null;
-	render();
-	void load();
-});
 
 void mountPage(() => t("nav.profile"), App);
 // Redraw once the catalogs land so the first paint is already translated

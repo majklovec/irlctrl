@@ -454,4 +454,94 @@ describe("projects", () => {
         );
         expect(membersAfter.status).toBe(404);
     });
+
+    test("device tokens: project-scoped CRUD with the role matrix", async () => {
+        // Fixtures at this point in the file: alice = owner, bob = editor,
+        // carol = viewer (joined in an earlier test).
+        // Owner can create; the response carries the full value.
+        const created = await api(
+            "POST",
+            `/api/projects/${projectId}/tokens`,
+            aliceCookie,
+        );
+        expect(created.status).toBe(201);
+        const createdToken = (await created.json())["token"] as {
+            id: number;
+            token: string;
+            createdAt: string;
+        };
+        expect(createdToken.token).toMatch(/^[0-9a-f]{48}$/);
+        expect(createdToken.id).toBeGreaterThan(0);
+
+        // The list shows the value (so it can be copied) and is visible to any
+        // member — bob (editor) sees the one alice created.
+        const bobList = await api(
+            "GET",
+            `/api/projects/${projectId}/tokens`,
+            bobCookie,
+        );
+        expect(bobList.status).toBe(200);
+        const bobTokens = (await bobList.json())["tokens"] as {
+            id: number;
+            token: string;
+        }[];
+        expect(
+            bobTokens.find((t) => t.id === createdToken.id),
+        ).toMatchObject({ token: createdToken.token });
+
+        // An editor can create, and can revoke any token in the project
+        // (project admins manage device access, not just their own).
+        const bobCreated = await api(
+            "POST",
+            `/api/projects/${projectId}/tokens`,
+            bobCookie,
+        );
+        expect(bobCreated.status).toBe(201);
+        const bobToken = (await bobCreated.json())["token"] as {
+            id: number;
+        };
+        const bobDeletesAlice = await api(
+            "DELETE",
+            `/api/projects/${projectId}/tokens/${createdToken.id}`,
+            bobCookie,
+        );
+        expect(bobDeletesAlice.status).toBe(200);
+
+        // A viewer can read the list but not create or revoke.
+        expect(
+            (await api("GET", `/api/projects/${projectId}/tokens`, carolCookie))
+                .status,
+        ).toBe(200);
+        expect(
+            (await api(
+                "POST",
+                `/api/projects/${projectId}/tokens`,
+                carolCookie,
+            )).status,
+        ).toBe(403);
+        expect(
+            (await api(
+                "DELETE",
+                `/api/projects/${projectId}/tokens/${bobToken.id}`,
+                carolCookie,
+            )).status,
+        ).toBe(403);
+
+        // A non-member has no reach at all: a uniform 404.
+        const invite = await api("POST", "/api/invitations", aliceCookie);
+        const code = (await invite.json())["code"] as string;
+        await register("projects-dave", code);
+        const daveCookie = await login("projects-dave");
+        expect(
+            (await api("GET", `/api/projects/${projectId}/tokens`, daveCookie))
+                .status,
+        ).toBe(404);
+        expect(
+            (await api(
+                "POST",
+                `/api/projects/${projectId}/tokens`,
+                daveCookie,
+            )).status,
+        ).toBe(404);
+    });
 });

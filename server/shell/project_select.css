@@ -1,8 +1,14 @@
-/* The main-menu project selector: a compact dropdown in the nav row. */
+/* The main-menu project selector: a compact dropdown pinned to the header's
+ * right, just left of the profile trigger (which floats at `right: 1.25rem`,
+ * 2.5rem wide — so `right: 4.25rem` leaves a gap and clears it). */
 
 .project-select {
+    position: absolute;
+    top: 50%;
+    right: 4.25rem;
+    transform: translateY(-50%);
+    z-index: 39;
     padding: 0.35rem 0.6rem;
-    margin-right: 1.25rem;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--bg) 60%, transparent);

@@ -95,6 +95,27 @@ async function login(): Promise<string> {
     return cookie;
 }
 
+/** Create a device token in the session user's Personal project and return the
+ * raw value. Tokens are project-scoped (`/api/projects/:id/tokens`), so this
+ * resolves the caller's personal project id from their project list first. */
+async function personalProjectToken(cookie: string): Promise<string> {
+    const list = await fetch(`${baseUrl}/api/projects`, { headers: { cookie } });
+    const projects = (await list.json()) as {
+        projects: { id: string; name: string }[];
+    };
+    const personal = projects.projects.find((p) =>
+        p.id.startsWith("personal-"),
+    );
+    if (!personal) throw new Error("No Personal project found");
+    const res = await fetch(`${baseUrl}/api/projects/${personal.id}/tokens`, {
+        method: "POST",
+        headers: { cookie },
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { token: { token: string } };
+    return body.token.token;
+}
+
 async function connectSocket(
     url: string,
     headers: Record<string, string>,
@@ -252,15 +273,9 @@ describe("control server HTTP contracts", () => {
             dashboardSocket.close();
         }
 
-        const tokenResponse = await fetch(`${baseUrl}/api/profile/tokens`, {
-            method: "POST",
-            headers: { cookie },
-        });
-        const tokenResult = (await tokenResponse.json()) as {
-            token: { token: string };
-        };
+        const token = await personalProjectToken(cookie);
         const device = await connectSocket(`${baseUrl}/device`, {
-            authorization: `Bearer ${tokenResult.token.token}`,
+            authorization: `Bearer ${token}`,
             "x-device-id": deviceId,
             "x-device-role": "relay",
         });

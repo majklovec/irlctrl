@@ -31,6 +31,14 @@ export interface ProjectMember {
     role: ProjectRole;
 }
 
+/** A device token bound to a project — authenticates one device. */
+export interface DeviceToken {
+    id: number;
+    /** The full token value — the only place it is ever returned. */
+    token: string;
+    createdAt: string;
+}
+
 export interface ProjectInvite {
     id: string;
     role: InviteRole;
@@ -113,8 +121,20 @@ export interface Projects {
     create(user: string, name: unknown): ProjectSummary;
     /** Rename (owner / editor). `name` is validated. */
     rename(actor: string, projectId: string, name: unknown): ProjectSummary;
-    /** Delete (owner); cascades to members and invites. */
+    /** Delete (owner); cascades to members and invites and device tokens. */
     remove(actor: string, projectId: string): void;
+    /**
+     * The project's device tokens, oldest first (any member). Each row carries
+     * the full token value.
+     */
+    listTokens(actor: string, projectId: string): DeviceToken[];
+    /**
+     * Create a device token (owner/editor). Returns the row; `token` is the
+     * value to present to the device.
+     */
+    createToken(actor: string, projectId: string): DeviceToken;
+    /** Delete a device token (owner/editor); 404 for a missing or foreign id. */
+    removeToken(actor: string, projectId: string, tokenId: string): void;
     /** The project's members, owner first, then join order (404 on a missing project). */
     members(projectId: string): ProjectMember[];
     /** Change a member's role (owner; the owner row is fixed). */
@@ -276,6 +296,65 @@ export function createProjects(db: Database | null): Projects {
             const d = useDb();
             requireRole(actor, projectId, ["owner"]);
             d.prepare("DELETE FROM projects WHERE id = ?").run(projectId);
+        },
+
+        listTokens: (actor, projectId) => {
+            const d = useDb();
+            requireRole(actor, projectId, ["owner", "editor", "viewer"]);
+            const rows = d
+                .prepare(
+                    "SELECT id, token, created_at FROM tokens " +
+                        "WHERE project_id = ? ORDER BY id ASC",
+                )
+                .all(projectId) as {
+                    id: number;
+                    token: string;
+                    created_at: string;
+                }[];
+            return rows.map((r) => ({
+                id: r.id,
+                token: r.token,
+                createdAt: r.created_at,
+            }));
+        },
+
+        createToken: (actor, projectId) => {
+            const d = useDb();
+            requireRole(actor, projectId, ["owner", "editor"]);
+            const token = randomBytes(24).toString("hex");
+            const ins = d
+                .prepare(
+                    "INSERT INTO tokens (user_id, token, project_id) " +
+                        "SELECT id, ?, ? FROM users WHERE login = ?",
+                )
+                .run(token, projectId, actor);
+            const created = d
+                .prepare(
+                    "SELECT id, token, created_at FROM tokens WHERE id = ?",
+                )
+                .get(Number(ins.lastInsertRowid)) as {
+                id: number;
+                token: string;
+                created_at: string;
+            };
+            return {
+                id: created.id,
+                token: created.token,
+                createdAt: created.created_at,
+            };
+        },
+
+        removeToken: (actor, projectId, tokenId) => {
+            const d = useDb();
+            requireRole(actor, projectId, ["owner", "editor"]);
+            // Scope the delete to the project: a missing or foreign id 404s.
+            const result = d
+                .prepare(
+                    "DELETE FROM tokens WHERE id = ? AND project_id = ?",
+                )
+                .run(tokenId, projectId);
+            if (Number(result.changes) === 0)
+                throw new ApiError(`Token ${tokenId} not found`, 404);
         },
 
         members: (projectId) => {

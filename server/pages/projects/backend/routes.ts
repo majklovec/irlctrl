@@ -13,6 +13,9 @@
  *   GET    /api/projects/:id/invites  `[{...}]` (owner)
  *   DELETE /api/projects/:id/invites/:inviteId (owner)
  *   POST   /api/projects/join/:token  accept an invite → {project}
+ *   GET    /api/projects/:id/tokens   `[{id, token, createdAt}]` (any member)
+ *   POST   /api/projects/:id/tokens   → {token} (owner / editor)
+ *   DELETE /api/projects/:id/tokens/:tokenId  (owner / editor)
  *
  * The authorization rules live in the store (backend/registry.ts); these
  * handlers only parse the request and translate its outcome into JSON.
@@ -126,6 +129,12 @@ export function mountProjectRoutes(
                             ),
                         },
                     }));
+                if (sub === "tokens")
+                    return run(() => ({
+                        body: {
+                            tokens: projects.listTokens(user, id),
+                        },
+                    }));
                 return notFound();
             }),
         )
@@ -155,6 +164,11 @@ export function mountProjectRoutes(
                         return { status: 201, body: { invite } };
                     });
                 }
+                if (sub === "tokens")
+                    return run(() => ({
+                        status: 201,
+                        body: { token: projects.createToken(user, id) },
+                    }));
                 return notFound();
             }),
         )
@@ -232,6 +246,11 @@ export function mountProjectRoutes(
                 if (sub === "invites" && tail)
                     return run(() => {
                         projects.revokeInvite(user, id, tail);
+                        return { body: { ok: true } };
+                    });
+                if (sub === "tokens" && tail)
+                    return run(() => {
+                        projects.removeToken(user, id, tail);
                         return { body: { ok: true } };
                     });
                 return notFound();

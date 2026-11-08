@@ -192,13 +192,6 @@
     justify-content: flex-end;
     margin-top: 0.25rem;
 }
-/* Dashboard name input in the header (edit mode only): transparent until
- * hovered/focused, the global input rules provide the focus ring */
-header h1 .dash-name-input {
-    padding: 0.15rem 0.5rem;
-    background: transparent;
-    border-color: transparent;
-}
 .dash-save {
     font-size: 0.8rem;
     color: var(--muted);
@@ -308,6 +301,11 @@ header h1 .dash-name-input {
 .dash-table tr.active td {
     background: var(--ring);
 }
+/* Inline rename input shown in a dashboard row while renaming. */
+.dash-table .dash-rename {
+    width: 100%;
+    min-width: 0;
+}
 .dash-table .actions-cell {
     white-space: nowrap;
     text-align: right;
@@ -372,12 +370,6 @@ header h1 .dash-name-input {
     opacity: 0.55;
     box-shadow: 0 0 8px currentColor;
 }
-.dash-name-input {
-    font-size: 1.05em;
-    font-weight: 600;
-    width: min(320px, 60vw);
-}
-
 .dash-color-input::-webkit-color-swatch-wrapper {
     padding: 2px;
 }

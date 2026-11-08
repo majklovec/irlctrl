@@ -1,37 +1,9 @@
-/* Profile page: language, device tokens, invitations. */
+/* Profile page: language and the password form. (Device tokens live on the
+ * project page now; their row styles moved to the projects module.) */
 
 /* Language section: the selector moved here from the page header. */
 .profile-language .lang-select {
     margin-left: 0;
     max-width: none;
     width: 100%;
-}
-
-/* Profile page: one row per device token (value + date + actions) */
-.token-item {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--border);
-}
-.token-item:last-child {
-    border-bottom: 0;
-}
-.token-value {
-    flex: 1;
-    overflow-wrap: anywhere;
-    font-size: 0.85rem;
-    user-select: all;
-    cursor: copy;
-}
-.token-item > .icon-link {
-    flex: none;
-    padding: 0;
-    box-shadow: none;
-}
-.token-item > .dash-delete:hover {
-    color: var(--bad);
-    border-color: var(--bad);
-    background: color-mix(in srgb, var(--bad) 10%, transparent);
 }

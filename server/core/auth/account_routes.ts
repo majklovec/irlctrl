@@ -20,26 +20,14 @@ export function accountRoutes(auth: Auth, frontend: Frontend) {
         )
         .get(
             "/api/profile",
-            authenticatedHandler(auth, (request, user) =>
-                auth.profileResponse(request, user),
+            authenticatedHandler(auth, (_request, user) =>
+                auth.profileResponse(user),
             ),
         )
         .post(
             "/api/profile/password",
             authenticatedHandler(auth, (request, user) =>
                 auth.changePasswordResponse(request, user),
-            ),
-        )
-        .post(
-            "/api/profile/tokens",
-            authenticatedHandler(auth, (request, user) =>
-                auth.createTokenResponse(request, user),
-            ),
-        )
-        .delete(
-            "/api/profile/tokens/:tokenId",
-            authenticatedHandler(auth, (request, user) =>
-                auth.deleteTokenResponse(new URL(request.url), user),
             ),
         )
         .get(
