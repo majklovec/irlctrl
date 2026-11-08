@@ -53,7 +53,7 @@ async function onImportFile(input: HTMLInputElement): Promise<void> {
 
 export function listToolbar(): m.Vnode {
 	return (
-		<Toolbar label={t("overlay.new_overlay")}>
+		<Toolbar label={t("overlay.create_new")}>
 			<input
 				type="text"
 				placeholder={t("overlay.overlay_name")}
@@ -64,7 +64,7 @@ export function listToolbar(): m.Vnode {
 				}}
 			/>
 			<Button
-				label={t("overlay.new_overlay")}
+				label={t("tpl.create")}
 				disabled={!state.newOverlayName.trim()}
 				title={
 					state.newOverlayName.trim()
@@ -82,6 +82,8 @@ export function listToolbar(): m.Vnode {
 					void onImportFile(ev.target as HTMLInputElement)
 				}
 			/>
+			{/* Spacer: pushes the import button to the right edge */}
+			<span class="ov-tb-spacer" aria-hidden="true" />
 			<Button
 				label={t("overlay.import_overlay")}
 				onclick={() =>
