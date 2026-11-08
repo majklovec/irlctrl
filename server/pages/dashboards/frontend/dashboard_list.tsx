@@ -144,6 +144,11 @@ function createToolbar(): m.Vnode {
 				label={t("tpl.create")}
 				onclick={createDashboard}
 				disabled={state.saving || !state.newName.trim()}
+				title={
+					state.newName.trim()
+						? undefined
+						: t("ui.enter_name_to_create")
+				}
 			/>
 		</Toolbar>
 	);

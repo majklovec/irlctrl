@@ -66,6 +66,11 @@ export function listToolbar(): m.Vnode {
 			<Button
 				label={t("overlay.new_overlay")}
 				disabled={!state.newOverlayName.trim()}
+				title={
+					state.newOverlayName.trim()
+						? undefined
+						: t("ui.enter_name_to_create")
+				}
 				onclick={() => void createOverlay()}
 			/>
 			<input

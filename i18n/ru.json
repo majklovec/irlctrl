@@ -336,6 +336,7 @@
     "tpl.preview_fit": "По размеру",
     "tpl.preview_height": "Высота (px)",
     "tpl.preview_width": "Ширина (px)",
+    "ui.enter_name_to_create": "Введите имя, чтобы включить создание",
     "ui.logout": "Выйти",
     "ui.save": "Сохранить",
     "tpl.saved": "Шаблон сохранён",

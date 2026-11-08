@@ -336,6 +336,7 @@
     "tpl.preview_fit": "フィット",
     "tpl.preview_height": "高さ（px）",
     "tpl.preview_width": "幅（px）",
+    "ui.enter_name_to_create": "作成を有効にするには名前を入力してください",
     "ui.logout": "サインアウト",
     "ui.save": "保存",
     "tpl.saved": "テンプレートを保存しました",

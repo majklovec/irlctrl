@@ -336,6 +336,7 @@
     "tpl.preview_fit": "Ajustar",
     "tpl.preview_height": "Altura (px)",
     "tpl.preview_width": "Largura (px)",
+    "ui.enter_name_to_create": "Introduza um nome para permitir a criação",
     "ui.logout": "Terminar sessão",
     "ui.save": "Guardar",
     "tpl.saved": "Modelo guardado",

@@ -336,6 +336,7 @@
     "tpl.preview_fit": "适配",
     "tpl.preview_height": "高度（px）",
     "tpl.preview_width": "宽度（px）",
+    "ui.enter_name_to_create": "输入名称以启用创建",
     "ui.logout": "退出",
     "ui.save": "保存",
     "tpl.saved": "模板已保存",

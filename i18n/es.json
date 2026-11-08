@@ -336,6 +336,7 @@
     "tpl.preview_fit": "Ajustar",
     "tpl.preview_height": "Alto (px)",
     "tpl.preview_width": "Ancho (px)",
+    "ui.enter_name_to_create": "Introduce un nombre para habilitar la creación",
     "ui.logout": "Cerrar sesión",
     "ui.save": "Guardar",
     "tpl.saved": "Plantilla guardada",

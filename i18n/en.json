@@ -336,6 +336,7 @@
     "tpl.preview_fit": "Fit",
     "tpl.preview_height": "H (px)",
     "tpl.preview_width": "W (px)",
+    "ui.enter_name_to_create": "Enter a name to enable creating",
     "ui.logout": "Sign out",
     "ui.save": "Save",
     "tpl.saved": "Template saved",

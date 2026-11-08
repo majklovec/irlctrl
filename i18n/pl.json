@@ -336,6 +336,7 @@
     "tpl.preview_fit": "Dopasuj",
     "tpl.preview_height": "Wysokość (px)",
     "tpl.preview_width": "Szerokość (px)",
+    "ui.enter_name_to_create": "Wpisz nazwę, aby umożliwić tworzenie",
     "ui.logout": "Wyloguj",
     "ui.save": "Zapisz",
     "tpl.saved": "Szablon zapisany",
