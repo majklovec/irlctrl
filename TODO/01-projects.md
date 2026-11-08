@@ -114,7 +114,8 @@ All endpoints require an authenticated session (cookie) and return JSON.
 | `POST`   | `/api/projects/:id/invites`           | Create an invite link. Body: `{role}` (`editor` or `viewer`). Returns `{token, url, expiresAt}`.                      |
 | `GET`    | `/api/projects/:id/invites`           | List active invite links (only `owner`).                                                                              |
 | `DELETE` | `/api/projects/:id/invites/:inviteId` | Revoke an invite link (only `owner`).                                                                                 |
-| `POST`   | `/api/projects/join/:token`           | Accept an invite. The authenticated user becomes a member with the role from the invite. Returns `{projectId, role}`. |
+| `GET`    | `/api/projects/join/:token`           | Preview a valid invite without consuming it. Returns `{project: {name}}`.                                             |
+| `POST`   | `/api/projects/join/:token`           | Accept an invite. The authenticated user becomes a member. Returns `{project: {id, name, role}}`.                     |
 
 **Recommendations for invite links:**
 - Generate the token using `randomBytes(24).toString("hex")`.

@@ -12,6 +12,7 @@
  *   POST   /api/projects/:id/invites  {role} → {invite} (owner / editor)
  *   GET    /api/projects/:id/invites  `[{...}]` (owner)
  *   DELETE /api/projects/:id/invites/:inviteId (owner)
+ *   GET    /api/projects/join/:token  preview the project name (no consumption)
  *   POST   /api/projects/join/:token  accept an invite → {project}
  *   GET    /api/projects/:id/tokens   `[{id, token, createdAt}]` (any member)
  *   POST   /api/projects/:id/tokens   → {token} (owner / editor)
@@ -115,6 +116,13 @@ export function mountProjectRoutes(
                 if (!match) return notFound();
                 const id = match[1] ?? "";
                 const sub = match[2];
+                if (id === "join" && sub && !match[3])
+                    return run(() => ({
+                        body: { project: projects.previewInvite(user, sub) },
+                    })).then((response) => {
+                        response.headers.set("cache-control", "no-store");
+                        return response;
+                    });
                 if (sub === "members")
                     return run(() => ({
                         body: { members: projects.members(id) },

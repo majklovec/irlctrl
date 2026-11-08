@@ -66,6 +66,15 @@ interface InviteRow {
     used_by: string | null;
 }
 
+interface JoinInviteRow {
+    id: string;
+    project_id: string;
+    role: InviteRole;
+    expires_at: string | null;
+    used_by: number | null;
+    name: string;
+}
+
 const INVITE_ROLES: readonly InviteRole[] = ["editor", "viewer"];
 /** An invite's default lifetime: 7 days. */
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -169,6 +178,8 @@ export interface Projects {
         projectId: string,
         inviteId: string,
     ): void;
+    /** Preview the current project name without consuming a valid invite. */
+    previewInvite(user: string, token: string): { name: string };
     /**
      * Accept an invite link: the user joins with the invite's role.
      * Fails for a missing, used or expired link and when the user is
@@ -206,6 +217,26 @@ export function createProjects(db: Database | null): Projects {
             .get(projectId, userId) as { role: ProjectRole } | undefined;
         return row?.role ?? null;
     };
+
+    function validInvite(token: string): JoinInviteRow {
+        const d = useDb();
+        if (typeof token !== "string" || token === "")
+            throw new ApiError("token is required");
+        const row = d
+            .prepare(
+                "SELECT i.id, i.project_id, i.role, i.expires_at, i.used_by, " +
+                    "p.name FROM project_invites i " +
+                    "JOIN projects p ON p.id = i.project_id " +
+                    "WHERE i.token = ?",
+            )
+            .get(token) as JoinInviteRow | undefined;
+        if (!row) throw new ApiError("Invite link not found", 404);
+        if (row.used_by !== null)
+            throw new ApiError("Invite link already used", 409);
+        if (row.expires_at && new Date(row.expires_at) < new Date())
+            throw new ApiError("Invite link expired", 410);
+        return row;
+    }
 
     /**
      * The acting user's role in the project: a uniform 404 for both a
@@ -485,32 +516,14 @@ export function createProjects(db: Database | null): Projects {
                 throw new ApiError("Invite link not found", 404);
         },
 
+        previewInvite: (user, token) => {
+            userIdOf(user);
+            return { name: validInvite(token).name };
+        },
+
         join: (user, token) => {
             const d = useDb();
-            if (typeof token !== "string" || token === "")
-                throw new ApiError("token is required");
-            const row = d
-                .prepare(
-                    "SELECT i.id, i.project_id, i.role, i.expires_at, i.used_by, " +
-                        "p.name FROM project_invites i " +
-                        "JOIN projects p ON p.id = i.project_id " +
-                        "WHERE i.token = ?",
-                )
-                .get(token) as
-                | {
-                      id: string;
-                      project_id: string;
-                      role: InviteRole;
-                      expires_at: string | null;
-                      used_by: number | null;
-                      name: string;
-                  }
-                | undefined;
-            if (!row) throw new ApiError("Invite link not found", 404);
-            if (row.used_by !== null)
-                throw new ApiError("Invite link already used", 409);
-            if (row.expires_at && new Date(row.expires_at) < new Date())
-                throw new ApiError("Invite link expired", 410);
+            const row = validInvite(token);
             const uid = userIdOf(user);
             if (roleRow(uid, row.project_id))
                 throw new ApiError("You are already a member", 409);

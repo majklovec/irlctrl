@@ -6,7 +6,12 @@
  * doubles as the invite-accept screen: under /projects/join/<token> it
  * shows the join card instead of the list.
  */
-import { apiJson, isUnauthorized } from "@ui/api_client";
+import {
+	ApiError,
+	apiErrorMessage,
+	apiJson,
+	isUnauthorized,
+} from "@ui/api_client";
 import {
 	Badge,
 	Button,
@@ -86,6 +91,12 @@ const state = {
 
 	// The /projects/join/<token> screen.
 	joinToken: "",
+	joinProjectName: null as string | null,
+	joinPreviewBusy: false,
+	joinPreviewError: null as
+		| { kind: "invalid" }
+		| { kind: "request"; message: string }
+		| null,
 	joinBusy: false,
 	joined: null as { name: string; role: string } | null,
 	joinFailed: false,
@@ -101,6 +112,10 @@ function joinTokenFromPath(): string {
 
 function isJoinPage(): boolean {
 	return state.joinToken !== "";
+}
+
+function joinApiPath(): string {
+	return `/api/projects/join/${encodeURIComponent(state.joinToken)}`;
 }
 
 async function loadProjects(): Promise<void> {
@@ -395,13 +410,40 @@ function copyToken(value: string): void {
 	void navigator.clipboard?.writeText(value).catch(() => {});
 }
 
+async function loadJoinProject(): Promise<void> {
+	if (state.joinPreviewBusy || !state.joinToken) return;
+	state.joinPreviewBusy = true;
+	state.joinPreviewError = null;
+	render();
+	try {
+		const body = await apiJson<{ project?: { name?: unknown } }>(joinApiPath());
+		const name = body.project?.name;
+		if (typeof name !== "string" || !name.trim())
+			throw new Error("Invalid invite preview response");
+		state.joinProjectName = name;
+	} catch (err) {
+		if (isUnauthorized(err)) {
+			location.replace("/login");
+			return;
+		}
+		state.joinPreviewError =
+			err instanceof ApiError && [404, 409, 410].includes(err.status)
+				? { kind: "invalid" }
+				: { kind: "request", message: apiErrorMessage(err) };
+	} finally {
+		state.joinPreviewBusy = false;
+		render();
+	}
+}
+
 function acceptInvite(): void {
-	if (state.joinBusy || !state.joinToken) return;
+	if (state.joinBusy || !state.joinToken || state.joinProjectName === null)
+		return;
 	state.joinBusy = true;
 	state.joinFailed = false;
 	render();
 	void apiJson<{ project: { name: string; role: string } }>(
-		`/api/projects/join/${state.joinToken}`,
+		joinApiPath(),
 		{ method: "POST" },
 	)
 		.then(({ project }) => {
@@ -445,16 +487,33 @@ const JoinViewComponent: m.Component = {
 			</Card>
 		) : (
 			<Card title={t("projects.join.title")}>
-				<code class="token-value join-token">{state.joinToken}</code>
+				{state.joinProjectName !== null ? (
+					<p class="join-project-name">{state.joinProjectName}</p>
+				) : state.joinPreviewError ? (
+					<p class="error">
+						{state.joinPreviewError.kind === "invalid"
+							? t("projects.join.failed")
+							: state.joinPreviewError.message}
+					</p>
+				) : (
+					<p class="muted">{t("mgmt.loading")}</p>
+				)}
 				{state.joinFailed ? (
 					<p class="error">{t("projects.join.failed")}</p>
 				) : null}
 				<div class="actions">
-					<Button
-						label={t("projects.join.accept")}
-						disabled={state.joinBusy}
-						onclick={acceptInvite}
-					/>
+					{state.joinPreviewError ? (
+						<Button
+							label={t("assets.retry")}
+							onclick={() => void loadJoinProject()}
+						/>
+					) : (
+						<Button
+							label={t("projects.join.accept")}
+							disabled={state.joinBusy || state.joinProjectName === null}
+							onclick={acceptInvite}
+						/>
+					)}
 				</div>
 			</Card>
 		),
@@ -540,9 +599,12 @@ function projectsCard(): m.Children {
 }
 
 const App: m.Component = {
-	oncreate() {
+	oninit() {
 		state.joinToken = joinTokenFromPath();
-		if (!isJoinPage()) void loadProjects();
+	},
+	oncreate() {
+		if (isJoinPage()) void loadJoinProject();
+		else void loadProjects();
 	},
 	view: () => (
 		<Page nav={<ServerNav active="projects" />}>

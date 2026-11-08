@@ -1,5 +1,5 @@
 /* Projects page (server/pages/projects): the project list rows, the select
- * inside the member rows and the join link. */
+ * inside the member rows and the invited project's name. */
 
 /* The project list rows select a project on click. */
 .projects-list .dash-table tr {
@@ -15,13 +15,13 @@
     padding: 0.2rem 0.4rem;
 }
 
-/* The invite-accept page's token: it is what the user verifies. */
-.join-token {
+/* The project being joined. */
+.join-project-name {
     display: inline-block;
     max-width: 100%;
     overflow-wrap: anywhere;
     padding: 0.5rem 0.75rem;
-    margin-bottom: 0.75rem;
+    margin: 0 0 0.75rem;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);

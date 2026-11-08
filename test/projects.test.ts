@@ -4,6 +4,7 @@
  * permission matrix (owner / editor / viewer).
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { Database } from "bun:sqlite";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -391,6 +392,115 @@ describe("projects", () => {
         expect(removed.status).toBe(403);
     });
 
+    test("previews the current project name without consuming the invite", async () => {
+        const created = await api("POST", "/api/projects", aliceCookie, {
+            name: "Preview project",
+        });
+        expect(created.status).toBe(201);
+        const previewProjectId = (
+            (await created.json())["project"] as { id: string }
+        ).id;
+        const link = await api(
+            "POST",
+            `/api/projects/${previewProjectId}/invites`,
+            aliceCookie,
+            { role: "viewer" },
+        );
+        expect(link.status).toBe(201);
+        const token = ((await link.json())["invite"] as { url: string }).url
+            .split("/")
+            .pop()!;
+        const path = `/api/projects/join/${token}`;
+
+        expect((await fetch(`${baseUrl}${path}`)).status).toBe(401);
+        const preview = await fetch(`${baseUrl}${path}`, {
+            headers: { cookie: carolCookie },
+        });
+        expect(preview.status).toBe(200);
+        expect(preview.headers.get("cache-control")).toBe("no-store");
+        expect(await preview.json()).toEqual({
+            project: { name: "Preview project" },
+        });
+        const beforeJoin = await api("GET", "/api/projects", carolCookie);
+        expect(
+            ((await beforeJoin.json())["projects"] as { id: string }[]).some(
+                (project) => project.id === previewProjectId,
+            ),
+        ).toBe(false);
+
+        const renamed = await api(
+            "PATCH",
+            `/api/projects/${previewProjectId}`,
+            aliceCookie,
+            { name: "Renamed preview project" },
+        );
+        expect(renamed.status).toBe(200);
+        const again = await api("GET", path, carolCookie);
+        expect(again.status).toBe(200);
+        expect(await again.json()).toEqual({
+            project: { name: "Renamed preview project" },
+        });
+        expect((await api("GET", `${path}/extra`, carolCookie)).status).toBe(404);
+
+        const joined = await api("POST", path, carolCookie);
+        expect(joined.status).toBe(200);
+        expect(await joined.json()).toEqual({
+            project: {
+                id: previewProjectId,
+                name: "Renamed preview project",
+                role: "viewer",
+            },
+        });
+        expect((await api("GET", path, bobCookie)).status).toBe(409);
+    });
+
+    test("rejects expired and revoked invite previews", async () => {
+        const expiredLink = await api(
+            "POST",
+            `/api/projects/${projectId}/invites`,
+            aliceCookie,
+            { role: "viewer" },
+        );
+        const expiredToken = (
+            (await expiredLink.json())["invite"] as { url: string }
+        ).url.split("/").pop()!;
+        const db = new Database(databasePath);
+        try {
+            db.query("UPDATE project_invites SET expires_at = ? WHERE token = ?")
+                .run("2000-01-01T00:00:00.000Z", expiredToken);
+        } finally {
+            db.close();
+        }
+        const expiredPath = `/api/projects/join/${expiredToken}`;
+        expect((await api("GET", expiredPath, carolCookie)).status).toBe(410);
+        expect((await api("POST", expiredPath, carolCookie)).status).toBe(410);
+
+        const revokedLink = await api(
+            "POST",
+            `/api/projects/${projectId}/invites`,
+            aliceCookie,
+            { role: "viewer" },
+        );
+        const revoked = (await revokedLink.json())["invite"] as {
+            id: string;
+            url: string;
+        };
+        expect(
+            (
+                await api(
+                    "DELETE",
+                    `/api/projects/${projectId}/invites/${revoked.id}`,
+                    aliceCookie,
+                )
+            ).status,
+        ).toBe(200);
+        const revokedToken = revoked.url.split("/").pop()!;
+        expect(
+            (await api("GET", `/api/projects/join/${revokedToken}`, carolCookie))
+                .status,
+        ).toBe(404);
+    });
+
     test("a used invite cannot be joined twice", async () => {
         const link = await api(
             "POST",
@@ -419,6 +529,12 @@ describe("projects", () => {
     });
 
     test("an unknown invite token is rejected", async () => {
+        const preview = await api(
+            "GET",
+            "/api/projects/join/not-a-real-token",
+            aliceCookie,
+        );
+        expect(preview.status).toBe(404);
         const response = await api(
             "POST",
             "/api/projects/join/not-a-real-token",

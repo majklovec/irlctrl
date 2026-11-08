@@ -6,6 +6,12 @@ type Role = "owner" | "editor" | "viewer";
 type Token = { id: number; token: string; createdAt: string };
 type ApiRequest = { path: string; method: string };
 
+class FixtureApiError extends Error {
+    constructor(message: string, readonly status: number) {
+        super(message);
+    }
+}
+
 const existingToken: Token = {
     id: 1,
     token: "existing-device-token",
@@ -30,6 +36,7 @@ const globalKeys = [
     "requestAnimationFrame",
     "cancelAnimationFrame",
     "__projectsPageTestApi",
+    "__projectsPageTestApiError",
 ];
 
 beforeAll(async () => {
@@ -50,7 +57,10 @@ beforeAll(async () => {
                     build.onLoad({ filter: /shared\/ui\/i18n\.tsx$/ }, () => ({
                         contents: `
                             export const i18nReady = Promise.resolve();
-                            export const t = (key) => key;
+                            export const t = (key, params) =>
+                                key === "projects.join.joined"
+                                    ? key + ":" + params.project + ":" + params.role
+                                    : key;
                             export const LanguageSelect = { view: () => null };
                         `,
                         loader: "js",
@@ -58,7 +68,11 @@ beforeAll(async () => {
                     build.onLoad({ filter: /shared\/ui\/api_client\.ts$/ }, () => ({
                         contents: `
                             export const apiJson = (...args) => globalThis.__projectsPageTestApi(...args);
-                            export const isUnauthorized = () => false;
+                            export const ApiError = globalThis.__projectsPageTestApiError;
+                            export const apiErrorMessage = (err) =>
+                                err instanceof Error ? err.message : String(err);
+                            export const isUnauthorized = (err) =>
+                                err instanceof ApiError && err.status === 401;
                         `,
                         loader: "js",
                     }));
@@ -104,6 +118,7 @@ beforeEach(async () => {
         Node: win.Node,
         requestAnimationFrame: win.requestAnimationFrame.bind(win),
         cancelAnimationFrame: win.cancelAnimationFrame.bind(win),
+        __projectsPageTestApiError: FixtureApiError,
     };
     for (const [key, value] of Object.entries(values))
         Object.defineProperty(globalThis, key, {
@@ -149,6 +164,11 @@ function card(title: string) {
     return found;
 }
 
+async function importProjectsPage(): Promise<void> {
+    const source = `${pageBundle}\n// projects view fixture ${++mountCount}\n`;
+    await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
+}
+
 async function mountPage(role: Role, tokens: Token[]): Promise<void> {
     Object.defineProperty(globalThis, "__projectsPageTestApi", {
         configurable: true,
@@ -186,8 +206,7 @@ async function mountPage(role: Role, tokens: Token[]): Promise<void> {
             throw new Error(`Unexpected request: ${method} ${path}`);
         },
     });
-    const source = `${pageBundle}\n// projects view fixture ${++mountCount}\n`;
-    await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
+    await importProjectsPage();
     await until(() => {
         const tokensCard = findCard("projects.tokens.title");
         return !!tokensCard && (
@@ -196,6 +215,25 @@ async function mountPage(role: Role, tokens: Token[]): Promise<void> {
                 : tokensCard.querySelector("tbody tr") !== null
         );
     });
+}
+
+async function mountJoinPage(
+    respond: (method: string) => Promise<unknown>,
+): Promise<void> {
+    win.history.replaceState(null, "", "/projects/join/invite%3Fsecret");
+    Object.defineProperty(globalThis, "__projectsPageTestApi", {
+        configurable: true,
+        value: async (path: string, init?: { method?: string }) => {
+            const method = init?.method ?? "GET";
+            requests.push({ path, method });
+            if (path === "/api/whoami") return { user: "test-user" };
+            if (path === "/api/projects/join/invite%3Fsecret")
+                return respond(method);
+            throw new Error(`Unexpected request: ${method} ${path}`);
+        },
+    });
+    await importProjectsPage();
+    await until(() => findCard("projects.join.title") !== undefined);
 }
 
 describe("project device token list", () => {
@@ -282,5 +320,150 @@ describe("project device token list", () => {
         expect(tokensCard.textContent).toContain("projects.tokens.empty");
         expect(tokensCard.querySelector("table")).toBeNull();
         expect(tokensCard.querySelector(".project-card-actions button")).not.toBeNull();
+    });
+});
+
+describe("project invitation", () => {
+    test("shows the project name before accepting without revealing the token", async () => {
+        let resolvePreview!: (value: { project: { name: string } }) => void;
+        const preview = new Promise<{ project: { name: string } }>((resolve) => {
+            resolvePreview = resolve;
+        });
+        const name = "Studio <script>stream</script>";
+        await mountJoinPage(async (method) => {
+            if (method === "GET") return preview;
+            if (method === "POST") return { project: { name, role: "viewer" } };
+            throw new Error(`Unexpected method: ${method}`);
+        });
+        const joinCard = card("projects.join.title");
+        expect(joinCard.textContent).toContain("mgmt.loading");
+        expect(joinCard.textContent).not.toContain("invite?secret");
+        expect(findCard("projects.title")).toBeUndefined();
+        const accept = joinCard.querySelector("button");
+        if (!(accept instanceof win.HTMLButtonElement))
+            throw new Error("Missing accept button");
+        expect(accept.disabled).toBe(true);
+        accept.click();
+        expect(requests.some((request) => request.method === "POST")).toBe(false);
+
+        resolvePreview({ project: { name } });
+        await until(() => joinCard.textContent?.includes(name) === true);
+        expect(joinCard.textContent).not.toContain("invite?secret");
+        expect(joinCard.textContent).not.toContain("invite%3Fsecret");
+        expect(joinCard.querySelector("script")).toBeNull();
+        expect(accept.disabled).toBe(false);
+        accept.click();
+        await until(
+            () => win.document.querySelector(".ok")?.textContent?.includes(name) === true,
+        );
+        expect(requests).toContainEqual({
+            path: "/api/projects/join/invite%3Fsecret",
+            method: "POST",
+        });
+    });
+
+    for (const status of [404, 409, 410]) {
+        test(`shows an invalid invite and can retry a ${status} preview`, async () => {
+            let previews = 0;
+            await mountJoinPage(async (method) => {
+                if (method !== "GET") throw new Error(`Unexpected method: ${method}`);
+                if (++previews === 1) throw new FixtureApiError("Invalid invite", status);
+                return { project: { name: "Recovered project" } };
+            });
+            const joinCard = card("projects.join.title");
+            await until(
+                () => joinCard.textContent?.includes("projects.join.failed") === true,
+            );
+            expect(joinCard.textContent).not.toContain("invite%3Fsecret");
+            const retry = joinCard.querySelector("button");
+            if (!(retry instanceof win.HTMLButtonElement))
+                throw new Error("Missing retry button");
+            expect(retry.textContent).toBe("assets.retry");
+            retry.click();
+            await until(
+                () => joinCard.textContent?.includes("Recovered project") === true,
+            );
+            expect(requests.filter((request) =>
+                request.path === "/api/projects/join/invite%3Fsecret" &&
+                request.method === "GET"
+            )).toHaveLength(2);
+            expect(joinCard.textContent).not.toContain("projects.join.failed");
+        });
+    }
+
+    test("surfaces preview network errors and retries", async () => {
+        let previews = 0;
+        await mountJoinPage(async (method) => {
+            if (method !== "GET") throw new Error(`Unexpected method: ${method}`);
+            if (++previews === 1)
+                throw new FixtureApiError("Connection unavailable", 0);
+            return { project: { name: "Recovered project" } };
+        });
+        const joinCard = card("projects.join.title");
+        await until(
+            () => joinCard.textContent?.includes("Connection unavailable") === true,
+        );
+        expect(joinCard.textContent).not.toContain("projects.join.failed");
+        const retry = joinCard.querySelector("button");
+        if (!(retry instanceof win.HTMLButtonElement))
+            throw new Error("Missing retry button");
+        retry.click();
+        await until(
+            () => joinCard.textContent?.includes("Recovered project") === true,
+        );
+    });
+
+    test("rejects an invalid preview response instead of allowing acceptance", async () => {
+        await mountJoinPage(async () => ({ project: { name: null } }));
+        const joinCard = card("projects.join.title");
+        await until(
+            () => joinCard.textContent?.includes("Invalid invite preview response") === true,
+        );
+        expect(joinCard.querySelector("button")?.textContent).toBe("assets.retry");
+        expect(requests.some((request) => request.method === "POST")).toBe(false);
+    });
+
+    test("redirects to login when the session expires during preview", async () => {
+        const redirects: string[] = [];
+        Object.defineProperty(globalThis, "location", {
+            configurable: true,
+            value: {
+                pathname: "/projects/join/invite%3Fsecret",
+                replace: (path: string) => redirects.push(path),
+            },
+        });
+        await mountJoinPage(async () => {
+            throw new FixtureApiError("Unauthorized", 401);
+        });
+        await until(() => redirects.length > 0);
+        expect(redirects).toEqual(["/login"]);
+    });
+
+    test("retains the project name when acceptance fails and allows retry", async () => {
+        let attempts = 0;
+        await mountJoinPage(async (method) => {
+            if (method === "GET") return { project: { name: "Stream" } };
+            if (method === "POST") {
+                if (++attempts === 1) throw new FixtureApiError("Join failed", 409);
+                return { project: { name: "Stream", role: "viewer" } };
+            }
+            throw new Error(`Unexpected method: ${method}`);
+        });
+        const joinCard = card("projects.join.title");
+        await until(() => joinCard.textContent?.includes("Stream") === true);
+        const accept = joinCard.querySelector("button");
+        if (!(accept instanceof win.HTMLButtonElement))
+            throw new Error("Missing accept button");
+        accept.click();
+        await until(
+            () => joinCard.textContent?.includes("projects.join.failed") === true &&
+                !accept.disabled,
+        );
+        expect(joinCard.textContent).toContain("Stream");
+        accept.click();
+        await until(
+            () => win.document.querySelector(".ok")?.textContent?.includes("Stream") === true,
+        );
+        expect(attempts).toBe(2);
     });
 });
