@@ -169,7 +169,7 @@
     <path d="M 0 -35 A 35 35 0 0 1 0 35" fill="none" stroke="#60a5fa" stroke-width="1.8"
       stroke-linecap="round" opacity="0.5" />
   </g>
-  <text x="600" y="152" text-anchor="middle" fill="#64748b" font-size="9" font-weight="600">SRT</text>
+  <text x="600" y="152" text-anchor="middle" fill="#64748b" font-size="9" font-weight="600">SRTLA</text>
 
   <!-- RELAY -->
   <rect x="630" y="55" width="190" height="90" rx="10" fill="#f8fafc" stroke="#94a3b8"

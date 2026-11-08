@@ -256,34 +256,33 @@ const encoderSetupStep: ModuleSetupStep = {
 						/>
 					}
 				/>
-				[
-					<Field
-						label={t("dev.field.stream_host")}
-						required={true}
-						invalid={attempted && !setupFields.encoderHost}
-						control={
-							<Input
-								target={setupFields}
-								prop="encoderHost"
-								placeholder="relay"
-								required={true}
-							/>
-						}
-					/>,
-					<Field
-						label={t("dev.field.stream_srt_port")}
-						required={true}
-						invalid={attempted && !inRange(setupFields.encoderPort, 1, 65535)}
-						control={
-							<Input
-								target={setupFields}
-								prop="encoderPort"
-								{...setupPort}
-								required={true}
-							/>
-						}
-					/>,
-				]
+				<Field
+					label={t("dev.field.stream_host")}
+					required={true}
+					invalid={attempted && !setupFields.encoderHost}
+					control={
+						<Input
+							target={setupFields}
+							prop="encoderHost"
+							placeholder="relay"
+							required={true}
+						/>
+					}
+				/>
+				,
+				<Field
+					label={t("dev.field.stream_srtla_port")}
+					required={true}
+					invalid={attempted && !inRange(setupFields.encoderPort, 1, 65535)}
+					control={
+						<Input
+							target={setupFields}
+							prop="encoderPort"
+							{...setupPort}
+							required={true}
+						/>
+					}
+				/>
 				<Field
 					label={t("dev.field.srt_latency")}
 					required={true}
@@ -371,8 +370,7 @@ const encoderSummaryColumns = [
 			if (!device.online) return "—";
 			const { encoder, activeLinks } = device as EncoderDeviceSummary;
 			if (!encoder) return "—";
-			if (hasEncoderIssue(encoder))
-				return <EncoderIssueBadge e={encoder} />;
+			if (hasEncoderIssue(encoder)) return <EncoderIssueBadge e={encoder} />;
 			if (activeLinks === 0)
 				return <Badge text={t("dev.badge.no_links")} kind="warn" />;
 			return <Badge text={t("dev.badge.live")} kind="on" />;
@@ -898,7 +896,7 @@ export function encoderCardBody(
 						}
 					/>
 					<Field
-						label={t("dev.field.stream_srt_port")}
+						label={t("dev.field.stream_srtla_port")}
 						control={
 							<Input
 								target={fields}
