@@ -207,11 +207,12 @@ describe("projects", () => {
             name: string;
             role: string;
         }[];
-        // Every account gets an auto-created Personal project (migration 0012)
-        // in addition to the fixtures they created or joined.
-        const personal = list.filter((p) => p.id.startsWith("personal-"));
-        expect(personal).toHaveLength(1);
-        expect(personal[0]).toMatchObject({ name: "Personal", role: "owner" });
+        // No project is auto-created: the only entry is the fixture alice
+        // created (there is no longer a per-user Personal project).
+        expect(
+            list.filter((p) => p.id.startsWith("personal-")),
+        ).toHaveLength(0);
+        expect(list).toHaveLength(1);
         expect(list.find((p) => p.id === projectId)).toMatchObject({
             id: projectId,
             name: "Fixture",
@@ -222,9 +223,7 @@ describe("projects", () => {
             id: string;
             role: string;
         }[];
-        expect(
-            bobProjects.filter((p) => p.id.startsWith("personal-")),
-        ).toHaveLength(1);
+        expect(bobProjects).toHaveLength(1);
         expect(bobProjects.find((p) => p.id === projectId)).toMatchObject({
             role: "editor",
         });

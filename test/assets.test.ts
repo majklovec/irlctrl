@@ -101,6 +101,17 @@ async function login(username: string, invite?: string): Promise<string> {
     return cookie;
 }
 
+/** Create a project for the user so their entity routes resolve. */
+async function createProject(cookie: string, name: string): Promise<string> {
+    const res = await fetch(`${baseUrl}/api/projects`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({ name }),
+    });
+    expect(res.status).toBe(201);
+    return ((await res.json()) as { project: { id: string } }).project.id;
+}
+
 interface Folder {
 	id: string;
 	parentId: string | null;
@@ -139,6 +150,9 @@ beforeAll(async () => {
     expect(invite.status).toBe(201);
     const { code } = (await invite.json()) as { code: string };
     bob = await login("assets-bob", code);
+    // Assets live in a project; give each user their own.
+    await createProject(alice, "Alice assets");
+    await createProject(bob, "Bob assets");
     const res = await fetch(`${baseUrl}/api/assets/folders`, {
         headers: { cookie: alice },
     });

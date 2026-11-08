@@ -6,11 +6,11 @@
 -- in place).
 --
 -- Data migration: each existing user gains a single "Personal" project
--- (the deterministic id `personal-<user id>`), becomes its sole owner, and all
--- of their legacy `owner`-scoped entities + device tokens are re-parented into
--- it. Users created after this migration get their Personal project lazily via
--- the store's `createPersonalProject` (same id scheme, same `is_personal`
--- flag), so this seeding loop is a no-op for a fresh database.
+-- (the deterministic id `personal-<user id>`, the `is_personal` flag left for
+-- legacy rows), becomes its sole owner, and all of their legacy `owner`-scoped
+-- entities + device tokens are re-parented into it. Users created after this
+-- migration get no auto-created project: they make one explicitly from the
+-- UI, so this seeding loop is a no-op for a fresh database.
 
 -- Flag marking the auto-created per-user project (never rename/deletable UX).
 ALTER TABLE projects

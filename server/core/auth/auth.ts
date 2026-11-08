@@ -94,35 +94,6 @@ export async function createAuth({
         return row?.project_id ?? null;
     }
 
-    /**
-     * Ensure the user's auto-created "Personal" project exists (the
-     * `personal-<user id>` id scheme migration 0012 seeds) and return its id.
-     * Idempotent: a fresh user gets one, an existing user's is returned. Called
-     * on registration so every account starts with a home for its entities.
-     */
-    function ensurePersonalProject(login: string): string | null {
-        const d = db;
-        if (!d) return null;
-        const uid = (
-            d.prepare("SELECT id FROM users WHERE login = ?").get(login) as
-                | { id: number }
-                | undefined
-        )?.id;
-        if (uid === undefined) return null;
-        const projectId = `personal-${uid}`;
-        d.transaction(() => {
-            d.prepare(
-                "INSERT OR IGNORE INTO projects (id, name, owner_id, is_personal) " +
-                    "VALUES (?, 'Personal', ?, 1)",
-            ).run(projectId, uid);
-            d.prepare(
-                "INSERT OR IGNORE INTO project_members (project_id, user_id, role) " +
-                    "VALUES (?, ?, 'owner')",
-            ).run(projectId, uid);
-        })();
-        return projectId;
-    }
-
     // Opaque cookie sessions: the browser stores a session id (HttpOnly), so
     // the user token never lives in JS storage and WebSocket upgrades inherit the
     // cookie automatically.
@@ -288,13 +259,11 @@ export async function createAuth({
                 "INSERT INTO users (login, password, admin) SELECT ?, ?, 1 WHERE (SELECT COUNT(*) FROM users) = 0",
             )
             .run(clean, hash);
-        if (bootstrap.changes > 0) {
-            ensurePersonalProject(clean);
+        if (bootstrap.changes > 0)
             return Response.json(
                 { ok: true, user: clean, admin: true },
                 { status: 201 },
             );
-        }
 
         // Everyone after the first account needs a valid, single-use invite.
         const code = typeof invite === "string" ? invite.trim() : "";
@@ -344,7 +313,6 @@ export async function createAuth({
                 { status: 409 },
             );
         }
-        ensurePersonalProject(clean);
         return Response.json(
             { ok: true, user: clean, admin: false },
             { status: 201 },
@@ -512,7 +480,6 @@ export async function createAuth({
         hasUsers,
         userForToken,
         projectForToken,
-        ensurePersonalProject,
         userFromRequest,
         unauthorized,
         loginResponse,

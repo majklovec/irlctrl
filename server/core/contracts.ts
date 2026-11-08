@@ -80,7 +80,12 @@ export interface ProjectAccess {
         projectId: string,
         allowed: readonly ProjectRole[],
     ): ProjectRole;
-    /** Ensure + return the user's auto-created "Personal" project id. */
+    /**
+     * The default project id for a project-scoped request (no `?project=`
+     * override) — the user's earliest project as a member. Not auto-created:
+     * throws a 404 `ApiError` when the user has no projects (the UI prompts
+     * them to make one). `--no-auth` returns the local id.
+     */
     personalProjectId(user: string): string;
 }
 

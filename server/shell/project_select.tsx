@@ -5,12 +5,14 @@
  * (`activeProjectId`) and every change is broadcast as the global
  * `project-changed` CustomEvent so the open pages can rescope. It is purely a
  * switcher — projects are created on the Projects page, not here — and it
- * hides itself when the user has none.
+ * hides itself when the user has none. An authenticated user without a
+ * project is redirected to the Projects page (where they create one) so no
+ * project-scoped page renders for an empty account.
  *
  * Shell-owned: it talks to the API over HTTP only (the shell never imports
  * page code — the projects page just consumes the same storage key).
  */
-import { apiJson } from "@ui/api_client";
+import { apiTry } from "@ui/api_client";
 import { t } from "@ui/i18n";
 import type { MithrilJSXComponent } from "@ui/jsx";
 import m from "mithril";
@@ -30,6 +32,9 @@ interface Project {
 const state = {
 	projects: null as Project[] | null, // null = before the first load
 	active: null as string | null,
+	// null = before /api/projects answers (unauthenticated, e.g. a shared
+	// /live view, resolves false so the no-project redirect is suppressed).
+	authed: null as boolean | null,
 };
 
 /** The active project id (the persisted choice), `null` when none. */
@@ -62,21 +67,31 @@ function select(id: string): void {
 }
 
 async function load(): Promise<void> {
-	try {
-		const body = await apiJson<{ projects: Project[] }>("/api/projects");
-		state.projects = body.projects;
-		const saved = getActiveProjectId();
-		const fresh = body.projects.find((p) => p.id === saved);
-		// The saved id must still exist; otherwise fall back to the first
-		// project (a new user's first visit selects their first project).
-		if (fresh) state.active = fresh.id;
-		else setActiveProjectId(body.projects[0]?.id ?? null);
-		m.redraw();
-	} catch {
-		// `--no-auth` mode (503) or a network failure: hide the selector.
-		if (state.projects === null) state.projects = [];
-		m.redraw();
+	// `apiTry` keeps an unauthenticated (401) / `--no-auth` (503) visitor from
+	// throwing: a `null` body means "no session", which keeps the selector
+	// hidden and skips the no-project redirect for shared views.
+	const body = await apiTry<{ projects: Project[] }>("/api/projects");
+	state.authed = body !== null;
+	state.projects = body?.projects ?? [];
+	m.redraw();
+	// An authenticated user with no projects has nowhere to scope to: send
+	// them to the Projects page to create one (unless already there).
+	if (
+		state.authed === true &&
+		state.projects.length === 0 &&
+		!location.pathname.startsWith("/projects/")
+	) {
+		location.replace("/projects/");
+		return;
 	}
+	if (!visible()) return;
+	const saved = getActiveProjectId();
+	const fresh = body!.projects.find((p) => p.id === saved);
+	// The saved id must still exist; otherwise fall back to the first
+	// project (a new user's first visit selects their first project).
+	if (fresh) state.active = fresh.id;
+	else setActiveProjectId(body!.projects[0]?.id ?? null);
+	m.redraw();
 }
 
 /** The selector shows only once the API answered and the user has projects —

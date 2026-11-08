@@ -104,19 +104,27 @@ async function login(): Promise<string> {
     return cookie;
 }
 
-/** Create a device token in the session user's Personal project and return the
- * raw value. Tokens are project-scoped (`/api/projects/:id/tokens`), so this
- * resolves the caller's personal project id from their project list first. */
+/** Create a device token for the session user and return the raw value.
+ * Tokens are project-scoped (`/api/projects/:id/tokens`), so this resolves a
+ * project to use first — creating one when the user has none (there is no
+ * auto-created Personal project). */
 async function personalProjectToken(cookie: string): Promise<string> {
     const list = await fetch(`${baseUrl}/api/projects`, { headers: { cookie } });
     const projects = (await list.json()) as {
         projects: { id: string; name: string }[];
     };
-    const personal = projects.projects.find((p) =>
-        p.id.startsWith("personal-"),
-    );
-    if (!personal) throw new Error("No Personal project found");
-    const res = await fetch(`${baseUrl}/api/projects/${personal.id}/tokens`, {
+    let project = projects.projects[0];
+    if (!project) {
+        const created = await fetch(`${baseUrl}/api/projects`, {
+            method: "POST",
+            headers: { cookie, "content-type": "application/json" },
+            body: JSON.stringify({ name: "Overlay fixture project" }),
+        });
+        expect(created.status).toBe(201);
+        project = ((await created.json()) as { project: { id: string } })
+            .project;
+    }
+    const res = await fetch(`${baseUrl}/api/projects/${project.id}/tokens`, {
         method: "POST",
         headers: { cookie },
     });

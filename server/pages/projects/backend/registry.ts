@@ -121,9 +121,12 @@ export interface Projects {
         allowed: readonly ProjectRole[],
     ): ProjectRole;
     /**
-     * Ensure + return the user's auto-created "Personal" project id
-     * (`personal-<user id>`, the id migration 0012 seeds). The user's home for
-     * entities before they create named projects; idempotent.
+     * The default project id for a user's project-scoped request when no
+     * `?project=` override is given: the user's earliest project as a member
+     * (for pre-existing accounts, migration 0012's seeded `personal-<user id>`
+     * is the earliest and wins the tie-break). Not auto-created — it throws a
+     * 404 `ApiError` when the user has no projects, so such requests 404 (the
+     * UI then prompts them to create a project) instead of materialising one.
      */
     personalProjectId(user: string): string;
     /** Create a project; the creator becomes its sole owner. `name` is validated. */
@@ -282,18 +285,20 @@ export function createProjects(db: Database | null): Projects {
             if (!db) return LOCAL_PROJECT_ID;
             const d = useDb();
             const uid = userIdOf(user);
-            const projectId = `personal-${uid}`;
-            d.transaction(() => {
-                d.prepare(
-                    "INSERT OR IGNORE INTO projects (id, name, owner_id, is_personal) " +
-                        "VALUES (?, 'Personal', ?, 1)",
-                ).run(projectId, uid);
-                d.prepare(
-                    "INSERT OR IGNORE INTO project_members (project_id, user_id, role) " +
-                        "VALUES (?, ?, 'owner')",
-                ).run(projectId, uid);
-            })();
-            return projectId;
+            // Default project for a request without `?project=`: the user's
+            // earliest project as a member. Not auto-created — a user without
+            // any project 404s (the UI offers to create one).
+            const row = d
+                .prepare(
+                    "SELECT p.id FROM projects p " +
+                        "JOIN project_members m ON m.project_id = p.id " +
+                        "WHERE m.user_id = ? " +
+                        "ORDER BY p.created_at ASC, p.id ASC LIMIT 1",
+                )
+                .get(uid) as { id: string } | undefined;
+            if (!row)
+                throw new ApiError(`User ${user} has no projects`, 404);
+            return row.id;
         },
 
         create: (user, rawName) => {

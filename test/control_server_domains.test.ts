@@ -107,7 +107,9 @@ describe("control-server domain contracts", () => {
             error: "Invitation already used",
         });
 
-        const aliceProject = projects.personalProjectId("alice");
+        // No auto-created Personal project exists: alice's project is created
+        // explicitly so the token has a project to bind to.
+        const aliceProject = projects.create("alice", "Alice project").id;
         const token = projects.createToken("alice", aliceProject);
         expect(auth.userForToken(token.token)).toBe("alice");
         // A foreign owner/editor cannot delete a token that is not theirs:

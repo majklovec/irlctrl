@@ -1,10 +1,11 @@
 /*
  * Project-scoping guards shared by every project-scoped page (devices,
  * dashboards, overlays, assets). A route resolves the target project — the
- * `?project=` query param, else the requesting user's auto-created Personal
- * project — and enforces the requested roles through the "projectAccess"
- * capability before dispatching to its store. Stores take the resolved project
- * id and scope their queries to it without doing auth themselves.
+ * `?project=` query param, else the requesting user's Personal project (a
+ * 404 when they have none) — and enforces the requested roles through the
+ * "projectAccess" capability before dispatching to its store. Stores take the
+ * resolved project id and scope their queries to it without doing auth
+ * themselves.
  */
 import { ApiError } from "../../shared/params";
 import { projectParam } from "../../shared/project_param";
