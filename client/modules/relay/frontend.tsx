@@ -378,7 +378,7 @@ const relayModule: FrontendModule = {
 	kind: "device-card",
 	title: "Relay",
 	roleIcons: { relay: relayIcon },
-	order: 20,
+	order: 5,
 	log,
 	available: (status) => status.role === "relay",
 	dashboardWidgets: relayDashboardWidgets,

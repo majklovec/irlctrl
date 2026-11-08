@@ -4,30 +4,27 @@
  * columns sit muted until/unless stats arrive).
  */
 import "./styles.css";
-import {
-	Badge,
-	Card,
-	type Child,
-	IconButton,
-} from "@ui/components/";
+import { Badge, Card, type Child, IconButton } from "@ui/components/";
 import { Icon } from "@ui/components/icons";
 import { card, type DeviceCard } from "@ui/device/store";
 import { t } from "@ui/i18n";
 import { formatBitrate, formatSpeed, since } from "@ui/util";
 import m from "mithril";
 import type {
-	FrontendModule,
 	DeviceDashboardWidget,
+	FrontendModule,
 } from "../../../shared/contracts/frontend_module";
+import log from "./log";
 import { defaultRouteRowIndex } from "./route_view";
 import type { Iface, NetworkStatus, SrtlaLinkStats } from "./types";
-import log from "./log";
 
 const STATS_STALE_MS = 5_000;
 const LINK_COLUMNS = 7;
 
 /** The `relay.stats` push frame with its payload, once validated. */
-function statsFrame(host: DeviceCard):
+function statsFrame(
+	host: DeviceCard,
+):
 	| { at: number; data: { stats: { links?: SrtlaLinkStats[] } | null } }
 	| undefined {
 	const entry = host.st.events.get("relay.stats");
@@ -149,9 +146,7 @@ function linkHeader(): m.Vnode {
 }
 
 function interfacesCard(host: DeviceCard, status: NetworkStatus): m.Vnode {
-	const selected = new Set(
-		(status.selected ?? []).map((i: Iface) => i.iface),
-	);
+	const selected = new Set((status.selected ?? []).map((i: Iface) => i.iface));
 	const frame = statsFrame(host);
 	const live = frame?.data.stats ?? null;
 	const stale = !!live && frame?.at && Date.now() - frame.at > STATS_STALE_MS;
@@ -268,9 +263,7 @@ const networkDashboardWidgets: DeviceDashboardWidget[] = [
 		defaultSize: { w: 4, h: 5 },
 		minSize: { w: 3, h: 3 },
 		body: ({ card: host, status }) =>
-			status
-				? interfacesCard(host, status as unknown as NetworkStatus)
-				: null,
+			status ? interfacesCard(host, status as unknown as NetworkStatus) : null,
 	},
 ];
 
@@ -280,8 +273,7 @@ const networkModule: FrontendModule = {
 	title: "Network",
 	order: 15,
 	log,
-	available: (status) =>
-		status.role === "relay" || status.role === "encoder",
+	available: (status) => status.role === "relay" || status.role === "encoder",
 	dashboardWidgets: networkDashboardWidgets,
 	defaultSize: { w: 4, h: 5 },
 	minSize: { w: 3, h: 3 },

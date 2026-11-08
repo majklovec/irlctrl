@@ -10,17 +10,20 @@
  * The uplinks-changed handlers are registered by the consuming modules, so
  * one network module serves both roles without knowing which one is running.
  */
-import type { ModuleCore } from "../../backend/module_core";
-import { t } from "../../../shared/i18n";
+
+import { requireCapability } from "../../../shared/capabilities";
 import type {
     BackendModule,
     Params,
 } from "../../../shared/contracts/backend_module";
+import { t } from "../../../shared/i18n";
 import {
     ApiError,
     optionalStringList,
     requireString,
 } from "../../../shared/params";
+import type { ModuleCore } from "../../backend/module_core";
+import log from "./log";
 import {
     bindRouting,
     defaultRouteDetails,
@@ -28,8 +31,8 @@ import {
     ensureUplinksFile,
     isMonitorRunning,
     onUplinksChanged,
-    resolveSelection,
     reconfigure,
+    resolveSelection,
     selection,
     setSelection,
     startDefaultRouteFailover,
@@ -38,10 +41,7 @@ import {
     stopInterfaceMonitor,
     UPLINKS_FILE,
 } from "./routing";
-import type { Iface, Modem, ModemConfig } from "./types";
-import { requireCapability } from "../../../shared/capabilities";
-import type { ModemSource } from "./types";
-import log from "./log";
+import type { Iface, Modem, ModemConfig, ModemSource } from "./types";
 
 /** Core bag, bound at discovery and re-filled at start (a module never imports the core). */
 let core: ModuleCore;
