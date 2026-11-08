@@ -184,7 +184,7 @@
     "overlay.copied": "Zkopírováno!",
     "overlay.copy": "Kopírovat URL overlaye pro OBS",
     "overlay.copy_variable_url": "Zkopírovat URL proměnné (přidejte hodnotu pro úpravu proměnné)",
-    "overlay.create_new": "Vytvořit nový overlay",
+    "overlay.create_new": "Nový overlay",
     "overlay.delete": "Smazat",
     "overlay.delete_overlay": "Smazat overlay",
     "overlay.duplicate_overlay": "Duplikovat overlay",
