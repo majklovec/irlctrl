@@ -662,7 +662,7 @@ const App: m.Component = {
 																	? new Date(inv.expiresAt).toLocaleString()
 																	: "—"}
 															</td>
-															<td>
+															<td class="right">
 																{inv.usedBy ? null : (
 																	<Button
 																		label={t("projects.invites.revoke")}
@@ -677,7 +677,7 @@ const App: m.Component = {
 												</tbody>
 											</table>
 										)}
-										<div class="actions invite-create">
+										<div class="actions project-card-actions">
 											<Select
 												target={state}
 												prop="newInviteRole"
@@ -698,47 +698,57 @@ const App: m.Component = {
 										</div>
 									</Card>
 								) : null,
-								<Card
-									title={t("projects.tokens.title")}
-									headActions={
-										state.selected.role !== "viewer" ? (
-											<Button
-												label={t("projects.tokens.add")}
-												disabled={state.tokenBusy}
-												onclick={addToken}
-											/>
-										) : null
-									}
-								>
+								<Card title={t("projects.tokens.title")}>
 									{state.tokens === undefined ? (
 										<p class="muted">{t("mgmt.loading")}</p>
 									) : state.tokens.length === 0 ? (
 										<p class="muted">{t("projects.tokens.empty")}</p>
 									) : (
-										state.tokens.map((tk) => (
-											<div class="token-item" key={tk.id}>
-												<code
-													class="token-value"
-													title={t("projects.tokens.copy")}
-													onclick={() => copyToken(tk.token)}
-												>
-													{tk.token}
-												</code>
-												<span class="muted">
-													{new Date(tk.createdAt).toLocaleString()}
-												</span>
-												{state.selected?.role !== "viewer" ? (
-													<IconButton
-														danger
-														label={t("projects.tokens.remove")}
-														icon={<Icon name="delete" class="role-icon" />}
-														disabled={state.removingToken}
-														onclick={() => removeToken(tk)}
-													/>
-												) : null}
-											</div>
-										))
+										<table class="dash-table project-token-table">
+											<thead>
+												<tr>
+													<th>{t("projects.tokens.value")}</th>
+													<th>{t("invitations.created")}</th>
+													<th />
+												</tr>
+											</thead>
+											<tbody>
+												{state.tokens.map((tk) => (
+													<tr key={tk.id}>
+														<td>
+															<code
+																class="token-value"
+																title={t("projects.tokens.copy")}
+																onclick={() => copyToken(tk.token)}
+															>
+																{tk.token}
+															</code>
+														</td>
+														<td>{new Date(tk.createdAt).toLocaleString()}</td>
+														<td class="right">
+															{state.selected?.role !== "viewer" ? (
+																<Button
+																	label={t("projects.tokens.remove")}
+																	class="danger"
+																	disabled={state.removingToken}
+																	onclick={() => removeToken(tk)}
+																/>
+															) : null}
+														</td>
+													</tr>
+												))}
+											</tbody>
+										</table>
 									)}
+									{state.selected.role !== "viewer" ? (
+										<div class="actions project-card-actions">
+											<Button
+												label={t("projects.tokens.add")}
+												disabled={state.tokenBusy}
+												onclick={addToken}
+											/>
+										</div>
+									) : null}
 								</Card>,
 							]
 						: null,

@@ -27,9 +27,23 @@
     border-radius: var(--radius-sm);
 }
 
-.invite-create {
+.project-card-actions {
     margin-top: 0.75rem;
     justify-content: flex-start;
+}
+
+.project-token-table td:not(:last-child) {
+    white-space: normal;
+}
+
+@container card (max-width: 320px) {
+    .project-token-table th,
+    .project-token-table td {
+        padding-inline: 0.25rem;
+    }
+    .project-token-table button {
+        padding-inline: 0.5rem;
+    }
 }
 
 /* Inline rename input shown in the project row while renaming. */
@@ -38,31 +52,9 @@
     min-width: 0;
 }
 
-/* Device tokens: one row per token (value + date + remove action). */
-.token-item {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--border);
-}
-.token-item:last-child {
-    border-bottom: 0;
-}
 .token-value {
-    flex: 1;
     overflow-wrap: anywhere;
     font-size: 0.85rem;
     user-select: all;
     cursor: copy;
-}
-.token-item > .icon-link {
-    flex: none;
-    padding: 0;
-    box-shadow: none;
-}
-.token-item > .dash-delete:hover {
-    color: var(--bad);
-    border-color: var(--bad);
-    background: color-mix(in srgb, var(--bad) 10%, transparent);
 }

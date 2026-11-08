@@ -283,6 +283,7 @@
     "projects.tokens.empty": "Ainda não há tokens. Adicione um para que os seus dispositivos possam ligar.",
     "projects.tokens.remove": "Remover",
     "projects.tokens.title": "Tokens do dispositivo",
+    "projects.tokens.value": "Token",
     "projects.you": "você",
     "register.back": "Já tem uma conta? Iniciar sessão",
     "register.confirm": "Confirmar palavra-passe",

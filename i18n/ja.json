@@ -283,6 +283,7 @@
     "projects.tokens.empty": "トークンはまだありません。デバイスが接続できるように追加してください。",
     "projects.tokens.remove": "削除",
     "projects.tokens.title": "デバイストークン",
+    "projects.tokens.value": "トークン",
     "projects.you": "あなた",
     "register.back": "アカウントをお持ちですか？ログイン",
     "register.confirm": "パスワード確認",

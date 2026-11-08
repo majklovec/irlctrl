@@ -283,6 +283,7 @@
     "projects.tokens.empty": "Noch keine Tokens. Fügen Sie eines hinzu, damit sich Ihre Geräte verbinden können.",
     "projects.tokens.remove": "Entfernen",
     "projects.tokens.title": "Geräte-Tokens",
+    "projects.tokens.value": "Token",
     "projects.you": "Sie",
     "register.back": "Haben Sie bereits ein Konto? Anmelden",
     "register.confirm": "Passwort bestätigen",

@@ -283,6 +283,7 @@
     "projects.tokens.empty": "Токенов пока нет. Добавьте один, чтобы ваши устройства могли подключаться.",
     "projects.tokens.remove": "Удалить",
     "projects.tokens.title": "Токены устройства",
+    "projects.tokens.value": "Токен",
     "projects.you": "вы",
     "register.back": "Уже есть аккаунт? Войти",
     "register.confirm": "Подтвердите пароль",

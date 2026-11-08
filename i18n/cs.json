@@ -283,6 +283,7 @@
     "projects.tokens.empty": "Zatím žádné tokeny. Přidejte jeden, aby se vaše zařízení mohla připojit.",
     "projects.tokens.remove": "Odebrat",
     "projects.tokens.title": "Tokeny zařízení",
+    "projects.tokens.value": "Token",
     "projects.you": "vy",
     "register.back": "Máte už účet? Přihlaste se",
     "register.confirm": "Potvrdit heslo",

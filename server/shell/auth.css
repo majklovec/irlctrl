@@ -88,10 +88,6 @@
     .card {
         padding: 1rem;
     }
-    /* Token rows wrap their actions below the value on narrow screens. */
-    .token-item {
-        flex-wrap: wrap;
-    }
     /* The wizard stepper scrolls instead of crushing its step labels. */
     .wizard-stepper {
         overflow-x: auto;
