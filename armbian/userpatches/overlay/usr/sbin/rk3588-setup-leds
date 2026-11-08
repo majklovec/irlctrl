@@ -1,0 +1,17 @@
+#!/bin/bash
+
+set_led() {
+	if [ -d "/sys/class/leds/$1" ]; then
+		echo "$2" >"/sys/class/leds/$1/trigger"
+	fi
+}
+
+if [ "$1" == "reset" ]; then
+	set_led "blue_led" "heartbeat"
+	set_led "green_led" "heartbeat"
+	set_led "user-led2" "heartbeat"
+else
+	set_led "blue_led" "none"
+	set_led "green_led" "default-on"
+	set_led "user-led2" "none"
+fi

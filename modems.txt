@@ -1,0 +1,123 @@
+[ 1431.948615] usb 5-1.3: new high-speed USB device number 3 using xhci-hcd
+[ 1432.067856] usb 5-1.3: New USB device found, idVendor=12d1, idProduct=14fe, bcdDevice= 1.02
+[ 1432.067871] usb 5-1.3: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+[ 1432.067882] usb 5-1.3: Product: HUAWEI_MOBILE
+[ 1432.067890] usb 5-1.3: Manufacturer: HUAWEI_MOBILE
+[ 1432.067898] usb 5-1.3: SerialNumber: 0123456789ABCDEF
+[ 1432.104465] usb-storage 5-1.3:1.0: USB Mass Storage device detected
+[ 1432.105622] scsi host0: usb-storage 5-1.3:1.0
+[ 1433.044395] usb 5-1.3: USB disconnect, device number 3
+[ 1433.515309] usb 5-1.3: new high-speed USB device number 4 using xhci-hcd
+[ 1433.634378] usb 5-1.3: New USB device found, idVendor=12d1, idProduct=1506, bcdDevice= 1.02
+[ 1433.634395] usb 5-1.3: New USB device strings: Mfr=1, Product=2, SerialNumber=0
+[ 1433.634405] usb 5-1.3: Product: HUAWEI_MOBILE
+[ 1433.634414] usb 5-1.3: Manufacturer: HUAWEI_MOBILE
+[ 1433.729889] usb-storage 5-1.3:1.3: USB Mass Storage device detected
+[ 1433.731888] scsi host0: usb-storage 5-1.3:1.3
+[ 1433.732766] usb-storage 5-1.3:1.4: USB Mass Storage device detected
+[ 1433.734194] scsi host1: usb-storage 5-1.3:1.4
+[ 1433.754367] usbcore: registered new interface driver cdc_wdm
+[ 1433.756339] usbcore: registered new interface driver usbserial_generic
+[ 1433.756360] usbserial: USB Serial support registered for generic
+[ 1433.761175] usbcore: registered new interface driver option
+[ 1433.761201] usbserial: USB Serial support registered for GSM modem (1-port)
+[ 1433.958312] huawei_cdc_ncm 5-1.3:1.2: MAC-Address: 00:1e:10:1f:00:00
+[ 1433.958337] huawei_cdc_ncm 5-1.3:1.2: setting rx_max = 16384
+[ 1433.964396] huawei_cdc_ncm 5-1.3:1.2: NDP will be placed at end of frame for this device.
+[ 1433.965239] huawei_cdc_ncm 5-1.3:1.2: cdc-wdm0: USB WDM device
+[ 1433.969200] huawei_cdc_ncm 5-1.3:1.2 wwan0: register 'huawei_cdc_ncm' at usb-xhci-hcd.10.auto-1.3, Huawei CDC NCM device, 00:1e:10:1f:00:00
+[ 1433.970944] usbcore: registered new interface driver huawei_cdc_ncm
+[ 1433.971124] option 5-1.3:1.0: GSM modem (1-port) converter detected
+[ 1433.971663] usb 5-1.3: GSM modem (1-port) converter now attached to ttyUSB0
+[ 1433.971938] option 5-1.3:1.1: GSM modem (1-port) converter detected
+[ 1433.974955] usb 5-1.3: GSM modem (1-port) converter now attached to ttyUSB1
+[ 1434.759894] scsi 1:0:0:0: Direct-Access     HUAWEI   TF CARD Storage  2.31 PQ: 0 ANSI: 2
+[ 1434.763496] sd 1:0:0:0: Power-on or device reset occurred
+[ 1434.765180] scsi 0:0:0:0: CD-ROM            HUAWEI   Mass Storage     2.31 PQ: 0 ANSI: 2
+[ 1434.768089] sr 0:0:0:0: Power-on or device reset occurred
+[ 1434.770259] sr 0:0:0:0: [sr0] scsi-1 drive
+[ 1434.770270] cdrom: Uniform CD-ROM driver Revision: 3.20
+[ 1434.812988] sd 1:0:0:0: [sda] Attached SCSI removable disk
+[ 1434.830022] sr 0:0:0:0: Attached scsi CD-ROM sr0
+[ 1434.877016] sr 0:0:0:0: [sr0] tag#0 UNKNOWN(0x2003) Result: hostbyte=0x00 driverbyte=0x08 cmd_age=0s
+[ 1434.877036] sr 0:0:0:0: [sr0] tag#0 Sense Key : 0x3 [current]
+[ 1434.877049] sr 0:0:0:0: [sr0] tag#0 ASC=0x11 ASCQ=0x0
+[ 1434.877066] sr 0:0:0:0: [sr0] tag#0 CDB: opcode=0x28 28 00 00 00 91 fc 00 00 02 00
+[ 1434.877314] blk_update_request: critical medium error, dev sr0, sector 149488 op 0x0:(READ) flags 0x80700 phys_seg 1 prio class 0
+[ 1434.888534] attempt to access beyond end of device
+               sr0: rw=0, want=149496, limit=149488
+[ 1434.888546] Buffer I/O error on dev sr0, logical block 18686, async page read
+[ 1434.972926] sr 0:0:0:0: [sr0] tag#0 UNKNOWN(0x2003) Result: hostbyte=0x00 driverbyte=0x08 cmd_age=0s
+[ 1434.972998] sr 0:0:0:0: [sr0] tag#0 Sense Key : 0x3 [current]
+[ 1434.973023] sr 0:0:0:0: [sr0] tag#0 ASC=0x11 ASCQ=0x0
+[ 1434.973052] sr 0:0:0:0: [sr0] tag#0 CDB: opcode=0x28 28 00 00 00 90 80 00 00 3c 00
+[ 1434.973079] blk_update_request: critical medium error, dev sr0, sector 147968 op 0x0:(READ) flags 0x80700 phys_seg 9 prio class 0
+[ 1434.979012] sr 0:0:0:0: [sr0] tag#0 UNKNOWN(0x2003) Result: hostbyte=0x00 driverbyte=0x08 cmd_age=0s
+[ 1434.979074] sr 0:0:0:0: [sr0] tag#0 Sense Key : 0x3 [current]
+[ 1434.979100] sr 0:0:0:0: [sr0] tag#0 ASC=0x11 ASCQ=0x0
+[ 1434.979129] sr 0:0:0:0: [sr0] tag#0 CDB: opcode=0x28 28 00 00 00 90 80 00 00 02 00
+[ 1434.979155] blk_update_request: critical medium error, dev sr0, sector 147968 op 0x0:(READ) flags 0x0 phys_seg 1 prio class 0
+[ 1434.979254] Buffer I/O error on dev sr0, logical block 18496, async page read
+[ 1434.985538] sr 0:0:0:0: [sr0] tag#0 UNKNOWN(0x2003) Result: hostbyte=0x00 driverbyte=0x08 cmd_age=0s
+[ 1434.985561] sr 0:0:0:0: [sr0] tag#0 Sense Key : 0x3 [current]
+[ 1434.985581] sr 0:0:0:0: [sr0] tag#0 ASC=0x11 ASCQ=0x0
+[ 1434.985611] sr 0:0:0:0: [sr0] tag#0 CDB: opcode=0x28 28 00 00 00 91 fa 00 00 02 00
+[ 1434.985639] blk_update_request: critical medium error, dev sr0, sector 149480 op 0x0:(READ) flags 0x80700 phys_seg 1 prio class 0
+[ 1434.985880] attempt to access beyond end of device
+               sr0: rw=0, want=149488, limit=149480
+[ 1434.985904] Buffer I/O error on dev sr0, logical block 18685, async page read
+[ 1435.112822] sr 0:0:0:0: [sr0] tag#0 UNKNOWN(0x2003) Result: hostbyte=0x00 driverbyte=0x08 cmd_age=0s
+[ 1435.112839] sr 0:0:0:0: [sr0] tag#0 Sense Key : 0x3 [current]
+[ 1435.112848] sr 0:0:0:0: [sr0] tag#0 ASC=0x11 ASCQ=0x0
+[ 1435.112862] sr 0:0:0:0: [sr0] tag#0 CDB: opcode=0x28 28 00 00 00 91 f6 00 00 02 00
+[ 1435.112874] blk_update_request: critical medium error, dev sr0, sector 149464 op 0x0:(READ) flags 0x80700 phys_seg 1 prio class 0
+[ 1435.112992] attempt to access beyond end of device
+               sr0: rw=0, want=149472, limit=149464
+[ 1435.113004] Buffer I/O error on dev sr0, logical block 18683, async page read
+[ 1435.149823] sr 0:0:0:0: [sr0] tag#0 UNKNOWN(0x2003) Result: hostbyte=0x00 driverbyte=0x08 cmd_age=0s
+[ 1435.149842] sr 0:0:0:0: [sr0] tag#0 Sense Key : 0x3 [current]
+[ 1435.149856] sr 0:0:0:0: [sr0] tag#0 ASC=0x11 ASCQ=0x0
+[ 1435.149873] sr 0:0:0:0: [sr0] tag#0 CDB: opcode=0x28 28 00 00 00 90 80 00 00 3c 00
+[ 1435.149888] blk_update_request: critical medium error, dev sr0, sector 147968 op 0x0:(READ) flags 0x80700 phys_seg 16 prio class 0
+[ 1435.156402] sr 0:0:0:0: [sr0] tag#0 UNKNOWN(0x2003) Result: hostbyte=0x00 driverbyte=0x08 cmd_age=0s
+[ 1435.156420] sr 0:0:0:0: [sr0] tag#0 Sense Key : 0x3 [current]
+[ 1435.156434] sr 0:0:0:0: [sr0] tag#0 ASC=0x11 ASCQ=0x0
+[ 1435.156448] sr 0:0:0:0: [sr0] tag#0 CDB: opcode=0x28 28 00 00 00 90 80 00 00 02 00
+[ 1435.156461] blk_update_request: critical medium error, dev sr0, sector 147968 op 0x0:(READ) flags 0x0 phys_seg 1 prio class 0
+[ 1435.156525] Buffer I/O error on dev sr0, logical block 18496, async page read
+[ 1435.163276] sr 0:0:0:0: [sr0] tag#0 UNKNOWN(0x2003) Result: hostbyte=0x00 driverbyte=0x08 cmd_age=0s
+[ 1435.163298] sr 0:0:0:0: [sr0] tag#0 Sense Key : 0x3 [current]
+[ 1435.163316] sr 0:0:0:0: [sr0] tag#0 ASC=0x11 ASCQ=0x0
+[ 1435.163335] sr 0:0:0:0: [sr0] tag#0 CDB: opcode=0x28 28 00 00 00 91 f4 00 00 02 00
+[ 1435.163353] blk_update_request: critical medium error, dev sr0, sector 149456 op 0x0:(READ) flags 0x80700 phys_seg 1 prio class 0
+[ 1435.163630] attempt to access beyond end of device
+               sr0: rw=0, want=149464, limit=149456
+[ 1435.163648] Buffer I/O error on dev sr0, logical block 18682, async page read
+[ 1436.471893] usb 1-1: new high-speed USB device number 2 using ehci-platform
+[ 1436.621741] usb 1-1: New USB device found, idVendor=3566, idProduct=2001, bcdDevice= 1.02
+[ 1436.621749] usb 1-1: New USB device strings: Mfr=2, Product=3, SerialNumber=4
+[ 1436.621754] usb 1-1: Product: Mobile
+[ 1436.621759] usb 1-1: Manufacturer: Mobile
+[ 1436.621762] usb 1-1: SerialNumber: 123456789ABCD
+[ 1436.626033] rndis_host 1-1:1.0 usb0: register 'rndis_host' at usb-fc800000.usb-1, RNDIS device, ba:6a:98:fc:d5:9f
+[ 1437.659269] rndis_host 1-1:1.0 usb0: unregister 'rndis_host' usb-fc800000.usb-1, RNDIS device
+[ 1437.815474] usb 1-1: reset high-speed USB device number 2 using ehci-platform
+[ 1437.970762] rndis_host 1-1:1.0 usb0: register 'rndis_host' at usb-fc800000.usb-1, RNDIS device, 5a:07:20:ce:a9:88
+[ 1438.612593] usb 1-1: USB disconnect, device number 2
+[ 1438.613109] rndis_host 1-1:1.0 usb0: unregister 'rndis_host' usb-fc800000.usb-1, RNDIS device
+[ 1439.455496] usb 1-1: new high-speed USB device number 3 using ehci-platform
+[ 1439.608151] usb 1-1: New USB device found, idVendor=12d1, idProduct=1f01, bcdDevice= 1.02
+[ 1439.608179] usb 1-1: New USB device strings: Mfr=2, Product=3, SerialNumber=4
+[ 1439.608197] usb 1-1: Product: Mobile
+[ 1439.608215] usb 1-1: Manufacturer: Mobile
+[ 1439.608232] usb 1-1: SerialNumber: 123456789ABCD
+[ 1439.612433] usb-storage 1-1:1.0: USB Mass Storage device detected
+[ 1439.614460] scsi host2: usb-storage 1-1:1.0
+[ 1440.304657] usb 1-1: USB disconnect, device number 3
+[ 1440.605648] usb 1-1: new high-speed USB device number 4 using ehci-platform
+[ 1440.757699] usb 1-1: New USB device found, idVendor=12d1, idProduct=155e, bcdDevice= 1.02
+[ 1440.757713] usb 1-1: New USB device strings: Mfr=2, Product=3, SerialNumber=4
+[ 1440.757718] usb 1-1: Product: Mobile
+[ 1440.757723] usb 1-1: Manufacturer: Mobile
+[ 1440.757728] usb 1-1: SerialNumber: 123456789ABCD
+[ 1440.762026] cdc_ether 1-1:1.0 usb0: register 'cdc_ether' at usb-fc800000.usb-1, CDC Ethernet Device, 5a:45:8f:fe:d1:c7

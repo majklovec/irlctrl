@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# Pin the XHCI IRQs to the big cores
+# Except for core 4, which we've set up to run the UVC async memcpy work
+irqs=$(grep xhci-hcd /proc/interrupts | awk -F ':' '{print $1}')
+for irq in $irqs; do
+	echo e0 >/proc/irq/$irq/smp_affinity
+done
