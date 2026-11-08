@@ -3,11 +3,13 @@
  * or a second browser to publish a camera or screen feed. It dials the control
  * server's signaling WebSocket and drives the WebRTC offer as the sender.
  *
- * Self-contained on purpose: it is a standalone utility page (not part of the
- * app shell), so it uses plain DOM + hardcoded copy rather than the bundled
- * Mithril/i18n stack, exactly like the OBS overlay runtime page.
+ * Standalone utility page (not part of the app shell): a small Mithril app
+ * mounted on `#app`, with hardcoded copy (no i18n) and no other runtime
+ * dependencies.
  */
+import m from "mithril";
 import { WEBRTC_STREAM_ID_RE } from "../webrtc_protocol";
+import "./styles.css";
 
 type StatusKind = "idle" | "waiting" | "live" | "error";
 
@@ -39,21 +41,18 @@ interface ServerMessage {
 
 const params = new URLSearchParams(location.search);
 const streamId = params.get("streamId") ?? "";
+const validStreamId = WEBRTC_STREAM_ID_RE.test(streamId);
 
-const frontBtn = document.getElementById(
-	"share-camera-front",
-) as HTMLButtonElement | null;
-const backBtn = document.getElementById(
-	"share-camera-back",
-) as HTMLButtonElement | null;
-const screenBtn = document.getElementById(
-	"share-screen",
-) as HTMLButtonElement | null;
-const stopBtn = document.getElementById("stop") as HTMLButtonElement | null;
-const statusEl = document.getElementById(
-	"status",
-) as HTMLParagraphElement | null;
-const preview = document.getElementById("preview") as HTMLVideoElement | null;
+/** The re-rendered UI slice; the imperative WebRTC state stays outside it. */
+interface UiState {
+	status: { text: string; kind: StatusKind };
+}
+
+const ui: UiState = {
+	status: validStreamId
+		? { text: "Idle.", kind: "idle" }
+		: { text: "Missing or invalid stream id.", kind: "error" },
+};
 
 const state: SenderState = {
 	pc: null,
@@ -64,11 +63,8 @@ const state: SenderState = {
 };
 
 function setStatus(text: string, kind: StatusKind = "idle"): void {
-	if (!statusEl) return;
-	statusEl.textContent = text;
-	statusEl.className =
-		"status" +
-		(kind === "live" ? " is-live" : kind === "error" ? " is-error" : "");
+	ui.status = { text, kind };
+	m.redraw();
 }
 
 /** Stop every track, close the peer + signaling socket, and reset the preview. */
@@ -83,8 +79,7 @@ function stopAll(): void {
 	state.pc = null;
 	if (state.ws && state.ws.readyState === WebSocket.OPEN) state.ws.close();
 	state.ws = null;
-	if (preview) preview.srcObject = null;
-	if (stopBtn) stopBtn.disabled = true;
+	m.redraw();
 }
 
 function sendOffer(): Promise<void> {
@@ -146,10 +141,7 @@ async function start(source: Source): Promise<void> {
 	}
 	state.stream = stream;
 	state.source = source;
-	if (preview) {
-		preview.srcObject = stream;
-		void preview.play().catch(() => {});
-	}
+	m.redraw();
 	// The browser offers a Stop control for screen shares; honour it.
 	stream.getVideoTracks()[0]?.addEventListener("ended", () => stopAll());
 
@@ -180,7 +172,6 @@ async function start(source: Source): Promise<void> {
 	state.ws = ws;
 
 	ws.onopen = () => {
-		if (stopBtn) stopBtn.disabled = false;
 		setStatus("Waiting for the overlay to receive…", "waiting");
 		// Ask for the room layout right after the socket is usable: the
 		// server's on-join snapshot can race this listener's setup, while a
@@ -232,26 +223,108 @@ async function start(source: Source): Promise<void> {
 	};
 }
 
-if (
-	!WEBRTC_STREAM_ID_RE.test(streamId) ||
-	!frontBtn ||
-	!backBtn ||
-	!screenBtn ||
-	!stopBtn ||
-	!statusEl ||
-	!preview
-) {
-	setStatus("Missing or invalid stream id.", "error");
-	if (frontBtn) frontBtn.disabled = true;
-	if (backBtn) backBtn.disabled = true;
-	if (screenBtn) screenBtn.disabled = true;
-} else {
-	frontBtn.addEventListener("click", () => void start("front"));
-	backBtn.addEventListener("click", () => void start("back"));
-	screenBtn.addEventListener("click", () => void start("screen"));
+/**
+ * Point the (Mithril-managed) preview at the current stream, playing it on
+ * attach. m.redraw never writes `srcObject`, so the hook syncs it from the
+ * imperative state (null clears the preview on stop).
+ */
+function syncPreview(preview: HTMLVideoElement): void {
+	const stream = state.stream;
+	if (preview.srcObject === stream) return;
+	preview.srcObject = stream;
+	if (stream) void preview.play().catch(() => {});
 }
-stopBtn?.addEventListener("click", () => {
-	stopAll();
-	setStatus("Stopped.", "idle");
-});
+
+interface SourceButtonAttrs {
+	source: Source;
+	label: string;
+	secondary?: boolean;
+}
+
+const SourceButton: m.Component<SourceButtonAttrs> = {
+	view(vnode) {
+		const { source, label, secondary = false } = vnode.attrs;
+		return (
+			<button
+				type="button"
+				class={secondary ? "secondary" : undefined}
+				disabled={!validStreamId}
+				onclick={() => void start(source)}
+			>
+				{label}
+			</button>
+		);
+	},
+};
+
+const StatusLine: m.Component = {
+	view() {
+		const { text, kind } = ui.status;
+		return (
+			<p
+				class={
+					"status" +
+					(kind === "live"
+						? " is-live"
+						: kind === "error"
+							? " is-error"
+							: "")
+				}
+			>
+				{text}
+			</p>
+		);
+	},
+};
+
+const Preview: m.Component = {
+	view() {
+		return (
+			<video
+				class="preview"
+				autoplay
+				muted
+				playsInline
+				oncreate={(vnode) => syncPreview(vnode.dom as HTMLVideoElement)}
+				onupdate={(vnode) => syncPreview(vnode.dom as HTMLVideoElement)}
+			/>
+		);
+	},
+};
+
+function App(): m.Vnode {
+	return (
+		<main>
+			<h1>Share to IRL Control</h1>
+			<p class="sub">Pick a source to start streaming to the overlay.</p>
+			<div class="actions">
+				{/* The two camera buttons always share one row, 50/50. */}
+				<div class="camera-row">
+					{m(SourceButton, { source: "front", label: "Front camera" })}
+					{m(SourceButton, { source: "back", label: "Back camera" })}
+				</div>
+				{m(SourceButton, {
+					source: "screen",
+					label: "Share screen",
+					secondary: true,
+				})}
+				<button
+					type="button"
+					class="secondary"
+					disabled={!state.source}
+					onclick={() => {
+						stopAll();
+						setStatus("Stopped.", "idle");
+					}}
+				>
+					Stop
+				</button>
+			</div>
+			{m(StatusLine)}
+			{m(Preview)}
+		</main>
+	);
+}
+
+m.mount(document.getElementById("app") as HTMLElement, { view: App });
 window.addEventListener("beforeunload", () => stopAll());

@@ -319,31 +319,24 @@ function editForm({ element: e }: ElementProps): Vnode {
 			</label>
 			<div class="field" style={{ marginTop: "10px" }}>
 				<span class="field-label">{t("overlay.webrtc_qr")}</span>
-				{m(
-					"canvas.overlay-webrtc-qr",
-					{
-						style: {
-							display: "block",
-							margin: "6px auto 0",
-							borderRadius: "4px",
-						},
-						oncreate: (vnode) => {
-							// Render the sender URL as a QR code so a phone can
-							// scan it instead of typing the address. A failure
-							// just leaves the canvas empty; the URL field
-							// above remains usable.
-							QRCode.toCanvas(
-								vnode.dom as HTMLCanvasElement,
-								senderUrl,
-								{
-									width: 160,
-									margin: 1,
-									color: { dark: "#000", light: "#fff" },
-								},
-							).catch(() => {});
-						},
+				{m("canvas.overlay-webrtc-qr", {
+					style: {
+						display: "block",
+						margin: "6px auto 0",
+						borderRadius: "4px",
 					},
-				)}
+					oncreate: (vnode) => {
+						// Render the sender URL as a QR code so a phone can
+						// scan it instead of typing the address. A failure
+						// just leaves the canvas empty; the URL field
+						// above remains usable.
+						QRCode.toCanvas(vnode.dom as HTMLCanvasElement, senderUrl, {
+							width: 160,
+							margin: 1,
+							color: { dark: "#000", light: "#fff" },
+						}).catch(() => {});
+					},
+				})}
 			</div>
 			<p
 				style={{
