@@ -1,3 +1,20 @@
+# [4.0.0](https://github.com/majklovec/irlctrl/compare/v3.5.1...v4.0.0) (2026-11-08)
+
+
+### Features
+
+* **auth:** preserve route after auth ([bd41c2c](https://github.com/majklovec/irlctrl/commit/bd41c2cefb8660e063393a34527d2893eb828a8d))
+* **i18n:** add project and overlay translations ([70c717d](https://github.com/majklovec/irlctrl/commit/70c717df120d573a1c8833a59049305b2d469a13))
+* **projects:** present device tokens in a table ([52d9e55](https://github.com/majklovec/irlctrl/commit/52d9e55e3beb5e8cf160c6e54ff69cec329481fd))
+* **projects:** preview invite before join ([98247f2](https://github.com/majklovec/irlctrl/commit/98247f2c14c9da2994a00c4f638d75be00b3e6e6))
+* **projects:** scope all entities by project ([9b40e63](https://github.com/majklovec/irlctrl/commit/9b40e63f8f9462453b12dd4ae1a9516224d0914f))
+* **projects:** scope device tokens to projects ([f550f37](https://github.com/majklovec/irlctrl/commit/f550f37d5f60a07a494b09ebe4b5510e199149cc))
+
+
+### BREAKING CHANGES
+
+* **projects:** /api/profile/tokens removed; use /api/projects/:id/tokens
+
 ## [3.5.1](https://github.com/majklovec/irlctrl/compare/v3.5.0...v3.5.1) (2026-11-08)
 
 
