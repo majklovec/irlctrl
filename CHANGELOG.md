@@ -1,3 +1,19 @@
+# [5.0.0](https://github.com/majklovec/irlctrl/compare/v4.0.0...v5.0.0) (2026-11-08)
+
+
+### Features
+
+* **encoder:** rename SRT port to SRTLA ([3a1af3d](https://github.com/majklovec/irlctrl/commit/3a1af3da8b4e96719d563e11226d1a2bcbe30d01))
+* **modules:** extract network and modem modules ([40252d4](https://github.com/majklovec/irlctrl/commit/40252d43b689ff5cff4de7ad2ec7728e722e77bf))
+* **modules:** order relay before network ([c89e1e8](https://github.com/majklovec/irlctrl/commit/c89e1e8e3b4960248c459b5d5efeac7cb72bb1da))
+* **stream:** use SRTLA everywhere ([a817c47](https://github.com/majklovec/irlctrl/commit/a817c47c607e611c4e71a0a95a3cc87915dc4318))
+
+
+### BREAKING CHANGES
+
+* **stream:** combined devices must be migrated to the
+encoder role and SRT is no longer accepted on the relay input
+
 # [Unreleased]
 
 ### Removed
