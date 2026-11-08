@@ -53,6 +53,7 @@
     "overlay.iframe_url": "URL",
     "overlay.webrtc_sender_url": "Odkaz odosielateľa",
     "overlay.webrtc_copy": "Kopírovať",
+    "overlay.webrtc_qr": "QR code",
     "overlay.webrtc_hint": "Čaká sa na odosielateľa",
     "overlay.webrtc_hint_form": "Tento odkaz otvorte na zariadení, ktoré bude posielať kameru alebo obrazovku.",
     "overlay.line_height": "Výška riadku",

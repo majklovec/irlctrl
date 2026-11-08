@@ -53,6 +53,7 @@
   "overlay.iframe_url": "URL",
   "overlay.webrtc_sender_url": "送信元 URL",
   "overlay.webrtc_copy": "コピー",
+  "overlay.webrtc_qr": "QR code",
   "overlay.webrtc_hint": "送信元を待っています",
   "overlay.webrtc_hint_form": "カメラや画面を送信するデバイスで、この URL を開いてください。",
   "overlay.line_height": "行間",

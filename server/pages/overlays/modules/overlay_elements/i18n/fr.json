@@ -53,6 +53,7 @@
   "overlay.iframe_url": "URL",
   "overlay.webrtc_sender_url": "URL de l'émetteur",
   "overlay.webrtc_copy": "Copier",
+  "overlay.webrtc_qr": "QR code",
   "overlay.webrtc_hint": "En attente d'un émetteur",
   "overlay.webrtc_hint_form": "Ouvre cette URL sur l'appareil qui enverra sa caméra ou son écran.",
   "overlay.line_height": "Interligne",

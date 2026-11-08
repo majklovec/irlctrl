@@ -53,6 +53,7 @@
   "overlay.iframe_url": "URL",
   "overlay.webrtc_sender_url": "Adres nadawcy",
   "overlay.webrtc_copy": "Kopiuj",
+  "overlay.webrtc_qr": "QR code",
   "overlay.webrtc_hint": "Oczekiwanie na nadawcę",
   "overlay.webrtc_hint_form": "Otwórz ten adres na urządzeniu, które będzie nadawało kamerę lub ekran.",
   "overlay.line_height": "Wysokość wiersza",

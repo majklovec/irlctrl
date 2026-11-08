@@ -11,11 +11,19 @@ import { WEBRTC_STREAM_ID_RE } from "../webrtc_protocol";
 
 type StatusKind = "idle" | "waiting" | "live" | "error";
 
+type Source = "front" | "back" | "screen";
+
+const SOURCE_NAMES: Record<Source, string> = {
+	front: "Front camera",
+	back: "Back camera",
+	screen: "Screen",
+};
+
 interface SenderState {
 	pc: RTCPeerConnection | null;
 	ws: WebSocket | null;
 	stream: MediaStream | null;
-	source: "camera" | "screen" | null;
+	source: Source | null;
 	/** true once an offer has been sent; guards against double-negotiating. */
 	negotiating: boolean;
 }
@@ -32,8 +40,11 @@ interface ServerMessage {
 const params = new URLSearchParams(location.search);
 const streamId = params.get("streamId") ?? "";
 
-const cameraBtn = document.getElementById(
-	"share-camera",
+const frontBtn = document.getElementById(
+	"share-camera-front",
+) as HTMLButtonElement | null;
+const backBtn = document.getElementById(
+	"share-camera-back",
 ) as HTMLButtonElement | null;
 const screenBtn = document.getElementById(
 	"share-screen",
@@ -100,7 +111,7 @@ function sendOffer(): Promise<void> {
 		});
 }
 
-async function start(source: "camera" | "screen"): Promise<void> {
+async function start(source: Source): Promise<void> {
 	stopAll();
 	if (!navigator.mediaDevices) {
 		setStatus(
@@ -109,7 +120,7 @@ async function start(source: "camera" | "screen"): Promise<void> {
 		);
 		return;
 	}
-	setStatus(`Requesting ${source}…`, "waiting");
+	setStatus(`Requesting ${SOURCE_NAMES[source].toLowerCase()}…`, "waiting");
 	let stream: MediaStream;
 	try {
 		stream =
@@ -119,12 +130,15 @@ async function start(source: "camera" | "screen"): Promise<void> {
 						audio: true,
 					})
 				: await navigator.mediaDevices.getUserMedia({
-						video: true,
+						// facingMode picks the physical camera ("front" is the
+						// selfie one, "back" the rear one) on phones; desktops
+						// simply use their only camera.
+						video: { facingMode: source },
 						audio: true,
 					});
 	} catch (err) {
 		setStatus(
-			`${source === "screen" ? "Screen" : "Camera"} unavailable: ` +
+			`${SOURCE_NAMES[source]} unavailable: ` +
 				(err instanceof Error ? err.message : String(err)),
 			"error",
 		);
@@ -220,17 +234,20 @@ async function start(source: "camera" | "screen"): Promise<void> {
 
 if (
 	!WEBRTC_STREAM_ID_RE.test(streamId) ||
-	!cameraBtn ||
+	!frontBtn ||
+	!backBtn ||
 	!screenBtn ||
 	!stopBtn ||
 	!statusEl ||
 	!preview
 ) {
 	setStatus("Missing or invalid stream id.", "error");
-	if (cameraBtn) cameraBtn.disabled = true;
+	if (frontBtn) frontBtn.disabled = true;
+	if (backBtn) backBtn.disabled = true;
 	if (screenBtn) screenBtn.disabled = true;
 } else {
-	cameraBtn.addEventListener("click", () => void start("camera"));
+	frontBtn.addEventListener("click", () => void start("front"));
+	backBtn.addEventListener("click", () => void start("back"));
 	screenBtn.addEventListener("click", () => void start("screen"));
 }
 stopBtn?.addEventListener("click", () => {
