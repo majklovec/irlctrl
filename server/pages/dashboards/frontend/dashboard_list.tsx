@@ -39,6 +39,11 @@ serverLive.on({
 	},
 });
 
+// Rescope to the newly selected project when the shell's selector changes it.
+window.addEventListener("project-changed", () => {
+	void refresh();
+});
+
 async function refresh(): Promise<void> {
 	const body = await apiTry<{ dashboards: ServerDashboard[] }>(
 		"/api/dashboards",

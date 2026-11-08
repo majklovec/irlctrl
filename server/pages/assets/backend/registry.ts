@@ -1,8 +1,8 @@
 /*
- * Assets manager backend: a per-user folder tree with file storage.
+ * Assets manager backend: a per-project folder tree with file storage.
  *
- * Every user owns an isolated subtree — all queries are owner-scoped, so a
- * user only ever sees (or mutates) their own folders and files. Each user's
+ * Every project owns an isolated subtree — all queries are project_id-scoped, so a
+ * project only ever sees (or mutates) their own folders and files. Each project's
  * tree has a single root folder (created lazily on first access). File bytes
  * live on disk in the server's storage directory (one file per asset, keyed
  * by its id); the database keeps only the metadata.
@@ -44,7 +44,7 @@ export interface AssetFile {
 
 interface FolderRow {
     id: string;
-    owner: string;
+    project_id: string;
     parent_id: string | null;
     name: string;
     created_at: number;
@@ -61,41 +61,41 @@ interface FileRow {
 }
 
 export interface Assets {
-    /** The user's single root folder (created on first access). */
-    rootFolder(user: string): AssetFolder;
+    /** The project's single root folder (created on first access). */
+    rootFolder(project: string): AssetFolder;
     /** The child folders of `parentId` (`null` for the root list). */
-    listFolders(user: string, parentId: string | null): AssetFolder[];
-    /** Every folder of the user (move-target pickers). */
-    allFolders(user: string): AssetFolder[];
+    listFolders(project: string, parentId: string | null): AssetFolder[];
+    /** Every folder of the project (move-target pickers). */
+    allFolders(project: string): AssetFolder[];
     createFolder(
-        user: string,
+        project: string,
         parentId: string,
         name: string,
     ): AssetFolder;
-    renameFolder(user: string, folderId: string, name: string): AssetFolder;
-    moveFolder(user: string, folderId: string, parentId: string): AssetFolder;
-    deleteFolder(user: string, folderId: string): void;
-    listFiles(user: string, folderId: string): AssetFile[];
+    renameFolder(project: string, folderId: string, name: string): AssetFolder;
+    moveFolder(project: string, folderId: string, parentId: string): AssetFolder;
+    deleteFolder(project: string, folderId: string): void;
+    listFiles(project: string, folderId: string): AssetFile[];
     uploadFile(
-        user: string,
+        project: string,
         folderId: string,
         name: string,
         mimeType: string,
         data: Uint8Array,
     ): AssetFile;
-    renameFile(user: string, fileId: string, name: string): AssetFile;
-    moveFile(user: string, fileId: string, folderId: string): AssetFile;
-    deleteFile(user: string, fileId: string): void;
-    /** A file's metadata (owner-checked; for the drag-and-drop move path). */
-    fileMeta(user: string, fileId: string): AssetFile;
-    /** The file metadata + raw bytes (owner-checked). */
-    fileBlob(user: string, fileId: string): { file: AssetFile; data: Uint8Array };
+    renameFile(project: string, fileId: string, name: string): AssetFile;
+    moveFile(project: string, fileId: string, folderId: string): AssetFile;
+    deleteFile(project: string, fileId: string): void;
+    /** A file's metadata (project_id-checked; for the drag-and-drop move path). */
+    fileMeta(project: string, fileId: string): AssetFile;
+    /** The file metadata + raw bytes (project_id-checked). */
+    fileBlob(project: string, fileId: string): { file: AssetFile; data: Uint8Array };
     /**
-     * The user's files of one media kind, flattened across the whole tree
+     * The project's files of one media kind, flattened across the whole tree
      * with their folder path (the overlay editor's asset picker).
      */
     browseFiles(
-        user: string,
+        project: string,
         kind: "image" | "video" | "audio",
     ): (AssetFile & { path: string })[];
 }
@@ -109,7 +109,7 @@ export function createAssets({
     storageDir: string;
 }): Assets {
     if (!db) {
-        // `--no-auth` runs without a user database: the asset API stays
+        // `--no-auth` runs without a project database: the asset API stays
         // disabled and answers with empty lists.
         const unavailable = () => {
             throw new ApiError("Assets are unavailable");
@@ -166,12 +166,12 @@ export function createAssets({
     }
 
     const FOLDER_SELECT =
-        "SELECT id, owner, parent_id, name, created_at FROM asset_folders WHERE id = ? AND owner = ?";
+        "SELECT id, project_id, parent_id, name, created_at FROM asset_folders WHERE id = ? AND project_id = ?";
     const FILE_SELECT =
-        "SELECT id, folder_id, name, size, mime_type, created_at, updated_at FROM asset_files WHERE id = ? AND owner = ?";
+        "SELECT id, folder_id, name, size, mime_type, created_at, updated_at FROM asset_files WHERE id = ? AND project_id = ?";
 
-    const getFolder = (user: string, id: string): FolderRow => {
-        const row = database.query<FolderRow, [string, string]>(FOLDER_SELECT).get(id, user);
+    const getFolder = (project: string, id: string): FolderRow => {
+        const row = database.query<FolderRow, [string, string]>(FOLDER_SELECT).get(id, project);
         if (!row) throw new ApiError("Folder not found", 404);
         return row;
     };
@@ -186,41 +186,41 @@ export function createAssets({
         updatedAt: row.updated_at,
     });
 
-    const getFile = (user: string, id: string): AssetFile => {
+    const getFile = (project: string, id: string): AssetFile => {
         const row = database
             .query<FileRow, [string, string]>(FILE_SELECT)
-            .get(id, user);
+            .get(id, project);
         if (!row) throw new ApiError("File not found", 404);
         return toFile(row);
     };
 
     /** Ancestor chain of `folderId` (the folder itself first). */
-    const ancestorIds = (user: string, folderId: string): string[] => {
+    const ancestorIds = (project: string, folderId: string): string[] => {
         const chain: string[] = [];
-        let current: FolderRow | undefined = getFolder(user, folderId) ?? undefined;
+        let current: FolderRow | undefined = getFolder(project, folderId) ?? undefined;
         while (current) {
             chain.push(current.id);
             if (!current.parent_id) break;
             current =
                 database
                     .query<FolderRow, [string, string]>(FOLDER_SELECT)
-                    .get(current.parent_id, user) ?? undefined;
+                    .get(current.parent_id, project) ?? undefined;
         }
         return chain;
     };
 
     const nameTaken = (
-        user: string,
+        project: string,
         folderId: string,
         name: string,
     ): boolean =>
         (database
             .query<{ n: number }, [string, string, string]>(
-                "SELECT COUNT(*) AS n FROM asset_files WHERE owner = ? AND folder_id = ? AND name = ?",
+                "SELECT COUNT(*) AS n FROM asset_files WHERE project_id = ? AND folder_id = ? AND name = ?",
             )
-            .get(user, folderId, name)?.n ?? 0) > 0;
+            .get(project, folderId, name)?.n ?? 0) > 0;
 
-    const toFolder = (user: string, row: FolderRow): AssetFolder => ({
+    const toFolder = (project: string, row: FolderRow): AssetFolder => ({
         id: row.id,
         parentId: row.parent_id,
         name: row.name,
@@ -228,32 +228,32 @@ export function createAssets({
         hasChildren:
             (database
                 .query<{ n: number }, [string, string]>(
-                    "SELECT COUNT(*) AS n FROM asset_folders WHERE owner = ? AND parent_id = ?",
+                    "SELECT COUNT(*) AS n FROM asset_folders WHERE project_id = ? AND parent_id = ?",
                 )
-                .get(user, row.id)?.n ?? 0) > 0,
+                .get(project, row.id)?.n ?? 0) > 0,
         fileCount:
             database
                 .query<{ n: number }, [string, string]>(
-                    "SELECT COUNT(*) AS n FROM asset_files WHERE owner = ? AND folder_id = ?",
+                    "SELECT COUNT(*) AS n FROM asset_files WHERE project_id = ? AND folder_id = ?",
                 )
-                .get(user, row.id)?.n ?? 0,
+                .get(project, row.id)?.n ?? 0,
     });
 
-    function rootFolder(user: string): AssetFolder {
+    function rootFolder(project: string): AssetFolder {
         const existing = database
             .query<FolderRow, [string]>(
-                "SELECT id, owner, parent_id, name, created_at FROM asset_folders WHERE owner = ? AND parent_id IS NULL",
+                "SELECT id, project_id, parent_id, name, created_at FROM asset_folders WHERE project_id = ? AND parent_id IS NULL",
             )
-            .get(user);
-        if (existing) return toFolder(user, existing);
+            .get(project);
+        if (existing) return toFolder(project, existing);
         const id = randomUUID();
         const ts = now();
         database.query<unknown, [string, string, string, number]>(
-            "INSERT INTO asset_folders (id, owner, parent_id, name, created_at) VALUES (?, ?, NULL, ?, ?)",
-        ).run(id, user, ROOT_NAME, ts);
-        return toFolder(user, {
+            "INSERT INTO asset_folders (id, project_id, parent_id, name, created_at) VALUES (?, ?, NULL, ?, ?)",
+        ).run(id, project, ROOT_NAME, ts);
+        return toFolder(project, {
             id,
-            owner: user,
+            project_id: project,
             parent_id: null,
             name: ROOT_NAME,
             created_at: ts,
@@ -261,104 +261,104 @@ export function createAssets({
     }
 
     function listFolders(
-        user: string,
+        project: string,
         parentId: string | null,
     ): AssetFolder[] {
-        if (parentId === null) rootFolder(user);
+        if (parentId === null) rootFolder(project);
         const rows =
             parentId === null
                 ? (database
                       .query<FolderRow, [string]>(
-                          "SELECT id, owner, parent_id, name, created_at FROM asset_folders WHERE owner = ? AND parent_id IS NULL ORDER BY name COLLATE NOCASE",
+                          "SELECT id, project_id, parent_id, name, created_at FROM asset_folders WHERE project_id = ? AND parent_id IS NULL ORDER BY name COLLATE NOCASE",
                       )
-                      .all(user) ?? [])
+                      .all(project) ?? [])
                 : (database
                       .query<FolderRow, [string, string]>(
-                          "SELECT id, owner, parent_id, name, created_at FROM asset_folders WHERE owner = ? AND parent_id = ? ORDER BY name COLLATE NOCASE",
+                          "SELECT id, project_id, parent_id, name, created_at FROM asset_folders WHERE project_id = ? AND parent_id = ? ORDER BY name COLLATE NOCASE",
                       )
-                      .all(user, parentId) ?? []);
-        return rows.map((row) => toFolder(user, row));
+                      .all(project, parentId) ?? []);
+        return rows.map((row) => toFolder(project, row));
     }
 
-    function allFolders(user: string): AssetFolder[] {
+    function allFolders(project: string): AssetFolder[] {
         const rows = (
             database
                 .query<FolderRow, [string]>(
-                    "SELECT id, owner, parent_id, name, created_at FROM asset_folders WHERE owner = ?",
+                    "SELECT id, project_id, parent_id, name, created_at FROM asset_folders WHERE project_id = ?",
                 )
-                .all(user) ?? []
+                .all(project) ?? []
         );
-        return rows.map((row) => toFolder(user, row));
+        return rows.map((row) => toFolder(project, row));
     }
 
     function createFolder(
-        user: string,
+        project: string,
         parentId: string,
         name: string,
     ): AssetFolder {
         const clean = parseName(name, "folder");
-        getFolder(user, parentId);
+        getFolder(project, parentId);
         const taken =
             database
                 .query<{ n: number }, [string, string, string]>(
-                    "SELECT COUNT(*) AS n FROM asset_folders WHERE owner = ? AND parent_id = ? AND name = ? COLLATE NOCASE",
+                    "SELECT COUNT(*) AS n FROM asset_folders WHERE project_id = ? AND parent_id = ? AND name = ? COLLATE NOCASE",
                 )
-                .get(user, parentId, clean)?.n ?? 0;
+                .get(project, parentId, clean)?.n ?? 0;
         if (taken)
             throw new ApiError(
                 "A folder with this name already exists",
                 409,
             );
-        const depth = ancestorIds(user, parentId).length + 1;
+        const depth = ancestorIds(project, parentId).length + 1;
         if (depth > MAX_FOLDER_DEPTH)
             throw new ApiError(`Folder is too deep (max ${MAX_FOLDER_DEPTH})`);
         const id = randomUUID();
         database.query<unknown, [string, string, string, string, number]>(
-            "INSERT INTO asset_folders (id, owner, parent_id, name, created_at) VALUES (?, ?, ?, ?, ?)",
-        ).run(id, user, parentId, clean, now());
-        return toFolder(user, getFolder(user, id));
+            "INSERT INTO asset_folders (id, project_id, parent_id, name, created_at) VALUES (?, ?, ?, ?, ?)",
+        ).run(id, project, parentId, clean, now());
+        return toFolder(project, getFolder(project, id));
     }
 
     function renameFolder(
-        user: string,
+        project: string,
         folderId: string,
         name: string,
     ): AssetFolder {
         const clean = parseName(name, "folder");
-        const folder = getFolder(user, folderId);
+        const folder = getFolder(project, folderId);
         if (folder.parent_id === null)
             throw new ApiError("The root folder cannot be renamed");
         database.query<unknown, [string, string, string]>(
-            "UPDATE asset_folders SET name = ? WHERE id = ? AND owner = ?",
-        ).run(clean, folderId, user);
-        return toFolder(user, getFolder(user, folderId));
+            "UPDATE asset_folders SET name = ? WHERE id = ? AND project_id = ?",
+        ).run(clean, folderId, project);
+        return toFolder(project, getFolder(project, folderId));
     }
 
     function moveFolder(
-        user: string,
+        project: string,
         folderId: string,
         parentId: string,
     ): AssetFolder {
-        const folder = getFolder(user, folderId);
+        const folder = getFolder(project, folderId);
         if (folder.parent_id === null)
             throw new ApiError("The root folder cannot be moved");
-        const parent = getFolder(user, parentId);
+        const parent = getFolder(project, parentId);
         if (parent.id === folderId)
             throw new ApiError("A folder cannot be moved into itself");
-        const chain = ancestorIds(user, parentId);
+        const chain = ancestorIds(project, parentId);
         if (chain.includes(folderId))
             throw new ApiError("A folder cannot be moved into its own subtree");
         const depth = chain.length + 1;
         if (depth > MAX_FOLDER_DEPTH)
             throw new ApiError(`Folder is too deep (max ${MAX_FOLDER_DEPTH})`);
         database.query<unknown, [string, string, string]>(
-            "UPDATE asset_folders SET parent_id = ? WHERE id = ? AND owner = ?",
-        ).run(parentId, folderId, user);
-        return toFolder(user, getFolder(user, folderId));
+            "UPDATE asset_folders SET parent_id = ? WHERE id = ? AND project_id = ?",
+        ).run(parentId, folderId, project);
+        return toFolder(project, getFolder(project, folderId));
     }
 
-    function deleteFolder(user: string, folderId: string): void {
-        const folder = getFolder(user, folderId);
+    function deleteFolder(project: string, folderId: string): void {
+        const folder = getFolder(project, folderId);
         if (folder.parent_id === null)
             throw new ApiError("The root folder cannot be deleted");
         // Walk the subtree breadth-first: the folder plus all descendants.
@@ -370,9 +370,9 @@ export function createAssets({
             const children = (
                 database
                     .query<{ id: string }, [string, string]>(
-                        "SELECT id FROM asset_folders WHERE owner = ? AND parent_id = ?",
+                        "SELECT id FROM asset_folders WHERE project_id = ? AND parent_id = ?",
                     )
-                    .all(user, id) ?? []
+                    .all(project, id) ?? []
             );
             for (const child of children) {
                 if (!doomed.has(child.id)) {
@@ -387,46 +387,46 @@ export function createAssets({
         const doomedFileIds = (
             database
                 .query<{ id: string }, [string, ...string[]]>(
-                    "SELECT id FROM asset_files WHERE owner = ? AND folder_id IN (" +
+                    "SELECT id FROM asset_files WHERE project_id = ? AND folder_id IN (" +
                         doomedIds.map(() => "?").join(",") +
                         ")",
                 )
-                .all(user, ...doomedIds) ?? []
+                .all(project, ...doomedIds) ?? []
         ).map((r) => r.id);
         database.transaction(() => {
             const delFiles = database.query<unknown, [string, string]>(
-                "DELETE FROM asset_files WHERE owner = ? AND folder_id = ?",
+                "DELETE FROM asset_files WHERE project_id = ? AND folder_id = ?",
             );
             const delFolder = database.query<unknown, [string, string]>(
-                "DELETE FROM asset_folders WHERE owner = ? AND id = ?",
+                "DELETE FROM asset_folders WHERE project_id = ? AND id = ?",
             );
             for (const id of doomed) {
-                delFiles.run(user, id);
-                delFolder.run(user, id);
+                delFiles.run(project, id);
+                delFolder.run(project, id);
             }
         })();
         for (const id of doomedFileIds) removeDiskFile(id);
     }
 
-    function listFiles(user: string, folderId: string): AssetFile[] {
-        getFolder(user, folderId); // owner + existence check
+    function listFiles(project: string, folderId: string): AssetFile[] {
+        getFolder(project, folderId); // project_id + existence check
         const rows = (
             database
                 .query<FileRow, [string, string]>(
-                    "SELECT id, folder_id, name, size, mime_type, created_at, updated_at FROM asset_files WHERE owner = ? AND folder_id = ? ORDER BY name COLLATE NOCASE",
+                    "SELECT id, folder_id, name, size, mime_type, created_at, updated_at FROM asset_files WHERE project_id = ? AND folder_id = ? ORDER BY name COLLATE NOCASE",
                 )
-                .all(user, folderId) ?? []
+                .all(project, folderId) ?? []
         );
         return rows.map(toFile);
     }
 
     /** The name as given, or `name (n).ext` with the smallest free `n`. */
     function uniqueName(
-        user: string,
+        project: string,
         folderId: string,
         name: string,
     ): string {
-        if (!nameTaken(user, folderId, name)) return name;
+        if (!nameTaken(project, folderId, name)) return name;
         const dot = name.lastIndexOf(".");
         const base = dot > 0 ? name.slice(0, dot) : name;
         const ext = dot > 0 ? name.slice(dot) : "";
@@ -434,19 +434,19 @@ export function createAssets({
             const candidate = `${base} (${i})${ext}`;
             if (candidate.length > MAX_NAME_LENGTH)
                 throw new ApiError("File name is too long", 409);
-            if (!nameTaken(user, folderId, candidate)) return candidate;
+            if (!nameTaken(project, folderId, candidate)) return candidate;
         }
     }
 
     function uploadFile(
-        user: string,
+        project: string,
         folderId: string,
         name: string,
         mimeType: string,
         data: Uint8Array,
     ): AssetFile {
         const clean = parseName(name, "file");
-        getFolder(user, folderId);
+        getFolder(project, folderId);
         // Browser File objects carry `;charset=utf-8` on text/* types —
         // store the bare media type, not the parameter.
         const mime = (mimeType || "").split(";")[0].trim();
@@ -455,61 +455,61 @@ export function createAssets({
                 `File is too large (max ${Math.round(MAX_FILE_SIZE / 1024 / 1024)} MB)`,
                 413,
             );
-        const finalName = uniqueName(user, folderId, clean);
+        const finalName = uniqueName(project, folderId, clean);
         const id = randomUUID();
         const ts = now();
         // Bytes go to the storage directory; the row keeps only the metadata.
         mkdirSync(storageDir, { recursive: true });
         writeFileSync(storagePath(id), data);
         database.query<unknown, [string, string, string, string, number, string, number, number]>(
-            "INSERT INTO asset_files (id, owner, folder_id, name, size, mime_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        ).run(id, user, folderId, finalName, data.byteLength, mime || "application/octet-stream", ts, ts);
-        return getFile(user, id);
+            "INSERT INTO asset_files (id, project_id, folder_id, name, size, mime_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        ).run(id, project, folderId, finalName, data.byteLength, mime || "application/octet-stream", ts, ts);
+        return getFile(project, id);
     }
 
     function renameFile(
-        user: string,
+        project: string,
         fileId: string,
         name: string,
     ): AssetFile {
         const clean = parseName(name, "file");
-        const file = getFile(user, fileId);
-        if (clean !== file.name && nameTaken(user, file.folderId, clean))
+        const file = getFile(project, fileId);
+        if (clean !== file.name && nameTaken(project, file.folderId, clean))
             throw new ApiError("A file with this name already exists", 409);
         database.query<unknown, [string, number, string, string]>(
-            "UPDATE asset_files SET name = ?, updated_at = ? WHERE id = ? AND owner = ?",
-        ).run(clean, now(), fileId, user);
-        return getFile(user, fileId);
+            "UPDATE asset_files SET name = ?, updated_at = ? WHERE id = ? AND project_id = ?",
+        ).run(clean, now(), fileId, project);
+        return getFile(project, fileId);
     }
 
     function moveFile(
-        user: string,
+        project: string,
         fileId: string,
         folderId: string,
     ): AssetFile {
-        const file = getFile(user, fileId);
-        getFolder(user, folderId);
-        if (file.folderId !== folderId && nameTaken(user, folderId, file.name))
+        const file = getFile(project, fileId);
+        getFolder(project, folderId);
+        if (file.folderId !== folderId && nameTaken(project, folderId, file.name))
             throw new ApiError("A file with this name already exists", 409);
         database.query<unknown, [string, number, string, string]>(
-            "UPDATE asset_files SET folder_id = ?, updated_at = ? WHERE id = ? AND owner = ?",
-        ).run(folderId, now(), fileId, user);
-        return getFile(user, fileId);
+            "UPDATE asset_files SET folder_id = ?, updated_at = ? WHERE id = ? AND project_id = ?",
+        ).run(folderId, now(), fileId, project);
+        return getFile(project, fileId);
     }
 
-    function deleteFile(user: string, fileId: string): void {
-        getFile(user, fileId);
+    function deleteFile(project: string, fileId: string): void {
+        getFile(project, fileId);
         database.query<unknown, [string, string]>(
-            "DELETE FROM asset_files WHERE id = ? AND owner = ?",
-        ).run(fileId, user);
+            "DELETE FROM asset_files WHERE id = ? AND project_id = ?",
+        ).run(fileId, project);
         removeDiskFile(fileId);
     }
 
     function fileBlob(
-        user: string,
+        project: string,
         fileId: string,
     ): { file: AssetFile; data: Uint8Array } {
-        const file = getFile(user, fileId);
+        const file = getFile(project, fileId);
         let data: Uint8Array;
         try {
             data = new Uint8Array(readFileSync(storagePath(fileId)));
@@ -520,16 +520,16 @@ export function createAssets({
     }
 
     function browseFiles(
-        user: string,
+        project: string,
         kind: "image" | "video" | "audio",
     ): (AssetFile & { path: string })[] {
-        rootFolder(user);
+        rootFolder(project);
         const folders = (
             database
                 .query<FolderRow, [string]>(
-                    "SELECT id, owner, parent_id, name, created_at FROM asset_folders WHERE owner = ?",
+                    "SELECT id, project_id, parent_id, name, created_at FROM asset_folders WHERE project_id = ?",
                 )
-                .all(user) ?? []
+                .all(project) ?? []
         );
         const byId = new Map(folders.map((f) => [f.id, f]));
         const prefix = `${kind}/`;
@@ -542,9 +542,9 @@ export function createAssets({
             const rows = (
                 database
                     .query<FileRow, [string, string, string]>(
-                        "SELECT id, folder_id, name, size, mime_type, created_at, updated_at FROM asset_files WHERE owner = ? AND folder_id = ? AND mime_type LIKE ? ORDER BY name COLLATE NOCASE",
+                        "SELECT id, folder_id, name, size, mime_type, created_at, updated_at FROM asset_files WHERE project_id = ? AND folder_id = ? AND mime_type LIKE ? ORDER BY name COLLATE NOCASE",
                     )
-                    .all(user, folderId, `${prefix}%`) ?? []
+                    .all(project, folderId, `${prefix}%`) ?? []
             );
             for (const row of rows)
                 out.push({ ...toFile(row), path: trail.join("/") });

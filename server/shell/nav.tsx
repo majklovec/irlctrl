@@ -10,6 +10,7 @@ import { t } from "@ui/i18n";
 import type { MithrilJSXComponent } from "@ui/jsx";
 import m from "mithril";
 import { MENUS } from "../../generated/pages";
+import { ProjectSelect } from "./project_select";
 
 /** Menu items in display order — the generated manifest is only sorted by
  * page id, mirroring the server registry's menu.order ordering (default 100). */
@@ -44,6 +45,7 @@ const ServerNavComponent: m.Component<{ active?: string }> = {
 	},
 	view: ({ attrs: { active } }) => (
 		<span>
+			<ProjectSelect />
 			{MENU_ITEMS.map((item) => (
 				<a
 					key={item.id}

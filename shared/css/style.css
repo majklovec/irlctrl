@@ -5,6 +5,7 @@
 @import "./base.css";
 @import "../ui/components/header.css";
 @import "../../server/shell/auth.css";
+@import "../../server/shell/project_select.css";
 @import "../ui/components/language_select.css";
 @import "./layout.css";
 @import "../../server/shell/profile.css";
@@ -22,3 +23,4 @@
 @import "../ui/components/modal.css";
 @import "../../server/pages/assets/frontend/assets.css";
 @import "../../server/pages/templates/frontend/template_editor.css";
+@import "../../server/pages/projects/frontend/projects.css";

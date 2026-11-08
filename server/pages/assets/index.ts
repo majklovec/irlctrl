@@ -14,6 +14,7 @@ const routes = new Elysia({ name: "page-assets" });
 
 export default {
     id: "assets",
+    dependencies: ["projects"],
     menu,
     backend: {
         routes,

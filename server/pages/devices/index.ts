@@ -17,12 +17,15 @@ let devices: ReturnType<typeof createDevices> | undefined;
 export default {
     id: "devices",
     menu,
+    dependencies: ["projects"],
     backend: {
         routes,
         init: async (s: PageServices) => {
             devices = createDevices({
                 publish: s.publish,
-                userForToken: s.auth.userForToken,
+                // Device connect tokens resolve to a project (migration 0012);
+                // in --no-auth mode auth.projectForToken returns the local id.
+                projectForToken: s.auth.projectForToken,
             });
             s.capabilities.provide("devices", devices);
             mountDeviceRoutes(routes, s, devices);

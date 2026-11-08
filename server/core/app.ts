@@ -85,9 +85,12 @@ export async function createControlServer(options: ControlServerOptions) {
                     releaseChatChannels: (specs) =>
                         releaseWidgetChannels("chat", specs),
                     overlayChatOverlaySpecs: (token, overlayId) => {
-                        const user = auth.userForToken(token);
-                        return user
-                            ? overlays.runtimeOverlayChatSpecs(user, overlayId)
+                        const project = auth.projectForToken(token);
+                        return project
+                            ? overlays.runtimeOverlayChatSpecs(
+                                  project,
+                                  overlayId,
+                              )
                             : null;
                     },
                 }),

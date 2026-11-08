@@ -1,0 +1,28 @@
+/* The main-menu project selector: a compact dropdown in the nav row. */
+
+.project-select {
+    padding: 0.35rem 0.6rem;
+    margin-right: 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--bg) 60%, transparent);
+    color: var(--text);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    max-width: 14rem;
+    transition:
+        border-color var(--t),
+        background var(--t);
+}
+.project-select:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+.project-select:hover {
+    border-color: var(--border-strong);
+}
+.project-select:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}

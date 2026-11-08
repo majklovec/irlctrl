@@ -20,8 +20,8 @@ export function accountRoutes(auth: Auth, frontend: Frontend) {
         )
         .get(
             "/api/profile",
-            authenticatedHandler(auth, (_request, user) =>
-                auth.profileResponse(user),
+            authenticatedHandler(auth, (request, user) =>
+                auth.profileResponse(request, user),
             ),
         )
         .post(
@@ -32,8 +32,8 @@ export function accountRoutes(auth: Auth, frontend: Frontend) {
         )
         .post(
             "/api/profile/tokens",
-            authenticatedHandler(auth, (_request, user) =>
-                auth.createTokenResponse(user),
+            authenticatedHandler(auth, (request, user) =>
+                auth.createTokenResponse(request, user),
             ),
         )
         .delete(

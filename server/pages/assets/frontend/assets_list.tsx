@@ -830,4 +830,9 @@ const assetsPage: m.Component = {
 	),
 };
 
+// Rescope to the newly selected project when the shell selector changes it.
+window.addEventListener("project-changed", () => {
+	void init();
+});
+
 void mountPage(() => t("assets.title"), assetsPage);

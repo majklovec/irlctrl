@@ -151,8 +151,8 @@ export interface ServerDashboardWidget {
 }
 export interface ServerDashboard {
     id: string;
-    /** User profile that owns this dashboard (server-assigned). */
-    owner?: string;
+    /** Project id this dashboard belongs to (server-assigned). */
+    project?: string;
     name: string;
     /** Dashboard accent color, used by the list's dot */
     color?: string;

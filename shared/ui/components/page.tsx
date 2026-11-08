@@ -1,6 +1,6 @@
 /** @jsx m */
-/* Page skeleton: header (brand, title, nav, language, actions), optional
- * toolbar strip, main content and the version footer. */
+/* Page skeleton: header (brand, title, nav, optional language selector,
+ * actions), optional toolbar strip, main content and the version footer. */
 import m from "mithril";
 import logoUrl from "../../assets/img/logo-irlctrl-64.png";
 import { APP_VERSION } from "../../../generated/version";
@@ -18,8 +18,10 @@ const FooterComponent: m.Component = {
 export const Footer = FooterComponent as MithrilJSXComponent;
 
 /** <header> + <main> + <footer> page skeleton. The header leads with the brand logo (linking
- * home), then carries the optional main menu, and the language selector plus the
- * page's own `headerRight` actions on its right edge. */
+ * home), then carries the optional main menu, and the page's own `headerRight`
+ * actions on its right edge. The header language selector is opt-in
+ * (`showLanguage`): the control server keeps it in the Profile page, the
+ * device client passes it to every device page. */
 export const Page = {
 	view: (v) => [
 		<header>
@@ -38,7 +40,7 @@ export const Page = {
 					<nav class="main-nav">{v.attrs.nav}</nav>
 				) : null,
 				<span class="actions">
-					<LanguageSelect />
+					{v.attrs.showLanguage ? <LanguageSelect /> : null}
 					{v.attrs.headerRight}
 				</span>,
 			]}
@@ -52,6 +54,9 @@ export const Page = {
 } as MithrilJSXComponent<{
 	title?: m.Children;
 	nav?: m.Children;
+	/** Render the header language selector (the control server keeps it in
+	 * the Profile page; the device client passes it per page). */
+	showLanguage?: boolean;
 	headerRight?: m.Children;
 	/** Full-width strip rendered flush between the header and the content. */
 	toolbar?: m.Children;

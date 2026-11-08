@@ -22,7 +22,12 @@
  */
 import { Elysia } from "elysia";
 import { ApiError } from "../../../../shared/params";
-import type { PageServices } from "../../../core/contracts";
+import type {
+    PageServices,
+    ProjectAccess,
+    ProjectRole,
+} from "../../../core/contracts";
+import { scopedProject } from "../../../core/project_scope";
 import { authenticatedHandler } from "../../../core/auth/authenticated";
 import type { Assets, AssetFile, AssetFolder } from "./registry";
 
@@ -65,12 +70,23 @@ const json = (body: Record<string, unknown>): Response =>
 const folderOut = (f: AssetFolder): Record<string, unknown> => ({ ...f });
 const fileOut = (f: AssetFile): Record<string, unknown> => ({ ...f });
 
+/** Read assets of any project the request's user can see; edits need editor+. */
+const READ_ROLES = ["viewer", "editor", "owner"] as const;
+const EDIT_ROLES = ["editor", "owner"] as const;
+
 export function mountAssetRoutes(
     routes: Elysia,
     s: PageServices,
     assets: Assets,
 ): void {
-    const { auth, frontend } = s;
+    const { auth, capabilities, frontend } = s;
+    const access = capabilities.require<ProjectAccess>("projectAccess");
+    /** Resolve the request's project (`?project=` else Personal) + enforce roles. */
+    const proj = (
+        request: Request,
+        user: string,
+        roles: readonly ProjectRole[],
+    ): string => scopedProject(access, new URL(request.url), user, roles);
     routes
         .get(
             "/assets/",
@@ -84,15 +100,19 @@ export function mountAssetRoutes(
                 const parent = new URL(request.url).searchParams.get("parent");
                 return run(() => ({
                     body: {
-                        folders: assets.listFolders(user, parent),
+                        folders: assets.listFolders(proj(request, user, READ_ROLES), parent),
                     },
                 }));
             }),
         )
         .get(
             "/api/assets/folders/all",
-            authenticatedHandler(auth, (_request, user) =>
-                run(() => ({ body: { folders: assets.allFolders(user) } })),
+            authenticatedHandler(auth, (request, user) =>
+                run(() => ({
+                    body: {
+                        folders: assets.allFolders(proj(request, user, READ_ROLES)),
+                    },
+                })),
             ),
         )
         .post(
@@ -108,7 +128,7 @@ export function mountAssetRoutes(
                 return run(() => ({
                     body: {
                         folder: assets.createFolder(
-                            user,
+                            proj(request, user, EDIT_ROLES),
                             parentId,
                             typeof body?.name === "string" ? body.name : "",
                         ),
@@ -129,13 +149,13 @@ export function mountAssetRoutes(
                     let folder: AssetFolder;
                     if (typeof body?.parentId === "string")
                         folder = assets.moveFolder(
-                            user,
+                            proj(request, user, EDIT_ROLES),
                             match[1],
                             body.parentId,
                         );
                     else if (typeof body?.name === "string")
                         folder = assets.renameFolder(
-                            user,
+                            proj(request, user, EDIT_ROLES),
                             match[1],
                             body.name,
                         );
@@ -153,7 +173,7 @@ export function mountAssetRoutes(
                 const match = new URL(request.url).pathname.match(FOLDER_ID_RE);
                 if (!match) return json({ ok: false, error: "Not found", code: 404 });
                 return run(() => {
-                    assets.deleteFolder(user, match[1]);
+                    assets.deleteFolder(proj(request, user, EDIT_ROLES), match[1]);
                     return { body: { ok: true } };
                 });
             }),
@@ -167,7 +187,7 @@ export function mountAssetRoutes(
                 if (!match)
                     return json({ ok: false, error: "Not found", code: 404 });
                 return run(() => ({
-                    body: { file: assets.fileMeta(user, match[1]) },
+                    body: { file: assets.fileMeta(proj(request, user, READ_ROLES), match[1]) },
                 }));
             }),
         )
@@ -178,7 +198,7 @@ export function mountAssetRoutes(
                     new URL(request.url).searchParams.get("folderId") ?? "";
                 return run(() => ({
                     body: {
-                        files: assets.listFiles(user, folderId),
+                        files: assets.listFiles(proj(request, user, READ_ROLES), folderId),
                     },
                 }));
             }),
@@ -197,7 +217,7 @@ export function mountAssetRoutes(
                     return {
                         body: {
                             files: assets.browseFiles(
-                                user,
+                                proj(request, user, READ_ROLES),
                                 kind as "image" | "video" | "audio",
                             ),
                         },
@@ -223,7 +243,7 @@ export function mountAssetRoutes(
                 for (const part of uploads)
                     created.push(
                         assets.uploadFile(
-                            user,
+                            proj(request, user, EDIT_ROLES),
                             folderId,
                             part.name,
                             part.type,
@@ -239,7 +259,7 @@ export function mountAssetRoutes(
                 const match = new URL(request.url).pathname.match(FILE_ID_RE);
                 if (!match) return json({ ok: false, error: "Not found", code: 404 });
                 try {
-                    const { file, data } = assets.fileBlob(user, match[1]);
+                    const { file, data } = assets.fileBlob(proj(request, user, READ_ROLES), match[1]);
                     // `filename*` carries the UTF-8 name (RFC 5987); the
                     // plain `filename` is an ASCII fallback for old clients.
                     const asciiName = file.name.replace(/[^\x20-\x7e]/g, "_");
@@ -281,13 +301,13 @@ export function mountAssetRoutes(
                     let file: AssetFile;
                     if (typeof body?.folderId === "string")
                         file = assets.moveFile(
-                            user,
+                            proj(request, user, EDIT_ROLES),
                             match[1],
                             body.folderId,
                         );
                     else if (typeof body?.name === "string")
                         file = assets.renameFile(
-                            user,
+                            proj(request, user, EDIT_ROLES),
                             match[1],
                             body.name,
                         );
@@ -305,7 +325,7 @@ export function mountAssetRoutes(
                 const match = new URL(request.url).pathname.match(FILE_ID_RE);
                 if (!match) return json({ ok: false, error: "Not found", code: 404 });
                 return run(() => {
-                    assets.deleteFile(user, match[1]);
+                    assets.deleteFile(proj(request, user, EDIT_ROLES), match[1]);
                     return { body: { ok: true } };
                 });
             }),

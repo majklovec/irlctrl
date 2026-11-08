@@ -7,7 +7,8 @@
 import { Elysia } from "elysia";
 import { originAllowed, text, upgradeRequired } from "../../shared/http";
 import { widgetHubSnapshot } from "../../shared/registry";
-import type { PageServices } from "./contracts";
+import { projectParam } from "../../shared/project_param";
+import type { PageServices, ProjectAccess } from "./contracts";
 import {
     dashboardsTopic,
     devicesTopic,
@@ -19,11 +20,14 @@ import {
     unauthenticatedResponse,
 } from "./auth/authenticated";
 
+/** Any member of the project may subscribe to its live feed. */
+const READ_ROLES = ["viewer", "editor", "owner"] as const;
+
 interface DashboardsFeed {
-    dashboardsFor(user: string): unknown;
+    dashboardsFor(project: string): unknown;
 }
 interface DevicesFeed {
-    summaries(user: string): unknown;
+    summaries(project: string): unknown;
 }
 
 export function liveFeedRoutes(s: PageServices) {
@@ -42,23 +46,37 @@ export function liveFeedRoutes(s: PageServices) {
                     return text("Origin not allowed", 403);
             },
             open(ws) {
-                const user = auth.userFromRequest(ws.data.request);
+                const request = ws.data.request;
+                const user = auth.userFromRequest(request);
                 if (!user) return ws.close(1008, "Authentication required");
+                // The feed is per-project: `?project=` (the shell's active
+                // project) else the user's Personal project.
+                const access = capabilities.require<ProjectAccess>(
+                    "projectAccess",
+                );
+                const projectId =
+                    projectParam(new URL(request.url)) ??
+                    access.personalProjectId(user);
+                try {
+                    access.requireRole(user, projectId, READ_ROLES);
+                } catch {
+                    return ws.close(1008, "Access denied");
+                }
                 const dashboards = capabilities.require<DashboardsFeed>(
                     "dashboards",
                 );
                 const devices = capabilities.require<DevicesFeed>("devices");
 
                 ws.subscribe(WIDGET_HUB_TOPIC);
-                ws.subscribe(dashboardsTopic(user));
-                ws.subscribe(devicesTopic(user));
+                ws.subscribe(dashboardsTopic(projectId));
+                ws.subscribe(devicesTopic(projectId));
                 ws.send(event("widget.snapshot", widgetHubSnapshot()));
                 ws.send(
                     event("dashboards.snapshot", {
-                        dashboards: dashboards.dashboardsFor(user),
+                        dashboards: dashboards.dashboardsFor(projectId),
                     }),
                 );
-                ws.send(event("devices.snapshot", devices.summaries(user)));
+                ws.send(event("devices.snapshot", devices.summaries(projectId)));
             },
         });
 }

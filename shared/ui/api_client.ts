@@ -33,11 +33,49 @@ interface ErrorBody {
 	code?: number;
 }
 
+/**
+ * The localStorage key the shell's project selector persists the active
+ * project id under (see `server/shell/project_select.tsx`, which owns the UI).
+ * Duplicated here rather than imported: `shared/ui` must not reach into page
+ * code, and the selector is the single writer of this key.
+ */
+const ACTIVE_PROJECT_KEY = "activeProjectId";
+/** The management APIs that are project-scoped and accept `?project=`. */
+const PROJECT_SCOPED_ROUTES = [
+	"/api/dashboards",
+	"/api/assets",
+	"/api/overlays",
+	"/api/devices",
+] as const;
+
+/** The active project id from the selector, `null` when none / SSR. */
+function activeProjectId(): string | null {
+	try {
+		return localStorage.getItem(ACTIVE_PROJECT_KEY);
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Append `?project=<active>` to a project-scoped API path when the caller did
+ * not set it already. Non-scoped paths and paths that already carry a project
+ * are returned unchanged, so explicit overrides (e.g. the project selector
+ * fetching `/api/projects`) keep working.
+ */
+function scopeProject(path: string): string {
+	const id = activeProjectId();
+	if (!id) return path;
+	if (!PROJECT_SCOPED_ROUTES.some((r) => path === r || path.startsWith(`${r}/`) || path.startsWith(`${r}?`))) return path;
+	if (/[?&]project=/.test(path)) return path;
+	return `${path}${path.includes("?") ? "&" : "?"}project=${encodeURIComponent(id)}`;
+}
+
 /** Call the API; resolves with the parsed JSON body, rejects with `ApiError`. */
 export async function apiJson<T>(path: string, init: ApiInit = {}): Promise<T> {
 	let res: Response;
 	try {
-		res = await fetch(path, {
+		res = await fetch(scopeProject(path), {
 			method: init.method ?? (init.body === undefined ? "GET" : "POST"),
 			headers: { "Content-Type": "application/json" },
 			body: init.body === undefined ? undefined : JSON.stringify(init.body),

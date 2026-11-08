@@ -232,4 +232,9 @@ const overlayListPage: m.Component = {
 	),
 };
 
+// Rescope to the newly selected project when the shell selector changes it.
+window.addEventListener("project-changed", () => {
+	void load();
+});
+
 void mountPage(() => t("overlay.title"), overlayListPage);

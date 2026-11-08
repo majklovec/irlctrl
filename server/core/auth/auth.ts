@@ -7,7 +7,7 @@ import {
 } from "node:crypto";
 import { text } from "../../../shared/http";
 import { openDatabase } from "../db";
-import { LOCAL_USER } from "../runtime";
+import { LOCAL_PROJECT_ID, LOCAL_USER } from "../runtime";
 
 export async function createAuth({
     noAuth,
@@ -75,6 +75,52 @@ export async function createAuth({
             )
             .get(token) as { login: string } | undefined;
         return row?.login ?? null;
+    }
+
+    /**
+     * Resolve the project for a presented device token (the `tokens.project_id`
+     * column, back-filled by migration 0012). With `--no-auth` every
+     * connection maps to the local user's Personal project so the same
+     * project-scoped code path runs. `null` when the token is unknown.
+     */
+    function projectForToken(token: string | null): string | null {
+        if (NO_AUTH) return LOCAL_PROJECT_ID;
+        if (!token || !db) return null;
+        const row = db
+            .prepare(
+                "SELECT project_id FROM tokens WHERE token = ?",
+            )
+            .get(token) as { project_id: string | null } | undefined;
+        return row?.project_id ?? null;
+    }
+
+    /**
+     * Ensure the user's auto-created "Personal" project exists (the
+     * `personal-<user id>` id scheme migration 0012 seeds) and return its id.
+     * Idempotent: a fresh user gets one, an existing user's is returned. Called
+     * on registration so every account starts with a home for its entities.
+     */
+    function ensurePersonalProject(login: string): string | null {
+        const d = db;
+        if (!d) return null;
+        const uid = (
+            d.prepare("SELECT id FROM users WHERE login = ?").get(login) as
+                | { id: number }
+                | undefined
+        )?.id;
+        if (uid === undefined) return null;
+        const projectId = `personal-${uid}`;
+        d.transaction(() => {
+            d.prepare(
+                "INSERT OR IGNORE INTO projects (id, name, owner_id, is_personal) " +
+                    "VALUES (?, 'Personal', ?, 1)",
+            ).run(projectId, uid);
+            d.prepare(
+                "INSERT OR IGNORE INTO project_members (project_id, user_id, role) " +
+                    "VALUES (?, ?, 'owner')",
+            ).run(projectId, uid);
+        })();
+        return projectId;
     }
 
     // Opaque cookie sessions: the browser stores a session id (HttpOnly), so
@@ -242,11 +288,13 @@ export async function createAuth({
                 "INSERT INTO users (login, password, admin) SELECT ?, ?, 1 WHERE (SELECT COUNT(*) FROM users) = 0",
             )
             .run(clean, hash);
-        if (bootstrap.changes > 0)
+        if (bootstrap.changes > 0) {
+            ensurePersonalProject(clean);
             return Response.json(
                 { ok: true, user: clean, admin: true },
                 { status: 201 },
             );
+        }
 
         // Everyone after the first account needs a valid, single-use invite.
         const code = typeof invite === "string" ? invite.trim() : "";
@@ -296,6 +344,7 @@ export async function createAuth({
                 { status: 409 },
             );
         }
+        ensurePersonalProject(clean);
         return Response.json(
             { ok: true, user: clean, admin: false },
             { status: 201 },
@@ -336,13 +385,17 @@ export async function createAuth({
     // Profile API: the session user's password and device tokens
     // ----------------------------------------------------------------------
 
-    /** The user's tokens as the profile page shows them. */
-    function tokensFor(user: string) {
+    /** The user's device tokens for one project, as the profile page shows them.
+     * Scoped by both `project_id` and `user_id`, so a project with several
+     * members only ever reveals the caller's own tokens for that project. */
+    function tokensFor(user: string, projectId: string) {
         return (db
             ?.prepare(
-                "SELECT id, token, created_at FROM tokens WHERE user_id = (SELECT id FROM users WHERE login = ?) ORDER BY id",
+                "SELECT id, token, created_at FROM tokens " +
+                    "WHERE project_id = ? AND user_id = (SELECT id FROM users WHERE login = ?) " +
+                    "ORDER BY id",
             )
-            .all(user) ?? []) as {
+            .all(projectId, user) ?? []) as {
             id: number;
             token: string;
             created_at: string;
@@ -354,13 +407,41 @@ export async function createAuth({
         return Response.json({ ok: true, user });
     }
 
-    /** GET /api/profile — username, admin flag + the user's device tokens. */
-    function profileResponse(user: string): Response {
+    /** GET /api/profile — username, admin flag + the user's device tokens for
+     * the `?project=` project (owner/editor/viewer required). Without a project
+     * it falls back to the Personal project, so tokens always resolve to a real
+     * project the user belongs to. */
+    function profileResponse(request: Request, user: string): Response {
+        if (!db)
+            return Response.json(
+                { ok: false, error: "Authentication unavailable" },
+                { status: 503 },
+            );
+        const requested = new URL(request.url).searchParams.get("project");
+        let projectId: string;
+        if (requested) {
+            const role =
+                (db
+                    .prepare(
+                        "SELECT role FROM project_members WHERE project_id = ? AND user_id = (SELECT id FROM users WHERE login = ?)",
+                    )
+                    .get(requested, user) as { role: string } | undefined
+                )?.role;
+            if (!role)
+                return Response.json(
+                    { ok: false, error: "No access to that project" },
+                    { status: 404 },
+                );
+            projectId = requested;
+        } else {
+            projectId = ensurePersonalProject(user) ?? "";
+        }
         return Response.json({
             ok: true,
             username: user,
             admin: adminOf(user),
-            tokens: tokensFor(user).map((t) => ({
+            project: projectId,
+            tokens: tokensFor(user, projectId).map((t) => ({
                 id: t.id,
                 token: t.token,
                 createdAt: t.created_at,
@@ -471,18 +552,47 @@ export async function createAuth({
     }
 
     /** POST /api/profile/tokens — add a fresh device token; it is returned in
-     * the body (the only time the full value is ever sent). */
-    function createTokenResponse(user: string): Response {
+     * the body (the only time the full value is ever sent). The token belongs
+     * to the `?project=` project (editor/owner required), defaulting to the
+     * user's Personal project, so a device connecting with it joins that
+     * project (see `projectForToken`). */
+    function createTokenResponse(request: Request, user: string): Response {
         if (!db) return unauthorized();
+        const requested = new URL(request.url).searchParams.get("project");
+        let projectId: string;
+        if (requested) {
+            const role =
+                (db
+                    .prepare(
+                        "SELECT role FROM project_members WHERE project_id = ? AND user_id = (SELECT id FROM users WHERE login = ?)",
+                    )
+                    .get(requested, user) as { role: string } | undefined
+                )?.role;
+            if (role !== "owner" && role !== "editor")
+                return Response.json(
+                    { ok: false, error: "No access to that project" },
+                    { status: 404 },
+                );
+            projectId = requested;
+        } else {
+            const row = ensurePersonalProject(user);
+            if (!row)
+                return Response.json(
+                    { ok: false, error: "User not found" },
+                    { status: 404 },
+                );
+            projectId = row;
+        }
         const token = randomBytes(24).toString("hex");
-        const row = db
+        const ins = db
             .prepare(
-                "INSERT INTO tokens (user_id, token) SELECT id, ? FROM users WHERE login = ?",
+                "INSERT INTO tokens (user_id, token, project_id) " +
+                    "SELECT id, ?, ? FROM users WHERE login = ?",
             )
-            .run(token, user);
+            .run(token, projectId, user);
         const created = db
             .prepare("SELECT id, token, created_at FROM tokens WHERE id = ?")
-            .get(Number(row.lastInsertRowid)) as {
+            .get(Number(ins.lastInsertRowid)) as {
             id: number;
             token: string;
             created_at: string;
@@ -506,6 +616,9 @@ export async function createAuth({
                 { ok: false, error: "Invalid token id" },
                 { status: 400 },
             );
+        // The token is the user's own; it may belong to any project they own
+        // (created with `?project=`), so scope by ownership, not the Personal
+        // project.
         const result = db
             .prepare(
                 "DELETE FROM tokens WHERE id = ? AND user_id = (SELECT id FROM users WHERE login = ?)",
@@ -523,6 +636,8 @@ export async function createAuth({
         db,
         hasUsers,
         userForToken,
+        projectForToken,
+        ensurePersonalProject,
         userFromRequest,
         unauthorized,
         loginResponse,

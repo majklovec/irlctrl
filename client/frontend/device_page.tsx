@@ -88,6 +88,7 @@ const App: m.Component = {
 		const children = status ? moduleCards(status) : [];
 		return (
 			<Page
+				showLanguage
 				title={
 					<TitleWithBack
 						href={st.device ? "../../" : undefined}

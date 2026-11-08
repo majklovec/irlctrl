@@ -15,7 +15,7 @@ const routes = new Elysia({ name: "page-overlays" });
 
 export default {
     id: "overlays",
-    dependencies: ["assets"],
+    dependencies: ["assets", "projects"],
     menu,
     backend: {
         routes,

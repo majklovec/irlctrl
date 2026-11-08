@@ -1,6 +1,7 @@
 /* Profile page: change the login password and manage the device tokens. */
 
 import { apiJson } from "@ui/api_client";
+import { getActiveProjectId } from "./project_select";
 import {
 	Actions,
 	Badge,
@@ -15,7 +16,7 @@ import {
 } from "@ui/components/";
 import { Icon } from "@ui/components/icons";
 import { ServerNav } from "./nav";
-import { i18nReady, t } from "@ui/i18n";
+import { i18nReady, LanguageSelect, t } from "@ui/i18n";
 import { mountPage } from "@ui/util";
 import m from "mithril";
 
@@ -37,6 +38,8 @@ interface Invitation {
 const state = {
 	username: "",
 	tokens: undefined as Token[] | undefined,
+	/** The project the currently-shown token list belongs to. */
+	scopedProject: null as string | null,
 
 	current: "",
 	next: "",
@@ -57,24 +60,25 @@ function render(): void {
 	m.redraw();
 }
 
-function mergeTokens(loaded: Token[], current: Token[] | undefined): Token[] {
-	if (!current) return loaded;
-	const loadedIds = new Set(loaded.map(({ id }) => id));
-	return [...loaded, ...current.filter(({ id }) => !loadedIds.has(id))];
-}
-
-/** Load the profile (username, admin flag + existing tokens), and the
- * invitation history when this user is an admin. */
+/** Load the profile (username, admin flag) + the device tokens for the active
+ * project, and the invitation history when this user is an admin. The token list
+ * always reflects `scopedProject` (the project the active list belongs to) so it
+ * rescope cleanly when the shell selector switches projects. */
 async function load(): Promise<void> {
+	const active = getActiveProjectId();
 	try {
+		const path = `/api/profile${
+			active ? `?project=${encodeURIComponent(active)}` : ""
+		}`;
 		const body = await apiJson<{
 			username: string;
 			admin: boolean;
 			tokens: Token[];
-		}>("/api/profile");
+		}>(path);
 		state.username = body.username;
 		state.admin = body.admin;
-		state.tokens = mergeTokens(body.tokens, state.tokens);
+		state.scopedProject = active;
+		state.tokens = body.tokens;
 		render();
 		if (body.admin) void loadInvitations();
 	} catch {
@@ -146,12 +150,18 @@ function changePassword(): void {
 }
 
 /** POST /api/profile/tokens: the response carries the full token value (the
- * only time the server ever returns one), so it is shown for copying. */
+ * only time the server ever returns one), so it is shown for copying. The token
+ * is created for the shell's active project (devices join that project),
+ * falling back to the Personal project when none is selected. */
 function addToken(): void {
 	if (state.tokenBusy) return;
 	state.tokenBusy = true;
 	render();
-	void apiJson<{ token: Token }>("/api/profile/tokens", { method: "POST" })
+	const active = getActiveProjectId();
+	const path = `/api/profile/tokens${
+		active ? `?project=${encodeURIComponent(active)}` : ""
+	}`;
+	void apiJson<{ token: Token }>(path, { method: "POST" })
 		.then(({ token }) => {
 			state.tokens = [...(state.tokens ?? []), token];
 		})
@@ -190,6 +200,11 @@ const App: m.Component = {
 	},
 	view: () => (
 		<Page title={t("nav.profile")} nav={<ServerNav active="profile" />}>
+			<Card title={t("profile.language.title")}>
+				<div class="profile-language">
+					<LanguageSelect />
+				</div>
+			</Card>
 			<Card title={t("login.password")}>
 				<Form onSubmit={changePassword}>
 					<FieldGroup legend={t("profile.password.change")}>
@@ -359,6 +374,14 @@ const App: m.Component = {
 		</Page>
 	),
 };
+
+// Rescope the device-token list to the newly selected project.
+window.addEventListener("project-changed", () => {
+	state.tokens = undefined;
+	state.scopedProject = null;
+	render();
+	void load();
+});
 
 void mountPage(() => t("nav.profile"), App);
 // Redraw once the catalogs land so the first paint is already translated

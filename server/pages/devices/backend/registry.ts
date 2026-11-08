@@ -17,7 +17,7 @@ import {
     devicesTopic,
     event,
     ID_RE,
-    LOCAL_USER,
+    LOCAL_PROJECT_ID,
     type Publish,
     type Socket,
     viewersTopic,
@@ -33,8 +33,8 @@ const REQUEST_TIMEOUT_MS = 20_000;
 interface Device {
     /** Stable uuid; the key of this entry. Hostnames change, so the id does not */
     id: string;
-    /** User this device is assigned to (derived from the connect token) */
-    owner?: string;
+    /** Project this device is assigned to (derived from the connect token) */
+    project?: string;
     hostname?: string; // display name, from the device's hello
     color?: string; // the device's header color, from the device's hello
     language?: Language; // UI language, from the device's hello
@@ -65,10 +65,10 @@ interface Pending {
 
 export function createDevices({
     publish,
-    userForToken,
+    projectForToken,
 }: {
     publish: Publish;
-    userForToken: (token: string | null) => string | null;
+    projectForToken: (token: string | null) => string | null;
 }) {
     const devices = new Map<string, Device>();
     const pending = new Map<number, Pending>();
@@ -360,7 +360,7 @@ export function createDevices({
                     id,
                     method,
                     ok: true,
-                    result: summaries(origin.owner ?? LOCAL_USER),
+                    result: summaries(origin.project ?? LOCAL_PROJECT_ID),
                 }),
             );
             return;
@@ -424,9 +424,9 @@ export function createDevices({
     });
 
     /** Device list scoped to one user's assignments. */
-    function summaries(user: string): DeviceSummary[] {
+    function summaries(project: string): DeviceSummary[] {
         return [...devices.values()]
-            .filter((d) => (d.owner ?? LOCAL_USER) === user)
+            .filter((d) => (d.project ?? LOCAL_PROJECT_ID) === project)
             .map(deviceSummary)
             .sort(
                 (a, b) =>
@@ -435,11 +435,12 @@ export function createDevices({
             );
     }
 
-    /** The set of users with at least one registered device. */
-    const deviceOwners = (): string[] => {
-        const owners = new Set<string>();
-        for (const d of devices.values()) owners.add(d.owner ?? LOCAL_USER);
-        return [...owners];
+    /** The set of projects with at least one registered device. */
+    const deviceProjects = (): string[] => {
+        const projects = new Set<string>();
+        for (const d of devices.values())
+            projects.add(d.project ?? LOCAL_PROJECT_ID);
+        return [...projects];
     };
 
     // The per-device push cadence (2 s stats × N devices + 30 s status) would
@@ -460,33 +461,33 @@ export function createDevices({
             ),
         );
 
-    // Per-user fingerprints: a change to user A's devices must not re-kick
-    // user B's (unchanged) list feed.
+    // Per-project fingerprints: a change to project A's devices must not
+    // re-kick project B's (unchanged) list feed.
     const listFingerprints = new Map<string, string>();
     let lastListsFingerprint = "";
     let listPublishedAt = 0;
 
-    /** One stable fingerprint over every user's current list. */
+    /** One stable fingerprint over every project's current list. */
     const listsFingerprint = (): string =>
-        deviceOwners()
+        deviceProjects()
             .sort()
-            .map((u) => `${u}:${stableFingerprint(summaries(u))}`)
+            .map((p) => `${p}:${stableFingerprint(summaries(p))}`)
             .join("|");
 
     function publishDeviceListNow(): void {
         listPublishedAt = Date.now();
         lastListsFingerprint = listsFingerprint();
-        // Publish per owner so each client only hears about its own devices.
-        for (const user of deviceOwners()) {
-            const list = summaries(user);
+        // Publish per project so each client only hears about its own devices.
+        for (const project of deviceProjects()) {
+            const list = summaries(project);
             const fingerprint = stableFingerprint(list);
-            if (listFingerprints.get(user) === fingerprint) continue;
-            listFingerprints.set(user, fingerprint);
-            publish(devicesTopic(user), event("devices.changed", list));
+            if (listFingerprints.get(project) === fingerprint) continue;
+            listFingerprints.set(project, fingerprint);
+            publish(devicesTopic(project), event("devices.changed", list));
         }
     }
 
-    /** Re-broadcast the per-user lists to the live-feed subscribers; each list
+    /** Re-broadcast the per-project lists to the live-feed subscribers; each
      * is identical to what the pages fetch from /api/devices. Throttled to at
      * most one broadcast per tick and skipped when nothing visible changed —
      * except structural events (connect / disconnect / identity), which pass
@@ -510,18 +511,18 @@ export function createDevices({
             req.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1] ??
             "";
         if (!ID_RE.test(id)) return text("Missing or invalid x-device-id", 400);
-        // The connect token assigns the device to the presenting user
-        const user = userForToken(token);
-        if (!user) {
+        // The connect token assigns the device to the presenting project
+        const project = projectForToken(token);
+        if (!project) {
             console.warn(
                 `[device ${id}] rejected: bad token from ${address || "?"}`,
             );
             return text("Unauthorized", 401);
         }
         const existing = devices.get(id);
-        if (existing && (existing.owner ?? LOCAL_USER) !== user) {
+        if (existing && (existing.project ?? LOCAL_PROJECT_ID) !== project) {
             console.warn(
-                `[device ${id}] rejected from ${address || "?"}: assigned to a different user`,
+                `[device ${id}] rejected from ${address || "?"}: assigned to a different project`,
             );
             return text("Forbidden", 403);
         }
@@ -530,7 +531,7 @@ export function createDevices({
             kind: "device",
             id,
             address,
-            owner: user,
+            project,
             role: isRegisteredRole(role) ? role : undefined,
         };
     }
@@ -543,7 +544,7 @@ export function createDevices({
             if (d.ws) d.ws.close(4001, "replaced by a new connection");
             d.ws = ws;
             d.address = data.address;
-            d.owner = data.owner;
+            d.project = data.project;
             d.role = data.role ?? d.role;
             d.connectedAt = d.lastSeen = Date.now();
             console.log(`[device ${d.id}] connected from ${data.address}`);
@@ -628,9 +629,9 @@ export function createDevices({
 
     return {
         getDevice: (id: string) => devices.get(id),
-        ownsDevice: (id: string, user: string): boolean => {
+        ownsDevice: (id: string, project: string): boolean => {
             const d = devices.get(id);
-            return !!d && (d.owner ?? LOCAL_USER) === user;
+            return !!d && (d.project ?? LOCAL_PROJECT_ID) === project;
         },
         summaries,
         deviceConnection,

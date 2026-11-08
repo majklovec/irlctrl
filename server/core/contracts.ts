@@ -58,6 +58,32 @@ export interface PageServices {
     capabilities: CapabilityRegistry;
 }
 
+/**
+ * The authorization surface every project-scoped page pulls from the
+ * "projects" capability (see core/app.ts). The projects store is the single
+ * authority on membership + roles; entity stores take a `projectId` and scope
+ * queries to it without doing auth themselves, so `requireRole` is the one
+ * guard a handler must run before calling into an entity store.
+ */
+export type ProjectRole = "owner" | "editor" | "viewer";
+
+export interface ProjectAccess {
+    /** The user's role in the project, `null` when not a member (or no db). */
+    role(user: string, projectId: string): ProjectRole | null;
+    /**
+     * The user's role in the project, throwing `ApiError` (404 for a missing
+     * project / non-member, 403 for an insufficient role) — the guard an
+     * entity route runs before dispatching to its store.
+     */
+    requireRole(
+        user: string,
+        projectId: string,
+        allowed: readonly ProjectRole[],
+    ): ProjectRole;
+    /** Ensure + return the user's auto-created "Personal" project id. */
+    personalProjectId(user: string): string;
+}
+
 /** A menu entry contributed by a page (rendered by the shell nav). */
 export interface MenuContribution {
     /** Must equal the page directory name. */

@@ -1,4 +1,11 @@
-/* Profile page: device tokens, invitations. */
+/* Profile page: language, device tokens, invitations. */
+
+/* Language section: the selector moved here from the page header. */
+.profile-language .lang-select {
+    margin-left: 0;
+    max-width: none;
+    width: 100%;
+}
 
 /* Profile page: one row per device token (value + date + actions) */
 .token-item {

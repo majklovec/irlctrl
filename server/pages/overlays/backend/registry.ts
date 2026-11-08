@@ -32,7 +32,12 @@ import {
 } from "../overlay";
 import { overlayElementSchema } from "../overlay_elements";
 import { parsePosition } from "../../../../shared/ui/overlay/geo";
-import { event, overlayRuntimeTopic, type Publish } from "../../../core/runtime";
+import {
+    event,
+    LOCAL_PROJECT_ID,
+    overlayRuntimeTopic,
+    type Publish,
+} from "../../../core/runtime";
 export { overlayRuntimeTopic };
 
 // single ApiError class shared with shared/overlay.ts so `instanceof`
@@ -43,7 +48,7 @@ import { ApiError } from "../../../../shared/params";
 
 interface Store {
     id: string;
-    owner: string;
+    project: string;
     overlay: Overlay;
     updatedAt: number;
 }
@@ -76,28 +81,32 @@ const VALID_TYPES: Variable["type"][] = [
 ];
 
 export interface RuntimeOverlay {
-    /** The overlay's owner (kept so the WS uplink can address the store). */
-    owner: string;
+    /** The overlay's project (kept so the WS uplink can address the store). */
+    project: string;
     overlay: Overlay;
 }
 
 export interface Overlays {
-    api(req: Request, url: URL, user: string): Promise<Response>;
-    /** A user's overlays (lightweight, list-page shape). */
-    overlaysFor(user: string): OverlaySummary[];
+    api(req: Request, url: URL, project: string): Promise<Response>;
+    /** A project's overlays (lightweight, list-page shape). */
+    overlaysFor(project: string): OverlaySummary[];
     /**
-     * The full overlay an OBS runtime page renders, resolved from the owner's
-     * login + overlay id; `null` when that user does not own an overlay with
-     * that id (probes must not leak existence, same as the runtime page).
+     * The full overlay an OBS runtime page renders, resolved from the
+     * overlay's project id + overlay id; `null` when the project does not
+     * contain an overlay with that id (probes must not leak existence, same
+     * as the runtime page).
      */
-    runtimeOverlay(user: string, overlayId: string): RuntimeOverlay | null;
+    runtimeOverlay(project: string, overlayId: string): RuntimeOverlay | null;
     /**
      * The channel specs an overlay's chat elements display, resolved from the
-     * owner's login + overlay id; `null` when that user does not own an
-     * overlay with that id. Used by the standalone chat overlay WebSocket to
-     * know which providers to keep attached.
+     * overlay's project id + overlay id; `null` when the project does not
+     * contain an overlay with that id. Used by the standalone chat overlay
+     * WebSocket to know which providers to keep attached.
      */
-    runtimeOverlayChatSpecs(user: string, overlayId: string): string[] | null;
+    runtimeOverlayChatSpecs(
+        project: string,
+        overlayId: string,
+    ): string[] | null;
     /**
      * Owner-authenticated batch revalue for the variables endpoint
      * (`GET /overlay/:id/variables?token=…&<name>=<value>…` and
@@ -110,7 +119,7 @@ export interface Overlays {
      * or a bad value throws ApiError(404/400).
      */
     setVariables(
-        user: string,
+        project: string,
         overlayId: string,
         values: Record<string, unknown>,
     ): { status: number; body: Record<string, unknown> } | null;
@@ -129,7 +138,7 @@ export interface Overlays {
      * the client).
      */
     triggerEvent(
-        user: string,
+        project: string,
         overlayId: string,
         name: string,
         values: Record<string, unknown>,
@@ -149,7 +158,7 @@ export interface Overlays {
      * like the other token endpoints).
      */
     mapHistory(
-        user: string,
+        project: string,
         overlayId: string,
     ): { status: number; body: Record<string, unknown> } | null;
     /**
@@ -178,16 +187,16 @@ export function createOverlays({
         if (!db) return;
         try {
             db.prepare(
-                `INSERT INTO overlays (id, owner, schema_version, data, updated_at)
+                `INSERT INTO overlays (id, project_id, schema_version, data, updated_at)
                  VALUES (?, ?, ?, ?, ?)
                  ON CONFLICT(id) DO UPDATE SET
-                     owner = excluded.owner,
+                     project_id = excluded.project_id,
                      schema_version = excluded.schema_version,
                      data = excluded.data,
                      updated_at = excluded.updated_at`,
             ).run(
                 store.id,
-                store.owner,
+                store.project,
                 OVERLAY_SCHEMA_VERSION,
                 JSON.stringify(store.overlay),
                 store.updatedAt,
@@ -234,8 +243,14 @@ export function createOverlays({
             .prepare("SELECT owner, data FROM overlay_projects")
             .all() as { owner: string; data: string }[];
         const insert = db.prepare(
-            "INSERT INTO overlays (id, owner, schema_version, data, updated_at) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO overlays (id, project_id, schema_version, data, updated_at) VALUES (?, ?, ?, ?, ?)",
         );
+        const personalProjectOf = (login: string): string => {
+            const u = db
+                .prepare("SELECT id FROM users WHERE login = ?")
+                .get(login) as { id: number } | undefined;
+            return u ? `personal-${u.id}` : LOCAL_PROJECT_ID;
+        };
         for (const row of rows) {
             let project: Record<string, unknown>;
             try {
@@ -267,7 +282,7 @@ export function createOverlays({
                     });
                     insert.run(
                         randomUUID(),
-                        row.owner,
+                        personalProjectOf(row.owner),
                         OVERLAY_SCHEMA_VERSION,
                         JSON.stringify(overlay),
                         Date.now(),
@@ -287,10 +302,10 @@ export function createOverlays({
         if (!db) return;
         backfillFromLegacy();
         const rows = db
-            .prepare("SELECT id, owner, data, updated_at FROM overlays")
+            .prepare("SELECT id, project_id, data, updated_at FROM overlays")
             .all() as {
             id: string;
-            owner: string;
+            project_id: string | null;
             data: string;
             updated_at: number;
         }[];
@@ -299,7 +314,7 @@ export function createOverlays({
                 const { overlay } = migrateOverlayBlob(JSON.parse(row.data));
                 stores.set(row.id, {
                     id: row.id,
-                    owner: row.owner,
+                    project: row.project_id ?? LOCAL_PROJECT_ID,
                     overlay,
                     updatedAt: row.updated_at,
                 });
@@ -320,15 +335,15 @@ export function createOverlays({
         updatedAt: s.updatedAt,
     });
 
-    const overlaysFor = (owner: string): OverlaySummary[] =>
+    const overlaysFor = (project: string): OverlaySummary[] =>
         [...stores.values()]
-            .filter((s) => s.owner === owner)
+            .filter((s) => s.project === project)
             .sort((a, b) => a.updatedAt - b.updatedAt)
             .map(summary);
 
-    const storeWithOwner = (owner: string, id: string): Store => {
+    const storeWithOwner = (project: string, id: string): Store => {
         const store = stores.get(id);
-        if (!store || store.owner !== owner)
+        if (!store || store.project !== project)
             throw new ApiError("Unknown overlay", 404);
         return store;
     };
@@ -360,27 +375,27 @@ export function createOverlays({
     };
 
     // ── event fan-out ────────────────────────────────────────────────────
-    /** Editor feed: shared per-owner topic (the overlays editor + dashboards
+    /** Editor feed: shared per-project topic (the overlays editor + dashboards
      * both listen; each page filters frames it doesn't own). */
-    const feed = (owner: string, name: string, data: unknown): void => {
-        publish(`dashboards:${owner}`, event(name, data));
+    const feed = (project: string, name: string, data: unknown): void => {
+        publish(`dashboards:${project}`, event(name, data));
     };
-    /** Runtime feed: keyed per overlay id so one user's overlays don't feed
+    /** Runtime feed: keyed per overlay id so one project's overlays don't feed
      * each other's OBS pages. */
     const runtime = (overlayId: string, name: string, data: unknown): void => {
         publish(overlayRuntimeTopic(overlayId), event(name, data));
     };
-    /** Refresh the owner's list page (names, counts). */
-    const feedList = (owner: string): void => {
-        feed(owner, "overlays.overlays", { overlays: overlaysFor(owner) });
+    /** Refresh the project's list page (names, counts). */
+    const feedList = (project: string): void => {
+        feed(project, "overlays.overlays", { overlays: overlaysFor(project) });
     };
     /** Push one overlay's state to its editor and its runtime page. The
-     * editor feed is a per-owner topic serving every overlay at once, so the
+     * editor feed is a per-project topic serving every overlay at once, so the
      * frame carries `overlayId` (the runtime topic is already per-overlay, but
      * keeps the same shape). */
     const feedOverlay = (store: Store): void => {
         const overlay: Overlay = { ...store.overlay };
-        feed(store.owner, "overlays.overlay", {
+        feed(store.project, "overlays.overlay", {
             overlayId: store.id,
             overlay,
         });
@@ -396,19 +411,19 @@ export function createOverlays({
             { status: 405 },
         );
 
-    /** Create a fresh overlay for `owner` and persist it. */
-    function createOverlay(owner: string, name: string): Store {
-        if (overlaysFor(owner).length >= OVERLAY_LIMITS.overlaysMax)
+    /** Create a fresh overlay in `project` and persist it. */
+    function createOverlay(project: string, name: string): Store {
+        if (overlaysFor(project).length >= OVERLAY_LIMITS.overlaysMax)
             throw new ApiError("Too many overlays");
         const store: Store = {
             id: randomUUID(),
-            owner,
+            project,
             overlay: defaultOverlay(name),
             updatedAt: Date.now(),
         };
         stores.set(store.id, store);
         commit(store);
-        feedList(owner);
+        feedList(project);
         feedOverlay(store);
         return store;
     }
@@ -416,11 +431,11 @@ export function createOverlays({
     /** Apply a `{name?, elements?}` patch to one overlay, validate, persist,
      * fan out. */
     function patchOverlay(
-        owner: string,
+        project: string,
         id: string,
         patch: { name?: string; elements?: OverlayElement[] },
     ): Store {
-        const store = storeWithOwner(owner, id);
+        const store = storeWithOwner(project, id);
         if (patch.name !== undefined) store.overlay.name = patch.name;
         if (patch.elements !== undefined) {
             store.overlay.elements = patch.elements;
@@ -430,7 +445,7 @@ export function createOverlays({
         }
         revalidate(store.overlay);
         commit(store);
-        feedList(owner);
+        feedList(project);
         feedOverlay(store);
         return store;
     }
@@ -438,7 +453,7 @@ export function createOverlays({
     async function api(
         req: Request,
         url: URL,
-        user: string,
+        project: string,
     ): Promise<Response> {
         try {
             const m = url.pathname.match(
@@ -465,10 +480,10 @@ export function createOverlays({
             // The body is an exported overlay file (the raw overlay blob:
             // schemaVersion, name, canvas, variables, elements, …);
             // `migrateOverlayBlob` validates and migrates it, and a new
-            // overlay with a fresh id is created for the user.
+            // overlay with a fresh id is created for the project.
             if (id === "import" && !sub) {
                 if (req.method !== "POST") return notAllowed();
-                if (overlaysFor(user).length >= OVERLAY_LIMITS.overlaysMax)
+                if (overlaysFor(project).length >= OVERLAY_LIMITS.overlaysMax)
                     throw new ApiError("Too many overlays");
                 let raw: unknown;
                 try {
@@ -489,13 +504,13 @@ export function createOverlays({
                 // a fresh overlay: its own id, no server-managed rev
                 const store: Store = {
                     id: randomUUID(),
-                    owner: user,
+                    project,
                     overlay: { ...overlay, rev: undefined },
                     updatedAt: Date.now(),
                 };
                 stores.set(store.id, store);
                 commit(store);
-                feedList(user);
+                feedList(project);
                 feedOverlay(store);
                 return Response.json(
                     { ok: true, id: store.id, overlay: store.overlay },
@@ -506,7 +521,7 @@ export function createOverlays({
             // ── collection: /api/overlays ────────────────────────────────
             if (!id) {
                 if (req.method === "GET")
-                    return Response.json({ ok: true, overlays: overlaysFor(user) });
+                    return Response.json({ ok: true, overlays: overlaysFor(project) });
                 if (req.method === "POST") {
                     const body = (await req.json().catch(() => ({}))) as {
                         name?: unknown;
@@ -515,7 +530,7 @@ export function createOverlays({
                         typeof body.name === "string" && body.name.trim()
                             ? body.name.trim().slice(0, OVERLAY_LIMITS.nameMax)
                             : "Overlay";
-                    const store = createOverlay(user, name);
+                    const store = createOverlay(project, name);
                     return Response.json(
                         { ok: true, id: store.id, overlay: store.overlay },
                         { status: 201 },
@@ -527,7 +542,7 @@ export function createOverlays({
             // ── one overlay: /api/overlays/:id ───────────────────────────
             if (!sub) {
                 if (req.method === "GET") {
-                    const store = storeWithOwner(user, id);
+                    const store = storeWithOwner(project, id);
                     return Response.json({
                         ok: true,
                         id: store.id,
@@ -542,14 +557,14 @@ export function createOverlays({
                     const patch = parseOverlayInput(body);
                     if (body.name !== undefined && !patch.name)
                         throw new ApiError("overlay name is empty");
-                    const store = patchOverlay(user, id, patch);
+                    const store = patchOverlay(project, id, patch);
                     return Response.json({ ok: true, overlay: store.overlay });
                 }
                 if (req.method === "DELETE") {
-                    storeWithOwner(user, id);
+                    storeWithOwner(project, id);
                     stores.delete(id);
                     prune(id);
-                    feedList(user);
+                    feedList(project);
                     return Response.json({ ok: true });
                 }
                 return notAllowed();
@@ -558,9 +573,9 @@ export function createOverlays({
             // ── sub-resources under /api/overlays/:id/… ──────────────────
             if (sub === "duplicate") {
                 if (req.method !== "POST") return notAllowed();
-                if (overlaysFor(user).length >= OVERLAY_LIMITS.overlaysMax)
+                if (overlaysFor(project).length >= OVERLAY_LIMITS.overlaysMax)
                     throw new ApiError("Too many overlays");
-                const source = storeWithOwner(user, id);
+                const source = storeWithOwner(project, id);
                 // a copy is a fresh overlay: clone the source, rename it, drop
                 // its server-managed rev
                 const copy = JSON.parse(
@@ -573,14 +588,14 @@ export function createOverlays({
                 copy.rev = undefined;
                 const store: Store = {
                     id: randomUUID(),
-                    owner: user,
+                    project,
                     overlay: copy,
                     updatedAt: Date.now(),
                 };
                 revalidate(store.overlay);
                 stores.set(store.id, store);
                 commit(store);
-                feedList(user);
+                feedList(project);
                 feedOverlay(store);
                 return Response.json(
                     { ok: true, id: store.id, overlay: store.overlay },
@@ -590,7 +605,7 @@ export function createOverlays({
 
             if (sub === "export") {
                 if (req.method !== "GET") return notAllowed();
-                const store = storeWithOwner(user, id);
+                const store = storeWithOwner(project, id);
                 // The export file is the raw overlay blob (the same JSON the
                 // runtime page receives), sans the server-managed `rev`
                 // counter; `filename` from the overlay name makes the
@@ -614,7 +629,7 @@ export function createOverlays({
                 if (req.method !== "PUT") return notAllowed();
                 const body = (await req.json()) as { canvas?: unknown };
                 const canvas = parseCanvasInput(body.canvas);
-                const store = storeWithOwner(user, id);
+                const store = storeWithOwner(project, id);
                 store.overlay.canvas = canvas;
                 revalidate(store.overlay);
                 commit(store);
@@ -628,7 +643,7 @@ export function createOverlays({
                     if (!isRecord(body.element))
                         throw new ApiError("element is required");
                     const element = parseElementInput(body.element);
-                    const store = storeWithOwner(user, id);
+                    const store = storeWithOwner(project, id);
                     // checked up front so a stale binding fails with a 400
                     // naming the problem, not a 500 deep in revalidate
                     if (
@@ -650,12 +665,12 @@ export function createOverlays({
                     store.overlay.rev = (store.overlay.rev ?? 0) + 1;
                     revalidate(store.overlay);
                     commit(store);
-                    feedList(user);
+                    feedList(project);
                     feedOverlay(store);
                     return Response.json({ ok: true, overlay: store.overlay });
                 }
                 if (req.method === "DELETE" && subId) {
-                    const store = storeWithOwner(user, id);
+                    const store = storeWithOwner(project, id);
                     const i = store.overlay.elements.findIndex(
                         (e) => e.id === subId,
                     );
@@ -669,7 +684,7 @@ export function createOverlays({
                     store.overlay.rev = (store.overlay.rev ?? 0) + 1;
                     revalidate(store.overlay);
                     commit(store);
-                    feedList(user);
+                    feedList(project);
                     feedOverlay(store);
                     return Response.json({ ok: true, overlay: store.overlay });
                 }
@@ -683,7 +698,7 @@ export function createOverlays({
                         type?: unknown;
                         value?: unknown;
                     };
-                    const store = storeWithOwner(user, id);
+                    const store = storeWithOwner(project, id);
                     if (
                         store.overlay.variables.length >=
                         OVERLAY_LIMITS.variablesMax
@@ -741,7 +756,7 @@ export function createOverlays({
                         type?: unknown;
                         value?: unknown;
                     };
-                    const store = storeWithOwner(user, id);
+                    const store = storeWithOwner(project, id);
                     const variable = store.overlay.variables.find(
                         (v) => v.id === subId,
                     );
@@ -781,7 +796,7 @@ export function createOverlays({
                     return Response.json({ ok: true, variable });
                 }
                 if (req.method === "DELETE" && subId) {
-                    const store = storeWithOwner(user, id);
+                    const store = storeWithOwner(project, id);
                     const before = store.overlay.variables.length;
                     store.overlay.variables = store.overlay.variables.filter(
                         (v) => v.id !== subId,
@@ -816,11 +831,11 @@ export function createOverlays({
     }
 
     // ── runtime access (owner-authenticated via the owner's user token) ──
-    function runtimeStore(user: string, overlayId: string): Store | null {
+    function runtimeStore(project: string, overlayId: string): Store | null {
         const store = stores.get(overlayId);
-        // ownership check: a user's token names only their own overlays, so a
-        // probe with a valid token for a foreign id 404s (no existence leak)
-        if (!store || store.owner !== user) return null;
+        // project check: a token names only its project's overlays, so a probe
+        // with a valid token for a foreign id 404s (no existence leak)
+        if (!store || store.project !== project) return null;
         return store;
     }
 
@@ -957,11 +972,11 @@ export function createOverlays({
     }
 
     function setVariables(
-        user: string,
+        project: string,
         overlayId: string,
         values: Record<string, unknown>,
     ): { status: number; body: Record<string, unknown> } | null {
-        const store = runtimeStore(user, overlayId);
+        const store = runtimeStore(project, overlayId);
         if (!store) return null;
         if (Object.keys(values).length === 0)
             throw new ApiError("at least one variable is required", 400);
@@ -997,12 +1012,12 @@ export function createOverlays({
      * no-leak contract as the variables endpoint); unknown variable names and
      * bad values throw ApiError. */
     function triggerEvent(
-        user: string,
+        project: string,
         overlayId: string,
         name: string,
         values: Record<string, unknown>,
     ): { status: number; body: Record<string, unknown> } | null {
-        const store = runtimeStore(user, overlayId);
+        const store = runtimeStore(project, overlayId);
         if (!store) return null;
         // validate + coerce without touching the overlay: the values travel
         // with the event and land when an element plays it
@@ -1019,11 +1034,11 @@ export function createOverlays({
      * points in time order (a global newest-20k cap keeps a long-running
      * overlay's response bounded). */
     function mapHistory(
-        user: string,
+        project: string,
         overlayId: string,
     ): { status: number; body: Record<string, unknown> } | null {
         if (!db) return null;
-        const store = runtimeStore(user, overlayId);
+        const store = runtimeStore(project, overlayId);
         if (!store) return null;
         const paths = (
             db
@@ -1101,18 +1116,18 @@ export function createOverlays({
         api,
         overlaysFor,
         runtimeOverlay: (
-            user: string,
+            project: string,
             overlayId: string,
         ): RuntimeOverlay | null => {
-            const store = runtimeStore(user, overlayId);
+            const store = runtimeStore(project, overlayId);
             if (!store) return null;
-            return { owner: store.owner, overlay: store.overlay };
+            return { project: store.project, overlay: store.overlay };
         },
         runtimeOverlayChatSpecs: (
-            user: string,
+            project: string,
             overlayId: string,
         ): string[] | null => {
-            const store = runtimeStore(user, overlayId);
+            const store = runtimeStore(project, overlayId);
             if (!store) return null;
             const specs = new Set<string>();
             for (const el of store.overlay.elements) {

@@ -18,8 +18,11 @@ import {
 } from "../../../../shared/http";
 import { socketMessage } from "../../../../shared/socket_message";
 import { modulePage } from "../../../../shared/registry";
-import type { PageServices } from "../../../core/contracts";
-import { ID_RE, LOCAL_USER, type WsData } from "../../../core/runtime";
+import { projectParam } from "../../../../shared/project_param";
+import { ApiError } from "../../../../shared/params";
+import type { PageServices, ProjectAccess } from "../../../core/contracts";
+import { apiGuard, scopedProject } from "../../../core/project_scope";
+import { ID_RE, LOCAL_PROJECT_ID, type WsData } from "../../../core/runtime";
 import { socketAdapter } from "../../../core/socket";
 import {
     authenticatedHandler,
@@ -29,13 +32,17 @@ import type { createDevices } from "./registry";
 
 type Devices = ReturnType<typeof createDevices>;
 
+/** Any member of the project may view its devices. */
+const ALL_ROLES = ["viewer", "editor", "owner"] as const;
+
 /* The device list: its page (`/devices/`, also the home page `/`) and the
  * summaries API it reads. */
 function deviceListRoutes(
 	s: PageServices,
 	devices: Devices,
 ) {
-	const { auth, frontend } = s;
+	const { auth, capabilities, frontend } = s;
+	const access = capabilities.require<ProjectAccess>("projectAccess");
 	const page = authenticatedHandler(auth, () =>
 		frontend.htmlResponse("device_list"),
 	);
@@ -44,8 +51,16 @@ function deviceListRoutes(
 		.get("/devices/", page)
 		.get(
 			"/api/devices",
-			authenticatedHandler(auth, (_request, user) =>
-				Response.json(devices.summaries(user)),
+			authenticatedHandler(auth, (request, user) =>
+				apiGuard(() => {
+					const projectId = scopedProject(
+						access,
+						new URL(request.url),
+						user,
+						ALL_ROLES,
+					);
+					return Response.json(devices.summaries(projectId));
+				}),
 			),
 		);
 }
@@ -98,7 +113,8 @@ function deviceConnectionRoutes(devices: Devices) {
 }
 
 function devicePageRoutes(s: PageServices, devices: Devices) {
-    const { auth, frontend } = s;
+    const { auth, capabilities, frontend } = s;
+    const access = capabilities.require<ProjectAccess>("projectAccess");
     const DEVICE_PATH_RE = /^\/d\/([^/]+)(?:(\/)(?:(ws)|(settings|setup)(\/)?)?)?$/;
     /** `/d/<id>/<rest>` — `rest` is matched against the module-declared page routes. */
     const DEVICE_SUBPATH_RE = /^\/d\/([^/]+)(\/.+)$/;
@@ -115,51 +131,66 @@ function devicePageRoutes(s: PageServices, devices: Devices) {
 
     return new Elysia({ name: "control-device-pages" }).all(
         "/d/*",
-        authenticatedHandler(auth, (request, user) => {
-            const url = new URL(request.url);
-            const path = url.pathname;
-            const sub = path.match(DEVICE_SUBPATH_RE);
-            const modulePageName = sub ? modulePage(sub[2]) : undefined;
-            if (sub && modulePageName) {
-                const id = deviceId(sub[1]);
+        authenticatedHandler(auth, (request, user) =>
+            apiGuard(() => {
+                const url = new URL(request.url);
+                const projectId = scopedProject(
+                    access,
+                    url,
+                    user,
+                    ALL_ROLES,
+                );
+                const path = url.pathname;
+                const sub = path.match(DEVICE_SUBPATH_RE);
+                const modulePageName = sub ? modulePage(sub[2]) : undefined;
+                if (sub && modulePageName) {
+                    const id = deviceId(sub[1]);
+                    if (id instanceof Response) return id;
+                    const device = devices.getDevice(id);
+                    if (
+                        !device ||
+                        (device.project ?? LOCAL_PROJECT_ID) !== projectId
+                    )
+                        return notFound();
+                    return frontend.htmlResponse(modulePageName);
+                }
+
+                const match = path.match(DEVICE_PATH_RE);
+                if (!match) return notFound();
+                const [, rawId, slash, ws, page, pageSlash] = match;
+                const id = deviceId(rawId);
                 if (id instanceof Response) return id;
                 const device = devices.getDevice(id);
-                if (!device || (device.owner ?? LOCAL_USER) !== user)
+                if (!device || (device.project ?? LOCAL_PROJECT_ID) !== projectId)
                     return notFound();
-                return frontend.htmlResponse(modulePageName);
-            }
 
-            const match = path.match(DEVICE_PATH_RE);
-            if (!match) return notFound();
-            const [, rawId, slash, ws, page, pageSlash] = match;
-            const id = deviceId(rawId);
-            if (id instanceof Response) return id;
-            const device = devices.getDevice(id);
-            if (!device || (device.owner ?? LOCAL_USER) !== user)
-                return notFound();
-
-            const base = `/d/${encodeURIComponent(id)}/`;
-            if (ws) {
-                if (!originAllowed(request))
-                    return text("Origin not allowed", 403);
-                return upgradeRequired();
-            }
-            if (page)
-                return pageSlash
-                    ? frontend.htmlResponse(
-                          page === "settings" ? "settings" : "setup",
-                      )
-                    : Response.redirect(`${base}${page}/`, 308);
-            if (!slash) return Response.redirect(base, 308);
-            const setupRequired =
-                device.status?.setupRequired && !url.searchParams.has("ui");
-            return frontend.htmlResponse(setupRequired ? "setup" : "index");
-        }),
+                const base = `/d/${encodeURIComponent(id)}/`;
+                if (ws) {
+                    if (!originAllowed(request))
+                        return text("Origin not allowed", 403);
+                    return upgradeRequired();
+                }
+                if (page)
+                    return pageSlash
+                        ? frontend.htmlResponse(
+                              page === "settings" ? "settings" : "setup",
+                          )
+                        : Response.redirect(`${base}${page}/`, 308);
+                if (!slash) return Response.redirect(base, 308);
+                const setupRequired =
+                    device.status?.setupRequired &&
+                    !url.searchParams.has("ui");
+                return frontend.htmlResponse(
+                    setupRequired ? "setup" : "index",
+                );
+            }),
+        ),
     );
 }
 
 function deviceViewerRoutes(s: PageServices, devices: Devices) {
-    const { auth } = s;
+    const { auth, capabilities } = s;
+    const access = capabilities.require<ProjectAccess>("projectAccess");
     const VIEWER_PATH_RE = /^\/d\/([^/]+)\/ws\/?$/;
     type ViewerData = Extract<WsData, { kind: "viewer" }>;
 
@@ -178,7 +209,24 @@ function deviceViewerRoutes(s: PageServices, devices: Devices) {
         request: Request,
         user: string,
     ): ViewerData | Response {
-        const match = new URL(request.url).pathname.match(VIEWER_PATH_RE);
+        const url = new URL(request.url);
+        const projectId =
+            projectParam(url) ?? access.personalProjectId(user);
+        try {
+            access.requireRole(user, projectId, ALL_ROLES);
+        } catch (err: unknown) {
+            const status = err instanceof ApiError ? err.code : 500;
+            return Response.json(
+                {
+                    ok: false,
+                    error:
+                        err instanceof Error ? err.message : "Internal error",
+                    code: status,
+                },
+                { status },
+            );
+        }
+        const match = url.pathname.match(VIEWER_PATH_RE);
         if (!match) return notFound();
         let id: string;
         try {
@@ -188,7 +236,8 @@ function deviceViewerRoutes(s: PageServices, devices: Devices) {
         }
         if (!ID_RE.test(id)) return text("Invalid device id", 400);
         const device = devices.getDevice(id);
-        if (!device || (device.owner ?? LOCAL_USER) !== user) return notFound();
+        if (!device || (device.project ?? LOCAL_PROJECT_ID) !== projectId)
+            return notFound();
         if (!originAllowed(request)) return text("Origin not allowed", 403);
         return { kind: "viewer", id, user };
     }

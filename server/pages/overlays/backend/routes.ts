@@ -50,9 +50,10 @@ import { APP_VERSION } from "../../../../shared/app_version";
 import type { createFrontend } from "../../../../shared/frontend";
 import { upgradeRequired } from "../../../../shared/http";
 import { socketMessage } from "../../../../shared/socket_message";
-import type { PageServices } from "../../../core/contracts";
+import type { PageServices, ProjectAccess } from "../../../core/contracts";
 import type { Assets } from "../../assets/server/registry";
 import { authenticatedHandler } from "../../../core/auth/authenticated";
+import { apiGuard, scopedProject } from "../../../core/project_scope";
 import { event } from "../../../core/runtime";
 import { ApiError, type Overlays, overlayRuntimeTopic } from "./registry";
 
@@ -143,14 +144,19 @@ export function mountOverlayRoutes(
     overlays: Overlays,
     assets: Assets,
 ): void {
-    const { auth, frontend } = s;
+    const { auth, capabilities, frontend } = s;
+    const access = capabilities.require<ProjectAccess>("projectAccess");
 
-    /** Resolve a runtime request's `?token=` to the owner's login
-     * (`auth.userForToken` maps a user device token → login, and to the local
-     * user under `--no-auth`); `null` when the token is unknown. The overlay
-     * store then owner-checks the id against this login. */
-    const runtimeUser = (request: Request): string | null =>
-        auth.userForToken(runtimeToken(request));
+    /** Any member may read a project's overlays; editing needs editor+. */
+    const READ_ROLES = ["viewer", "editor", "owner"] as const;
+    const EDIT_ROLES = ["editor", "owner"] as const;
+
+    /** Resolve a runtime request's `?token=` to the project id
+     * (`auth.projectForToken` maps a device token → project, and to the local
+     * project under `--no-auth`); `null` when the token is unknown. The
+     * overlay store then checks the id against this project. */
+    const runtimeProject = (request: Request): string | null =>
+        auth.projectForToken(runtimeToken(request));
 
     routes
         .get(
@@ -170,10 +176,10 @@ export function mountOverlayRoutes(
             "/overlay/:id/variables",
             ({ request, params }) =>
                 ownerJson(() => {
-                    const user = runtimeUser(request);
-                    if (!user) return null;
+                    const project = runtimeProject(request);
+                    if (!project) return null;
                     return overlays.setVariables(
-                        user,
+                        project,
                         decodeURIComponent(params.id),
                         queryValues(request),
                     );
@@ -183,8 +189,8 @@ export function mountOverlayRoutes(
             "/overlay/:id/variables",
             ({ request, params }) =>
                 ownerJson(async () => {
-                    const user = runtimeUser(request);
-                    if (!user) return null;
+                    const project = runtimeProject(request);
+                    if (!project) return null;
                     // JSON body: {<name>: value|null} — null/"" clears
                     let body: unknown;
                     try {
@@ -202,7 +208,7 @@ export function mountOverlayRoutes(
                             400,
                         );
                     return overlays.setVariables(
-                        user,
+                        project,
                         decodeURIComponent(params.id),
                         body as Record<string, unknown>,
                     );
@@ -215,12 +221,12 @@ export function mountOverlayRoutes(
             "/overlay/:id/event/*",
             ({ request, params }) =>
                 ownerJson(() => {
-                    const user = runtimeUser(request);
-                    if (!user) return null;
+                    const project = runtimeProject(request);
+                    if (!project) return null;
                     // query pairs (if any) set project variables; the
                     // trigger itself is the URL's <name>
                     return overlays.triggerEvent(
-                        user,
+                        project,
                         decodeURIComponent(params.id),
                         safeDecodeURIComponent(
                             (params as Record<string, string>)["*"] ?? "",
@@ -235,10 +241,10 @@ export function mountOverlayRoutes(
             "/overlay/:id/map-history",
             ({ request, params }) =>
                 ownerJson(() => {
-                    const user = runtimeUser(request);
-                    if (!user) return null;
+                    const project = runtimeProject(request);
+                    if (!project) return null;
                     return overlays.mapHistory(
-                        user,
+                        project,
                         decodeURIComponent(params.id),
                     );
                 }),
@@ -252,9 +258,9 @@ export function mountOverlayRoutes(
         .get(
             "/overlay/:id/files/:fileId",
             ({ request, params }) => {
-                const user = runtimeUser(request);
-                const feed = user
-                    ? overlays.runtimeOverlay(user, decodeURIComponent(params.id))
+                const project = runtimeProject(request);
+                const feed = project
+                    ? overlays.runtimeOverlay(project, decodeURIComponent(params.id))
                     : null;
                 if (!feed)
                     return Response.json(
@@ -263,7 +269,7 @@ export function mountOverlayRoutes(
                     );
                 let file: { mime: string; data: Uint8Array };
                 try {
-                    const blob = assets.fileBlob(feed.owner, params.fileId);
+                    const blob = assets.fileBlob(feed.project, params.fileId);
                     file = { mime: blob.file.mimeType, data: blob.data };
                 } catch (err: unknown) {
                     const code = err instanceof ApiError ? err.code : 500;
@@ -293,13 +299,31 @@ export function mountOverlayRoutes(
         .all(
             "/api/overlays",
             authenticatedHandler(auth, (request, user) =>
-                overlays.api(request, new URL(request.url), user),
+                apiGuard(() => {
+                    const url = new URL(request.url);
+                    const projectId = scopedProject(
+                        access,
+                        url,
+                        user,
+                        request.method === "GET" ? READ_ROLES : EDIT_ROLES,
+                    );
+                    return overlays.api(request, url, projectId);
+                }),
             ),
         )
         .all(
             "/api/overlays/*",
             authenticatedHandler(auth, (request, user) =>
-                overlays.api(request, new URL(request.url), user),
+                apiGuard(() => {
+                    const url = new URL(request.url);
+                    const projectId = scopedProject(
+                        access,
+                        url,
+                        user,
+                        request.method === "GET" ? READ_ROLES : EDIT_ROLES,
+                    );
+                    return overlays.api(request, url, projectId);
+                }),
             ),
         )
         .get("/overlay/:id/ws", () => upgradeRequired())
@@ -310,9 +334,9 @@ export function mountOverlayRoutes(
                 );
                 if (!m) return ws.close(1008, "Unknown overlay route");
                 const overlayId = decodeURIComponent(m[1]);
-                const user = auth.userForToken(runtimeToken(ws.data.request));
-                const feed = user
-                    ? overlays.runtimeOverlay(user, overlayId)
+                const project = auth.projectForToken(runtimeToken(ws.data.request));
+                const feed = project
+                    ? overlays.runtimeOverlay(project, overlayId)
                     : null;
                 if (!feed) return ws.close(1008, "Invalid overlay token");
                 // the message handler reuses the already-validated overlay id

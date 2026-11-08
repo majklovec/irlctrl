@@ -1,6 +1,12 @@
 import type { Role } from "../../shared/validate";
 
 export const LOCAL_USER = "local";
+/**
+ * The `--no-auth` synthetic project id. No user rows exist in that mode, so
+ * the Personal-project scheme (`personal-<user id>`, migration 0012) has no
+ * user id to build from; every local connection scopes to this id instead.
+ */
+export const LOCAL_PROJECT_ID = "personal-local";
 export const ID_RE = /^[\w.-]{1,64}$/;
 
 export type WsData =
@@ -8,7 +14,7 @@ export type WsData =
           kind: "device";
           id: string;
           address: string;
-          owner: string;
+          project: string;
           role?: Role;
       }
     | { kind: "viewer"; id: string; user: string }

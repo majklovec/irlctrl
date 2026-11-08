@@ -6,6 +6,7 @@
  * Handlers are plain subscribers — callers redraw themselves. */
 
 import { RpcClient, socketUrl } from "@ui/services/rpc";
+import { getActiveProjectId } from "./project_select";
 import type {
     DeviceSummary,
     ServerDashboard,
@@ -17,7 +18,14 @@ export type DashboardsChanged = ServerDashboard | { id: string; deleted: true };
 
 // Absolute path: the subscribers live under / and /dashboards/, a relative
 // "dashboards/ws" would resolve to a different URL on each page.
-const rpc = new RpcClient(() => socketUrl("/dashboards/ws"));
+const rpc = new RpcClient(() =>
+    socketUrl(
+        "/dashboards/ws" +
+            (getActiveProjectId()
+                ? `?project=${encodeURIComponent(getActiveProjectId()!)}`
+                : ""),
+    ),
+);
 
 interface Handlers {
     /** Every devices.snapshot / devices.changed push, in server order. */
@@ -79,6 +87,13 @@ rpc.on("open", () => {
 });
 rpc.on("close", () => {
     for (const h of handlers) h.close?.();
+});
+
+// Rescope the shared feed to the newly selected project: drop the socket so
+// the auto-reconnect opens against `/dashboards/ws?project=<new>`, and the
+// fresh snapshot replaces the maintained device/dashboard lists.
+window.addEventListener("project-changed", () => {
+    rpc.reconnect();
 });
 
 export const serverLive = {

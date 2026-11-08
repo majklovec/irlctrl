@@ -16,7 +16,7 @@ const routes = new Elysia({ name: "page-dashboards" });
 
 export default {
     id: "dashboards",
-    dependencies: ["devices"],
+    dependencies: ["devices", "projects"],
     menu,
     backend: {
         routes,
@@ -26,7 +26,7 @@ export default {
                 db: s.db,
                 databaseFile: s.config.databaseFile,
                 publish: s.publish,
-                ownsDevice: (id, user) => devices.ownsDevice(id, user),
+                ownsDevice: (id, project) => devices.ownsDevice(id, project),
                 deviceExists: (id) => !!devices.getDevice(id),
                 deviceStatus: (id) => devices.getDevice(id)?.status,
             });

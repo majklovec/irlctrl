@@ -21,7 +21,7 @@ import { configFieldName } from "../../../../shared/contracts/wire";
 import {
     dashboardsTopic,
     event,
-    LOCAL_USER,
+    LOCAL_PROJECT_ID,
     type Publish,
     WIDGET_HUB_TOPIC,
 } from "../../../core/runtime";
@@ -31,7 +31,7 @@ const DASH_COLUMNS = 12;
 
 interface DashboardRow {
     id: string;
-    owner: string;
+    project_id: string | null;
     name: string;
     color: string | null;
     version: number;
@@ -51,7 +51,7 @@ export function createDashboards({
     db: Database | null;
     databaseFile: string;
     publish: Publish;
-    ownsDevice: (id: string, user: string) => boolean;
+    ownsDevice: (id: string, project: string) => boolean;
     /** `true` when the device exists (owned or not), `false`/`null` when it no
      * longer exists at all. Lets a save keep widgets bound to pruned devices
      * (they simply cannot connect) instead of rejecting the whole dashboard. */
@@ -132,7 +132,7 @@ export function createDashboards({
 
     function parseWidgets(
         raw: unknown,
-        owner: string,
+        project: string,
         strict = true,
     ): ServerDashboardWidget[] {
         if (!Array.isArray(raw)) throw new ApiError("widgets is required");
@@ -190,7 +190,7 @@ export function createDashboards({
                             ? deviceStatus?.(boundDevice)
                             : undefined,
                         deviceStatus: (id) => deviceStatus?.(id),
-                        ownsDevice: (id) => ownsDevice(id, owner),
+                        ownsDevice: (id) => ownsDevice(id, project),
                         // Without a registry lookup every device counts as existing (so
                         // a foreign id is rejected), like the device-bound branch below.
                         deviceExists: (id) =>
@@ -217,7 +217,8 @@ export function createDashboards({
                 };
             if (typeof deviceId !== "string" || deviceId === "")
                 throw new ApiError("Widget needs a deviceId");
-            // A widget may only bind to a device assigned to the dashboard's owner.
+            // A widget may only bind to a device assigned to the dashboard's
+            // project.
             // Exception on saves (strict=false): a widget bound to a device that no
             // longer exists is kept — the widget simply renders "No device" and the
             // user can remove it. Rejecting the whole save would brick any
@@ -227,7 +228,7 @@ export function createDashboards({
             // foreign/unknown devices are still rejected without a deviceExists
             // dependency.
             if (
-                !ownsDevice(deviceId, owner) &&
+                !ownsDevice(deviceId, project) &&
                 (strict || !deviceExists || deviceExists(deviceId))
             )
                 throw new ApiError(`Device not available: ${deviceId}`);
@@ -263,7 +264,7 @@ export function createDashboards({
             }
             return {
                 id: row.id,
-                owner: row.owner,
+                project: row.project_id ?? LOCAL_PROJECT_ID,
                 name: row.name,
                 color: row.color ?? undefined,
                 version: row.version,
@@ -281,12 +282,12 @@ export function createDashboards({
             db.transaction(() => {
                 db.prepare("DELETE FROM dashboards").run();
                 const ins = db.prepare(
-                    'INSERT INTO dashboards (id, owner, name, color, version, "columns", widgets, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    'INSERT INTO dashboards (id, project_id, name, color, version, "columns", widgets, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                 );
                 dashboards.forEach((d, i) =>
                     ins.run(
                         d.id,
-                        d.owner ?? LOCAL_USER,
+                        d.project ?? LOCAL_PROJECT_ID,
                         d.name,
                         d.color ?? null,
                         d.version,
@@ -321,24 +322,24 @@ export function createDashboards({
         return Response.json({ ok: false, error: message, code });
     }
 
-    /** Push a dashboard change to the owner's live dashboards topic, so their open
-     * dashboards (view/edit pages) re-render without a refresh. */
+    /** Push a dashboard change to the project's live dashboards topic, so its
+     * open dashboards (view/edit pages) re-render without a refresh. */
     function broadcastDashboard(d: ServerDashboard): void {
         publish(
-            dashboardsTopic(d.owner ?? LOCAL_USER),
+            dashboardsTopic(d.project ?? LOCAL_PROJECT_ID),
             event("dashboards.changed", d),
         );
     }
 
-    /** Dashboards owned by `user`, in stored order. Ownerless (legacy) dashboards
-     * belong to the `local` profile. */
-    const dashboardsFor = (user: string) =>
-        dashboards.filter((d) => (d.owner ?? LOCAL_USER) === user);
+    /** Dashboards belonging to `project`, in stored order. Ownerless (legacy)
+     * dashboards belong to the `local` project. */
+    const dashboardsFor = (project: string) =>
+        dashboards.filter((d) => (d.project ?? LOCAL_PROJECT_ID) === project);
 
     async function dashApi(
         req: Request,
         url: URL,
-        user: string,
+        project: string,
     ): Promise<Response> {
         try {
             const m = url.pathname.match(DASH_PATH_RE);
@@ -350,11 +351,11 @@ export function createDashboards({
                 });
             const id = m[1];
             if (!id) {
-                // The list is always scoped to the requesting user
+                // The list is always scoped to the target project
                 if (req.method === "GET")
                     return Response.json({
                         ok: true,
-                        dashboards: dashboardsFor(user),
+                        dashboards: dashboardsFor(project),
                     });
                 if (req.method === "POST") {
                     const body = (await req.json()) as {
@@ -367,12 +368,12 @@ export function createDashboards({
                     if (!name) return dashError(400, "Dashboard needs a name");
                     const dashboard: ServerDashboard = {
                         id: randomUUID(),
-                        owner: user,
+                        project,
                         name,
                         color: parseColor(body.color),
                         version: 1,
                         columns: DASH_COLUMNS,
-                        widgets: parseWidgets(body.widgets, user),
+                        widgets: parseWidgets(body.widgets, project),
                     };
                     dashboards.push(dashboard);
                     saveDashboards();
@@ -382,7 +383,7 @@ export function createDashboards({
                         {
                             ok: true,
                             dashboard,
-                            dashboards: dashboardsFor(user),
+                            dashboards: dashboardsFor(project),
                         },
                         { status: 201 },
                     );
@@ -394,9 +395,10 @@ export function createDashboards({
                 });
             }
             // Mutations need a body (JSON); the device list is a separate GET.
-            // Other users' dashboards are invisible (404, not just hidden).
+            // Other projects' dashboards are invisible (404, not just hidden).
             const dashboardsById = dashboards.find(
-                (d) => d.id === id && (d.owner ?? LOCAL_USER) === user,
+                (d) =>
+                    d.id === id && (d.project ?? LOCAL_PROJECT_ID) === project,
             );
             if (req.method === "DELETE") {
                 if (!dashboardsById) return dashError(404, "Unknown dashboard");
@@ -404,12 +406,12 @@ export function createDashboards({
                 saveDashboards();
                 syncHub();
                 publish(
-                    dashboardsTopic(user),
+                    dashboardsTopic(project),
                     event("dashboards.changed", { id, deleted: true }),
                 );
                 return Response.json({
                     ok: true,
-                    dashboards: dashboardsFor(user),
+                    dashboards: dashboardsFor(project),
                 });
             }
             if (req.method === "PUT") {
@@ -440,7 +442,7 @@ export function createDashboards({
                 dashboardsById.color = parseColor(body.color);
                 dashboardsById.widgets = parseWidgets(
                     body.widgets,
-                    user,
+                    project,
                     false,
                 );
                 dashboardsById.version += 1;
@@ -450,7 +452,7 @@ export function createDashboards({
                 return Response.json({
                     ok: true,
                     dashboard: dashboardsById,
-                    dashboards: dashboardsFor(user),
+                    dashboards: dashboardsFor(project),
                 });
             }
             if (req.method === "GET") {

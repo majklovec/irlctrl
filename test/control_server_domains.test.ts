@@ -103,7 +103,9 @@ describe("control-server domain contracts", () => {
             error: "Invitation already used",
         });
 
-        const { token } = await auth.createTokenResponse("alice").json();
+        const { token } = await auth
+            .createTokenResponse(request("/api/profile/tokens"), "alice")
+            .json();
         expect(auth.userForToken(token.token)).toBe("alice");
         const foreignDelete = auth.deleteTokenResponse(
             new URL(`http://localhost/api/profile/tokens/${token.id}`),
@@ -156,7 +158,7 @@ describe("control-server domain contracts", () => {
         expect(created.status).toBe(201);
         const { dashboard } = await created.json();
         expect(dashboard).toMatchObject({
-            owner: "alice",
+            project: "alice",
             name: "Operations",
             version: 1,
             columns: 12,
