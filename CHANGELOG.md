@@ -1,3 +1,11 @@
+# [3.5.0](https://github.com/majklovec/irlctrl/compare/v3.4.0...v3.5.0) (2026-11-08)
+
+
+### Features
+
+* **ui:** add create tooltip ([82a4a3d](https://github.com/majklovec/irlctrl/commit/82a4a3d35c722656dfbec0d86a208d2054e90fdb))
+* **ui:** improve overlay create toolbar ([f276bf1](https://github.com/majklovec/irlctrl/commit/f276bf108e93c4da46f380cc353c4e3f10255694))
+
 # [3.4.0](https://github.com/majklovec/irlctrl/compare/v3.3.0...v3.4.0) (2026-11-08)
 
 
