@@ -1,3 +1,10 @@
+# [3.4.0](https://github.com/majklovec/irlctrl/compare/v3.3.0...v3.4.0) (2026-11-08)
+
+
+### Features
+
+* **auth:** add device web login ([a8031c4](https://github.com/majklovec/irlctrl/commit/a8031c47dd75c767d6821070c1e3eb923757fe71))
+
 # [3.3.0](https://github.com/majklovec/irlctrl/compare/v3.2.2...v3.3.0) (2026-11-08)
 
 
