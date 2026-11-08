@@ -33,6 +33,7 @@ import type {
 	FrontendModule,
 } from "../../../shared/contracts/frontend_module";
 import type { DeviceSummary, SetupInfo } from "../../../shared/contracts/wire";
+import { attemptedSteps } from "../../../shared/setup_progress";
 import log from "./log";
 import { defaultRouteRowIndex } from "./route_view";
 import type {
@@ -785,7 +786,10 @@ const relayModule: FrontendModule = {
 						<Field
 							label={t("dev.field.srt_listen_port")}
 							required={true}
-							invalid={!inRange(setupFields.listenPort, 1, 65535)}
+							invalid={
+								attemptedSteps.has("relay") &&
+								!inRange(setupFields.listenPort, 1, 65535)
+							}
 							control={
 								<Input
 									target={setupFields}
@@ -798,7 +802,9 @@ const relayModule: FrontendModule = {
 						<Field
 							label={t("dev.field.remote_host")}
 							required={true}
-							invalid={!setupFields.srtlaRemoteHost}
+							invalid={
+								attemptedSteps.has("relay") && !setupFields.srtlaRemoteHost
+							}
 							control={
 								<Input
 									target={setupFields}
@@ -811,7 +817,10 @@ const relayModule: FrontendModule = {
 						<Field
 							label={t("dev.field.remote_port")}
 							required={true}
-							invalid={!inRange(setupFields.srtlaRemotePort, 1, 65535)}
+							invalid={
+								attemptedSteps.has("relay") &&
+								!inRange(setupFields.srtlaRemotePort, 1, 65535)
+							}
 							control={
 								<Input
 									target={setupFields}

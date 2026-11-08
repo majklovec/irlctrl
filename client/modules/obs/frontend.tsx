@@ -37,6 +37,7 @@ import type {
 	ModuleSetupStep,
 } from "../../../shared/contracts/frontend_module";
 import type { Role, SetupInfo } from "../../../shared/contracts/wire";
+import { attemptedSteps } from "../../../shared/setup_progress";
 import {
 	loadForm,
 	nameOptions,
@@ -1040,7 +1041,7 @@ const obsSetupStep: ModuleSetupStep = {
 				<Field
 					label={t("set.obs_url")}
 					required={true}
-					invalid={!isObsUrl(setupFields.obsUrl)}
+					invalid={attemptedSteps.has("obs") && !isObsUrl(setupFields.obsUrl)}
 					control={
 						<Input
 							target={setupFields}

@@ -39,7 +39,13 @@ const SERVER_EXTRA = [
 	"/i18n/en.json",
 ];
 /** Device-client routes (a fresh config → setup page at `/`). */
-const CLIENT_ROUTES = ["/", "/setup/", "/settings/", "/i18n/en.json"];
+const CLIENT_ROUTES = [
+	"/",
+	"/login/",
+	"/setup/",
+	"/settings/",
+	"/i18n/en.json",
+];
 
 async function freePort(): Promise<number> {
 	const listener = createServer();

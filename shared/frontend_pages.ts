@@ -4,7 +4,7 @@
  * (`server/pages/<id>/pages/*.html`) are discovered on top of these by
  * shared/frontend.ts.
  */
-export const CLIENT_PAGES = ["index", "settings", "setup"] as const;
+export const CLIENT_PAGES = ["index", "signin", "settings", "setup"] as const;
 
 export const SERVER_PAGES = ["login", "register", "profile"] as const;
 

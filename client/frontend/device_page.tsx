@@ -36,9 +36,27 @@ async function setAutostart(enabled: boolean): Promise<void> {
 	m.redraw();
 }
 
+async function signOut(): Promise<void> {
+	try {
+		await fetch("/logout", { method: "POST", cache: "no-store" });
+	} finally {
+		location.replace("/login/");
+	}
+}
+
 function headerRight(): m.Children[] {
 	const status = st.status;
 	return [
+		status?.auth === true && (
+			<button
+				type="button"
+				class="signout"
+				title={t("ui.logout")}
+				onClick={() => void signOut()}
+			>
+				{t("ui.logout")}
+			</button>
+		),
 		<label class="check" title={t("dev.autostart_title")}>
 			<input
 				type="checkbox"

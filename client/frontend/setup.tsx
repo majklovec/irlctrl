@@ -22,19 +22,26 @@ import m from "mithril";
 import roleDiagrams from "../../generated/role_diagrams";
 import type { ModuleSetupStep } from "../../shared/contracts/frontend_module";
 import type { Role, SetupInfo } from "../../shared/contracts/wire";
+import { attemptedSteps } from "../../shared/setup_progress";
 import { errorMessage } from "../../shared/util";
-import { DEFAULT_COLOR, HOSTNAME_RE } from "../../shared/validate";
+import {
+	DEFAULT_COLOR,
+	HOSTNAME_RE,
+	PASSWORD_MIN,
+	USERNAME_RE,
+} from "../../shared/validate";
 
 interface WizardStep {
 	id: string;
 	title: string;
 	subtitle: string;
-	valid(): boolean;
+	/** null when the step is complete; otherwise what is still missing. */
+	problem(): string | null;
 	render(): m.Children;
 }
 
 interface CoreStep {
-	id: "language" | "role" | "identity" | "control" | "finish";
+	id: "language" | "access" | "role" | "identity" | "control" | "finish";
 	title: string;
 	subtitle: string;
 }
@@ -44,6 +51,11 @@ const CORE_STEPS: CoreStep[] = [
 		id: "language",
 		title: "ui.language_label",
 		subtitle: "setup.step.language_sub",
+	},
+	{
+		id: "access",
+		title: "setup.step.access",
+		subtitle: "setup.step.access_sub",
 	},
 	{ id: "role", title: "set.role", subtitle: "setup.step.role_sub" },
 	{
@@ -77,6 +89,9 @@ const f = {
 	role: undefined as Role | undefined,
 	hostname: "",
 	color: DEFAULT_COLOR,
+	username: "",
+	password: "",
+	passwordRepeat: "",
 	remoteUrl: "",
 	remoteToken: "",
 	autostart: false,
@@ -136,7 +151,7 @@ function moduleStep(step: ModuleSetupStep, role: Role): WizardStep {
 		id: step.id,
 		title: step.title,
 		subtitle: step.subtitle,
-		valid: () => step.isValid(role),
+		problem: () => (step.isValid(role) ? null : t("setup.step_invalid")),
 		render: () => {
 			const info = state.info;
 			if (!info) throw new Error("Setup data is not available");
@@ -154,14 +169,26 @@ function moduleStep(step: ModuleSetupStep, role: Role): WizardStep {
 function coreStep(step: CoreStep): WizardStep {
 	return {
 		...step,
-		valid: () => {
+		problem: () => {
 			switch (step.id) {
 				case "role":
-					return !!f.role;
+					return f.role ? null : t("setup.err_role");
+				case "access":
+					if (!USERNAME_RE.test(f.username)) return t("setup.err_username");
+					if (f.password.length < PASSWORD_MIN) {
+						return t("setup.err_password_short", {
+							min: String(PASSWORD_MIN),
+						});
+					}
+					if (f.password !== f.passwordRepeat)
+						return t("setup.err_password_match");
+					return null;
 				case "identity":
-					return HOSTNAME_RE.test(f.hostname);
+					return HOSTNAME_RE.test(f.hostname)
+						? null
+						: t("setup.hostname_title");
 				default:
-					return true;
+					return null;
 			}
 		},
 		render: () => {
@@ -186,7 +213,7 @@ function coreStep(step: CoreStep): WizardStep {
 						/>,
 					);
 				case "role": {
-					const roleInvalid = !f.role;
+					const roleInvalid = attemptedSteps.has("role") && !f.role;
 					return stepFrame(
 						step.id,
 						t("set.role"),
@@ -203,7 +230,8 @@ function coreStep(step: CoreStep): WizardStep {
 					);
 				}
 				case "identity": {
-					const identityInvalid = !HOSTNAME_RE.test(f.hostname);
+					const identityInvalid =
+						attemptedSteps.has("identity") && !HOSTNAME_RE.test(f.hostname);
 					return stepFrame(
 						step.id,
 						t("setup.identity"),
@@ -231,6 +259,59 @@ function coreStep(step: CoreStep): WizardStep {
 									prop="color"
 									type="color"
 									onChange={(v) => setHeaderColor(v)}
+								/>
+							}
+						/>,
+					);
+				}
+				case "access": {
+					const attempted = attemptedSteps.has("access");
+					const usernameInvalid = attempted && !USERNAME_RE.test(f.username);
+					const passwordInvalid = attempted && f.password.length < PASSWORD_MIN;
+					const repeatInvalid = attempted && f.password !== f.passwordRepeat;
+					return stepFrame(
+						step.id,
+						t("setup.step.access"),
+						t("setup.step.access_sub"),
+						{ required: true },
+						<Field
+							label={t("setup.username_title")}
+							required={true}
+							invalid={usernameInvalid}
+							control={
+								<Input
+									target={f}
+									prop="username"
+									required={true}
+									autocomplete="username"
+								/>
+							}
+						/>,
+						<Field
+							label={t("setup.password_title")}
+							required={true}
+							invalid={passwordInvalid}
+							control={
+								<Input
+									target={f}
+									prop="password"
+									type="password"
+									required={true}
+									autocomplete="new-password"
+								/>
+							}
+						/>,
+						<Field
+							label={t("setup.password_repeat")}
+							required={true}
+							invalid={repeatInvalid}
+							control={
+								<Input
+									target={f}
+									prop="passwordRepeat"
+									type="password"
+									required={true}
+									autocomplete="new-password"
 								/>
 							}
 						/>,
@@ -293,10 +374,12 @@ const currentIndex = () => Math.min(state.current, visibleSteps().length - 1);
 function goNext(): void {
 	const steps = visibleSteps();
 	const current = currentIndex();
-	if (!steps[current]?.valid()) {
-		// Stay on the step; its required fields are already highlighted
-		// red, and this says what is missing.
-		state.message = t("setup.step_invalid");
+	const problem = steps[current]?.problem() ?? null;
+	if (problem) {
+		// Stay on the step, highlight its failed fields red and say exactly
+		// what is missing.
+		attemptedSteps.add(steps[current].id);
+		state.message = problem;
 		return;
 	}
 	state.message = "";
@@ -349,6 +432,8 @@ async function complete(): Promise<void> {
 		role,
 		hostname: f.hostname,
 		color: f.color,
+		username: f.username,
+		password: f.password,
 		remoteUrl: f.remoteUrl,
 		remoteToken: f.remoteToken,
 		autostart: f.autostart,

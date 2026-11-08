@@ -35,6 +35,7 @@ import type {
 	SetupInfo,
 	Status,
 } from "../../../shared/contracts/wire";
+import { attemptedSteps } from "../../../shared/setup_progress";
 import log from "./log";
 import type {
 	CeraBalancer,
@@ -201,6 +202,8 @@ const encoderSetupStep: ModuleSetupStep = {
 	render(role: Status["role"], setupInfo: SetupInfo) {
 		const info = setupInfo as EncoderSetupInfo;
 		const standalone = role === "encoder";
+		// Red highlighting only after the user has tried to leave this step.
+		const attempted = attemptedSteps.has("encoder");
 		const bitratesValid =
 			setupBitrateValid(setupFields.minBitrate) &&
 			setupBitrateValid(setupFields.maxBitrate) &&
@@ -210,7 +213,7 @@ const encoderSetupStep: ModuleSetupStep = {
 				<Field
 					label={t("dev.row.pipeline")}
 					required={true}
-					invalid={!setupFields.pipeline}
+					invalid={attempted && !setupFields.pipeline}
 					control={
 						<Select target={setupFields} prop="pipeline" required={true}>
 							<Options
@@ -222,7 +225,7 @@ const encoderSetupStep: ModuleSetupStep = {
 				<Field
 					label={t("dev.field.min_bitrate")}
 					required={true}
-					invalid={!bitratesValid}
+					invalid={attempted && !bitratesValid}
 					control={
 						<Input target={setupFields} prop="minBitrate" {...setupBitrate} />
 					}
@@ -230,7 +233,7 @@ const encoderSetupStep: ModuleSetupStep = {
 				<Field
 					label={t("dev.field.max_bitrate")}
 					required={true}
-					invalid={!bitratesValid}
+					invalid={attempted && !bitratesValid}
 					control={
 						<Input target={setupFields} prop="maxBitrate" {...setupBitrate} />
 					}
@@ -238,7 +241,7 @@ const encoderSetupStep: ModuleSetupStep = {
 				<Field
 					label={t("dev.field.audio_source")}
 					required={true}
-					invalid={!setupFields.audioSource}
+					invalid={attempted && !setupFields.audioSource}
 					control={
 						<Select target={setupFields} prop="audioSource" required={true}>
 							<Options
@@ -274,7 +277,7 @@ const encoderSetupStep: ModuleSetupStep = {
 					<Field
 						label={t("dev.field.stream_host")}
 						required={true}
-						invalid={!setupFields.encoderHost}
+						invalid={attempted && !setupFields.encoderHost}
 						control={
 							<Input
 								target={setupFields}
@@ -287,7 +290,7 @@ const encoderSetupStep: ModuleSetupStep = {
 					<Field
 						label={t("dev.field.stream_srt_port")}
 						required={true}
-						invalid={!inRange(setupFields.encoderPort, 1, 65535)}
+						invalid={attempted && !inRange(setupFields.encoderPort, 1, 65535)}
 						control={
 							<Input
 								target={setupFields}
@@ -301,7 +304,7 @@ const encoderSetupStep: ModuleSetupStep = {
 				<Field
 					label={t("dev.field.srt_latency")}
 					required={true}
-					invalid={!inRange(setupFields.latency, 100, 10000)}
+					invalid={attempted && !inRange(setupFields.latency, 100, 10000)}
 					control={
 						<Input
 							target={setupFields}
