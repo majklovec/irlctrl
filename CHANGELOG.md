@@ -1,3 +1,15 @@
+# [6.0.0](https://github.com/majklovec/irlctrl/compare/v5.2.0...v6.0.0) (2026-11-08)
+
+
+### Features
+
+* **projects:** require explicit project creation ([da0e4f1](https://github.com/majklovec/irlctrl/commit/da0e4f1165204a95f2ff2be9e1bc35daada64e37))
+
+
+### BREAKING CHANGES
+
+* **projects:** users no longer receive an implicit Personal project; project-scoped requests without a project return 404.
+
 # [5.2.0](https://github.com/majklovec/irlctrl/compare/v5.1.0...v5.2.0) (2026-11-08)
 
 
