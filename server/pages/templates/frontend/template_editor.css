@@ -2,379 +2,378 @@
  * data-bind slots), the HTML textarea and the preview frame. */
 
 .tpl-layout {
-	display: grid;
-	grid-template-columns: minmax(220px, 320px) 1fr;
-	gap: 1rem;
-	align-items: start;
+    display: grid;
+    grid-template-columns: minmax(220px, 320px) 1fr;
+    gap: 1rem;
+    align-items: start;
 }
 
 @media (max-width: 1100px) {
-	.tpl-layout {
-		grid-template-columns: 1fr;
-	}
+    .tpl-layout {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* The list card stays put while the editor grows. */
 .tpl-list-card {
-	position: sticky;
-	top: 1rem;
-	max-height: calc(100vh - 6rem);
-	display: flex;
-	flex-direction: column;
-	overflow: hidden;
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 6rem);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 /* The create row (id input + button) under the list title. */
 .tpl-create {
-	display: flex;
-	gap: 0.5rem;
-	margin-bottom: 0.75rem;
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
 }
 
 .tpl-create-input {
-	flex: 1;
-	min-width: 0;
+    flex: 1;
+    min-width: 0;
 }
 
 /* The template list rows (full-width buttons). */
 .tpl-list {
-	overflow-y: auto;
-	flex: 1;
-	padding: 0.25rem;
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
+    overflow-y: auto;
+    flex: 1;
+    padding: 0.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
 .tpl-list-row {
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
-	width: 100%;
-	padding: 0.35rem 0.5rem;
-	border: 0;
-	border-radius: var(--radius, 8px);
-	background: transparent;
-	color: inherit;
-	font: inherit;
-	text-align: left;
-	cursor: pointer;
-	user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.35rem 0.5rem;
+    border: 0;
+    border-radius: var(--radius, 8px);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    user-select: none;
 }
 
 .tpl-list-row:hover {
-	background: var(--card-subtle);
+    background: var(--card-subtle);
 }
 
 .tpl-list-row.active {
-	background: color-mix(in srgb, var(--accent) 18%, transparent);
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .tpl-list-id {
-	flex: 1;
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	font-family: var(--font-mono, ui-monospace, monospace);
-	font-size: 0.9em;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.9em;
 }
 
 .tpl-list-time {
-	font-size: 0.8em;
-	white-space: nowrap;
+    font-size: 0.8em;
+    white-space: nowrap;
 }
 
 /* The editor card and its title row (id + unsaved marker). */
 .tpl-editor-title {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.5rem;
-	font-family: var(--font-mono, ui-monospace, monospace);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--font-mono, ui-monospace, monospace);
 }
 
 .tpl-dirty {
-	font-size: 0.7em;
-	font-weight: 600;
-	color: var(--warn);
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
+    font-size: 0.7em;
+    font-weight: 600;
+    color: var(--warn);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
 }
 
 /* The tab bar (Fields | HTML) above the active panel. */
 .tpl-tabbar {
-	display: flex;
-	gap: 0.25rem;
-	border-bottom: 1px solid var(--border);
-	margin-bottom: 0.75rem;
+    display: flex;
+    gap: 0.25rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0.75rem;
 }
 
 .tpl-tab {
-	appearance: none;
-	border: 0;
-	border-bottom: 2px solid transparent;
-	margin-bottom: -1px; /* sit the active underline on the bar line */
-	padding: 0.4rem 0.75rem;
-	background: transparent;
-	color: var(--muted);
-	font: inherit;
-	font-size: 0.9em;
-	font-weight: 600;
-	cursor: pointer;
+    appearance: none;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px; /* sit the active underline on the bar line */
+    padding: 0.4rem 0.75rem;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.9em;
+    font-weight: 600;
+    cursor: pointer;
 }
 
 .tpl-tab:hover {
-	color: var(--text);
+    color: var(--text);
 }
 
 .tpl-tab.active {
-	color: var(--text);
-	border-bottom-color: var(--accent);
+    color: var(--text);
+    border-bottom-color: var(--accent);
 }
 
 /* The merged Fields card (CSS variables + data bindings). */
 .tpl-fields {
-	padding: 0.75rem 1rem;
+    padding: 0.75rem 1rem;
 }
 
 .tpl-fields-section {
-	margin-bottom: 0.75rem;
+    margin-bottom: 0.75rem;
 }
 
 .tpl-fields-section:last-child {
-	margin-bottom: 0;
+    margin-bottom: 0;
 }
 
 .tpl-fields-section h3 {
-	margin: 0 0 0.5rem;
-	font-size: 0.8em;
-	font-weight: 600;
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	color: var(--muted);
+    margin: 0 0 0.5rem;
+    font-size: 0.8em;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
 }
 
 .tpl-knob {
-	display: grid;
-	grid-template-columns: minmax(120px, 180px) 1fr;
-	align-items: center;
-	gap: 0.75rem;
-	padding: 0.2rem 0;
+    display: grid;
+    grid-template-columns: minmax(120px, 180px) 1fr;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.2rem 0;
 }
 
 .tpl-knob-name {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	font-family: var(--font-mono, ui-monospace, monospace);
-	font-size: 0.85em;
-	color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.85em;
+    color: var(--muted);
 }
 
 .tpl-knob-input {
-	min-width: 0;
+    min-width: 0;
 }
 
 /* The editor body split: the tab group (Fields | HTML) | the live preview. */
 .tpl-editor-body {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 1rem;
-	align-items: start;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    align-items: start;
 }
 
 @media (max-width: 1200px) {
-	.tpl-editor-body {
-		grid-template-columns: 1fr;
-	}
+    .tpl-editor-body {
+        grid-template-columns: 1fr;
+    }
 }
 
 .tpl-tabs {
-	min-width: 0;
+    min-width: 0;
 }
 
 /* The preview column keeps the pane's width (a wider fixed frame scrolls
  * inside the pane instead of stretching the grid). */
 .tpl-preview {
-	min-width: 0;
-	overflow-x: auto;
+    min-width: 0;
+    overflow-x: auto;
 }
 
 .tpl-preview-head {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	flex-wrap: wrap;
-	gap: 0.35rem 0.75rem;
-	margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.75rem;
+    margin-bottom: 0.5rem;
 }
 
 .tpl-preview-head h3 {
-	margin: 0;
-	font-size: 0.8em;
-	font-weight: 600;
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	color: var(--muted);
+    margin: 0;
+    font-size: 0.8em;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
 }
 
 .tpl-preview-size {
-	display: flex;
-	align-items: center;
-	flex-wrap: wrap;
-	gap: 0.5rem 0.75rem;
-	font-size: 0.85em;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    font-size: 0.85em;
 }
 
 .tpl-preview-size .check {
-	font-weight: 500;
-	color: var(--muted);
+    font-weight: 500;
+    color: var(--muted);
 }
 
 .tpl-size-field {
-	display: flex;
-	align-items: center;
-	gap: 0.35rem;
-	font-weight: 500;
-	color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 500;
+    color: var(--muted);
 }
 
 .tpl-size-field input {
-	width: 4.5rem;
-	padding: 0.3rem 0.5rem;
+    width: 4.5rem;
+    padding: 0.3rem 0.5rem;
 }
 
 .tpl-code {
-	display: flex;
-	flex-direction: column;
-	min-width: 0;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
 }
 
 /* The HTML editor: a transparent textarea over a highlighted <pre> with the
  * identical box metrics, so the coloured glyphs land exactly on the editable
  * (invisible) text — the same overlay the pipeline editor uses. */
 .tpl-code-area {
-	position: relative;
-	font-family: var(--font-mono, ui-monospace, monospace);
-	font-size: 0.82em;
-	line-height: 1.5;
-	tab-size: 4;
+    position: relative;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.82em;
+    line-height: 1.5;
+    tab-size: 4;
 }
 
 /* Syntax palette: declared as tokens here (css_tokens test forbids colour
  * literals anywhere but a custom-property value). */
 .tpl-code-hl {
-	--code-bg: color-mix(in srgb, var(--card-solid) 55%, var(--base));
-	--code-tk-tag: #56d364;
-	--code-tk-attr: #79c0ff;
-	--code-tk-str: #e3b341;
-	--code-tk-cmt: #6e7681;
-	--code-tk-at: #bc8cff;
-	--code-tk-pun: #8b949e;
-	--code-tk-prop: #79c0ff;
-	--code-tk-sel: #7ee787;
-	--code-tk-val: #e3b341;
+    --code-bg: color-mix(in srgb, var(--card-solid) 55%, var(--base));
+    --code-tk-tag: #56d364;
+    --code-tk-attr: #79c0ff;
+    --code-tk-str: #e3b341;
+    --code-tk-cmt: #6e7681;
+    --code-tk-at: #bc8cff;
+    --code-tk-pun: #8b949e;
+    --code-tk-prop: #79c0ff;
+    --code-tk-sel: #7ee787;
+    --code-tk-val: #e3b341;
 }
 
 /* The highlighted underlay carries the visible surface + the code surface. */
 .tpl-code-hl {
-	position: absolute;
-	inset: 0;
-	z-index: 0;
-	margin: 0;
-	padding: 0.75rem;
-	overflow: hidden;
-	pointer-events: none;
-	border: 1px solid var(--border);
-	border-radius: var(--radius, 8px);
-	background: var(--code-bg);
-	/* Must match the textarea exactly (the UA stylesheet forces `pre` to
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    margin: 0;
+    padding: 0.75rem;
+    overflow: hidden;
+    pointer-events: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius, 8px);
+    background: var(--code-bg);
+    /* Must match the textarea exactly (the UA stylesheet forces `pre` to
 	 * `monospace`, which would drift); set it here, not just inherited. */
-	font-family: var(--font-mono, ui-monospace, monospace);
-	white-space: pre;
-	color: var(--muted);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    white-space: pre;
+    color: var(--muted);
 }
 
 /* The editable textarea defines the box (resizable); its own glyphs are
  * transparent, the caret and selection stay visible. */
 .tpl-code-area .tpl-html {
-	position: relative;
-	z-index: 1;
-	min-height: 320px;
-	max-height: calc(100vh - 14rem);
-	width: 100%;
-	resize: vertical;
-	padding: 0.75rem;
-	border: 1px solid transparent;
-	border-radius: var(--radius, 8px);
-	background: transparent;
-	color: transparent;
-	caret-color: var(--text);
-	white-space: pre;
+    position: relative;
+    z-index: 1;
+    min-height: 320px;
+    max-height: calc(100vh - 14rem);
+    width: 100%;
+    resize: vertical;
+    padding: 0.75rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius, 8px);
+    background: transparent;
+    color: transparent;
+    caret-color: var(--text);
+    white-space: pre;
 }
 
 .tpl-code-hl .tk-tag {
-	color: var(--code-tk-tag);
+    color: var(--code-tk-tag);
 }
 .tpl-code-hl .tk-attr {
-	color: var(--code-tk-attr);
+    color: var(--code-tk-attr);
 }
 .tpl-code-hl .tk-str {
-	color: var(--code-tk-str);
+    color: var(--code-tk-str);
 }
 .tpl-code-hl .tk-cmt {
-	color: var(--code-tk-cmt);
+    color: var(--code-tk-cmt);
 }
 .tpl-code-hl .tk-at {
-	color: var(--code-tk-at);
+    color: var(--code-tk-at);
 }
 .tpl-code-hl .tk-pun {
-	color: var(--code-tk-pun);
+    color: var(--code-tk-pun);
 }
 .tpl-code-hl .tk-prop {
-	color: var(--code-tk-prop);
+    color: var(--code-tk-prop);
 }
 .tpl-code-hl .tk-sel {
-	color: var(--code-tk-sel);
+    color: var(--code-tk-sel);
 }
 .tpl-code-hl .tk-val {
-	color: var(--code-tk-val);
+    color: var(--code-tk-val);
 }
 
 .tpl-doc-error {
-	margin: 0.5rem 0 0;
-	color: var(--danger);
-	font-size: 0.85em;
+    margin: 0.5rem 0 0;
+    color: var(--danger);
+    font-size: 0.85em;
 }
 
 /* The preview: a transparent frame the template fills (like the OBS
  * element's box) over a dark backdrop so edge content is visible. */
 .tpl-preview-frame {
-	width: 100%;
-	aspect-ratio: 16 / 9;
-	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	background:
-		repeating-conic-gradient(
-			var(--canvas-check) 0% 25%,
-			var(--canvas-bg) 0% 50%
-		)
-		0 0 / 24px 24px;
-	overflow: hidden;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: repeating-conic-gradient(
+            var(--canvas-check) 0% 25%,
+            var(--canvas-bg) 0% 50%
+        )
+        0 0 / 24px 24px;
+    overflow: hidden;
 }
 
 /* Author-chosen box (the OBS element's size): explicit px dimensions,
  * centered in the pane; the pane scrolls when the box is bigger. */
 .tpl-preview-frame.fixed {
-	width: auto;
-	aspect-ratio: auto;
-	margin-inline: auto;
+    width: auto;
+    aspect-ratio: auto;
+    margin-inline: auto;
 }
 
 .tpl-preview-doc {
-	display: block;
-	width: 100%;
-	height: 100%;
-	border: 0;
-	background: transparent;
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: transparent;
 }

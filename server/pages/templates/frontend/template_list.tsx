@@ -605,7 +605,7 @@ const App: m.Component = {
 		void refreshList();
 	},
 	view: () => (
-		<Page nav={<ServerNav active="templates" />} title={t("tpl.title")}>
+		<Page nav={<ServerNav active="templates" />}>
 			<div class="tpl-layout">
 				{ListPane()}
 				{EditorPane()}

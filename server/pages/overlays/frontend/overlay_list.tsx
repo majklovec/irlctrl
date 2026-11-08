@@ -7,8 +7,8 @@ import {
 	Page,
 	RowActions,
 	Table,
-	Toolbar,
 	Toast,
+	Toolbar,
 	useToast,
 } from "@ui/components/";
 import { confirmDialog } from "@ui/components/confirm";
@@ -67,9 +67,7 @@ export function listToolbar(): m.Vnode {
 				label={t("tpl.create")}
 				disabled={!state.newOverlayName.trim()}
 				title={
-					state.newOverlayName.trim()
-						? undefined
-						: t("ui.enter_name_to_create")
+					state.newOverlayName.trim() ? undefined : t("ui.enter_name_to_create")
 				}
 				onclick={() => void createOverlay()}
 			/>
