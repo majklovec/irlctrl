@@ -1,3 +1,10 @@
+# [5.1.0](https://github.com/majklovec/irlctrl/compare/v5.0.0...v5.1.0) (2026-11-08)
+
+
+### Features
+
+* **overlay:** add webrtc QR and camera selection ([b77234a](https://github.com/majklovec/irlctrl/commit/b77234a8406ed954484322f258b05f3b349fc843))
+
 # [5.0.0](https://github.com/majklovec/irlctrl/compare/v4.0.0...v5.0.0) (2026-11-08)
 
 
