@@ -1,3 +1,10 @@
+# [5.2.0](https://github.com/majklovec/irlctrl/compare/v5.1.0...v5.2.0) (2026-11-08)
+
+
+### Features
+
+* **srtla:** share send leg supervision ([b06f33c](https://github.com/majklovec/irlctrl/commit/b06f33ca89d7d2f73ab3a0385ad8ebb72ca5ce65))
+
 # [5.1.0](https://github.com/majklovec/irlctrl/compare/v5.0.0...v5.1.0) (2026-11-08)
 
 
