@@ -218,7 +218,7 @@ export interface BackendModule<TCore = unknown> {
     // --- RPC ------------------------------------------------------------------
     /** Ordered list of RPC methods this module answers (names are frozen API). */
     methods: readonly string[];
-    /** Per-method role override (e.g. a combined-only method of a module that also serves encoders). */
+    /** Per-method role override (e.g. a relay-only method of a module that also serves other roles). */
     methodRoles?: Record<string, readonly Role[]>;
     /** Events the module emits. */
     events: readonly string[];

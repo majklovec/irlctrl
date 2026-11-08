@@ -9,6 +9,7 @@ import {
 import { state } from "../client/backend/state";
 import { parseBitrates, parseEncoderConfig } from "../client/modules/encoder/params";
 import type { Params } from "../shared/params";
+import type { Status } from "../shared/contracts/wire";
 
 const OBS = "obs";
 const originalSettings = state.settings;
@@ -21,12 +22,12 @@ afterEach(() => {
     state.data = originalData;
 });
 
-function combinedDevice() {
-    const modules = defaultModules("combined");
+function relayDevice() {
+    const modules = defaultModules("relay");
     modules[OBS].enabled = true;
     state.settings = {
         ...originalSettings,
-        role: "combined",
+        role: "relay",
         language: "en",
         modules,
     };
@@ -109,7 +110,6 @@ describe("device RPC surface", () => {
                 "pipelines.repositories.update",
                 "pipelines.repositories.updateAll",
                 "encoder.status",
-                "encoder.start",
                 "encoder.stop",
                 "encoder.bitrate",
                 "ceracoder.set",
@@ -129,7 +129,7 @@ describe("device RPC surface", () => {
     });
 
     test("keeps the read-only settings envelope and token redaction", async () => {
-        combinedDevice();
+        relayDevice();
         state.settings.remoteToken = "secret";
         const response = await request("settings.get");
         expect(response).toMatchObject({
@@ -147,17 +147,16 @@ describe("device RPC surface", () => {
     });
 
     test("status composes the module fragments", async () => {
-        combinedDevice();
+        relayDevice();
         const response = await request("status");
         expect(response.ok).toBe(true);
         expect(response.result).toMatchObject({
-            role: "combined",
+            role: "relay",
             state: { autostart: false },
-            modules: { relay: { enabled: true }, encoder: { enabled: true } },
+            modules: { relay: { enabled: true }, encoder: { enabled: false } },
         });
         expect(response.result).toHaveProperty("summary");
         expect(response.result?.state).toHaveProperty("relay");
-        expect(response.result?.state).toHaveProperty("encoder");
     });
 
     test("setup.get returns encoder resources on a relay process", async () => {
@@ -173,14 +172,14 @@ describe("device RPC surface", () => {
     });
 
     test.each([
-        ["relay", "encoder.start"],
         ["relay", "pipelines.list"],
         ["relay", "ceracoder.set"],
         ["relay", "stream.start"],
+        ["relay", "encoder.stop"],
         ["encoder", "modems.enable"],
         ["encoder", "relay.start"],
         ["encoder", "reconfigure"],
-        ["encoder", "stream.stop"],
+        ["encoder", "relay.stop"],
         ["obs", "ssh.status"],
     ] as const)(
         "rejects %s before invoking %s or logging",
@@ -202,7 +201,7 @@ describe("device RPC surface", () => {
     test.each(["obs.request", "obs.requestBatch", "lowBitrateSwitcher.save"])(
         "gates %s on the OBS module before validation",
         async (method) => {
-            const modules = combinedDevice();
+            const modules = relayDevice();
             modules[OBS].enabled = false;
             const response = await request(method);
             expect(response.code).toBe(409);
@@ -212,27 +211,37 @@ describe("device RPC surface", () => {
 
     test.each([
         [
+            "relay",
             "settings.update",
             { uuid: "changed" },
             "The device uuid can't be changed",
             false,
         ],
-        ["modems.enable", {}, "index must be a non-negative integer", true],
-        ["relay.start", {}, "listenPort is required", true],
-        ["relay.options", {}, "mode or quality is required", true],
-        ["pipelines.get", {}, "id is required", false],
-        ["pipelines.create", {}, "id is required", true],
-        ["encoder.start", {}, "host is required", true],
-        ["encoder.bitrate", {}, "maxBitrate or minBitrate is required", true],
-        ["stream.start", {}, "remoteHost is required", true],
-        ["autostart.set", {}, "enabled must be a boolean", true],
-        ["modules.enable", {}, "id is required", true],
-        ["obs.request", {}, "requestType is required", false],
-        ["obs.requestBatch", {}, "requests must be a non-empty array", false],
-    ] satisfies [string, Params, string, boolean][])(
+        ["relay", "modems.enable", {}, "index must be a non-negative integer", true],
+        ["relay", "relay.start", {}, "listenPort is required", true],
+        ["relay", "relay.options", {}, "mode or quality is required", true],
+        ["encoder", "pipelines.get", {}, "id is required", false],
+        ["encoder", "pipelines.create", {}, "id is required", true],
+        ["encoder", "encoder.bitrate", {}, "maxBitrate or minBitrate is required", true],
+        ["encoder", "stream.start", {}, "pipeline is required", true],
+        ["relay", "autostart.set", {}, "enabled must be a boolean", true],
+        ["relay", "modules.enable", {}, "id is required", true],
+        ["relay", "obs.request", {}, "requestType is required", false],
+        ["relay", "obs.requestBatch", {}, "requests must be a non-empty array", false],
+    ] satisfies [Status["role"], string, Params, string, boolean][])(
         "validates %s in the owning module and keeps the logged flag",
-        async (method, params, error, logged) => {
-            combinedDevice();
+        async (role, method, params, error, logged) => {
+            if (role === "relay") relayDevice();
+            else {
+                const modules = defaultModules("encoder");
+                modules[OBS].enabled = true;
+                state.settings = {
+                    ...originalSettings,
+                    role: "encoder",
+                    language: "en",
+                    modules,
+                };
+            }
             // Always differ from the supplied update, regardless of local config.
             state.settings.uuid = "original";
             const log = silenceLog();
@@ -250,7 +259,7 @@ describe("device RPC surface", () => {
     );
 
     test("routes a module method to its owner's dispatch with the raw params", async () => {
-        combinedDevice();
+        relayDevice();
         const log = silenceLog();
         const srtla = moduleById("relay");
         if (!srtla) throw new Error("srtla module missing");
@@ -273,7 +282,7 @@ describe("device RPC surface", () => {
     });
 
     test("unknown methods and unknown module ids are rejected", async () => {
-        combinedDevice();
+        relayDevice();
         expect((await request("nope.method")).code).toBe(404);
         const response = await request("modules.enable", { id: "nope" });
         expect(response).toMatchObject({
@@ -285,7 +294,7 @@ describe("device RPC surface", () => {
 
 describe("encoder parameter parsing", () => {
     test("validates bitrates in start order versus live-update order", () => {
-        combinedDevice();
+        relayDevice();
         const params = { minBitrate: "bad-min", maxBitrate: "bad-max" };
         expect(() => parseBitrates(params)).toThrow(
             "maxBitrate must be an integer",
@@ -299,7 +308,7 @@ describe("encoder parameter parsing", () => {
     });
 
     test("uses the saved encoder config as the defaults", () => {
-        combinedDevice();
+        relayDevice();
         const config = {
             pipeline: "saved",
             host: "old-host",

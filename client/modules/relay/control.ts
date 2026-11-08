@@ -74,53 +74,6 @@ function trimStats(raw: unknown): SrtlaStats | null {
 }
 
 // ----------------------------------------------------------------------
-// Binary capabilities (the BELABOX C srtla_send has no control socket)
-// ----------------------------------------------------------------------
-const helpCache = new Map<string, Promise<string>>();
-
-function helpText(bin: string): Promise<string> {
-    let p = helpCache.get(bin);
-    if (!p) {
-        p = (async () => {
-            try {
-                const proc = Bun.spawn([bin, "--help"], {
-                    stdout: "pipe",
-                    stderr: "pipe",
-                    stdin: "ignore",
-                });
-                const [out, err] = await Promise.all([
-                    new Response(proc.stdout).text(),
-                    new Response(proc.stderr).text(),
-                ]);
-                await proc.exited;
-                return out + err;
-            } catch {
-                return "";
-            }
-        })();
-        helpCache.set(bin, p);
-    }
-    return p;
-}
-
-export interface RelayCapabilities {
-    controlSocket: boolean;
-    mode: boolean;
-    quality: boolean;
-}
-
-export async function relayCapabilities(
-    bin: string,
-): Promise<RelayCapabilities> {
-    const help = await helpText(bin);
-    return {
-        controlSocket: help.includes("--control-socket"),
-        mode: help.includes("--mode"),
-        quality: help.includes("--no-quality"),
-    };
-}
-
-// ----------------------------------------------------------------------
 // Connection
 // ----------------------------------------------------------------------
 type StatsListener = (ev: SrtlaStatsEvent) => void;

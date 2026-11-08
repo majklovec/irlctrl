@@ -14,7 +14,7 @@ describe("OBS module role and settings", () => {
         expect(obsModule.roles).toBeUndefined();
         expect(obsModule.enabledByDefaultRoles).toEqual(["obs"]);
         expect(defaultModules("obs")[OBS].enabled).toBe(true);
-        for (const role of ["relay", "encoder", "combined"])
+        for (const role of ["relay", "encoder"])
             expect(defaultModules(role)[OBS].enabled).toBe(false);
     });
 

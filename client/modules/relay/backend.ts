@@ -8,7 +8,7 @@
  */
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { argEnv, argv, enumArgEnv } from "../../../shared/args";
+import { argEnv, argv, enumArgEnv, intArgEnv } from "../../../shared/args";
 import type {
     BackendModule,
     Emit,
@@ -25,6 +25,12 @@ import {
     requirePort,
     requireString,
 } from "../../../shared/params";
+import {
+    srtlaRecArgs,
+    srtlaSendCapabilities,
+    srtlaSendFlags,
+    waitForUdpPort,
+} from "../../../shared/srtla";
 import { errorMessage } from "../../../shared/util";
 import type { ModuleCore } from "../../backend/module_core";
 import * as control from "./control";
@@ -78,6 +84,22 @@ const SRTLA_SOCKET = argEnv(
     "--srtla-socket",
     "SRTLA_CONTROL_SOCKET",
     join(tmpdir(), "srtla_send.sock"),
+);
+/** UDP port the inbound `srtla_rec` binds (the encoder → relay SRTLA hop). */
+const SRTLA_LISTEN_PORT = intArgEnv(
+    "--srtla-listen-port",
+    "SRTLA_LISTEN_PORT",
+    6000,
+    1,
+    65535,
+);
+/** Loopback SRT port between `srtla_rec` and `srtla_send` — never exposed. */
+const SRT_INTERNAL_PORT = intArgEnv(
+    "--srt-internal-port",
+    "SRT_INTERNAL_PORT",
+    5000,
+    1,
+    65535,
 );
 
 /** Core bag, bound at discovery and re-filled at start (a module never imports the core). */
@@ -194,6 +216,10 @@ let sup: InstanceType<ModuleCore["Supervisor"]> | undefined;
 const supervisor = () =>
     (sup ??= new core.Supervisor("SRTLA", RESTART_DELAY_MS, onRelayExit));
 
+let recSup: InstanceType<ModuleCore["Supervisor"]> | undefined;
+const recSupervisor = () =>
+    (recSup ??= new core.Supervisor("SRTLA_REC", RESTART_DELAY_MS, onRecExit));
+
 /** The running (or last) srtla_send: pid, target, counters. */
 let live: SrtlaState = { running: false };
 let dryRunActive = false; // --dry-run has no process to track
@@ -263,31 +289,51 @@ async function reloadRelay(): Promise<void> {
     await startRelay(listenPort, remoteHost, remotePort);
 }
 
+/**
+ * Start the SRTLA→SRTLA bridge: `srtla_rec` on the SRTLA UDP port
+ * (SRTLA_LISTEN_PORT env by default; `listenPort` overrides it — the encoder
+ * passes the port it sends to, which is this same port) + `srtla_send` on the
+ * loopback SRT port.
+ */
 async function startRelay(
     listenPort: string,
     remoteHost: string,
     remotePort: string,
 ): Promise<SrtlaState> {
+    const srtlaPort = Number(listenPort) || SRTLA_LISTEN_PORT;
+    const sendPort = String(SRT_INTERNAL_PORT);
     const bin = process.env.SRTLA_SEND_BIN ?? "srtla_send";
+    const recBin = "srtla_rec";
     // Only pass flags this srtla_send build understands (the BELABOX C version has none of them).
-    // Probed before the running check so check → spawn stays free of awaits.
-    const caps = core.config.DRY_RUN
-        ? null
-        : await control.relayCapabilities(bin);
-    if (isRunning()) throw new Error("srtla_send is already running");
+    const caps = core.config.DRY_RUN ? null : await srtlaSendCapabilities(bin);
+    if (isRunning() && target())
+        throw new Error("srtla_send is already running");
 
     // Save the requested receiver before spawning so failed starts still
     // leave the UI with a complete target to restore.
-    await save({ listenPort, remoteHost, remotePort });
+    await save({ listenPort: String(srtlaPort), remoteHost, remotePort });
     await ensureUplinksFile();
     const uplinks = uplinksFile();
+    const recArgs = srtlaRecArgs(srtlaPort, "127.0.0.1", SRT_INTERNAL_PORT);
+    console.log(`Starting ${recBin} ${recArgs.join(" ")}`);
     console.log(
-        `Starting ${bin} listen: ${listenPort} target: ${remoteHost}:${remotePort} ${uplinks}`,
+        `Starting ${bin} ${[
+            ...srtlaSendFlags(
+                caps ?? { controlSocket: true, mode: true, quality: true },
+                options() ?? {},
+                SRTLA_SOCKET,
+            ),
+            sendPort,
+            remoteHost,
+            remotePort,
+            uplinks,
+        ].join(" ")}`,
     );
 
     const started = (pid?: number): SrtlaState => ({
         running: true,
-        listenPort,
+        listenPort: String(srtlaPort),
+        sendPort,
         remoteHost,
         remotePort,
         startedAt: Date.now(),
@@ -296,23 +342,32 @@ async function startRelay(
             : { pid, reloadCount: live.reloadCount ?? 0 }),
     });
     if (caps) {
-        // The starter runs again on supervisor restarts, so the record follows every spawn.
+        // srtla_send first, then srtla_rec once its loopback SRT listener is up.
         await supervisor().start(() => {
-            const opts = options() ?? {};
+            const flags = srtlaSendFlags(caps, options() ?? {}, SRTLA_SOCKET);
             const withControl = !!SRTLA_SOCKET && caps.controlSocket;
-            const flags: string[] = [];
-            if (withControl) flags.push("--control-socket", SRTLA_SOCKET);
-            if (caps.mode && opts.mode) flags.push("--mode", opts.mode);
-            if (caps.quality && opts.quality === false)
-                flags.push("--no-quality");
             control.prepareSrtlaControl(SRTLA_SOCKET, withControl);
             const proc = Bun.spawn(
-                [bin, ...flags, listenPort, remoteHost, remotePort, uplinks],
+                [bin, ...flags, sendPort, remoteHost, remotePort, uplinks],
                 { stdout: "inherit", stderr: "inherit", stdin: "inherit" },
             );
             if (withControl) control.startSrtlaControl(SRTLA_SOCKET);
             live = started(proc.pid);
             return proc;
+        });
+        // The starter re-runs on supervisor restarts, so the readiness gate
+        // (loopback SRT listener) is applied on every (re)spawn.
+        await recSupervisor().start(async () => {
+            const open = await waitForUdpPort(SRT_INTERNAL_PORT, 5_000);
+            if (!open)
+                console.warn(
+                    `srtla_rec: loopback SRT port ${SRT_INTERNAL_PORT} did not open in 5s — starting anyway`,
+                );
+            return Bun.spawn([recBin, ...recArgs], {
+                stdout: "inherit",
+                stderr: "inherit",
+                stdin: "inherit",
+            });
         });
     } else {
         dryRunActive = true;
@@ -326,7 +381,7 @@ async function startRelay(
 function onRelayExit(code: number | null): void {
     console.log(`srtla_send exited with code ${code}`);
     control.stopSrtlaControl();
-    live = { running: false, reloadCount: live.reloadCount };
+    live = { ...live, running: false, pid: undefined };
     core.notifyStateChange();
     if (!supervisor().wanted) return;
     core.logEvent(
@@ -337,12 +392,26 @@ function onRelayExit(code: number | null): void {
     supervisor().scheduleRestart();
 }
 
+/** srtla_rec died on its own: keep retrying like belaUI does. */
+function onRecExit(code: number | null): void {
+    console.log(`srtla_rec exited with code ${code}`);
+    if (!recSupervisor().wanted) return;
+    core.logEvent(
+        "warn",
+        "SRTLA_REC",
+        t("log.srtla_exited", { code, delay: RESTART_DELAY_MS / 1000 }),
+    );
+    recSupervisor().scheduleRestart();
+}
+
 async function stopRelay(): Promise<void> {
-    if (!sup && !dryRunActive) return; // never started in this process — nothing to stop
+    if (!sup && !recSup && !dryRunActive)
+        return; // never started in this process — nothing to stop
+    await recSup?.stop();
     await sup?.stop();
     control.stopSrtlaControl();
     dryRunActive = false;
-    live = { ...live, running: false };
+    live = { ...live, running: false, pid: undefined };
     core.notifyStateChange();
 }
 
@@ -432,7 +501,7 @@ const registration: BackendModule<ModuleCore> = {
             setupSelectable: true,
         },
     ],
-    roles: ["relay", "combined"],
+    roles: ["relay"],
     methods: [
         "interfaces.list",
         "reconfigure",
@@ -511,9 +580,8 @@ const registration: BackendModule<ModuleCore> = {
         await stopInterfaceMonitor();
         await stopRelay();
     },
-    /** Relay autostart: bring srtla_send back with the saved target (combined devices resume via the encoder module). */
+    /** Relay autostart: bring the bridge back with the saved target. */
     async resume() {
-        if (core.role() !== "relay") return false;
         const last = target();
         if (!last) return false;
         if (!isRunning())
@@ -624,7 +692,7 @@ const registration: BackendModule<ModuleCore> = {
             summary: { relay: relayStatus() },
         };
     },
-    /** Setup wizard (relay / combined): the receiver target and scheduler options. */
+    /** Setup wizard (relay): the receiver target and scheduler options. */
     async setup(p) {
         const listenPort = requirePort(p, "listenPort");
         const remoteHost = requireHost(p, "srtlaRemoteHost");

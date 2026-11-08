@@ -7,7 +7,6 @@
     "dev.control_unavailable_title": "No control websocket connected",
     "dev.field.remote_host": "SRTLA Remote host",
     "dev.field.remote_port": "SRTLA Remote port",
-    "dev.field.srt_listen_port": "SRT Listen port",
     "dev.group.connection": "Connection",
     "dev.iface_modem": "modem #{{index}}",
     "dev.imei": "IMEI",
@@ -76,5 +75,6 @@
     "mlog.done.reconfigured": "Reconfigured",
     "act.relay.reconfigure": "Reconfigure modems",
     "role.relay": "relay",
-    "setup.role.relay_tag": "Receives streams and forwards them with SRTLA"
+    "setup.role.relay_tag": "Receives streams and forwards them with SRTLA",
+    "dev.field.srtla_listen_port": "SRTLA Listen port"
 }

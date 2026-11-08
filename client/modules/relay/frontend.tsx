@@ -46,15 +46,6 @@ import type {
 	SrtlaStatsEvent,
 } from "./types";
 
-type EncoderStart = (
-	host: DeviceCard,
-	target: { remoteHost: string; remotePort: string },
-) => void;
-type EncoderStreamButtons = (
-	host: DeviceCard,
-	stopMethod: string,
-) => m.Children;
-
 /** The role pictogram (the summary column header and the role tag share it). */
 const relayIcon = () => (
 	<OutlineIcon class="role-icon role-icon-relay">
@@ -64,25 +55,6 @@ const relayIcon = () => (
 		<path d="M5.6 2.6a9 9 0 0 0 0 12.8M18.4 2.6a9 9 0 0 1 0 12.8" />
 	</OutlineIcon>
 );
-
-function startCombinedStream(host: DeviceCard): void {
-	const start = host.getCapability<EncoderStart>("encoder.start");
-	if (!start)
-		throw new Error("Encoder module did not provide its start capability");
-	start(host, relayState(host).fields);
-}
-
-function combinedStreamButtons(
-	host: DeviceCard,
-	stopMethod: string,
-): m.Children {
-	const render = host.getCapability<EncoderStreamButtons>(
-		"encoder.streamButtons",
-	);
-	if (!render)
-		throw new Error("Encoder module did not provide its stream controls");
-	return render(host, stopMethod);
-}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null;
@@ -116,7 +88,7 @@ const statsFrame = (host: DeviceCard) => {
 const setupFields = {
 	listenPort: "6000",
 	srtlaRemoteHost: "",
-	srtlaRemotePort: "5000",
+	srtlaRemotePort: "6000",
 	srtlaMode: "enhanced",
 	srtlaQuality: true,
 };
@@ -152,14 +124,8 @@ function prefillString(current: string, value: unknown, field: string): string {
 function syncRelayForm(host: DeviceCard, status: RelayStatus): void {
 	status.state.relay ??= { running: false };
 	const { fields } = relayState(host);
-	const combined = status.role === "combined";
 	for (const key of ["listenPort", "remoteHost", "remotePort"] as const)
-		fields[key] = prefillString(
-			fields[key],
-			status.state.relay[key] ??
-				(combined ? status.state.relayTarget?.[key] : undefined),
-			key,
-		);
+		fields[key] = prefillString(fields[key], status.state.relay[key], key);
 }
 
 const relayDashboardWidgets: DeviceDashboardWidget[] = [
@@ -177,23 +143,13 @@ const relayDashboardWidgets: DeviceDashboardWidget[] = [
 			/>
 		),
 	},
-	{
-		type: "combined",
-		available: (device) =>
-			device.role === "combined" || device.role === undefined,
-		defaultSize: { w: 6, h: 10 },
-		minSize: { w: 4, h: 8 },
-		body: ({ card: host, status }) =>
-			status ? srtlaComposite(host, status as RelayStatus) : null,
-	},
 ];
 
 const relaySummaryColumns = [
 	{
 		id: "stream",
 		order: 0,
-		available: (device: DeviceSummary) =>
-			device.role !== "encoder" && device.role !== "combined",
+		available: (device: DeviceSummary) => device.role === "relay",
 		header: () => t("mgmt.th.stream"),
 		cell: (device: DeviceSummary) => {
 			if (!device.online) return "—";
@@ -220,7 +176,7 @@ const relaySummaryColumns = [
 	{
 		id: "relay",
 		order: 40,
-		available: (device: DeviceSummary) => device.role !== "encoder",
+		available: (device: DeviceSummary) => device.role === "relay",
 		header: () => [relayIcon(), ` ${t("setup.step.relay")}`],
 		cell: (device: DeviceSummary) => {
 			const { relay } = device as RelayDeviceSummary;
@@ -293,7 +249,6 @@ export function relayCardBody(host: DeviceCard, status: RelayStatus): m.Vnode {
 	const { fields } = relayState(host);
 	const { busy } = host;
 	const s = status.state.relay;
-	const combined = status.role === "combined";
 	return (
 		<Card title={t("dev.card.relay")} class="mod-relay">
 			<DefinitionList
@@ -326,28 +281,20 @@ export function relayCardBody(host: DeviceCard, status: RelayStatus): m.Vnode {
 					[t("dev.control"), s.running ? controlBadge(status) : null],
 				]}
 			/>
-			<Form
-				onSubmit={
-					combined ? () => startCombinedStream(host) : () => srtlaStart(host)
-				}
-			>
+			<Form onSubmit={() => srtlaStart(host)}>
 				<FieldGroup legend={t("dev.group.connection")}>
-					{!combined && (
-						<>
-							<Field
-								label={t("dev.field.srt_listen_port")}
-								control={
-									<Input
-										target={fields}
-										prop="listenPort"
-										placeholder="6000"
-										required={true}
-									/>
-								}
+					<Field
+						label={t("dev.field.srtla_listen_port")}
+						control={
+							<Input
+								target={fields}
+								prop="listenPort"
+								placeholder="6000"
+								required={true}
 							/>
-							<span> ⇨ </span>
-						</>
-					)}
+						}
+					/>
+					<span> ⇨ </span>
 					<Field
 						label={t("dev.field.remote_host")}
 						control={
@@ -365,7 +312,7 @@ export function relayCardBody(host: DeviceCard, status: RelayStatus): m.Vnode {
 							<Input
 								target={fields}
 								prop="remotePort"
-								placeholder="5000"
+								placeholder="6000"
 								required={true}
 							/>
 						}
@@ -417,28 +364,24 @@ export function relayCardBody(host: DeviceCard, status: RelayStatus): m.Vnode {
 					/>
 				</FieldGroup>
 				<Break />
-				{combined ? (
-					combinedStreamButtons(host, "stream.stop")
-				) : (
-					<Actions>
-						<Button
-							label={t("ui.start")}
-							type="submit"
-							disabled={s.running || host.pending("srtla-start")}
-						/>
-						<Button
-							label={t("ui.stop")}
-							class="danger"
-							disabled={!s.running || host.pending("srtla-stop")}
-							onclick={() => host.press("srtla-stop", "relay.stop")}
-						/>
-						<Button
-							label={t("ui.reload")}
-							disabled={!s.running || host.pending("srtla-reload")}
-							onclick={() => host.press("srtla-reload", "relay.reload")}
-						/>
-					</Actions>
-				)}
+				<Actions>
+					<Button
+						label={t("ui.start")}
+						type="submit"
+						disabled={s.running || host.pending("srtla-start")}
+					/>
+					<Button
+						label={t("ui.stop")}
+						class="danger"
+						disabled={!s.running || host.pending("srtla-stop")}
+						onclick={() => host.press("srtla-stop", "relay.stop")}
+					/>
+					<Button
+						label={t("ui.reload")}
+						disabled={!s.running || host.pending("srtla-reload")}
+						onclick={() => host.press("srtla-reload", "relay.reload")}
+					/>
+				</Actions>
 			</Form>
 		</Card>
 	);
@@ -763,7 +706,7 @@ const relayModule: FrontendModule = {
 	roleIcons: { relay: relayIcon },
 	order: 20,
 	log,
-	available: (status) => status.role === "relay" || status.role === "combined",
+	available: (status) => status.role === "relay",
 	dashboardWidgets: relayDashboardWidgets,
 	deviceSummaryColumns: relaySummaryColumns,
 	setupSteps: [
@@ -771,7 +714,7 @@ const relayModule: FrontendModule = {
 			id: "relay",
 			title: "setup.step.relay",
 			subtitle: "setup.step.relay_sub",
-			roles: ["relay", "combined"],
+			roles: ["relay"],
 			isValid() {
 				const { listenPort, srtlaRemoteHost, srtlaRemotePort } = setupFields;
 				return (
@@ -784,7 +727,7 @@ const relayModule: FrontendModule = {
 				return (
 					<>
 						<Field
-							label={t("dev.field.srt_listen_port")}
+							label={t("dev.field.srtla_listen_port")}
 							required={true}
 							invalid={
 								attemptedSteps.has("relay") &&

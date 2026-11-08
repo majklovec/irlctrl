@@ -1,3 +1,16 @@
+# [Unreleased]
+
+### Removed
+
+- `combined` role. Its behavior is now the default for `encoder`.
+  Migration: replace `combined` with `encoder` and point its destination
+  at the relay (default: `<relay>:6000`) or directly at the final destination.
+
+### Changed
+
+- Encoder → relay transport is now SRTLA (UDP 6000 default).
+- Relay input is now SRTLA; relay is a full SRTLA→SRTLA bridge.
+
 # [4.0.0](https://github.com/majklovec/irlctrl/compare/v3.5.1...v4.0.0) (2026-11-08)
 
 

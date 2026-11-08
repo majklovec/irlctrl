@@ -8,9 +8,9 @@
  */
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import type { ModuleCore } from "../../backend/module_core";
-import { t } from "../../../shared/i18n";
 import type { BackendModule } from "../../../shared/contracts/backend_module";
+import { t } from "../../../shared/i18n";
+import type { ModuleCore } from "../../backend/module_core";
 import log from "./log";
 import type { SshHostStatus, SshModuleConfig, SshPasswordReset } from "./types";
 
@@ -235,7 +235,7 @@ const registration: BackendModule<ModuleCore> = {
     id: "ssh",
     title: "SSH",
     // Every box but an obs-only one has an sshd to manage.
-    roles: ["relay", "encoder", "combined"],
+    roles: ["relay", "encoder"],
     // No secret fields — the generated password is intentionally visible in
     // the status so the operator can always read it from the UI.
     methods: [

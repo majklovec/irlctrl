@@ -88,7 +88,6 @@
     "setup.step.encoder_sub": "Pipeline, rychlost přenosu a zvukové zpoždění.",
     "ui.optional": "Volitelné",
     "ui.remove": "Odebrat",
-    "wtype.combined": "Enkodér + relay",
     "act.encoder.stop": "Zastavit enkodér",
     "act.encoder.bitrate_low": "Bitrate 1,5 Mb/s",
     "act.encoder.bitrate_high": "Bitrate 6 Mb/s",

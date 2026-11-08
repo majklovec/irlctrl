@@ -88,7 +88,6 @@
     "setup.step.encoder_sub": "Pipeline, bitrate e ritardo audio.",
     "ui.optional": "Opzionale",
     "ui.remove": "Rimuovi",
-    "wtype.combined": "Encoder + relay",
     "act.encoder.stop": "Ferma encoder",
     "act.encoder.bitrate_low": "Bitrate 1,5 Mbps",
     "act.encoder.bitrate_high": "Bitrate 6 Mbps",

@@ -1,9 +1,9 @@
 /*
- * Encoder module: belacoder / ceracoder management for encoder and combined
- * devices — the encoder process (./encoder), pipeline and audio-source
- * discovery (./sources), pipeline files and GitHub pipeline repositories
- * (./pipelines, ./pipeline-repos), and combined streaming: srtla_send (the
- * srtla module, through the `stream.relay` capability) fed by the encoder.
+ * Encoder module: belacoder / ceracoder management — the encoder process
+ * (./encoder), pipeline and audio-source discovery (./sources), pipeline files
+ * and GitHub pipeline repositories (./pipelines, ./pipeline-repos), and SRTLA
+ * streaming: a local srtla_send fed by the encoder, sending the SRTLA stream
+ * to the relay (or a direct destination).
  *
  * Persisted sections: `encoder` (last used config), `ceracoder`,
  * `pipelineRepositories`. Live process state is module-local.
@@ -18,14 +18,14 @@ import {
     ApiError,
     optionalInt,
     requireHost,
-    requirePort,
     requireString,
 } from "../../../shared/params";
+import { argEnv, intArgEnv } from "../../../shared/args";
 import { errorMessage } from "../../../shared/util";
 import type { Role } from "../../../shared/validate";
 import { PIPELINES_DIR } from "./config";
 import { bindCore, core, data } from "./core";
-import { ceracoder, ceracoderConfig, encoder, stopEncoder } from "./encoder";
+import { ceracoder, ceracoderConfig, encoder } from "./encoder";
 import log from "./log";
 import { parseBitrates, parseEncoderConfig } from "./params";
 import {
@@ -40,10 +40,19 @@ import {
     updatePipelineFile,
 } from "./pipelines";
 import { listAudioSources, listPipelines } from "./sources";
-import type { EncoderConfig, RelayCapability, SrtlaTarget } from "./types";
-
-const srtla = (): RelayCapability =>
-    core.requireCapability<RelayCapability>("stream.relay");
+import type {
+    EncoderConfig,
+    SrtlaState,
+    SrtlaTarget,
+} from "./types";
+import {
+    defaultSourceIp,
+    srtlaSendCapabilities,
+    srtlaSendFlags,
+    writeUplinksFile,
+} from "../../../shared/srtla";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 /** Map a start failure to a status code: conflicts 409, bad pipeline / audio 400, else 500. */
 async function startChecked<T>(start: () => Promise<T>): Promise<T> {
@@ -58,48 +67,160 @@ async function startChecked<T>(start: () => Promise<T>): Promise<T> {
     }
 }
 
+/**
+ * SRTLA destination for the encoder's outbound leg. The request's `remoteHost`
+ * / `remotePort` win (so the UI can aim at a final destination directly);
+ * otherwise the `ENCODER_DESTINATION_HOST` / `ENCODER_DESTINATION_PORT` env vars
+ * apply, defaulting to the relay on UDP 6000.
+ */
+function encoderDestination(p: Params): {
+    remoteHost: string;
+    remotePort: string;
+} {
+    const hostParam =
+        typeof p.remoteHost === "string" ? p.remoteHost.trim() : "";
+    const host =
+        hostParam ||
+        argEnv("--encoder-destination-host", "ENCODER_DESTINATION_HOST", "relay");
+    const remotePort = String(
+        optionalInt(
+            p,
+            "remotePort",
+            intArgEnv(
+                "--encoder-destination-port",
+                "ENCODER_DESTINATION_PORT",
+                6000,
+                1,
+                65535,
+            ),
+            1,
+            65535,
+        ),
+    );
+    requireHost({ remoteHost: host }, "remoteHost"); // validate host shape
+    return { remoteHost: host, remotePort };
+}
+
 // ----------------------------------------------------------------------
-// Combined streaming: srtla_send + the encoder pointed at it
+// SRTLA streaming: the local srtla_send + the encoder pointed at it
 // ----------------------------------------------------------------------
 
+const SRTLA_RESTART_DELAY_MS = 2_000;
+const srtlaSendBin = () => process.env.SRTLA_SEND_BIN ?? "srtla_send";
+const uplinksPath = () => join(tmpdir(), "irlctrl_encoder_uplinks.txt");
+
+let srtlaSup: InstanceType<ModuleCore["Supervisor"]> | undefined;
+const srtlaSupervisor = () =>
+    (srtlaSup ??= new core.Supervisor("SRTLA_SEND", SRTLA_RESTART_DELAY_MS, onSrtlaExit));
+
+/** The running (or last) srtla_send: target, pid, startedAt. */
+let srtlaLive: SrtlaState = { running: false };
+
+const srtlaRunning = (): boolean =>
+    core.config.DRY_RUN ? srtlaLive.running : srtlaSupervisor().running;
+
+function srtlaState(): SrtlaState {
+    return srtlaRunning() ? srtlaLive : { ...srtlaLive, running: false, pid: undefined };
+}
+
+/** srtla_send died on its own: keep retrying like the relay does. */
+function onSrtlaExit(code: number | null): void {
+    console.log(`srtla_send exited with code ${code}`);
+    if (!srtlaSupervisor().wanted) return;
+    core.logEvent(
+        "warn",
+        "SRTLA_SEND",
+        `srtla_send exited (code ${code}); restarting in ${SRTLA_RESTART_DELAY_MS / 1000}s`,
+    );
+    srtlaSupervisor().scheduleRestart();
+}
+
+async function startSrtlaSend(target: SrtlaTarget): Promise<void> {
+    const bin = srtlaSendBin();
+    if (srtlaRunning()) {
+        const s = srtlaLive;
+        if (
+            s.listenPort === target.listenPort &&
+            s.remoteHost === target.remoteHost &&
+            s.remotePort === target.remotePort
+        )
+            return; // already aimed at the same target
+        await stopSrtlaSend();
+    }
+
+    const uplinks = uplinksPath();
+    if (core.config.DRY_RUN) {
+        console.log(
+            `[DRY-RUN] Would start ${bin} ${target.listenPort} ${target.remoteHost} ${target.remotePort} ${uplinks}`,
+        );
+        srtlaLive = { running: true, ...target, startedAt: Date.now() };
+        return;
+    }
+    // No control socket on the encoder leg; only the flags this build knows.
+    const flags = srtlaSendFlags(await srtlaSendCapabilities(bin), {});
+    await writeUplinksFile(uplinks, defaultSourceIp());
+    const args = [
+        ...flags,
+        target.listenPort,
+        target.remoteHost,
+        target.remotePort,
+        uplinks,
+    ];
+    console.log(`Starting ${bin} ${args.join(" ")}`);
+    await srtlaSupervisor().start(() =>
+        Bun.spawn([bin, ...args], {
+            stdout: "inherit",
+            stderr: "inherit",
+            stdin: "inherit",
+        }),
+    );
+    srtlaLive = {
+        running: true,
+        ...target,
+        pid: srtlaSupervisor().pid,
+        startedAt: Date.now(),
+    };
+}
+
+async function stopSrtlaSend(): Promise<void> {
+    if (!srtlaSup && !srtlaLive.running) return; // never started — nothing to stop
+    await srtlaSup?.stop();
+    srtlaLive = { ...srtlaLive, running: false, pid: undefined };
+}
+
 /** Bring up srtla_send (reusing it if already aimed at the same target), then the encoder into it. */
-async function startCombined(
+async function startStream(
     target: SrtlaTarget,
     cfg: EncoderConfig,
 ): Promise<void> {
     if (encoder().status().running) throw new Error("already streaming");
     // Keep the requested config even when validation fails, so the UI can restore it.
     data().encoder = cfg;
+    data().streamTarget = target;
     await core.saveState();
     await encoder().validate(cfg); // fail before touching srtla_send
 
-    const { listenPort, remoteHost, remotePort } = target;
-    const s = srtla().relayStatus();
-    if (
-        s.running &&
-        (s.listenPort !== listenPort ||
-            s.remoteHost !== remoteHost ||
-            s.remotePort !== remotePort)
-    )
-        await srtla().stopRelay();
-    if (!srtla().relayStatus().running)
-        await srtla().startRelay(listenPort, remoteHost, remotePort);
-
+    const { listenPort } = target;
+    try {
+        await startSrtlaSend(target);
+    } catch (e: unknown) {
+        throw new ApiError(errorMessage(e), 409);
+    }
     try {
         await encoder().start({ ...cfg, host: "127.0.0.1", port: listenPort });
     } catch (e: unknown) {
-        await srtla().stopRelay();
+        await stopSrtlaSend();
         throw e;
     }
 }
 
-async function stopCombined(): Promise<void> {
+async function stopStream(): Promise<void> {
     await encoder().stop();
-    await srtla().stopRelay();
+    await stopSrtlaSend();
 }
 
 const streamView = () => ({
-    srtla: srtla().relayStatus(),
+    srtla: srtlaState(),
     encoder: encoder().status(),
 });
 
@@ -229,15 +350,6 @@ async function dispatch(method: string, p: Params): Promise<unknown> {
     switch (method) {
         case "encoder.status":
             return { encoder: encoder().status() };
-        case "encoder.start": {
-            core.cancelAutostart();
-            const cfg = parseEncoderConfig(
-                p,
-                requireHost(p, "host"),
-                requirePort(p, "port"),
-            );
-            return { encoder: await startChecked(() => encoder().start(cfg)) };
-        }
         case "encoder.stop":
             core.cancelAutostart();
             await encoder().stop();
@@ -262,26 +374,25 @@ async function dispatch(method: string, p: Params): Promise<unknown> {
         }
         case "stream.start": {
             core.cancelAutostart();
-            const remoteHost = requireHost(p, "remoteHost");
-            const remotePort = requirePort(p, "remotePort");
+            const { remoteHost, remotePort } = encoderDestination(p);
             const listenPort = String(
                 optionalInt(
                     p,
                     "listenPort",
-                    Number(srtla().target()?.listenPort ?? 9000),
+                    Number(data().streamTarget?.listenPort ?? 9000),
                     1,
                     65535,
                 ),
             );
             const cfg = parseEncoderConfig(p, "127.0.0.1", listenPort);
             await startChecked(() =>
-                startCombined({ listenPort, remoteHost, remotePort }, cfg),
+                startStream({ listenPort, remoteHost, remotePort }, cfg),
             );
             return streamView();
         }
         case "stream.stop":
             core.cancelAutostart();
-            await stopCombined();
+            await stopStream();
             return streamView();
         default:
             return pipelineMethod(method, p);
@@ -306,12 +417,9 @@ const encoderModule: BackendModule<ModuleCore> = {
         },
     ],
     secretFields: [],
-    roles: ["encoder", "combined"],
-    methodRoles: { "stream.start": ["combined"], "stream.stop": ["combined"] },
-    dependencies: ["relay"],
+    roles: ["encoder"],
     methods: [
         "encoder.status",
-        "encoder.start",
         "encoder.stop",
         "encoder.bitrate",
         "ceracoder.set",
@@ -333,20 +441,17 @@ const encoderModule: BackendModule<ModuleCore> = {
     async start(ctx: ModuleStartContext<ModuleCore>) {
         bindCore(ctx.core);
     },
-    stop: stopEncoder,
+    stop: async () => {
+        await stopStream();
+    },
     dispatch,
 
-    /** Autostart: the last encoder config (combined: into the saved srtla target). */
+    /** Autostart: the last encoder config into the saved SRTLA target. */
     async resume() {
         const cfg = data().encoder;
-        if (!cfg) return false;
-        if (core.role() === "combined") {
-            const target = srtla().target();
-            if (!target) return false;
-            if (!encoder().status().running) await startCombined(target, cfg);
-            return true;
-        }
-        if (!encoder().status().running) await encoder().start(cfg);
+        const target = data().streamTarget;
+        if (!cfg || !target) return false;
+        if (!encoder().status().running) await startStream(target, cfg);
         return true;
     },
 
@@ -355,8 +460,7 @@ const encoderModule: BackendModule<ModuleCore> = {
         return {
             state: {
                 encoder: state,
-                stream:
-                    core.role() === "combined" ? srtla().target() : undefined,
+                stream: data().streamTarget,
             },
             audioSources: await listAudioSources(),
             // null when the encoder binary is not ceracoder; the UI hides its settings then
@@ -371,34 +475,22 @@ const encoderModule: BackendModule<ModuleCore> = {
             audioSources: await listAudioSources(),
         };
     },
+    /** Setup wizard (encoder): the SRTLA destination and the local listen port. */
     async setup(p: Params, role: Role) {
-        let cfg: EncoderConfig;
-        if (role === "combined")
-            // Combined devices stream into their own srtla_send
-            cfg = parseEncoderConfig(
-                p,
-                "127.0.0.1",
-                requirePort(p, "listenPort"),
-            );
-        else if (role === "encoder")
-            cfg = parseEncoderConfig(
-                p,
-                requireHost(p, "encoderHost"),
-                requirePort(p, "encoderPort"),
-            );
-        else return undefined;
+        if (role !== "encoder") return undefined;
+        const listenPort = String(optionalInt(p, "listenPort", 9000, 1, 65535));
+        const cfg = parseEncoderConfig(p, "127.0.0.1", listenPort);
+        const { remoteHost, remotePort } = encoderDestination(p);
         return () => {
             data().encoder = cfg;
+            data().streamTarget = { listenPort, remoteHost, remotePort };
         };
     },
 
     pages: [
         { match: /^\/pipelines\/(new|edit\/[^/]+)\/?$/, page: "pipelineedit" },
     ],
-    dashboardWidgets: [
-        { type: "encoder", defaultSize: { w: 6, h: 5 } },
-        { type: "combined", defaultSize: { w: 6, h: 10 } },
-    ],
+    dashboardWidgets: [{ type: "encoder", defaultSize: { w: 6, h: 5 } }],
     dashboardActions: [
         {
             id: "stop",
@@ -421,14 +513,15 @@ const encoderModule: BackendModule<ModuleCore> = {
             method: "encoder.bitrate",
             params: { maxBitrate: 6000 },
         },
-        // Needs `pipeline`, `host` and `port` — set them in the button's params override.
+        // The SRTLA start: encoder → srtla_send → relay (or direct destination).
+        // Destination defaults to relay:6000 (ENCODER_DESTINATION_* env).
         {
             id: "start",
             label: "act.encoder.start",
             icon: "▶",
-            method: "encoder.start",
+            method: "stream.start",
         },
-        // Combined boxes: stop the bonded stream (encoder + srtla) in one go.
+        // Stop the bonded stream (encoder + srtla_send) in one go.
         {
             id: "stream-stop",
             label: "act.encoder.stream_stop",

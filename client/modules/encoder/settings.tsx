@@ -1,7 +1,7 @@
 /**
  * Encoder settings module: pipeline repositories and pipeline files.
  *
- * Visible for the encoder/combined roles, and for the custom role when the
+ * Visible for the encoder role, and for the custom role when the
  * server reports the encoder module as enabled. Default-exports its
  * ModuleDef; the settings framework registers it from the generated
  * manifest (generated/modules.settings.ts) — no per-module imports.
@@ -205,7 +205,7 @@ export const def: ModuleDef = {
 	// wrapper, so titleKey is unused here.
 	titleKey: "set.repos",
 	selfCards: true,
-	visible: (ctx) => ctx.role === "encoder" || ctx.role === "combined",
+	visible: (ctx) => ctx.role === "encoder",
 	refresh: (ctx) => {
 		state.repositories = repositoryList(
 			(ctx.settings as EncoderSettings).pipelineRepositories,

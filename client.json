@@ -1,11 +1,11 @@
 {
   "autostart": false,
   "color": "#3b82f6",
-  "hostname": "combined",
+  "hostname": "encoder",
   "language": "en",
   "remoteToken": "token",
   "remoteUrl": "ws://192.168.1.136:8090/device",
-  "role": "combined",
+  "role": "encoder",
   "uuid": "54d4c237-01b4-439b-ad52-14de42c4484a",
   "ceracoder": {
     "balancer": "adaptive",

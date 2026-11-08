@@ -22,19 +22,6 @@ export interface SrtlaState {
     reloadCount?: number;
 }
 
-/** Runtime service the encoder consumes through the generic capability bus. */
-export interface RelayCapability {
-    relayStatus(): SrtlaState;
-    startRelay(
-        listenPort: string,
-        remoteHost: string,
-        remotePort: string,
-    ): Promise<SrtlaState>;
-    stopRelay(): Promise<void>;
-    reloadRelay(): Promise<void>;
-    target(): SrtlaTarget | undefined;
-}
-
 /** One GStreamer pipeline file found under the pipelines dir. */
 export interface Pipeline {
     id: string; // path relative to PIPELINES_DIR
@@ -54,7 +41,7 @@ export interface AudioSource {
 /** Complete encoder start / restart configuration (`encoder.start` params; the last used one is kept in state). */
 export interface EncoderConfig {
     pipeline: string;
-    host: string; // SRT destination (the relay, or 127.0.0.1 when combined)
+    host: string; // SRT destination (127.0.0.1 — the local srtla_send)
     port: string;
     minBitrate: number; // kbps
     maxBitrate: number; // kbps
@@ -105,11 +92,10 @@ export interface CeraConfig {
 /** Bitrate bounds (kbps) shared by wire validation and the UI, single source. */
 export const BITRATE_KBPS = { min: 300, max: 30_000 } as const;
 
-/** The status envelope as the encoder card reads it (encoder fragment + the srtla state it mirrors). */
+/** The status envelope as the encoder card reads it (encoder fragment + the saved SRTLA target). */
 export type EncoderStatus = Status & {
     state: {
         encoder: EncoderState;
-        relay: SrtlaState;
         stream?: SrtlaTarget;
     };
     audioSources: AudioSource[];
@@ -134,7 +120,6 @@ export type EncoderDeviceSummary = DeviceSummary & {
     maxBitrate?: number;
     /** Live srtla_send total, bytes/s across all links (the srtla module's summary). */
     bitrate?: number;
-    relay?: SrtlaState;
     activeLinks?: number;
     totalLinks?: number;
 };

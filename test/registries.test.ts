@@ -18,17 +18,14 @@ import {
 } from "../shared/registry";
 
 /**
- * Registry order of the device modules: the registry's topological sort over
- * declared `dependencies` (encoder after relay, combined after both), ids
- * visited alphabetically.
- * Independent modules precede that chain.
+ * Registry order of the device modules: no module declares `dependencies`
+ * anymore, so the topological sort is plain alphabetical order of ids.
  */
 const DEVICE_ORDER = [
     "broadcaster",
-    "relay",
     "encoder",
-    "combined",
     "obs",
+    "relay",
     "ssh",
 ];
 /** The channel widget modules (device-independent dashboard widgets). */
@@ -157,10 +154,9 @@ describe("module registries", () => {
     });
 
     test("device-card frontends cover every backend device-module id", () => {
-        // A module without a frontend.tsx (ssh lives on the settings page) or
-        // with only a card-less `contributions` registration (combined owns a
-        // role, nothing to show) has no card by design. Every other backend id
-        // must have exactly one card, and no extra card ids may exist.
+        // A module without a frontend.tsx (ssh lives on the settings page)
+        // has no card by design. Every other backend id must have exactly one
+        // card, and no extra card ids may exist.
         const fronts = scanFrontends();
         const cardIds = fronts
             .flatMap((fe) => fe.registrations)
@@ -297,7 +293,7 @@ describe("module registries", () => {
         expect(app).not.toMatch(/status\.role\s*[!=]|status\.modules/);
         expect(dashboard).not.toMatch(/ROLE_WIDGET_TYPES|CARD_MODULE/);
         expect(dashboard).not.toMatch(
-            /case ["'](encoder|srtla|relay|combined|obs)["']/,
+            /case ["'](encoder|srtla|relay|obs)["']/,
         );
         expect(dashboard).not.toContain("modules/obs");
         expect(setup).not.toMatch(
@@ -339,9 +335,9 @@ describe("module registries", () => {
     });
 });
 
-// Role presets come from module registrations: the bonding modules serve
-// relay and combined, the encoder serves encoder and combined, the OBS
-// controller defaults on for the dedicated OBS role and remains opt-in elsewhere.
+// Role presets come from module registrations: the relay module serves the
+// relay role, the encoder module the encoder role, the OBS controller defaults
+// on for the dedicated OBS role and remains opt-in elsewhere.
 describe("role presets from the registrations", () => {
     test("default modules follow the roles each module serves", () => {
         const on = (role: Parameters<typeof defaultModules>[0]) =>
@@ -350,7 +346,6 @@ describe("role presets from the registrations", () => {
                 .map(([key]) => key)
                 .sort();
         expect(on("relay")).toEqual(["relay", "ssh"]);
-        expect(on("combined")).toEqual(["combined", "encoder", "relay", "ssh"]);
         expect(on("encoder")).toEqual(["encoder", "ssh"]);
         expect(on("obs")).toEqual(["obs"]);
     });

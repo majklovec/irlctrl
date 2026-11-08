@@ -7,7 +7,6 @@
     "dev.control_unavailable_title": "制御 websocket が接続されていません",
     "dev.field.remote_host": "SRTLA リモートホスト",
     "dev.field.remote_port": "SRTLA リモートポート",
-    "dev.field.srt_listen_port": "SRT 待ち受けポート",
     "dev.group.connection": "接続",
     "dev.iface_modem": "モデム #{{index}}",
     "dev.imei": "IMEI",
@@ -76,5 +75,6 @@
     "mlog.done.reconfigured": "再設定済み",
     "act.relay.reconfigure": "モデム再設定",
     "role.relay": "リレー",
-    "setup.role.relay_tag": "ストリームを受信し、SRTLA で転送します"
+    "setup.role.relay_tag": "ストリームを受信し、SRTLA で転送します",
+    "dev.field.srtla_listen_port": "SRTLA 待ち受けポート"
 }

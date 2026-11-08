@@ -1,7 +1,7 @@
 /**
  * SSH server controls for the Settings page.
  *
- * Visible for the relay/encoder/combined roles (and the custom role when the
+ * Visible for the relay/encoder roles (and the custom role when the
  * server reports the ssh module as enabled). The login account lives under
  * `modules.ssh` and is saved when Start is pressed (the device persists
  * user + enabled with the daemon start).
@@ -121,8 +121,7 @@ export const def: ModuleDef = {
 	id: "ssh",
 	titleKey: "set.ssh",
 	log,
-	visible: (ctx) =>
-		ctx.role === "relay" || ctx.role === "encoder" || ctx.role === "combined",
+	visible: (ctx) => ctx.role === "relay" || ctx.role === "encoder",
 	refresh: (ctx) => {
 		const s = ctx.modules.ssh as SshSliceView;
 		draft.user = s.user ?? "root";

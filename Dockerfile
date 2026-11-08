@@ -36,9 +36,11 @@ COPY --from=builder /app/server ./server
 COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/i18n ./i18n
 COPY --from=builder /app/scripts ./scripts
-# The seed overlay templates live in the storage dir (assets/overlay_templates);
-# user uploads are persisted in a /config/assets volume on top of them.
-COPY --from=builder /app/assets /assets
+# The seed overlay templates ride under /app: on boot the server copies them
+# into the storage dir's overlay_templates/ when that is missing (a fresh
+# volume). The copy must not live under a mount target — /assets is bind-
+# mounted in Nomad, which would hide it.
+COPY --from=builder /app/assets/overlay_templates /app/assets/overlay_templates
 # tsconfig.json drives the JSX transform at bundle time (jsxFactory "m" ->
 # Mithril). Without it Bun defaults to react/jsx-dev-runtime, which isn't a dep.
 COPY --from=builder /app/tsconfig.json ./tsconfig.json

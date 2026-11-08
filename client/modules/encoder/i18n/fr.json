@@ -88,7 +88,6 @@
     "setup.step.encoder_sub": "Pipeline, débit et retard audio.",
     "ui.optional": "Facultatif",
     "ui.remove": "Supprimer",
-    "wtype.combined": "Encodeur + relais",
     "act.encoder.stop": "Arrêter l’encodeur",
     "act.encoder.bitrate_low": "Débit 1,5 Mbit/s",
     "act.encoder.bitrate_high": "Débit 6 Mbit/s",

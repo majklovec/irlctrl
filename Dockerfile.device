@@ -8,7 +8,7 @@
 #     plus ffmpeg for the broadcaster module.
 #
 # Pick the role per container with `--role` (see docker-compose.yaml):
-#   relay / encoder / combined / obs / broadcaster
+#   relay / encoder / obs / broadcaster
 #
 # SRT is built from the CERALIVE fork (Haivision 1.5.7 + BELABOX patches), the
 # same source the Armbian device image uses (armbian/userpatches/

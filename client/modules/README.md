@@ -20,7 +20,6 @@ cases.
 │       ├── README.md         # this file
 │       ├── encoder/
 │       ├── relay/
-│       ├── combined/         # role-only module (relay + encoder)
 │       ├── obs/
 │       ├── broadcaster/
 │       └── ssh/
@@ -107,7 +106,7 @@ beyond the contracts, components, store, i18n and util helpers a card needs.
 | `kind`, `id`, `title`              | identity (`id` = directory name; `kind` is `device` or `widget`)                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `roleDefinitions?`                 | roles provided by this module (stable id, translation keys, ordering, and default/setup metadata)                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `roles?`                           | roles the module serves: its methods are rejected (409) on other roles, its status/settings/setup hooks only run on them, and its slice starts `enabled` on them. Omit for "every role".                                                                                                                                                                                                                                                                                                                  |
-| `methodRoles?`                     | per-method role override (`{ "stream.start": ["combined"] }`)                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `methodRoles?`                     | per-method role override (`{ "relay.start": ["relay"] }`)                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `enabledByDefault?`                | `false` keeps the slice disabled on a fresh device even on its roles (opt-in modules)                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `enabledByDefaultRoles?`           | roles that receive an enabled default when the module serves multiple roles                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `requireEnabled?`                  | reject the methods (409) while the slice is disabled                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -290,7 +289,7 @@ frontend pages must stay free of module feature branches.
 
 | name           | provider | consumers | shape                                                                      |
 | -------------- | -------- | --------- | -------------------------------------------------------------------------- |
-| `stream.relay` | relay    | encoder   | `{ relayStatus(), startRelay(), stopRelay(), reloadRelay(), target() }`    |
+| `stream.relay` | relay    | —         | `{ relayStatus(), startRelay(), stopRelay(), reloadRelay(), target() }`    |
 
 Capabilities are looked up by name; providers and consumers remain isolated
 and depend only on the runtime methods they use.
@@ -299,8 +298,8 @@ and depend only on the runtime methods they use.
 
 `resolveOrder` (in `shared/registry.ts`) topologically sorts modules by their
 `dependencies` (cycle-safe; ids visited alphabetically). Today: `relay` →
-`encoder` → `combined` → `obs` → `ssh`. `startModules` / `stopModules`
-(reverse) / `moduleStatuses` / autostart all iterate that order.
+`encoder` → `obs` → `ssh`. `startModules` / `stopModules` (reverse) /
+`moduleStatuses` / autostart all iterate that order.
 
 ## Adding a module
 

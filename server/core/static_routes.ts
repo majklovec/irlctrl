@@ -1,8 +1,8 @@
 /*
  * Static assets for the control server: `/overlay_templates/*`
- * (assets/overlay_templates: the OBS html_template documents, fetched at
- * runtime by the runtime page; the templates live in the storage dir so the
- * templates page can edit them) plus
+ * (the storage dir's overlay_templates/: the OBS html_template documents,
+ * fetched at runtime by the runtime page; the templates live in the storage
+ * dir so the templates page can edit them) plus
  * `/overlay_templates/_catalog.json` (the auto-discovered id list — any
  * `<id>.html` file is a template, no index file is maintained), and `/i18n/*`
  * from the in-memory merged catalogs (core + every module's; see
@@ -20,20 +20,15 @@ import { join } from "node:path";
 import { Elysia } from "elysia";
 import { i18nResponse } from "../../shared/http";
 import { catalog } from "../../shared/i18n";
-import { appPath } from "../../shared/paths";
 import { isCompiledBinary } from "../../shared/util";
 
-/** Repo-relative directory of the OBS html_template documents. */
-const OVERLAY_TEMPLATES_DIR = "assets/overlay_templates";
-
 /**
- * The runtime template catalog: every `*.html` file in
- * `assets/overlay_templates/` is a template (its id is the filename minus the
+ * The runtime template catalog: every `*.html` file in the storage dir's
+ * `overlay_templates/` is a template (its id is the filename minus the
  * `.html`). Discovered on each request so a new file is served with no other
  * change; a missing directory (a fresh storage dir) is an empty catalog.
  */
-async function templateCatalog() {
-	const dir = appPath(OVERLAY_TEMPLATES_DIR);
+async function templateCatalog(dir: string) {
 	let entries: Dirent[];
 	try {
 		entries = (await readdir(dir, { withFileTypes: true })).filter(
@@ -54,7 +49,7 @@ async function templateCatalog() {
 	);
 }
 
-export async function staticRoutes() {
+export async function staticRoutes(templatesDir: string) {
 	const app = new Elysia({ name: "control-static" }).get(
 		"/i18n/*",
 		({ request }) => i18nResponse(new URL(request.url).pathname, catalog),
@@ -62,10 +57,9 @@ export async function staticRoutes() {
 	if (isCompiledBinary()) return app;
 	// Registered before the static plugin so it wins over any file at the
 	// same path; no static file is kept for it.
-	app.get("/overlay_templates/_catalog.json", () => templateCatalog());
+	app.get("/overlay_templates/_catalog.json", () => templateCatalog(templatesDir));
 	// The templates live in the storage dir (user-editable by the templates
 	// page); a fresh deployment has no directory yet — create it eagerly.
-	const templatesDir = appPath(OVERLAY_TEMPLATES_DIR);
 	mkdirSync(templatesDir, { recursive: true });
 	// Served by hand (not the static plugin): the templates page edits and
 	// deletes these files at runtime, and the plugin's in-memory view of the

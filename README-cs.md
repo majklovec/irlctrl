@@ -21,44 +21,39 @@
 
 Jeden klient zařízení, role dodávané moduly se vybírají pomocí `--role`:
 
-| Role              | Funkce                                                                                                                                                                                                                                                             |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `relay` (výchozí) | Přijímá SRT stream z enkodéru a distribuuje jej přes všechna dostupná připojení pomocí [srtla_send](https://github.com/irlserver/srtla_send). Spravuje směrování podle zdrojové adresy, soubor s uplinky a modemy (ModemManager).                                  |
-| `encoder`         | Spouští [belacoder](https://github.com/BELABOX/belacoder) nebo [ceracoder](https://github.com/CERALIVE/ceracoder) s GStreamer pipeline a odesílá SRT stream do relé. Nezajišťuje směrování, správu modemů ani `srtla_send` — nepotřebuje oprávnění uživatele root. |
-| `combined`        | Enkodér a relé v jednom zařízení: enkodér → lokální `srtla_send` → agregovaná připojení. Jedno tlačítko Start/Stop ovládá obě části.                                                                                                                               |
-| `obs`             | Připojuje OBS Studio, předává jeho události a spouští přepínač scén podle datového toku.                                                                                                                                                                             |
-| `broadcaster`     | Přijímá SRTLA přes `srtla_rec` a pomocí ffmpeg publikuje jeden či více RTMP výstupů.                                                                                                                                                                                |
+| Role              | Funkce                                                                                                                                                                                                                                                         |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `relay` (výchozí) | Kompletní SRTLA→SRTLA most: `srtla_rec` přijímá SRTLA stream z enkodéru (výchozí UDP 6000) a `srtla_send` jej redistribuuje přes všechna dostupná připojení k cíli. Spravuje směrování podle zdrojové adresy, soubor s uplinky a modemy (ModemManager). |
+| `encoder`         | Spouští [belacoder](https://github.com/BELABOX/belacoder) nebo [ceracoder](https://github.com/CERALIVE/ceracoder) s GStreamer pipeline a odesílá SRTLA do relé (výchozí `relay:6000`) přes lokální `srtla_send`. Nezajišťuje směrování ani správu modemů — nepotřebuje oprávnění uživatele root. |
+| `obs`             | Připojuje OBS Studio, předává jeho události a spouští přepínač scén podle datového toku.                                                                                                                                                                       |
+| `broadcaster`     | Přijímá SRTLA přes `srtla_rec` a pomocí ffmpeg publikuje jeden či více RTMP výstupů.                                                                                                                                                                            |
 
 ```text
-encoder ──SRT──▶ relay ──SRTLA (agregovaný stream)──▶ SRTLA přijímač
-combined ─────────SRTLA (agregovaný stream)─────────▶ SRTLA přijímač
-        ▲                    ▲
-        └── řídicí server (volitelný, WebSocket) ───┘
+encoder ──SRTLA──▶ relay ──SRTLA (agregovaný stream)──▶ SRTLA přijímač
+              ▲                    ▲
+              └── řídicí server (volitelný, WebSocket) ───┘
 ```
 
 ### Požadavky
 
 -   [Bun](https://bun.sh)
--   `srtla_send` (relay, combined)
--   `belacoder`/`ceracoder` a GStreamer (encoder, combined)
--   `iproute2` a ModemManager (`mmcli`) pro agregaci připojení a správu modemů
+-   `srtla_send` a `srtla_rec` (relay), `srtla_send` (encoder)
+-   `belacoder`/`ceracoder` a GStreamer (encoder)
+-   `iproute2` a ModemManager (`mmcli`) pro agregaci připojení a správu modemů (relay)
 -   `srtla_rec` a ffmpeg (broadcaster)
 -   OBS Studio s obs-websocket v5 (obs)
 
 ## První spuštění
 
 ```sh
-# Relé: lokální webové rozhraní + API na portu 8085, sleduje síťová rozhraní a znovu načítá srtla_send
+# Relé: lokální webové rozhraní + API na portu 8085, sleduje síťová rozhraní a znovu načítá most
 sudo bun client/backend/client.ts --host 0.0.0.0
 
-# Enkodér: vyberte pipeline a SRT port relé ve webovém rozhraní
+# Enkodér: vyberte pipeline a SRTLA cíl (výchozí relay:6000) ve webovém rozhraní
 bun client/backend/client.ts --role encoder --pipelines /usr/share/belacoder/pipelines
 
-# Kombinované zařízení
-sudo bun client/backend/client.ts --role combined --pipelines /usr/share/belacoder/pipelines
-
-# Relé: spustí srtla_send ihned při startu
-sudo bun client/backend/client.ts --start-srtla 6000 rec.example.com 5000
+# Relé: spustí SRTLA→SRTLA most ihned při startu
+sudo bun client/backend/client.ts --start-srtla 6000 rec.example.com 6000
 ```
 
 Otevřete `http://<device>:8085/`. Rozhraní zobrazuje pouze funkce relevantní pro zvolenou roli.
@@ -71,7 +66,7 @@ sudo CONTROL_SERVER_TOKEN=token \
   SRTLA_SEND_BIN=./srtla_send \
   bun client/backend/client.ts --port 8085 \
   --remote ws://127.0.0.1:8090/device \
-  --role combined --pipelines ./pipeline
+  --role encoder --pipelines ./pipeline
 ```
 
 ### Parametry
@@ -80,12 +75,12 @@ Každý parametr má protějšek v podobě proměnné prostředí. Řešení: **
 
 | Parametr                  | Proměnná prostředí                | Výchozí hodnota                  | Poznámka                                                                                                                              |
 | ------------------------- | --------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `‑‑role`                  | `ROLE`                            | `relay`                          | Role dodaná registrovaným modulem (`relay`, `encoder`, `combined`, `obs`, `broadcaster`)                                             |
+| `‑‑role`                  | `ROLE`                            | `relay`                          | Role dodaná registrovaným modulem (`relay`, `encoder`, `obs`, `broadcaster`)                                             |
 | `‑‑host`, `‑‑port`        | `API_HOST`, `API_PORT`            | `127.0.0.1`, `8085`              | Lokální webové rozhraní a WebSocket API (`/ws`), vždy aktivní                                                                         |
 | `‑‑allow‑origin`          | `ALLOWED_ORIGINS`                 |                                  | Další povolené originy pro `/ws` (oddělené čárkami, `*` = libovolný)                                                                  |
 | `‑‑config`                | `CONFIG_FILE`                     | `$TMPDIR/config.json`            | Konfigurace zařízení — nastavení jádra a sekce modulů. **V produkčním provozu použijte trvalou cestu.**                              |
 | `‑‑uplinks`               | `UPLINKS_FILE`                    | `$TMPDIR/srtla_ips.txt`          | Soubor s uplinky pro `srtla_send`                                                                                                     |
-| `‑‑start‑srtla`           |                                   |                                  | Pro relay/combined: spustí `srtla_send` při startu pomocí parametrů `<listenPort> <remoteHost> <remotePort>`                          |
+| `‑‑start‑srtla`           |                                   |                                  | Pro relay: spustí SRTLA→SRTLA most při startu pomocí parametrů `<srtlaPort> <remoteHost> <remotePort>`                          |
 | `‑‑srtla‑reload`          | `SRTLA_RELOAD_MODE`               | `signal`                         | `signal` (SIGHUP) nebo `restart`                                                                                                      |
 | `‑‑srtla‑socket`          | `SRTLA_CONTROL_SOCKET`            | `$TMPDIR/srtla_send.sock`        | Řídicí socket `srtla_send` (statistiky připojení, režim a kvalita); `""` jej deaktivuje                                               |
 | `‑‑debounce‑ms`           | `DEBOUNCE_MS`                     | `1500`                           | Prodleva pro sloučení událostí síťových rozhraní                                                                                      |
@@ -103,7 +98,7 @@ Každý parametr má protějšek v podobě proměnné prostředí. Řešení: **
 
 ### Průvodce prvotním nastavením
 
-Pokud zařízení ještě nemá konfigurační soubor `--config`, zobrazí se místo běžného rozhraní **průvodce prvotním nastavením**. Umožňuje nastavit jazyk, roli, identitu zařízení (název hostitele a barvu záhlaví), připojení k řídicímu serveru (URL a token), parametry enkodéru (pipeline, datový tok, zvuk) a u rolí relay/combined také cíl SRTLA a možnosti plánovače.
+Pokud zařízení ještě nemá konfigurační soubor `--config`, zobrazí se místo běžného rozhraní **průvodce prvotním nastavením**. Umožňuje nastavit jazyk, roli, identitu zařízení (název hostitele a barvu záhlaví), připojení k řídicímu serveru (URL a token), parametry enkodéru (pipeline, datový tok, zvuk, SRTLA cíl) a u relé také cíl SRTLA a možnosti plánovače.
 
 Uložení (`setup.complete`) ověří zadané údaje, vytvoří počáteční konfigurační soubor, připojí se k řídicímu serveru a spustí funkce příslušné zvolené roli. Poté se již zobrazuje běžné rozhraní a průvodce se znovu nenabízí.
 
@@ -136,7 +131,7 @@ Soubor `server/backend/server.ts` zobrazuje seznam všech zařízení a zpříst
 Server rovněž poskytuje jednotlivým uživatelům vlastní **nástěnky (dashboards)**. Ty využívají mřížky Gridstack složené z widgetů libovolných zařízení vlastněných daným uživatelem a mají samostatné stránky pro přidávání, úpravy a zobrazení.
 
 Widgety jsou dvojího druhu:
--   **Widgety zařízení** — živá stavová karta pro každé zařízení: `relay`, `encoder`, `combined`, `obs` nebo `broadcaster`, podle jeho role a povolených modulů.
+-   **Widgety zařízení** — živá stavová karta pro každé zařízení: `relay`, `encoder`, `obs` nebo `broadcaster`, podle jeho role a povolených modulů.
 -   **Widgety kanálů** — na zařízení nezávislé moduly. Jeden centrální hub pro každý typ modulu obsluhuje všechny widgety daného typu.
 
 Nástěnky se ukládají do databáze SQLite (tabulka `dashboards` v souboru `--db`) a společný živý datový tok (`/dashboards/ws`) průběžně předává data widgetů do všech otevřených zobrazení.
@@ -205,7 +200,7 @@ Adresář [`armbian/`](armbian/) obsahuje nástroje pro nativní sestavení při
 
 Obraz obsahuje celý řetězec pro streamování: GStreamer (včetně `gstreamer1.0-rockchip1`), SRT od CERALIVE, [ceracoder](https://github.com/CERALIVE/ceracoder) (sestavený ze zdrojových kódů), [srtla_send](https://github.com/irlserver/srtla_send) (předpřipravený balíček `.deb` pro arm64) a pravidla udev pro zvuk v belaUI.
 
-Díky tomu lze `client/backend/client.ts --role combined` spustit bez další konfigurace.
+Díky tomu lze `client/backend/client.ts --role encoder` spustit bez další konfigurace.
 
 ### Docker
 
@@ -258,9 +253,8 @@ Běží přímo na zařízení a každý se zobrazuje jako karta ve webovém roz
 
 | Modul            | Funkce                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `encoder`        | Spouští a spravuje proces enkodéru pro zařízení `encoder` a `combined`. Vyhledává pipeline (jejich identifikátory jsou cesty pod `--pipelines`, např. `rk3588/h265_hdmi_1440p25`), zajišťuje spuštění a automatické restartování a umožňuje měnit datový tok za běhu. Podporuje **belacoder** (datový tok se nastavuje pomocí souboru s minimální a maximální hodnotou, který se znovu načítá při SIGHUP) a **ceracoder** (konfigurace INI s nastavením balanceru). |
-| `relay`          | Spravuje SRTLA na zařízeních `relay` a `combined`: proces `srtla_send`, plánovač, směrování zdrojů, výběr uplinků a integraci ModemManageru (`mmcli`) včetně stavu a ovládání modemů.                                                                                                                                                                                                                                                                                    |
-| `combined`       | Vlastní roli `combined` (jedno zařízení, které enkóduje i relayuje): přispívá pouze definicí role; práci odvádějí moduly `relay` a `encoder`, které roli obsluhují. |
+| `encoder`        | Spouští a spravuje proces enkodéru a jeho lokální `srtla_send` (SRTLA úsek do relé). Vyhledává pipeline (jejich identifikátory jsou cesty pod `--pipelines`, např. `rk3588/h265_hdmi_1440p25`), zajišťuje spuštění a automatické restartování a umožňuje měnit datový tok za běhu. Podporuje **belacoder** (datový tok se nastavuje pomocí souboru s minimální a maximální hodnotou, který se znovu načítá při SIGHUP) a **ceracoder** (konfigurace INI s nastavením balanceru). |
+| `relay`          | Spravuje SRTLA→SRTLA most na relé: procesy `srtla_rec` a `srtla_send`, plánovač, směrování zdrojů, výběr uplinků a integraci ModemManageru (`mmcli`) včetně stavu a ovládání modemů.                                                                                                                                                              |
 | `obs` | Spravuje spojení `obs-websocket` verze 5 ([obs-websocket](https://github.com/obsproject/obs-websocket)) s propojenou instancí OBS Studio a předává její události do proudu událostí zařízení. Zajišťuje také **přepínač při nízkém datovém toku**: stavový automat ([`switcher_engine.ts`](client/modules/obs/switcher_engine.ts)), který sleduje metriky SRT/OBS a přepíná OBS mezi scénami `normal`, `low` a `offline`.                                       |
 
 ### Widgety kanálů

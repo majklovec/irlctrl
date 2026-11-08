@@ -1,4 +1,4 @@
-/* Types owned by the combined SRTLA, interface-routing and modem domain. */
+/* Types for the relay's SRTLA bridging, interface-routing and modem domain. */
 import type { DeviceSummary, Status } from "../../../shared/contracts/wire";
 
 export interface Iface {
@@ -52,6 +52,12 @@ export interface ModemSource {
     modemIface(modem: ModemInfo): Promise<string | null>;
 }
 
+/**
+ * The SRTLA target the relay bridges to. `listenPort` is the SRTLA UDP input
+ * port `srtla_rec` binds (the encoder → relay hop); the destination is what
+ * `srtla_send` sends to. The loopback SRT port between the two is a fixed
+ * internal detail (`SRT_INTERNAL_PORT`), not part of the target.
+ */
 export interface SrtlaTarget {
     listenPort: string;
     remoteHost: string;
@@ -61,7 +67,10 @@ export interface SrtlaTarget {
 export interface SrtlaState {
     running: boolean;
     pid?: number;
+    /** SRTLA UDP input port (`srtla_rec`), or the local SRT port on the encoder. */
     listenPort?: string;
+    /** The plain-SRT port `srtla_send` listens on (loopback internal port on the relay). */
+    sendPort?: string;
     remoteHost?: string;
     remotePort?: string;
     startedAt?: number;

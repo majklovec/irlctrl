@@ -18,7 +18,7 @@ import {
 	Options,
 	Select,
 } from "@ui/components/";
-import { Icon, OutlineIcon } from "@ui/components/icons";
+import { OutlineIcon } from "@ui/components/icons";
 import { card, type DeviceCard } from "@ui/device/store";
 import { t } from "@ui/i18n";
 import type { MithrilJSXComponent } from "@ui/jsx";
@@ -44,7 +44,6 @@ import type {
 	EncoderState,
 	EncoderStatus,
 	Pipeline,
-	SrtlaState,
 } from "./types";
 import { BITRATE_KBPS } from "./types";
 import "./styles.css";
@@ -134,30 +133,16 @@ function encoderState(host: DeviceCard): EncoderCardState {
 }
 
 const EncoderIssueBadge = {
-	view: ({ attrs: { role, e, relay } }) => {
+	view: ({ attrs: { e } }) => {
 		if (!e.running) return <Badge text={t("dev.badge.stopped")} kind="off" />;
-		if (role === "combined" && !relay?.running)
-			return <Badge text={t("dev.badge.srtla_send_down")} kind="warn" />;
 		if (!e.pid && e.restarts)
 			return <Badge text={t("dev.badge.restarting")} kind="warn" />;
 		return null;
 	},
-} as MithrilJSXComponent<{
-	role: Role | undefined;
-	e: EncoderState;
-	relay: SrtlaState | undefined;
-}>;
+} as MithrilJSXComponent<{ e: EncoderState }>;
 
-function hasEncoderIssue(
-	role: Role | undefined,
-	encoder: EncoderState,
-	relay: SrtlaState | undefined,
-): boolean {
-	return (
-		!encoder.running ||
-		(role === "combined" && !relay?.running) ||
-		(!encoder.pid && !!encoder.restarts)
-	);
+function hasEncoderIssue(encoder: EncoderState): boolean {
+	return !encoder.running || (!encoder.pid && !!encoder.restarts);
 }
 
 const setupFields = {
@@ -185,8 +170,8 @@ const encoderSetupStep: ModuleSetupStep = {
 	id: "encoder",
 	title: "wtype.encoder",
 	subtitle: "setup.step.encoder_sub",
-	roles: ["encoder", "combined"],
-	isValid(role: Status["role"]) {
+	roles: ["encoder"],
+	isValid(_role: Status["role"]) {
 		return (
 			!!setupFields.pipeline &&
 			!!setupFields.audioSource &&
@@ -194,14 +179,12 @@ const encoderSetupStep: ModuleSetupStep = {
 			setupBitrateValid(setupFields.maxBitrate) &&
 			Number(setupFields.minBitrate) <= Number(setupFields.maxBitrate) &&
 			inRange(setupFields.latency, 100, 10000) &&
-			(role !== "encoder" ||
-				(!!setupFields.encoderHost &&
-					inRange(setupFields.encoderPort, 1, 65535)))
+			!!setupFields.encoderHost &&
+			inRange(setupFields.encoderPort, 1, 65535)
 		);
 	},
-	render(role: Status["role"], setupInfo: SetupInfo) {
+	render(_role: Status["role"], setupInfo: SetupInfo) {
 		const info = setupInfo as EncoderSetupInfo;
-		const standalone = role === "encoder";
 		// Red highlighting only after the user has tried to leave this step.
 		const attempted = attemptedSteps.has("encoder");
 		const bitratesValid =
@@ -273,7 +256,7 @@ const encoderSetupStep: ModuleSetupStep = {
 						/>
 					}
 				/>
-				{standalone && [
+				[
 					<Field
 						label={t("dev.field.stream_host")}
 						required={true}
@@ -282,7 +265,7 @@ const encoderSetupStep: ModuleSetupStep = {
 							<Input
 								target={setupFields}
 								prop="encoderHost"
-								placeholder="192.168.1.10"
+								placeholder="relay"
 								required={true}
 							/>
 						}
@@ -300,7 +283,7 @@ const encoderSetupStep: ModuleSetupStep = {
 							/>
 						}
 					/>,
-				]}
+				]
 				<Field
 					label={t("dev.field.srt_latency")}
 					required={true}
@@ -339,6 +322,9 @@ const encoderSetupStep: ModuleSetupStep = {
 			delay: Number(setupFields.delay),
 			encoderPort: Number(setupFields.encoderPort),
 			latency: Number(setupFields.latency),
+			// The SRTLA destination the backend stores as the stream target
+			remoteHost: setupFields.encoderHost,
+			remotePort: Number(setupFields.encoderPort),
 		};
 	},
 };
@@ -373,32 +359,20 @@ const encoderDashboardWidgets: DeviceDashboardWidget[] = [
 			);
 		},
 	},
-	{
-		type: "combined",
-		available: (device) =>
-			device.role === "combined" || device.role === undefined,
-		defaultSize: { w: 6, h: 10 },
-		minSize: { w: 4, h: 8 },
-		body: ({ card: host, status }) =>
-			status ? encoderCardBody(host, status as EncoderStatus) : null,
-	},
 ];
 
 const encoderSummaryColumns = [
 	{
 		id: "stream",
 		order: 0,
-		available: (device: DeviceSummary) =>
-			device.role === "encoder" || device.role === "combined",
+		available: (device: DeviceSummary) => device.role === "encoder",
 		header: () => t("mgmt.th.stream"),
 		cell: (device: DeviceSummary) => {
 			if (!device.online) return "—";
-			const { encoder, relay, activeLinks } = device as EncoderDeviceSummary;
+			const { encoder, activeLinks } = device as EncoderDeviceSummary;
 			if (!encoder) return "—";
-			if (hasEncoderIssue(device.role, encoder, relay))
-				return (
-					<EncoderIssueBadge role={device.role} e={encoder} relay={relay} />
-				);
+			if (hasEncoderIssue(encoder))
+				return <EncoderIssueBadge e={encoder} />;
 			if (activeLinks === 0)
 				return <Badge text={t("dev.badge.no_links")} kind="warn" />;
 			return <Badge text={t("dev.badge.live")} kind="on" />;
@@ -431,8 +405,7 @@ const encoderSummaryColumns = [
 	{
 		id: "encoder",
 		order: 30,
-		available: (device: DeviceSummary) =>
-			device.role === "encoder" || device.role === "combined",
+		available: (device: DeviceSummary) => device.role === "encoder",
 		header: () => [encoderIcon(), ` ${t("wtype.encoder")}`],
 		cell: (device: DeviceSummary) => {
 			const { encoder } = device as EncoderDeviceSummary;
@@ -460,15 +433,21 @@ function syncEncoderForm(host: DeviceCard, status: EncoderStatus): void {
 	const state = encoderState(host);
 	const { fields, touched, cera } = state;
 	const config = status.state.encoder.config;
-	const combined = status.role === "combined";
+	const stream = status.state.stream;
 
 	if (state.role !== status.role) touched.clear();
 	state.role = status.role;
 
-	if (!combined) {
-		fields.encHost = prefillString(fields.encHost, config?.host, "encHost");
-		fields.encPort = prefillString(fields.encPort, config?.port, "encPort");
-	}
+	fields.encHost = prefillString(
+		fields.encHost,
+		stream?.remoteHost ?? config?.host,
+		"encHost",
+	);
+	fields.encPort = prefillString(
+		fields.encPort,
+		stream?.remotePort ?? config?.port,
+		"encPort",
+	);
 	fields.minBitrate = prefillString(
 		fields.minBitrate,
 		config?.minBitrate ?? status.ceracoder?.minBitrate,
@@ -554,8 +533,7 @@ async function loadPipelines(host: DeviceCard): Promise<void> {
 	m.redraw();
 }
 
-const hasEncoderRole = (status: EncoderStatus) =>
-	status.role === "encoder" || status.role === "combined";
+const hasEncoderRole = (status: EncoderStatus) => status.role === "encoder";
 
 // ----------------------------------------------------------------------
 // Stream control (owns the encoder + stream start logic, shared with SRTLA)
@@ -570,15 +548,13 @@ export function selectedPipeline(host: DeviceCard): Pipeline | undefined {
 }
 
 /** Submit the encoder / stream form: the chosen pipeline, bitrate, audio and target. */
-function encoderStart(
-	host: DeviceCard,
-	combinedTarget?: { remoteHost: string; remotePort: string },
-): void {
+function encoderStart(host: DeviceCard): void {
 	const status = host.st.status;
 	const { fields } = encoderState(host);
 	if (!status) return;
 	const pipeline = selectedPipeline(host);
-	const common = {
+	if (!fields.encHost || !fields.encPort) return;
+	host.press("encoder-start", "stream.start", {
 		pipeline: fields.pipeline,
 		minBitrate: optionalNumber(fields.minBitrate),
 		maxBitrate: optionalNumber(fields.maxBitrate),
@@ -589,32 +565,16 @@ function encoderStart(
 		audioSource: pipeline?.asrc ? fields.audioSource || undefined : "default",
 		audioCodec: pipeline?.acodec ? fields.audioCodec || undefined : undefined,
 		bitrateOverlay: pipeline?.overlay ? fields.bitrateOverlay : false,
-	};
-	if (status.role === "combined") {
-		if (!combinedTarget?.remoteHost || !combinedTarget.remotePort) return;
-		host.press("encoder-start", "stream.start", {
-			...common,
-			remoteHost: combinedTarget.remoteHost,
-			remotePort: combinedTarget.remotePort,
-		});
-	} else {
-		if (!fields.encHost || !fields.encPort) return;
-		host.press("encoder-start", "encoder.start", {
-			...common,
-			host: fields.encHost,
-			port: fields.encPort,
-		});
-	}
+		remoteHost: fields.encHost,
+		remotePort: fields.encPort,
+	});
 }
 
-/** Start / Stop buttons for a stream (encoder card, or the SRTLA card of a combined device). */
-function streamButtons(host: DeviceCard, stopMethod: string): m.Children {
+/** Start / Stop buttons for the stream (encoder card). */
+function streamButtons(host: DeviceCard): m.Children {
 	const status = currentStatus(host);
 	const canStart = !!status && !status.state.encoder.running;
-	const canStop =
-		!!status &&
-		(status.state.encoder.running ||
-			(status.role === "combined" && status.state.relay.running));
+	const canStop = !!status && status.state.encoder.running;
 	return (
 		<Actions>
 			<Button
@@ -626,7 +586,7 @@ function streamButtons(host: DeviceCard, stopMethod: string): m.Children {
 				label={t("ui.stop")}
 				class="danger"
 				disabled={!canStop || host.pending("encoder-stop")}
-				onclick={() => host.press("encoder-stop", stopMethod)}
+				onclick={() => host.press("encoder-stop", "stream.stop")}
 			/>
 		</Actions>
 	);
@@ -721,12 +681,9 @@ function ceracoderControls(host: DeviceCard): m.Children {
 // ----------------------------------------------------------------------
 // Card
 // ----------------------------------------------------------------------
-const stateBadge = ({
-	role,
-	state: { encoder, relay },
-}: EncoderStatus): m.Vnode =>
-	hasEncoderIssue(role, encoder, relay) ? (
-		<EncoderIssueBadge role={role} e={encoder} relay={relay} />
+const stateBadge = ({ state: { encoder } }: EncoderStatus): m.Vnode =>
+	hasEncoderIssue(encoder) ? (
+		<EncoderIssueBadge e={encoder} />
 	) : (
 		<Badge text={t("dev.badge.streaming")} kind="on" />
 	);
@@ -765,9 +722,8 @@ function statusRows(
 	status: EncoderStatus,
 ): [string, Child][] {
 	const { fields } = encoderState(host);
-	const { encoder: e } = status.state;
+	const { encoder: e, stream } = status.state;
 	const cfg = e.config;
-	const combined = status.role === "combined";
 	const audioName = status.audioSources.find(
 		(a) => a.id === fields.audioSource,
 	)?.name;
@@ -775,15 +731,10 @@ function statusRows(
 		[t("dev.row.state"), stateBadge(status)],
 		[t("dev.row.encoder"), status.ceracoder ? "ceracoder" : "belacoder"],
 		[t("dev.row.pipeline"), cfg?.pipeline],
-		// Combined devices stream into their own srtla_send, so the target row is hidden for them
-		...(combined
-			? []
-			: [
-					[
-						t("dev.row.target"),
-						e.running && cfg ? `${cfg.host}:${cfg.port}` : null,
-					] as [string, Child],
-				]),
+		[
+			t("dev.row.target"),
+			e.running && stream ? `${stream.remoteHost}:${stream.remotePort}` : null,
+		] as [string, Child],
 		[
 			t("dev.row.bitrate"),
 			cfg &&
@@ -816,7 +767,6 @@ export function encoderCardBody(
 	status: EncoderStatus,
 ): m.Vnode {
 	const { fields, touched } = encoderState(host);
-	const combined = status.role === "combined";
 	const pipeline = selectedPipeline(host);
 	return (
 		<Card title={t("wtype.encoder")} class="mod-encoder">
@@ -936,33 +886,29 @@ export function encoderCardBody(
 					/>
 				</FieldGroup>
 				<FieldGroup legend={t("dev.group.srt")}>
-					{!combined && (
-						<>
-							<Field
-								label={t("dev.field.stream_host")}
-								control={
-									<Input
-										target={fields}
-										prop="encHost"
-										placeholder="192.168.1.10"
-										required={true}
-									/>
-								}
+					<Field
+						label={t("dev.field.stream_host")}
+						control={
+							<Input
+								target={fields}
+								prop="encHost"
+								placeholder="relay"
+								required={true}
 							/>
-							<Field
-								label={t("dev.field.stream_srt_port")}
-								control={
-									<Input
-										target={fields}
-										prop="encPort"
-										placeholder="6000"
-										required={true}
-									/>
-								}
+						}
+					/>
+					<Field
+						label={t("dev.field.stream_srt_port")}
+						control={
+							<Input
+								target={fields}
+								prop="encPort"
+								placeholder="6000"
+								required={true}
 							/>
-							<Break />
-						</>
-					)}
+						}
+					/>
+					<Break />
 					<Field
 						label={t("dev.field.srt_latency")}
 						control={
@@ -984,7 +930,8 @@ export function encoderCardBody(
 						}
 					/>
 				</FieldGroup>
-				{!combined && [<Break />, streamButtons(host, "encoder.stop")]}
+				<Break />
+				{streamButtons(host)}
 			</Form>
 		</Card>
 	);
@@ -996,8 +943,7 @@ const encoderModule: FrontendModule = {
 	title: "Encoder",
 	roleIcons: { encoder: encoderIcon },
 	order: 10,
-	available: (status) =>
-		status.role === "encoder" || status.role === "combined",
+	available: (status) => status.role === "encoder",
 	dashboardWidgets: encoderDashboardWidgets,
 	setupSteps: [encoderSetupStep],
 	deviceSummaryColumns: encoderSummaryColumns,
@@ -1007,8 +953,6 @@ const encoderModule: FrontendModule = {
 	component: (status) => encoderCardBody(card, status as EncoderStatus),
 	handleEvent(event, _data, host) {
 		if (!host) return;
-		host.provideCapability("encoder.start", encoderStart);
-		host.provideCapability("encoder.streamButtons", streamButtons);
 		const state = encoderState(host);
 		const status = currentStatus(host);
 		if (event === "open") state.pipelinesLoaded = false;

@@ -7,7 +7,6 @@
     "dev.control_unavailable_title": "未连接控制 websocket",
     "dev.field.remote_host": "SRTLA 远程主机",
     "dev.field.remote_port": "SRTLA 远程端口",
-    "dev.field.srt_listen_port": "SRT 监听端口",
     "dev.group.connection": "连接",
     "dev.iface_modem": "调制解调器 #{{index}}",
     "dev.imei": "IMEI",
@@ -76,5 +75,6 @@
     "mlog.done.reconfigured": "已重新配置",
     "act.relay.reconfigure": "重新配置调制解调器",
     "role.relay": "中继",
-    "setup.role.relay_tag": "接收流并使用 SRTLA 转发"
+    "setup.role.relay_tag": "接收流并使用 SRTLA 转发",
+    "dev.field.srtla_listen_port": "SRTLA 监听端口"
 }

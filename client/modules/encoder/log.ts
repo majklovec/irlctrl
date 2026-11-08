@@ -10,7 +10,6 @@ const repoImported = (p: Record<string, unknown>) =>
 
 const log: LogWording = {
     methods: {
-        "encoder.start": wording("Encoder", "Start", "mlog.done.started"),
         "encoder.stop": wording("Encoder", "Stop", "mlog.done.stopped"),
         "encoder.bitrate": wording("Encoder", "Bitrate change", (p) =>
             logTranslate("mlog.done.bitrate", {

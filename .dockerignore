@@ -14,6 +14,11 @@ yarn-error.log*
 .npm
 .yarn
 
+# ---- User data (not baked into the image) ----
+assets/*
+# the seed overlay templates are part of the app
+!assets/overlay_templates/
+
 # ---- Build output ----
 dist
 build

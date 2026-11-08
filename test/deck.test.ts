@@ -41,7 +41,7 @@ describe("dashboard action catalogue (status.actions)", () => {
             const actions =
                 typeof mod.dashboardActions === "function"
                     ? mod.dashboardActions(
-                          status("combined", {
+                          status(mod.roles?.[0] ?? "relay", {
                               [mod.configKey ?? mod.id]: true,
                           }),
                       )
@@ -55,7 +55,7 @@ describe("dashboard action catalogue (status.actions)", () => {
 
     test("merges the actions of the enabled modules that serve the role", () => {
         const keys = dashboardActionsFor(
-            status("combined", { encoder: true, relay: false }),
+            status("encoder", { encoder: true, relay: false }),
         ).map((a) => a.key);
         expect(keys).toContain(dashboardActionKey("encoder", "stop"));
         // Disabled SRTLA module → neither relay nor modem actions.
@@ -66,27 +66,18 @@ describe("dashboard action catalogue (status.actions)", () => {
     });
 
     test("respects the module's roles and the method role overrides", () => {
-        // encoder serves encoder+combined: a relay never offers its actions even
-        // when the slice claims enabled
+        // a relay never offers encoder actions even when the slice claims enabled
         const relay = dashboardActionsFor(
             status("relay", { encoder: true, relay: true }),
         ).map((a) => a.key);
         expect(relay.some((k) => k.startsWith("encoder."))).toBe(false);
         expect(relay).toContain(dashboardActionKey("relay", "stop"));
-        // stream.stop is a combined-only method (methodRoles)
+        // encoder devices offer both the process and the stream controls
         const encoder = dashboardActionsFor(
             status("encoder", { encoder: true }),
         ).map((a) => a.key);
         expect(encoder).toContain(dashboardActionKey("encoder", "stop"));
-        expect(encoder).not.toContain(
-            dashboardActionKey("encoder", "stream-stop"),
-        );
-        const combined = dashboardActionsFor(
-            status("combined", { encoder: true }),
-        ).map((a) => a.key);
-        expect(combined).toContain(
-            dashboardActionKey("encoder", "stream-stop"),
-        );
+        expect(encoder).toContain(dashboardActionKey("encoder", "stream-stop"));
     });
 
     test("entries carry the owning module and the stored key", () => {
@@ -103,7 +94,7 @@ describe("dashboard action catalogue (status.actions)", () => {
     });
 
     test("emits one mute/toggle action per live OBS audio source", () => {
-        const st = status("combined", { "obs": true });
+        const st = status("relay", { "obs": true });
         // status() spreads module fragments to the top level, so the source
         // list lands at status.obs.audioSources (as the device reports it).
         st.obs = {
@@ -144,7 +135,7 @@ describe("dashboard action catalogue (status.actions)", () => {
     });
 
     test("emits one scene-switch action per OBS scene", () => {
-        const st = status("combined", { "obs": true });
+        const st = status("relay", { "obs": true });
         st.obs = { scenes: ["Live", "BRB"], currentScene: "Live" };
         const scenes = dashboardActionsFor(st).filter((a) =>
             a.id.startsWith("scene:"),
@@ -168,7 +159,7 @@ describe("dashboard action catalogue (status.actions)", () => {
     test("the OBS factory hides mute buttons when no sources are reported", () => {
         // enabled module with no obs fragment → base actions only
         const keys = dashboardActionsFor(
-            status("combined", { "obs": true }),
+            status("relay", { "obs": true }),
         ).map((a) => a.id);
         expect(keys).toContain("stream-start");
         expect(keys.some((k) => k.startsWith("mute:"))).toBe(false);
@@ -345,7 +336,7 @@ describe("deck widget config", () => {
     });
 
     test("server validation: foreign devices are always rejected; strict also rejects gone devices and unknown actions", () => {
-        const st = status("combined", { encoder: true });
+        const st = status("encoder", { encoder: true });
         st.actions = dashboardActionsFor(st);
         const context = (strict: boolean) => ({
             strict,

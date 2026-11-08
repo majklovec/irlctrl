@@ -7,7 +7,6 @@
     "dev.control_unavailable_title": "Nie je pripojený riadiaci websocket",
     "dev.field.remote_host": "SRTLA vzdialený hostiteľ",
     "dev.field.remote_port": "SRTLA vzdialený port",
-    "dev.field.srt_listen_port": "SRT počúvací port",
     "dev.group.connection": "Pripojenie",
     "dev.iface_modem": "modem #{{index}}",
     "dev.imei": "IMEI",
@@ -76,5 +75,6 @@
     "mlog.done.reconfigured": "Prekonfigurované",
     "act.relay.reconfigure": "Prekonfigurovať modemy",
     "role.relay": "relay",
-    "setup.role.relay_tag": "Prijíma streamy a preposiela ich pomocou SRTLA"
+    "setup.role.relay_tag": "Prijíma streamy a preposiela ich pomocou SRTLA",
+    "dev.field.srtla_listen_port": "SRTLA počúvací port"
 }

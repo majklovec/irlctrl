@@ -7,7 +7,6 @@
     "dev.control_unavailable_title": "Нет подключенного управляющего websocket",
     "dev.field.remote_host": "Удаленный хост SRTLA",
     "dev.field.remote_port": "Удаленный порт SRTLA",
-    "dev.field.srt_listen_port": "Порт прослушивания SRT",
     "dev.group.connection": "Подключение",
     "dev.iface_modem": "модем #{{index}}",
     "dev.imei": "IMEI",
@@ -76,5 +75,6 @@
     "mlog.done.reconfigured": "Перенастроено",
     "act.relay.reconfigure": "Перенастроить модемы",
     "role.relay": "ретранслятор",
-    "setup.role.relay_tag": "Принимает стримы и пересылает их через SRTLA"
+    "setup.role.relay_tag": "Принимает стримы и пересылает их через SRTLA",
+    "dev.field.srtla_listen_port": "Порт прослушивания SRTLA"
 }

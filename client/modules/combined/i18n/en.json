@@ -1,5 +1,0 @@
-{
-    "role.combined": "encoder + relay",
-    "setup.role.combined": "Combined",
-    "setup.role.combined_tag": "Encodes and relays in a single service"
-}

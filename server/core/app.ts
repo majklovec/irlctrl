@@ -10,6 +10,7 @@
  * the Elysia root, discovers + mounts the pages, mounts the core routes,
  * listens, then starts the pages' background work.
  */
+import { join } from "node:path";
 import { Elysia } from "elysia";
 import { notFound } from "../../shared/http";
 import { i18nReady } from "../../shared/i18n";
@@ -101,7 +102,7 @@ export async function createControlServer(options: ControlServerOptions) {
         .use(pwaRoutes())
         .use(accountRoutes(auth, frontend))
         .use(liveFeedRoutes(services))
-        .use(await staticRoutes())
+        .use(await staticRoutes(join(services.config.storageDir, "overlay_templates")))
         .use(
             new Elysia({ name: "control-not-found" }).all(
                 "*",
