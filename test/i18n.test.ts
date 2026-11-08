@@ -69,6 +69,70 @@ describe("i18next translation options", () => {
                 expect(merged?.[key], `${name}: ${key}`).toBeDefined();
     });
 
+    for (const language of LANGUAGES.filter((lang) => lang !== "en")) {
+        test(`project and overlay text is localized in ${language}`, async () => {
+            const keys = [
+                "mgmt.projects",
+                "overlay.create_new",
+                "overlay.export_overlay",
+                "overlay.import_invalid_file",
+                "overlay.import_overlay",
+                "overlay.zoom_fit",
+                "profile.language.title",
+                "projects.create_new",
+                "projects.created",
+                "projects.delete",
+                "projects.delete_confirm",
+                "projects.empty",
+                "projects.invites.create",
+                "projects.invites.empty",
+                "projects.invites.revoke",
+                "projects.invites.title",
+                "projects.join.accept",
+                "projects.join.failed",
+                "projects.join.joined",
+                "projects.join.open",
+                "projects.join.title",
+                "projects.members.remove",
+                "projects.members.title",
+                "projects.new_name",
+                "projects.new_placeholder",
+                "projects.rename",
+                "projects.renamed",
+                "projects.role.owner",
+                "projects.role.viewer",
+                "projects.select.label",
+                "projects.select.placeholder",
+                "projects.title",
+                "projects.you",
+            ];
+            const options = {
+                name: "Example",
+                project: "Example",
+                role: "Editor",
+            };
+            await i18nReady;
+            expect(await catalog(language)).not.toBeNull();
+            for (const key of keys)
+                expect(translate(language, key, options), `${language}: ${key}`)
+                    .not.toBe(translate("en", key, options));
+            expect(
+                translate(language, "projects.delete_confirm", options),
+            ).toContain(options.name);
+            const joined = translate(language, "projects.join.joined", options);
+            expect(joined).toContain(options.project);
+            expect(joined).toContain(options.role);
+        });
+    }
+
+    test("Czech action labels use the intended meaning", async () => {
+        await catalog("cs");
+        expect(translate("cs", "dash.delete")).toBe("Smazat");
+        expect(translate("cs", "mlog.action.delete")).toBe("Smazat");
+        expect(translate("cs", "assets.uploading")).toBe("Nahrávání…");
+        expect(translate("cs", "overlay.opacity")).toBe("Krytí");
+    });
+
     test("interpolates named values", async () => {
         await i18nReady;
         expect(
