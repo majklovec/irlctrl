@@ -16,6 +16,14 @@ const registered = params.has("registered");
 const queryUsername = params.get("username") ?? "";
 const queryPassword = params.get("password") ?? "";
 
+// When we were bounced here by a protected route, return to the original
+// path (only accept same-site relative targets).
+const nextParam = params.get("next") ?? "";
+const nextTarget =
+	nextParam.startsWith("/") && !nextParam.startsWith("//")
+		? nextParam
+		: "/";
+
 const state = {
 	username: queryUsername,
 	password: queryPassword,
@@ -24,7 +32,7 @@ const state = {
 };
 
 /** POST the credentials to /api/login; on success the server sets the
- * session cookie and we land on the device list. */
+ * session cookie and we return to the original route (or the device list). */
 async function attemptLogin(): Promise<void> {
 	if (state.busy) return;
 	state.busy = true;
@@ -34,7 +42,7 @@ async function attemptLogin(): Promise<void> {
 		await apiJson("/api/login", {
 			body: { username: state.username, password: state.password },
 		});
-		location.replace("/");
+		location.replace(nextTarget);
 	} catch {
 		state.error = true;
 	} finally {

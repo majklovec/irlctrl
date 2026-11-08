@@ -87,7 +87,12 @@ async function submit(ev: Event): Promise<void> {
 				invite: state.invite.trim(),
 			},
 		});
-		location.replace("/login?registered=1");
+		// Forward the ?next= target (if we were bounced from a protected
+		// route) so the login page can return there after signing in.
+		const next = new URLSearchParams(location.search).get("next") ?? "";
+		location.replace(
+			`/login?registered=1${next ? `&next=${encodeURIComponent(next)}` : ""}`,
+		);
 	} catch (err) {
 		// the server's error string maps to a translated message; anything
 		// else (network, non-JSON) keeps the generic one

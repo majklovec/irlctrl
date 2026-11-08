@@ -6,12 +6,14 @@ export function unauthenticatedResponse(
     auth: Auth,
     request: Request,
 ): Response {
-    const path = new URL(request.url).pathname;
-    if (request.method === "GET" && !path.startsWith("/api/"))
-        return Response.redirect(
-            auth.db && !auth.hasUsers() ? "/register" : "/login",
-            302,
-        );
+    const url = new URL(request.url);
+    if (request.method === "GET" && !url.pathname.startsWith("/api/")) {
+        // Preserve the original route so we can return to it after login.
+        const next =
+            url.pathname !== "/" ? url.pathname + url.search : "/";
+        const target = `${auth.db && !auth.hasUsers() ? "/register" : "/login"}?next=${encodeURIComponent(next)}`;
+        return Response.redirect(target, 302);
+    }
     return auth.unauthorized();
 }
 
