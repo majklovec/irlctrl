@@ -1,0 +1,28 @@
+/* Modems card: the modem panels (signal / operator / registration / power). */
+.mod-modems-card .modem {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.9rem 1rem;
+    background: var(--card-subtle);
+    transition:
+        border-color var(--t),
+        background var(--t);
+}
+.mod-modems-card .modem:hover {
+    border-color: var(--border-strong);
+}
+.mod-modems-card .modem h3 {
+    font-size: 0.95rem;
+    margin: 0 0 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+.mod-modems-card .modem dl {
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+}
+.mod-modems-card .modem .actions button {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.8rem;
+}

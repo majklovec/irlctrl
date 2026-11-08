@@ -3,8 +3,8 @@
  * or restart), the scheduler options applied over the control socket
  * (control.ts) and the per-link stats push.
  *
- * Also owns the relay's interface routing and ModemManager integration;
- * those implementations are internal parts of this module.
+ * The bonding / uplinks-file layer lives in the network module: this module
+ * points `srtla_send` at the `network.uplinks` file and reloads on change.
  */
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -18,10 +18,8 @@ import { t } from "../../../shared/i18n";
 import {
     ApiError,
     oneOf,
-    optionalStringList,
     requireBoolean,
     requireHost,
-    requireIndex,
     requirePort,
     requireString,
 } from "../../../shared/params";
@@ -32,36 +30,12 @@ import {
     waitForUdpPort,
 } from "../../../shared/srtla";
 import { errorMessage } from "../../../shared/util";
+import { requireCapability } from "../../../shared/capabilities";
 import type { ModuleCore } from "../../backend/module_core";
+import type { Uplinks } from "../../../shared/contracts/module_capabilities";
 import * as control from "./control";
 import log from "./log";
 import {
-    bindModemManager,
-    detectModems,
-    modemSource,
-    performModemAction,
-} from "./modems";
-import {
-    bindRouting,
-    defaultRouteDetails,
-    detectInterfaces,
-    ensureUplinksFile,
-    isMonitorRunning,
-    reconfigure,
-    resolveSelection,
-    selection,
-    setSelection,
-    startDefaultRouteFailover,
-    startInterfaceMonitor,
-    stopDefaultRouteFailover,
-    stopInterfaceMonitor,
-    UPLINKS_FILE,
-} from "./routing";
-import {
-    type Iface,
-    type ModemConfig,
-    type ModemInfo,
-    type ReconfigureResult,
     type RelayConfig,
     SRTLA_MODES,
     type SrtlaOptions,
@@ -106,61 +80,10 @@ const SRT_INTERNAL_PORT = intArgEnv(
 let core: ModuleCore;
 /** Push channel, available from start on. */
 let emit: Emit | undefined;
-
-const uplinksFile = (): string => UPLINKS_FILE;
-
-/** Reconfigure routing / uplinks and reload srtla_send if the file changed. */
-async function reconfigureAndReload(): Promise<ReconfigureResult> {
-    const result = await reconfigure();
-    if (!result.ok)
-        throw new ApiError(result.error ?? "reconfigure failed", 500);
-    if (result.changed) await reloadRelay();
-    return result;
-}
-
-async function applySelection(next: ModemConfig) {
-    await setSelection(next);
-    const { selected, ips, uplinksFile, changed } =
-        await reconfigureAndReload();
-    return { selection: selection(), selected, ips, uplinksFile, changed };
-}
-
-async function selectModems(p: Params) {
-    const names = optionalStringList(p, "modems");
-    const ips = optionalStringList(p, "ips");
-    const all = await detectInterfaces();
-    const badIfaces =
-        names?.filter((name) => !all.some((iface) => iface.iface === name)) ??
-        [];
-    if (badIfaces.length)
-        throw new ApiError(`Unknown interfaces: ${badIfaces.join(", ")}`);
-    const badIps =
-        ips?.filter((ip) => !all.some((iface) => iface.ip === ip)) ?? [];
-    if (badIps.length) throw new ApiError(`Unknown IPs: ${badIps.join(", ")}`);
-    return applySelection(
-        names?.length ? { modems: names } : ips?.length ? { ips } : {},
-    );
-}
-
-async function toggleModem(p: Params) {
-    const name = requireString(p, "iface");
-    const all = await detectInterfaces();
-    if (!all.some((iface) => iface.iface === name))
-        throw new ApiError(`Unknown interface: ${name}`, 404);
-    const names = new Set(resolveSelection(all).map((iface) => iface.iface));
-    if (!names.delete(name)) names.add(name);
-    return applySelection({ modems: [...names] });
-}
-
-async function modemStatus(): Promise<{
-    interfaces: Iface[];
-    selected: Iface[];
-    modems: ModemInfo[];
-}> {
-    const modems = await detectModems();
-    const interfaces = await detectInterfaces(modems);
-    return { interfaces, selected: resolveSelection(interfaces), modems };
-}
+/** The network module's uplinks layer (bonded file + change hook). */
+let uplinks: Uplinks;
+/** Unregister the uplinks-change handler on stop. */
+let uplinksUnsub: (() => void) | undefined;
 
 // ----------------------------------------------------------------------
 /** The module was `srtla` until v2: a config file still carrying that section
@@ -204,7 +127,6 @@ async function save(patch: Partial<RelayConfig>): Promise<void> {
         quality: s.quality ?? false,
         remoteHost: s.remoteHost ?? "",
         remotePort: s.remotePort ?? "",
-        selection: s.selection,
     } satisfies RelayConfig;
     await core.saveState();
 }
@@ -312,8 +234,8 @@ async function startRelay(
     // Save the requested receiver before spawning so failed starts still
     // leave the UI with a complete target to restore.
     await save({ listenPort: String(srtlaPort), remoteHost, remotePort });
-    await ensureUplinksFile();
-    const uplinks = uplinksFile();
+    await uplinks.ensure();
+    const uplinksFile = uplinks.file();
     const recArgs = srtlaRecArgs(srtlaPort, "127.0.0.1", SRT_INTERNAL_PORT);
     console.log(`Starting ${recBin} ${recArgs.join(" ")}`);
     console.log(
@@ -326,7 +248,7 @@ async function startRelay(
             sendPort,
             remoteHost,
             remotePort,
-            uplinks,
+                uplinksFile,
         ].join(" ")}`,
     );
 
@@ -348,7 +270,7 @@ async function startRelay(
             const withControl = !!SRTLA_SOCKET && caps.controlSocket;
             control.prepareSrtlaControl(SRTLA_SOCKET, withControl);
             const proc = Bun.spawn(
-                [bin, ...flags, sendPort, remoteHost, remotePort, uplinks],
+                [bin, ...flags, sendPort, remoteHost, remotePort, uplinksFile],
                 { stdout: "inherit", stderr: "inherit", stdin: "inherit" },
             );
             if (withControl) control.startSrtlaControl(SRTLA_SOCKET);
@@ -502,17 +424,9 @@ const registration: BackendModule<ModuleCore> = {
         },
     ],
     roles: ["relay"],
+    /** The srtla_send uplinks file lives in the network module. */
+    dependencies: ["network"],
     methods: [
-        "interfaces.list",
-        "reconfigure",
-        "modems.list",
-        "modems.select",
-        "modems.toggle",
-        "modems.enable",
-        "modems.disable",
-        "modems.reset",
-        "modems.connect",
-        "modems.disconnect",
         "relay.status",
         "relay.start",
         "relay.stop",
@@ -522,12 +436,6 @@ const registration: BackendModule<ModuleCore> = {
     ],
     events: ["relay.stats"],
     dashboardActions: [
-        {
-            id: "reconfigure",
-            label: "act.relay.reconfigure",
-            icon: "↻",
-            method: "reconfigure",
-        },
         {
             id: "start",
             label: "act.relay.start",
@@ -552,32 +460,21 @@ const registration: BackendModule<ModuleCore> = {
     bind(c) {
         core = c;
         adoptLegacySection(c);
-        bindModemManager(c);
-        bindRouting(c, modemSource);
+        uplinks = requireCapability<Uplinks>("network.uplinks");
     },
     async start(ctx) {
         core = ctx.core;
         emit = ctx.emit;
-        bindModemManager(core);
-        bindRouting(core, modemSource);
-        const result = await reconfigure();
-        if (!result.ok) {
-            console.error("Initial reconfigure failed:", result.error);
-            core.logEvent(
-                "error",
-                "Interfaces",
-                t("log.reconfigure_failed", { error: result.error }),
-            );
-            throw new Error(`Initial reconfigure failed: ${result.error}`);
-        }
-        console.log(`Initial uplinks: ${result.ips.join(", ")}`);
-        startInterfaceMonitor(reloadRelay);
-        startDefaultRouteFailover();
+        // Reload srtla_send whenever the network module rewrites the uplinks file.
+        uplinksUnsub = uplinks.onChanged(async () => {
+            console.log("Uplinks changed — reloading srtla_send");
+            await reloadRelay();
+        });
         await maybeStartRelay();
     },
     async stop() {
-        stopDefaultRouteFailover();
-        await stopInterfaceMonitor();
+        uplinksUnsub?.();
+        uplinksUnsub = undefined;
         await stopRelay();
     },
     /** Relay autostart: bring the bridge back with the saved target. */
@@ -590,18 +487,6 @@ const registration: BackendModule<ModuleCore> = {
     },
     async dispatch(method, p) {
         switch (method) {
-            case "interfaces.list":
-                return { interfaces: await detectInterfaces() };
-            case "reconfigure":
-                return reconfigureAndReload();
-            case "modems.list": {
-                const status = await modemStatus();
-                return { selection: selection(), ...status };
-            }
-            case "modems.select":
-                return selectModems(p);
-            case "modems.toggle":
-                return toggleModem(p);
             case "relay.status":
                 return { relay: relayStatus() };
             case "relay.start": {
@@ -649,46 +534,17 @@ const registration: BackendModule<ModuleCore> = {
                 return result;
             }
         }
-        if (method.startsWith("modems.")) {
-            const action = method.slice("modems.".length);
-            if (
-                action !== "enable" &&
-                action !== "disable" &&
-                action !== "reset" &&
-                action !== "connect" &&
-                action !== "disconnect"
-            )
-                throw new Error(`unknown method ${method}`);
-            const modemIndex = requireIndex(p);
-            return {
-                modemIndex,
-                action,
-                ok: await performModemAction(action, modemIndex),
-            };
-        }
         throw new Error(`unknown method ${method}`);
     },
     async status() {
-        const [modem, defaultRoute] = await Promise.all([
-            modemStatus(),
-            defaultRouteDetails(),
-        ]);
         return {
             state: {
                 relay: relayStatus(),
                 relayTarget: target(),
                 relayOptions: options() ?? {},
-                selection: selection(),
+                srtlaMonitor: { reloadMode: RELOAD_MODE },
             },
-            ...modem,
-            defaultRouteInterface: defaultRoute?.iface ?? null,
-            defaultRouteSourceIp: defaultRoute?.ip ?? null,
-            uplinksFile: UPLINKS_FILE,
             srtlaControl: control.srtlaControlState(),
-            monitor: {
-                running: isMonitorRunning(),
-                reloadMode: RELOAD_MODE,
-            },
             summary: { relay: relayStatus() },
         };
     },
@@ -710,7 +566,6 @@ const registration: BackendModule<ModuleCore> = {
                 quality,
                 remoteHost,
                 remotePort,
-                selection: stored().selection,
             } satisfies RelayConfig;
         };
     },

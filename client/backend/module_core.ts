@@ -10,7 +10,7 @@
  */
 import type { Role } from "../../shared/validate";
 import { cancelAutostart } from "./autostart";
-import { hasCapability, requireCapability } from "./capabilities";
+import { hasCapability, requireCapability } from "../../shared/capabilities";
 import {
     argv,
     DRY_RUN,

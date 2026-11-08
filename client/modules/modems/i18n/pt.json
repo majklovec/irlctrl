@@ -1,0 +1,17 @@
+{
+    "dev.imei": "IMEI",
+    "dev.modem_fallback": "Modem",
+    "dev.no_modems": "Nenhum modem encontrado (ModemManager).",
+    "dev.operator": "Operador",
+    "dev.power": "Energia",
+    "dev.registration": "Reg.",
+    "dev.reset_confirm": "Reiniciar modem #{{index}}?",
+    "dev.tech": "Tecnologia",
+    "mlog.done.modem_connected": "Modem #{{index}} ligado",
+    "mlog.done.modem_disabled": "Modem #{{index}} desativado",
+    "mlog.done.modem_disconnected": "Modem #{{index}} desligado",
+    "mlog.done.modem_enabled": "Modem #{{index}} ativado",
+    "mlog.done.modem_reset": "Modem #{{index}} reiniciado",
+    "wtype.modems": "Modems",
+    "wtype.network": "Rede"
+}

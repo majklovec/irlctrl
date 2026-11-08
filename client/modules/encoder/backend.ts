@@ -45,14 +45,9 @@ import type {
     SrtlaState,
     SrtlaTarget,
 } from "./types";
-import {
-    defaultSourceIp,
-    srtlaSendCapabilities,
-    srtlaSendFlags,
-    writeUplinksFile,
-} from "../../../shared/srtla";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { srtlaSendCapabilities, srtlaSendFlags } from "../../../shared/srtla";
+import { requireCapability } from "../../../shared/capabilities";
+import type { Uplinks } from "../../../shared/contracts/module_capabilities";
 
 /** Map a start failure to a status code: conflicts 409, bad pipeline / audio 400, else 500. */
 async function startChecked<T>(start: () => Promise<T>): Promise<T> {
@@ -107,7 +102,10 @@ function encoderDestination(p: Params): {
 
 const SRTLA_RESTART_DELAY_MS = 2_000;
 const srtlaSendBin = () => process.env.SRTLA_SEND_BIN ?? "srtla_send";
-const uplinksPath = () => join(tmpdir(), "irlctrl_encoder_uplinks.txt");
+/** The network module's bonded uplinks file + change hook. */
+let uplinks: Uplinks;
+/** Unregister the uplinks-change handler on stop. */
+let uplinksUnsub: (() => void) | undefined;
 
 let srtlaSup: InstanceType<ModuleCore["Supervisor"]> | undefined;
 const srtlaSupervisor = () =>
@@ -148,23 +146,24 @@ async function startSrtlaSend(target: SrtlaTarget): Promise<void> {
         await stopSrtlaSend();
     }
 
-    const uplinks = uplinksPath();
+    // The bonded uplinks file from the network module (same file the relay reloads on).
+    await uplinks.ensure();
+    const uplinksFile = uplinks.file();
     if (core.config.DRY_RUN) {
         console.log(
-            `[DRY-RUN] Would start ${bin} ${target.listenPort} ${target.remoteHost} ${target.remotePort} ${uplinks}`,
+            `[DRY-RUN] Would start ${bin} ${target.listenPort} ${target.remoteHost} ${target.remotePort} ${uplinksFile}`,
         );
         srtlaLive = { running: true, ...target, startedAt: Date.now() };
         return;
     }
     // No control socket on the encoder leg; only the flags this build knows.
     const flags = srtlaSendFlags(await srtlaSendCapabilities(bin), {});
-    await writeUplinksFile(uplinks, defaultSourceIp());
     const args = [
         ...flags,
         target.listenPort,
         target.remoteHost,
         target.remotePort,
-        uplinks,
+        uplinksFile,
     ];
     console.log(`Starting ${bin} ${args.join(" ")}`);
     await srtlaSupervisor().start(() =>
@@ -186,6 +185,39 @@ async function stopSrtlaSend(): Promise<void> {
     if (!srtlaSup && !srtlaLive.running) return; // never started — nothing to stop
     await srtlaSup?.stop();
     srtlaLive = { ...srtlaLive, running: false, pid: undefined };
+}
+
+/** Ask srtla_send to re-read the uplinks file; true when the signal was delivered. */
+function signalSrtlaReload(): boolean {
+    if (core.config.DRY_RUN) {
+        console.log("[DRY-RUN] SIGHUP srtla_send");
+        return true;
+    }
+    const pid = srtlaRunning() ? srtlaSupervisor().pid : undefined;
+    if (!pid) return false;
+    try {
+        process.kill(pid, "SIGHUP");
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/** Reload srtla_send after an uplinks-file change: SIGHUP, restart as fallback. */
+async function reloadSrtlaSend(): Promise<void> {
+    if (!srtlaRunning()) return;
+    if (signalSrtlaReload()) {
+        console.log("srtla_send sent SIGHUP (re-read uplinks)");
+        return;
+    }
+    console.warn("SIGHUP failed — restarting srtla_send");
+    const { listenPort, remoteHost, remotePort } = srtlaLive;
+    if (!listenPort || !remoteHost || !remotePort) {
+        console.warn("No srtla_send target cached — cannot restart");
+        return;
+    }
+    await stopSrtlaSend();
+    await startSrtlaSend({ listenPort, remoteHost, remotePort });
 }
 
 /** Bring up srtla_send (reusing it if already aimed at the same target), then the encoder into it. */
@@ -418,6 +450,8 @@ const encoderModule: BackendModule<ModuleCore> = {
     ],
     secretFields: [],
     roles: ["encoder"],
+    /** srtla_send points at the network module's bonded uplinks file. */
+    dependencies: ["network"],
     methods: [
         "encoder.status",
         "encoder.stop",
@@ -440,8 +474,16 @@ const encoderModule: BackendModule<ModuleCore> = {
     bind: bindCore,
     async start(ctx: ModuleStartContext<ModuleCore>) {
         bindCore(ctx.core);
+        uplinks = requireCapability<Uplinks>("network.uplinks");
+        // Reload srtla_send whenever the network module rewrites the uplinks file.
+        uplinksUnsub = uplinks.onChanged(async () => {
+            console.log("Uplinks changed — reloading srtla_send");
+            await reloadSrtlaSend();
+        });
     },
     stop: async () => {
+        uplinksUnsub?.();
+        uplinksUnsub = undefined;
         await stopStream();
     },
     dispatch,

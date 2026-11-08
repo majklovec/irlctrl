@@ -1,0 +1,17 @@
+{
+    "dev.imei": "IMEI",
+    "dev.modem_fallback": "Модем",
+    "dev.no_modems": "Модемы не найдены (ModemManager).",
+    "dev.operator": "Оператор",
+    "dev.power": "Питание",
+    "dev.registration": "Рег.",
+    "dev.reset_confirm": "Сбросить модем #{{index}}?",
+    "dev.tech": "Технология",
+    "mlog.done.modem_connected": "Модем #{{index}} подключен",
+    "mlog.done.modem_disabled": "Модем #{{index}} отключен",
+    "mlog.done.modem_disconnected": "Модем #{{index}} отсоединен",
+    "mlog.done.modem_enabled": "Модем #{{index}} включен",
+    "mlog.done.modem_reset": "Модем #{{index}} сброшен",
+    "wtype.modems": "Модемы",
+    "wtype.network": "Сеть"
+}

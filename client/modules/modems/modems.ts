@@ -1,6 +1,7 @@
 /*
- * ModemManager integration used by the SRTLA device module: enumerate modems,
- * resolve their network interfaces, and perform modem control actions.
+ * ModemManager integration of the modems module: enumerate modems, resolve
+ * their network interfaces, and perform modem control actions. Offered to
+ * other modules over the `modems.source` capability.
  */
 import type { ModuleCore } from "../../backend/module_core";
 import type { ModemInfo, ModemSource } from "./types";

@@ -1,7 +1,6 @@
 /* SRTLA card: srtla_send state, the receiver form and the scheduler options.
- * The SRTLA module is the relay device's single card: it composes the interfaces
- * table (with the live SRTLA link stats) and the modem panels, so the device
- * page and dashboard widgets show the same content. */
+ * The device page composes it with the network module's interfaces card and
+ * the modems module's modem panels. */
 import "./styles.css";
 import {
 	Actions,
@@ -16,17 +15,15 @@ import {
 	Field,
 	FieldGroup,
 	Form,
-	IconButton,
 	Input,
 	numberAttrs,
 	Options,
 	Select,
 } from "@ui/components/";
-import { confirmDialog } from "@ui/components/confirm";
-import { Icon, OutlineIcon } from "@ui/components/icons";
+import { OutlineIcon } from "@ui/components/icons";
 import { card, type DeviceCard } from "@ui/device/store";
 import { t } from "@ui/i18n";
-import { formatBitrate, formatSpeed, inRange, since } from "@ui/util";
+import { inRange, since } from "@ui/util";
 import m from "mithril";
 import type {
 	DeviceDashboardWidget,
@@ -35,12 +32,9 @@ import type {
 import type { DeviceSummary, SetupInfo } from "../../../shared/contracts/wire";
 import { attemptedSteps } from "../../../shared/setup_progress";
 import log from "./log";
-import { defaultRouteRowIndex } from "./route_view";
 import type {
-	ModemInfo,
 	RelayDeviceSummary,
 	RelayStatus,
-	SrtlaLinkStats,
 	SrtlaOptions,
 	SrtlaStats,
 	SrtlaStatsEvent,
@@ -135,7 +129,7 @@ const relayDashboardWidgets: DeviceDashboardWidget[] = [
 		defaultSize: { w: 4, h: 4 },
 		minSize: { w: 3, h: 3 },
 		body: ({ card: host, status }) =>
-			status ? srtlaComposite(host, status as RelayStatus) : null,
+			status ? relayCardBody(host, status as RelayStatus) : null,
 		badge: ({ status }) => (
 			<Badge
 				text={status ? t("dev.badge.online") : t("dev.badge.offline")}
@@ -267,16 +261,8 @@ export function relayCardBody(host: DeviceCard, status: RelayStatus): m.Vnode {
 						t("dev.reloads_detail", {
 							reloads: s.reloadCount ?? 0,
 							last: since(s.lastReloadAt),
-							mode: status.monitor.reloadMode,
+							mode: status.state.srtlaMonitor?.reloadMode ?? "signal",
 						}),
-					],
-					[
-						t("dev.monitor"),
-						status.monitor.running ? (
-							<Badge text={t("dev.monitor_watching")} kind="on" />
-						) : (
-							<Badge text={t("ui.off")} kind="warn" />
-						),
 					],
 					[t("dev.control"), s.running ? controlBadge(status) : null],
 				]}
@@ -387,318 +373,6 @@ export function relayCardBody(host: DeviceCard, status: RelayStatus): m.Vnode {
 	);
 }
 
-// -------------------------------------------------------------- interfaces card
-
-/* Interfaces: bond selection per interface, with the live srtla_send link
- * stats matched to interfaces by source IP (the `no-stats` class shows muted
- * placeholders until the first `relay.stats` push). */
-const STATS_STALE_MS = 5_000;
-const LINK_COLUMNS = 7;
-
-/** Signal-quality meter with its percentage. */
-function signal(quality?: number): Child {
-	if (quality === undefined) return "—";
-	return (
-		<span>
-			<meter
-				min={0}
-				max={100}
-				low={30}
-				high={60}
-				optimum={100}
-				value={quality}
-			/>
-			{` ${quality}%`}
-		</span>
-	);
-}
-
-function linkState(l: SrtlaLinkStats): m.Vnode {
-	if (l.timed_out) return <Badge text={t("dev.link_timed_out")} kind="off" />;
-	if (!l.connected)
-		return <Badge text={t("dev.control_connecting")} kind="warn" />;
-	if (l.stall_gated) return <Badge text={t("dev.link_stalled")} kind="warn" />;
-	if (l.weak)
-		return (
-			<span title={l.weak_reason ?? ""}>
-				<Badge text={t("dev.link_weak")} kind="warn" />
-			</span>
-		);
-	return (
-		<Badge
-			text={l.sole_carrier ? t("dev.link_sole") : t("dev.link_up")}
-			kind="on"
-		/>
-	);
-}
-
-function linkCells(l: SrtlaLinkStats | undefined, total: number): m.Vnode[] {
-	const cell = (child: Child, cls = "", title?: string): m.Vnode => (
-		<td class={`link-col ${cls}`.trim()} title={title}>
-			{child}
-		</td>
-	);
-	if (!l) return Array.from({ length: LINK_COLUMNS }, () => cell("—", "muted"));
-	const share = total ? l.bitrate_bytes_per_sec / total : 0;
-	return [
-		cell(linkState(l), "", l.label ?? ""),
-		cell(
-			<span>
-				<meter
-					class="share"
-					min={0}
-					max={1}
-					value={share}
-					title={t("dev.link_share_title", {
-						percentage: Math.round(share * 100),
-						rtt: Math.round(l.rtt_min_ms),
-					})}
-				/>
-				{formatBitrate(l.bitrate_bytes_per_sec)}
-			</span>,
-			"num",
-		),
-		cell(
-			l.connected ? `${Math.round(l.rtt_ms)} ms` : "—",
-			"num is-rtt",
-			t("dev.link_min_rtt", { rtt: Math.round(l.rtt_min_ms) }),
-		),
-		cell(`${l.in_flight} / ${l.window}`, "num is-inflight"),
-		cell(l.nak_count, "num is-naks"),
-		cell(`${((l.cc_loss_permille ?? 0) / 10).toFixed(1)}%`, "num is-loss"),
-		cell(
-			l.quality_multiplier !== undefined
-				? `×${l.quality_multiplier.toFixed(2)}`
-				: "—",
-			"num is-quality",
-			l.base_score !== undefined
-				? t("dev.link_score", { score: l.base_score })
-				: "",
-		),
-	];
-}
-
-function linkHeader(): m.Vnode {
-	const th = (text: string, title?: string, cls?: string) => (
-		<th class={`link-col ${cls ?? ""}`.trim()} title={title}>
-			{text}
-		</th>
-	);
-	return (
-		<thead>
-			<tr>
-				<th>{t("dev.th.bond")}</th>
-				<th class="is-iface">{t("dev.th.interface")}</th>
-				<th class="is-signal">{t("dev.signal")}</th>
-				<th class="is-network">{t("dev.th.network")}</th>
-				{th(t("dev.th.link"))}
-				{th(t("mgmt.th_bitrate"))}
-				{th("RTT", undefined, "is-rtt")}
-				{th(t("dev.th.in_flight"), t("dev.th.in_flight_title"), "is-inflight")}
-				{th(t("dev.th.naks"), undefined, "is-naks")}
-				{th(t("dev.th.loss"), undefined, "is-loss")}
-				{th(t("dev.th.quality"), undefined, "is-quality")}
-			</tr>
-		</thead>
-	);
-}
-
-function interfacesCard(host: DeviceCard, status: RelayStatus): m.Vnode {
-	const selected = new Set(status.selected.map((i) => i.iface));
-	const frame = statsFrame(host);
-	const live = frame?.value.stats ?? null;
-	const stale = !!live && !!frame?.at && Date.now() - frame.at > STATS_STALE_MS;
-	const links = new Map((live?.links ?? []).map((l) => [l.ip, l]));
-	const total =
-		live?.links.reduce((sum, l) => sum + (l.bitrate_bytes_per_sec || 0), 0) ??
-		0;
-	const defaultRouteRow = defaultRouteRowIndex(
-		status.interfaces,
-		status.defaultRouteInterface,
-		status.defaultRouteSourceIp,
-	);
-
-	const rows = status.interfaces.map((i, index) => {
-		const isDefaultRoute = index === defaultRouteRow;
-		const sub = [
-			i.cidr,
-			i.modemIndex !== undefined
-				? t("dev.iface_modem", { index: i.modemIndex })
-				: null,
-		]
-			.filter(Boolean)
-			.join(" · ");
-		const network = [i.operatorName, i.accessTech].filter(Boolean).join(" · ");
-		const busyKey = `iface:${i.iface}`;
-		return (
-			<tr
-				key={`${i.iface}:${i.ip}`}
-				class={[
-					selected.has(i.iface) ? "selected" : "",
-					isDefaultRoute ? "default-route" : "",
-				]
-					.filter(Boolean)
-					.join(" ")}
-			>
-				<td>
-					<input
-						type="checkbox"
-						checked={selected.has(i.iface)}
-						disabled={host.busy.has(busyKey)}
-						title={t("dev.include_in_bond")}
-						onchange={() =>
-							void host.act(busyKey, "modems.toggle", {
-								iface: i.iface,
-							})
-						}
-					/>
-				</td>
-				<td class="is-iface">
-					{i.iface}
-					{isDefaultRoute ? (
-						<span class="default-route-label">{t("dev.default_route")}</span>
-					) : null}
-					{i.speed ? (
-						<small class="muted">{` · ${formatSpeed(i.speed)}`}</small>
-					) : null}
-					{sub ? <span class="iface-sub muted">{sub}</span> : null}
-				</td>
-				<td class="is-signal">{signal(i.signalQuality)}</td>
-				<td class="is-network">{network || "—"}</td>
-				{linkCells(links.get(i.ip), total)}
-			</tr>
-		);
-	});
-
-	return (
-		<Card
-			title={t("dev.card.interfaces")}
-			headActions={[
-				stale && (
-					<Badge
-						text={t("dev.stale", {
-							time: since(frame?.at ?? 0),
-						})}
-						kind="warn"
-					/>
-				),
-				<IconButton
-					label={t("ui.reconfigure")}
-					icon={<Icon name="sync" class="role-icon" />}
-					disabled={host.busy.has("reconfigure")}
-					onclick={() => void host.act("reconfigure", "reconfigure")}
-				/>,
-			]}
-		>
-			<table class={live ? "" : "no-stats"}>
-				{linkHeader()}
-				{rows.length ? (
-					rows
-				) : (
-					<tr>
-						<td colspan={4 + LINK_COLUMNS} class="muted">
-							{t("dev.no_interfaces")}
-						</td>
-					</tr>
-				)}
-			</table>
-		</Card>
-	);
-}
-
-// ----------------------------------------------------------------- modem panels
-
-async function modemAction(
-	host: DeviceCard,
-	method: string,
-	index: number,
-): Promise<void> {
-	if (
-		method === "modems.reset" &&
-		!(await confirmDialog(t("dev.reset_confirm", { index }), { danger: true }))
-	)
-		return;
-	void host.act(`modem:${method}:${index}`, method, { index });
-}
-
-const stateKind = (state: string) =>
-	state === "connected"
-		? "on"
-		: state === "disabled" || state === "failed"
-			? "off"
-			: "warn";
-
-function modemPanel(host: DeviceCard, modem: ModemInfo): m.Vnode {
-	const control = (label: string, method: string, cls = "secondary") => (
-		<Button
-			label={label}
-			class={cls}
-			disabled={
-				host.busy.has(`modem:${method}:${modem.index}`) ||
-				!!currentStatus(host)?.state.relay.running
-			}
-			onclick={() => void modemAction(host, method, modem.index)}
-		/>
-	);
-	const connected = modem.state === "connected";
-	const name =
-		[modem.manufacturer, modem.model].filter(Boolean).join(" ") ||
-		t("dev.modem_fallback");
-	return (
-		<article class="modem" key={modem.index}>
-			<h3>
-				<span>{`#${modem.index} ${name}`}</span>
-				<Badge text={modem.state} kind={stateKind(modem.state)} />
-			</h3>
-			<DefinitionList
-				rows={[
-					[t("dev.signal"), signal(modem.signalQuality)],
-					[t("dev.operator"), modem.operatorName],
-					[t("dev.tech"), modem.accessTech],
-					[t("dev.registration"), modem.registrationState],
-					[t("dev.power"), modem.powerState],
-					[t("dev.imei"), modem.imei],
-				]}
-			/>
-			<Actions>
-				{control(t("ui.enable"), "modems.enable")}
-				{control(t("ui.disable"), "modems.disable")}
-				{connected
-					? control(t("ui.disconnect"), "modems.disconnect")
-					: control(t("ui.connect"), "modems.connect")}
-				{control(t("ui.reset"), "modems.reset", "danger")}
-			</Actions>
-		</article>
-	);
-}
-
-function modemsCard(host: DeviceCard, status: RelayStatus): m.Vnode {
-	return (
-		<Card title={t("dev.card.modems")} class="mod-relay-modems">
-			{status.modems.length ? (
-				<div class="grid">
-					{status.modems.map((modem) => modemPanel(host, modem))}
-				</div>
-			) : (
-				<p class="muted">{t("dev.no_modems")}</p>
-			)}
-		</Card>
-	);
-}
-
-/** The relay device's full card set (device page and dashboard widgets): the
- * SRTLA state card, the interfaces table with the live link stats, and the
- * modem panels. */
-export function srtlaComposite(host: DeviceCard, status: RelayStatus): m.Vnode {
-	return (
-		<>
-			{relayCardBody(host, status)}
-			{interfacesCard(host, status)}
-			{modemsCard(host, status)}
-		</>
-	);
-}
-
 const relayModule: FrontendModule = {
 	id: "relay",
 	kind: "device-card",
@@ -806,7 +480,7 @@ const relayModule: FrontendModule = {
 	],
 	defaultSize: { w: 4, h: 4 },
 	minSize: { w: 3, h: 3 },
-	component: (status) => srtlaComposite(card, status as RelayStatus),
+	component: (status) => relayCardBody(card, status as RelayStatus),
 	handleEvent(event, _data, host) {
 		const status = host ? currentStatus(host) : null;
 		if (event === "status" && host && status) syncRelayForm(host, status);

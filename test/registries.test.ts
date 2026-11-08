@@ -21,8 +21,12 @@ import {
  * Registry order of the device modules: no module declares `dependencies`
  * anymore, so the topological sort is plain alphabetical order of ids.
  */
+// Canonical dependency order (the registry's start order): capability
+// providers (modems, network) come before their consumers (encoder, relay).
 const DEVICE_ORDER = [
     "broadcaster",
+    "modems",
+    "network",
     "encoder",
     "obs",
     "relay",
@@ -176,13 +180,18 @@ describe("module registries", () => {
         );
         expect(missing).toEqual([]);
         expect(extra).toEqual([]);
-        // The relay card composes the routing table and modem panels.
-        const relaySrc = readFileSync(
-            join(moduleDir("relay"), "frontend.tsx"),
+        // The network card owns the interfaces table and the modems card
+        // owns the modem panels — the relay card is SRTLA-only.
+        const networkSrc = readFileSync(
+            join(moduleDir("network"), "frontend.tsx"),
             "utf8",
         );
-        expect(relaySrc).toContain("mod-relay-modems");
-        expect(relaySrc).toContain("interfacesCard");
+        expect(networkSrc).toContain("interfacesCard");
+        const modemsSrc = readFileSync(
+            join(moduleDir("modems"), "frontend.tsx"),
+            "utf8",
+        );
+        expect(modemsSrc).toContain("modemsCard");
     });
 
     test("widget frontends are separate from device modules", () => {
@@ -345,8 +354,13 @@ describe("role presets from the registrations", () => {
                 .filter(([, slice]) => slice.enabled)
                 .map(([key]) => key)
                 .sort();
-        expect(on("relay")).toEqual(["relay", "ssh"]);
-        expect(on("encoder")).toEqual(["encoder", "ssh"]);
+        expect(on("relay")).toEqual(["modems", "network", "relay", "ssh"]);
+        expect(on("encoder")).toEqual([
+            "encoder",
+            "modems",
+            "network",
+            "ssh",
+        ]);
         expect(on("obs")).toEqual(["obs"]);
     });
 

@@ -21,7 +21,7 @@ import {
 import { deepMerge } from "../../shared/util";
 import type { Role } from "../../shared/validate";
 import { runAutostart as runAutostartWith } from "./autostart";
-import { provideCapability } from "./capabilities";
+import { provideCapability } from "../../shared/capabilities";
 import { logEvent } from "./eventlog";
 import { ROLE } from "./config";
 import { buildModuleCore, type ModuleCore } from "./module_core";

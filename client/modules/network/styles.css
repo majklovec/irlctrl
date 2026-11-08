@@ -1,0 +1,78 @@
+/* Network card: the interfaces table with the live srtla_send link stats. */
+
+/* Responsive interfaces table: when the dashboard cell is narrow, drop the
+ * lower-priority link columns one tier at a time (bond checkbox, interface,
+ * link state and bitrate stay). The classes live on th/td pairs; in the
+ * `no-stats` table the .link-col cells are already hidden, so only
+ * signal/network tiers apply there. Ignored outside .dash-widget (e.g. the
+ * full-width device page). */
+@container dash-widget (max-width: 920px) {
+    th.is-inflight,
+    td.is-inflight,
+    th.is-naks,
+    td.is-naks,
+    th.is-loss,
+    td.is-loss,
+    th.is-quality,
+    td.is-quality {
+        display: none;
+    }
+}
+@container dash-widget (max-width: 660px) {
+    th.is-rtt,
+    td.is-rtt,
+    th.is-network,
+    td.is-network {
+        display: none;
+    }
+}
+@container dash-widget (max-width: 486px) {
+    th.is-signal,
+    td.is-signal {
+        display: none;
+    }
+    /* Compact: small padding/font and a wrapping interface name keep the
+     * 4-column table inside very narrow cells (fits down to ~260px). */
+    .mod-network table {
+        font-size: 0.8rem;
+    }
+    .mod-network th,
+    .mod-network td {
+        padding: 0.35rem 0.4rem;
+    }
+    .mod-network td meter.share {
+        display: none;
+    }
+    .mod-network th.is-iface,
+    .mod-network td.is-iface {
+        white-space: normal;
+        overflow-wrap: break-word;
+    }
+}
+
+/* srtla_send link telemetry */
+.iface-sub {
+    display: block;
+    font-size: 0.8rem;
+}
+tr.default-route td {
+    background: color-mix(in srgb, var(--ok) 12%, transparent);
+}
+.default-route-label {
+    display: inline-block;
+    margin-left: 0.45rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ok) 20%, transparent);
+    color: var(--ok);
+    font-size: 0.75em;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.no-stats .link-col {
+    display: none;
+}
+td meter.share {
+    width: 50px;
+    margin-right: 0.35rem;
+}

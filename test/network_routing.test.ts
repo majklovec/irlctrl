@@ -8,8 +8,8 @@ import {
     defaultRouteDetails,
     isSelfGeneratedEvent,
     setRtTablesFileForTest,
-} from "../client/modules/relay/routing";
-import { defaultRouteRowIndex } from "../client/modules/relay/route_view";
+} from "../client/modules/network/routing";
+import { defaultRouteRowIndex } from "../client/modules/network/route_view";
 
 // The tests below bind stub bags into the module singleton; hand the real
 // process bag back so later test files see the device as discovery left it.

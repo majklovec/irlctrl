@@ -1,0 +1,17 @@
+{
+    "dev.imei": "IMEI",
+    "dev.modem_fallback": "Modem",
+    "dev.no_modems": "No modems found (ModemManager).",
+    "dev.operator": "Operator",
+    "dev.power": "Power",
+    "dev.registration": "Reg.",
+    "dev.reset_confirm": "Reset modem #{{index}}?",
+    "dev.tech": "Tech",
+    "mlog.done.modem_connected": "Modem #{{index}} connected",
+    "mlog.done.modem_disabled": "Modem #{{index}} disabled",
+    "mlog.done.modem_disconnected": "Modem #{{index}} disconnected",
+    "mlog.done.modem_enabled": "Modem #{{index}} enabled",
+    "mlog.done.modem_reset": "Modem #{{index}} reset",
+    "wtype.modems": "Modems",
+    "wtype.network": "Network"
+}

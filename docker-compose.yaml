@@ -99,6 +99,8 @@ services:
         restart: unless-stopped
         # Runs as root (like the relay): the ssh module needs root for
         # sshd (port 22, root logins) and chpasswd (password reset).
+        cap_add:
+            - NET_ADMIN
         ports:
             - "8085:8085"
         command:

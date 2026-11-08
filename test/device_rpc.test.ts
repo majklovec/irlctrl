@@ -176,10 +176,10 @@ describe("device RPC surface", () => {
         ["relay", "ceracoder.set"],
         ["relay", "stream.start"],
         ["relay", "encoder.stop"],
-        ["encoder", "modems.enable"],
         ["encoder", "relay.start"],
-        ["encoder", "reconfigure"],
         ["encoder", "relay.stop"],
+        ["obs", "modems.enable"],
+        ["obs", "reconfigure"],
         ["obs", "ssh.status"],
     ] as const)(
         "rejects %s before invoking %s or logging",
@@ -261,9 +261,9 @@ describe("device RPC surface", () => {
     test("routes a module method to its owner's dispatch with the raw params", async () => {
         relayDevice();
         const log = silenceLog();
-        const srtla = moduleById("relay");
-        if (!srtla) throw new Error("srtla module missing");
-        const dispatch = spyOn(srtla, "dispatch").mockResolvedValue({
+        const modems = moduleById("modems");
+        if (!modems) throw new Error("modems module missing");
+        const dispatch = spyOn(modems, "dispatch").mockResolvedValue({
             modemIndex: 2,
             action: "enable",
             ok: false,

@@ -1,0 +1,17 @@
+{
+    "dev.imei": "IMEI",
+    "dev.modem_fallback": "调制解调器",
+    "dev.no_modems": "未找到调制解调器 (ModemManager)。",
+    "dev.operator": "运营商",
+    "dev.power": "电源",
+    "dev.registration": "注册",
+    "dev.reset_confirm": "重置调制解调器 #{{index}}？",
+    "dev.tech": "技术",
+    "mlog.done.modem_connected": "调制解调器 #{{index}} 已连接",
+    "mlog.done.modem_disabled": "调制解调器 #{{index}} 已禁用",
+    "mlog.done.modem_disconnected": "调制解调器 #{{index}} 已断开",
+    "mlog.done.modem_enabled": "调制解调器 #{{index}} 已启用",
+    "mlog.done.modem_reset": "调制解调器 #{{index}} 已重置",
+    "wtype.modems": "调制解调器",
+    "wtype.network": "网络"
+}

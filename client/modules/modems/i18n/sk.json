@@ -1,0 +1,17 @@
+{
+    "dev.imei": "IMEI",
+    "dev.modem_fallback": "Modem",
+    "dev.no_modems": "Nenašli sa žiadne modemy (ModemManager).",
+    "dev.operator": "Operátor",
+    "dev.power": "Napájanie",
+    "dev.registration": "Reg.",
+    "dev.reset_confirm": "Resetovať modem #{{index}}?",
+    "dev.tech": "Technológia",
+    "mlog.done.modem_connected": "Modem #{{index}} pripojený",
+    "mlog.done.modem_disabled": "Modem #{{index}} zakázaný",
+    "mlog.done.modem_disconnected": "Modem #{{index}} odpojený",
+    "mlog.done.modem_enabled": "Modem #{{index}} povolený",
+    "mlog.done.modem_reset": "Modem #{{index}} resetovaný",
+    "wtype.modems": "Módemy",
+    "wtype.network": "Sieť"
+}

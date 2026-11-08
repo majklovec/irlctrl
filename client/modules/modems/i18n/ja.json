@@ -1,0 +1,17 @@
+{
+    "dev.imei": "IMEI",
+    "dev.modem_fallback": "モデム",
+    "dev.no_modems": "モデムが見つかりません (ModemManager)。",
+    "dev.operator": "オペレーター",
+    "dev.power": "電源",
+    "dev.registration": "登録",
+    "dev.reset_confirm": "モデム #{{index}} をリセットしますか？",
+    "dev.tech": "技術",
+    "mlog.done.modem_connected": "モデム #{{index}} を接続しました",
+    "mlog.done.modem_disabled": "モデム #{{index}} を無効化しました",
+    "mlog.done.modem_disconnected": "モデム #{{index}} を切断しました",
+    "mlog.done.modem_enabled": "モデム #{{index}} を有効化しました",
+    "mlog.done.modem_reset": "モデム #{{index}} をリセットしました",
+    "wtype.modems": "モデム",
+    "wtype.network": "ネットワーク"
+}

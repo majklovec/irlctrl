@@ -19,6 +19,8 @@ cases.
 │   └── modules/              # device modules (run on the box, serve a role)
 │       ├── README.md         # this file
 │       ├── encoder/
+│       ├── modems/
+│       ├── network/
 │       ├── relay/
 │       ├── obs/
 │       ├── broadcaster/

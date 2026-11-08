@@ -2,9 +2,10 @@
  * Interface detection, bonding selection, source-based routing tables,
  * uplinks file management and the live netlink interface monitor.
  *
- * Bound by the SRTLA module at discovery (`bindRouting`): the core bag supplies
- * the dry-run aware `ip` runner and atomic writes; the module supplies the
- * ModemManager lookups.
+ * Bound by the network module at discovery (`bindRouting`): the core bag
+ * supplies the dry-run aware `ip` runner and atomic writes; the modems
+ * module supplies the ModemManager lookups over the `modems.source`
+ * capability.
  */
 import { exists, readFile } from "node:fs/promises";
 import { resolve4 } from "node:dns/promises";
@@ -17,8 +18,8 @@ import { argEnv, intArgEnv } from "../../../shared/args";
 import { errorMessage, readLines } from "../../../shared/util";
 import type {
     Iface,
+    Modem,
     ModemConfig,
-    ModemInfo,
     ModemSource,
     ReconfigureResult,
 } from "./types";
@@ -111,13 +112,13 @@ async function linkSpeed(iface: string): Promise<number | undefined> {
 // ----------------------------------------------------------------------
 /** IPv4 interfaces usable for bonding; pass `modems` when the caller already listed them. */
 export async function detectInterfaces(
-    modemList?: ModemInfo[],
+    modemList?: Modem[],
 ): Promise<Iface[]> {
     const [addrs, list] = await Promise.all([
         query(["-o", "-4", "addr", "show", "up"]),
         modemList ?? modems.detect(),
     ]);
-    const modemByIface = new Map<string, ModemInfo>();
+    const modemByIface = new Map<string, Modem>();
     await Promise.all(
         list.map(async (m) => {
             const ifName = await modems.modemIface(m);
@@ -185,10 +186,10 @@ function getNetwork(ipAddr: string, prefix: number): string {
 }
 
 // ----------------------------------------------------------------------
-// Selection (persisted in the SRTLA config section)
+// Selection (persisted in the network config section)
 // ----------------------------------------------------------------------
 export const selection = (): ModemConfig =>
-    ((core.state.data.relay as Record<string, unknown> | undefined)?.selection ??
+    ((core.state.data.network as Record<string, unknown> | undefined)?.selection ??
         {}) as ModemConfig;
 
 /** The interfaces chosen for bonding: by name, else by IP, else all of them. */
@@ -200,8 +201,8 @@ export function resolveSelection(all: Iface[]): Iface[] {
 }
 
 export async function setSelection(next: ModemConfig): Promise<void> {
-    const stored = (core.state.data.relay ?? {}) as Record<string, unknown>;
-    core.state.data.relay = { ...stored, selection: next };
+    const stored = (core.state.data.network ?? {}) as Record<string, unknown>;
+    core.state.data.network = { ...stored, selection: next };
     await core.saveState();
 }
 
@@ -574,8 +575,21 @@ let monitorProc: Bun.Subprocess<"ignore", "pipe", "pipe"> | null = null;
 let monitorDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let monitorBusy = false;
 let monitorPending = false;
-let onUplinksChanged: UplinksChangedHandler = async () => {};
+// One handler per SRTLA leg owner (relay, encoder) — each reloads its own
+// srtla_send. Registered over the `network.uplinks` capability.
+const uplinksChangedHandlers = new Set<UplinksChangedHandler>();
 let monitorWanted = false;
+
+/** Register an uplinks-changed handler (`network.uplinks.onChanged`); returns the unsubscribe. */
+export function onUplinksChanged(handler: UplinksChangedHandler): () => void {
+    uplinksChangedHandlers.add(handler);
+    return () => uplinksChangedHandlers.delete(handler);
+}
+
+/** Run every registered handler (the monitor after a changed file, a manual reconfigure). */
+export async function fireUplinksChanged(): Promise<void> {
+    await Promise.all([...uplinksChangedHandlers].map((handler) => handler()));
+}
 
 export const isMonitorRunning = (): boolean => monitorProc !== null;
 
@@ -607,7 +621,7 @@ async function runReconcile(reason: string): Promise<void> {
         console.log(`[monitor] active uplinks: ${result.ips.join(", ")}`);
 
         if (result.changed) {
-            await onUplinksChanged();
+            await fireUplinksChanged();
         } else {
             console.log(
                 "[monitor] no change to uplinks file — skipping reload",
@@ -664,11 +678,10 @@ export async function isSelfGeneratedEvent(line: string): Promise<boolean> {
 
 /**
  * Start watching netlink events for address / link / route changes.
- * Any relevant event triggers a debounced reconfigure; `onChange` runs
- * whenever the uplinks file content actually changed.
+ * Any relevant event triggers a debounced reconfigure; the registered
+ * uplinks-changed handlers run whenever the uplinks file content changed.
  */
-export function startInterfaceMonitor(onChange?: UplinksChangedHandler): void {
-    if (onChange) onUplinksChanged = onChange;
+export function startInterfaceMonitor(): void {
     monitorWanted = true;
     if (monitorProc) return;
 

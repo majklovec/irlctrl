@@ -4,7 +4,7 @@ import {
     hasCapability,
     provideCapability,
     requireCapability,
-} from "../client/backend/capabilities";
+} from "../shared/capabilities";
 describe("module capability bus", () => {
     afterEach(clearCapabilities);
 

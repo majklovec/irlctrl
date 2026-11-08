@@ -1,56 +1,6 @@
-/* Types for the relay's SRTLA bridging, interface-routing and modem domain. */
+/* Types for the relay's SRTLA bridge. The interface/modem domain types live
+ * in the network and modems modules. */
 import type { DeviceSummary, Status } from "../../../shared/contracts/wire";
-
-export interface Iface {
-    iface: string;
-    ip: string;
-    prefix: number;
-    cidr: string;
-    speed?: number;
-    modemIndex?: number;
-    modemPath?: string;
-    signalQuality?: number;
-    operatorName?: string;
-    accessTech?: string;
-    registered?: boolean;
-    connectionState?: string;
-}
-
-export interface ModemConfig {
-    modems?: string[];
-    ips?: string[];
-}
-
-export interface ModemInfo {
-    index: number;
-    path: string;
-    state: string;
-    powerState: string;
-    signalQuality?: number;
-    accessTech?: string;
-    operatorName?: string;
-    registrationState?: string;
-    model?: string;
-    manufacturer?: string;
-    imei?: string;
-    primaryPort?: string;
-    deviceId?: string;
-    simPath?: string;
-}
-
-export interface ReconfigureResult {
-    ok: boolean;
-    selected: Iface[];
-    uplinksFile: string;
-    ips: string[];
-    changed: boolean;
-    error?: string;
-}
-
-export interface ModemSource {
-    detect(): Promise<ModemInfo[]>;
-    modemIface(modem: ModemInfo): Promise<string | null>;
-}
 
 /**
  * The SRTLA target the relay bridges to. `listenPort` is the SRTLA UDP input
@@ -137,23 +87,17 @@ export interface SrtlaStatsEvent {
     stats: SrtlaStats | null;
 }
 
-/** The status envelope exposed by the SRTLA module. */
+/** The status envelope exposed by the relay module (the network and modems
+ * modules contribute the interfaces / modems / monitor fragments themselves). */
 export type RelayStatus = Status & {
     state: {
         relay: SrtlaState;
         relayTarget?: SrtlaTarget;
         relayOptions: SrtlaOptions;
-        selection: ModemConfig;
+        srtlaMonitor?: { reloadMode: string };
         stream?: SrtlaTarget;
     };
-    interfaces: Iface[];
-    selected: Iface[];
-    defaultRouteInterface?: string | null;
-    defaultRouteSourceIp?: string | null;
-    modems: ModemInfo[];
-    uplinksFile: string;
     srtlaControl: SrtlaControlState;
-    monitor: { running: boolean; reloadMode: string };
 };
 
 /** The device-list row with the relay module's summary fields (status `summary` + live stats patches). */
@@ -172,5 +116,4 @@ export interface RelayConfig {
     quality: boolean;
     remoteHost: string;
     remotePort: string;
-    selection?: ModemConfig;
 }
