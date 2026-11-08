@@ -7,9 +7,12 @@ import {
     moduleById,
 } from "../client/backend/modules";
 import { state } from "../client/backend/state";
-import { parseBitrates, parseEncoderConfig } from "../client/modules/encoder/params";
-import type { Params } from "../shared/params";
+import {
+    parseBitrates,
+    parseEncoderConfig,
+} from "../client/modules/encoder/params";
 import type { Status } from "../shared/contracts/wire";
+import type { Params } from "../shared/params";
 
 const OBS = "obs";
 const originalSettings = state.settings;
@@ -115,6 +118,9 @@ describe("device RPC surface", () => {
                 "ceracoder.set",
                 "stream.start",
                 "stream.stop",
+                "stream.stats",
+                "stream.options",
+                "stream.reload",
                 "obs.request",
                 "obs.requestBatch",
                 "obs.setEventSubscriptions",
@@ -217,17 +223,35 @@ describe("device RPC surface", () => {
             "The device uuid can't be changed",
             false,
         ],
-        ["relay", "modems.enable", {}, "index must be a non-negative integer", true],
+        [
+            "relay",
+            "modems.enable",
+            {},
+            "index must be a non-negative integer",
+            true,
+        ],
         ["relay", "relay.start", {}, "listenPort is required", true],
         ["relay", "relay.options", {}, "mode or quality is required", true],
         ["encoder", "pipelines.get", {}, "id is required", false],
         ["encoder", "pipelines.create", {}, "id is required", true],
-        ["encoder", "encoder.bitrate", {}, "maxBitrate or minBitrate is required", true],
+        [
+            "encoder",
+            "encoder.bitrate",
+            {},
+            "maxBitrate or minBitrate is required",
+            true,
+        ],
         ["encoder", "stream.start", {}, "pipeline is required", true],
         ["relay", "autostart.set", {}, "enabled must be a boolean", true],
         ["relay", "modules.enable", {}, "id is required", true],
         ["relay", "obs.request", {}, "requestType is required", false],
-        ["relay", "obs.requestBatch", {}, "requests must be a non-empty array", false],
+        [
+            "relay",
+            "obs.requestBatch",
+            {},
+            "requests must be a non-empty array",
+            false,
+        ],
     ] satisfies [Status["role"], string, Params, string, boolean][])(
         "validates %s in the owning module and keeps the logged flag",
         async (role, method, params, error, logged) => {

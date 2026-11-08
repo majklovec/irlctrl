@@ -40,6 +40,7 @@
     "dev.row.restarts": "Рестарты",
     "dev.row.target": "Цель",
     "log.encoder_exited": "энкодер завершился с кодом {{code}}; перезапуск через {{delay}}s",
+    "log.legacy_target": "принята устаревшая цель SRTLA: {{listenPort}} → {{remoteHost}}:{{remotePort}}",
     "mlog.action.bitrate": "Изменение битрейта",
     "mlog.done.bitrate": "Битрейт: мин. {{minBitrate}} / макс. {{maxBitrate}} kbps",
     "mlog.done.cera_settings": "Настройки управления битрейтом применены",
@@ -93,6 +94,7 @@
     "act.encoder.bitrate_high": "Битрейт 6 Мбит/с",
     "act.encoder.start": "Запустить энкодер",
     "act.encoder.stream_stop": "Остановить стрим",
+    "act.encoder.reload": "Перезагрузить SRTLA",
     "role.encoder": "энкодер",
     "setup.role.encoder": "Энкодер",
     "setup.role.encoder_tag": "Захватывает pipeline GStreamer и отправляет его по SRT"

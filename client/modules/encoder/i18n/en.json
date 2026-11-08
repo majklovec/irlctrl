@@ -40,6 +40,7 @@
     "dev.row.restarts": "Restarts",
     "dev.row.target": "Target",
     "log.encoder_exited": "the encoder exited with code {{code}}; restarting in {{delay}}s",
+    "log.legacy_target": "adopted the legacy SRTLA target {{listenPort}} → {{remoteHost}}:{{remotePort}}",
     "mlog.action.bitrate": "Bitrate change",
     "mlog.done.bitrate": "Bitrate set to min {{minBitrate}} / max {{maxBitrate}} kbps",
     "mlog.done.cera_settings": "Bitrate control settings applied",
@@ -93,6 +94,7 @@
     "act.encoder.bitrate_high": "Bitrate 6 Mbps",
     "act.encoder.start": "Start encoder",
     "act.encoder.stream_stop": "Stop stream",
+    "act.encoder.reload": "Reload SRTLA",
     "role.encoder": "encoder",
     "setup.role.encoder": "Encoder",
     "setup.role.encoder_tag": "Captures video and sends it over SRT"

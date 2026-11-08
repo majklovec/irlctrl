@@ -40,6 +40,7 @@
     "dev.row.restarts": "再起動",
     "dev.row.target": "ターゲット",
     "log.encoder_exited": "エンコーダーがコード {{code}} で終了しました; {{delay}}s 後に再起動します",
+    "log.legacy_target": "従来の SRTLA ターゲットを移行しました: {{listenPort}} → {{remoteHost}}:{{remotePort}}",
     "mlog.action.bitrate": "ビットレート変更",
     "mlog.done.bitrate": "ビットレートを最小 {{minBitrate}} / 最大 {{maxBitrate}} kbps に設定しました",
     "mlog.done.cera_settings": "ビットレート制御設定を適用しました",
@@ -93,6 +94,7 @@
     "act.encoder.bitrate_high": "ビットレート 6 Mbps",
     "act.encoder.start": "エンコーダー開始",
     "act.encoder.stream_stop": "ストリーム停止",
+    "act.encoder.reload": "SRTLA を再読み込み",
     "role.encoder": "エンコーダー",
     "setup.role.encoder": "エンコーダー",
     "setup.role.encoder_tag": "GStreamer パイプラインをキャプチャし、SRT で送信します"

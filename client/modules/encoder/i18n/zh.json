@@ -40,6 +40,7 @@
     "dev.row.restarts": "重启",
     "dev.row.target": "目标",
     "log.encoder_exited": "编码器以代码 {{code}} 退出；将在 {{delay}}s 后重启",
+    "log.legacy_target": "已采用旧 SRTLA 目标: {{listenPort}} → {{remoteHost}}:{{remotePort}}",
     "mlog.action.bitrate": "码率更改",
     "mlog.done.bitrate": "码率设为最小 {{minBitrate}} / 最大 {{maxBitrate}} kbps",
     "mlog.done.cera_settings": "码率控制设置已应用",
@@ -93,6 +94,7 @@
     "act.encoder.bitrate_high": "码率 6 Mbps",
     "act.encoder.start": "启动编码器",
     "act.encoder.stream_stop": "停止推流",
+    "act.encoder.reload": "重新加载 SRTLA",
     "role.encoder": "编码器",
     "setup.role.encoder": "编码器",
     "setup.role.encoder_tag": "采集 GStreamer 管线并通过 SRT 发送"

@@ -8,19 +8,34 @@
  * Persisted sections: `encoder` (last used config), `ceracoder`,
  * `pipelineRepositories`. Live process state is module-local.
  */
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { ModuleCore } from "../../backend/module_core";
 import type {
     BackendModule,
+    Emit,
     ModuleStartContext,
     Params,
 } from "../../../shared/contracts/backend_module";
 import {
     ApiError,
     optionalInt,
+    oneOf,
+    requireBoolean,
     requireHost,
     requireString,
 } from "../../../shared/params";
-import { argEnv, intArgEnv } from "../../../shared/args";
+import {
+    argEnv,
+    enumArgEnv,
+    intArgEnv,
+} from "../../../shared/args";
+import {
+    SRTLA_MODES,
+    SrtlaSend,
+    srtlaStatsSummary,
+} from "../../../shared/srtla";
+import { t } from "../../../shared/i18n";
 import { errorMessage } from "../../../shared/util";
 import type { Role } from "../../../shared/validate";
 import { PIPELINES_DIR } from "./config";
@@ -42,10 +57,12 @@ import {
 import { listAudioSources, listPipelines } from "./sources";
 import type {
     EncoderConfig,
+    SrtlaConfig,
+    SrtlaOptions,
+    SrtlaOptionsResult,
     SrtlaState,
     SrtlaTarget,
 } from "./types";
-import { srtlaSendCapabilities, srtlaSendFlags } from "../../../shared/srtla";
 import { requireCapability } from "../../../shared/capabilities";
 import type { Uplinks } from "../../../shared/contracts/module_capabilities";
 
@@ -102,41 +119,63 @@ function encoderDestination(p: Params): {
 
 const SRTLA_RESTART_DELAY_MS = 2_000;
 const srtlaSendBin = () => process.env.SRTLA_SEND_BIN ?? "srtla_send";
+/** How an uplinks change reaches srtla_send: SIGHUP (re-read) or a respawn. */
+const RELOAD_MODE = enumArgEnv(
+    "--srtla-reload",
+    ["signal", "restart"] as const,
+    "SRTLA_RELOAD_MODE",
+    "signal",
+);
+/** srtla_send JSON-RPC control socket (link stats, mode / quality switching); "" disables it. */
+const SRTLA_SOCKET = argEnv(
+    "--srtla-socket",
+    "SRTLA_CONTROL_SOCKET",
+    join(tmpdir(), "srtla_send.sock"),
+);
 /** The network module's bonded uplinks file + change hook. */
 let uplinks: Uplinks;
 /** Unregister the uplinks-change handler on stop. */
 let uplinksUnsub: (() => void) | undefined;
+/** Push channel, available from start on. */
+let emit: Emit | undefined;
 
-let srtlaSup: InstanceType<ModuleCore["Supervisor"]> | undefined;
-const srtlaSupervisor = () =>
-    (srtlaSup ??= new core.Supervisor("SRTLA_SEND", SRTLA_RESTART_DELAY_MS, onSrtlaExit));
+let send: InstanceType<typeof SrtlaSend> | undefined;
+/** The supervised srtla_send leg (the same class the relay's leg uses). */
+const sendLeg = (): SrtlaSend =>
+    (send ??= new SrtlaSend(
+        {
+            Supervisor: core.Supervisor,
+            dryRun: core.config.DRY_RUN,
+            logEvent: core.logEvent,
+            notifyStateChange: () => core.notifyStateChange(),
+        },
+        {
+            section: "SRTLA_SEND",
+            controlSocket: SRTLA_SOCKET,
+            restartDelayMs: SRTLA_RESTART_DELAY_MS,
+            reloadMode: RELOAD_MODE,
+        },
+    ));
 
-/** The running (or last) srtla_send: target, pid, startedAt. */
-let srtlaLive: SrtlaState = { running: false };
+/** The leg's persisted section (`state.data.stream`). */
+const streamConfig = (): SrtlaConfig | undefined => data().stream;
+/** Scheduler options of the persisted stream config (the leg's spawn flags). */
+const streamOptions = (): SrtlaOptions | undefined => {
+    const s = streamConfig();
+    return s ? { mode: s.mode, quality: s.quality } : undefined;
+};
 
-const srtlaRunning = (): boolean =>
-    core.config.DRY_RUN ? srtlaLive.running : srtlaSupervisor().running;
+const srtlaRunning = (): boolean => sendLeg().running;
+const srtlaState = (): SrtlaState => sendLeg().state();
 
-function srtlaState(): SrtlaState {
-    return srtlaRunning() ? srtlaLive : { ...srtlaLive, running: false, pid: undefined };
-}
-
-/** srtla_send died on its own: keep retrying like the relay does. */
-function onSrtlaExit(code: number | null): void {
-    console.log(`srtla_send exited with code ${code}`);
-    if (!srtlaSupervisor().wanted) return;
-    core.logEvent(
-        "warn",
-        "SRTLA_SEND",
-        `srtla_send exited (code ${code}); restarting in ${SRTLA_RESTART_DELAY_MS / 1000}s`,
-    );
-    srtlaSupervisor().scheduleRestart();
-}
-
+/**
+ * Spawn (or reuse) srtla_send aimed at `target`. The scheduler options come
+ * from the persisted stream config; the control socket is on by default so
+ * the leg is monitored like the relay's.
+ */
 async function startSrtlaSend(target: SrtlaTarget): Promise<void> {
-    const bin = srtlaSendBin();
-    if (srtlaRunning()) {
-        const s = srtlaLive;
+    if (sendLeg().running) {
+        const s = sendLeg().state();
         if (
             s.listenPort === target.listenPort &&
             s.remoteHost === target.remoteHost &&
@@ -148,76 +187,39 @@ async function startSrtlaSend(target: SrtlaTarget): Promise<void> {
 
     // The bonded uplinks file from the network module (same file the relay reloads on).
     await uplinks.ensure();
-    const uplinksFile = uplinks.file();
-    if (core.config.DRY_RUN) {
-        console.log(
-            `[DRY-RUN] Would start ${bin} ${target.listenPort} ${target.remoteHost} ${target.remotePort} ${uplinksFile}`,
-        );
-        srtlaLive = { running: true, ...target, startedAt: Date.now() };
-        return;
-    }
-    // No control socket on the encoder leg; only the flags this build knows.
-    const flags = srtlaSendFlags(await srtlaSendCapabilities(bin), {});
-    const args = [
-        ...flags,
-        target.listenPort,
-        target.remoteHost,
-        target.remotePort,
-        uplinksFile,
-    ];
-    console.log(`Starting ${bin} ${args.join(" ")}`);
-    await srtlaSupervisor().start(() =>
-        Bun.spawn([bin, ...args], {
-            stdout: "inherit",
-            stderr: "inherit",
-            stdin: "inherit",
-        }),
-    );
-    srtlaLive = {
-        running: true,
-        ...target,
-        pid: srtlaSupervisor().pid,
-        startedAt: Date.now(),
-    };
+    await sendLeg().start(srtlaSendBin(), {
+        sendPort: target.listenPort,
+        remoteHost: target.remoteHost,
+        remotePort: target.remotePort,
+        uplinksFile: uplinks.file(),
+        options: streamOptions(),
+    });
 }
 
 async function stopSrtlaSend(): Promise<void> {
-    if (!srtlaSup && !srtlaLive.running) return; // never started — nothing to stop
-    await srtlaSup?.stop();
-    srtlaLive = { ...srtlaLive, running: false, pid: undefined };
-}
-
-/** Ask srtla_send to re-read the uplinks file; true when the signal was delivered. */
-function signalSrtlaReload(): boolean {
-    if (core.config.DRY_RUN) {
-        console.log("[DRY-RUN] SIGHUP srtla_send");
-        return true;
-    }
-    const pid = srtlaRunning() ? srtlaSupervisor().pid : undefined;
-    if (!pid) return false;
-    try {
-        process.kill(pid, "SIGHUP");
-        return true;
-    } catch {
-        return false;
-    }
+    await sendLeg().stop();
 }
 
 /** Reload srtla_send after an uplinks-file change: SIGHUP, restart as fallback. */
 async function reloadSrtlaSend(): Promise<void> {
-    if (!srtlaRunning()) return;
-    if (signalSrtlaReload()) {
-        console.log("srtla_send sent SIGHUP (re-read uplinks)");
-        return;
+    await sendLeg().reload();
+}
+
+/** Persist + apply scheduler options; `applied` is false when they only take effect on the next start. */
+async function setStreamOptions(
+    opts: SrtlaOptions,
+): Promise<SrtlaOptionsResult> {
+    const s = streamConfig();
+    if (s) {
+        data().stream = {
+            ...s,
+            mode: opts.mode ?? s.mode,
+            quality: opts.quality ?? s.quality,
+        };
+        await core.saveState();
     }
-    console.warn("SIGHUP failed — restarting srtla_send");
-    const { listenPort, remoteHost, remotePort } = srtlaLive;
-    if (!listenPort || !remoteHost || !remotePort) {
-        console.warn("No srtla_send target cached — cannot restart");
-        return;
-    }
-    await stopSrtlaSend();
-    await startSrtlaSend({ listenPort, remoteHost, remotePort });
+    const applied = await sendLeg().applyOptions(opts);
+    return { options: streamOptions() ?? {}, applied };
 }
 
 /** Bring up srtla_send (reusing it if already aimed at the same target), then the encoder into it. */
@@ -228,7 +230,14 @@ async function startStream(
     if (encoder().status().running) throw new Error("already streaming");
     // Keep the requested config even when validation fails, so the UI can restore it.
     data().encoder = cfg;
-    data().streamTarget = target;
+    data().stream = {
+        listenPort: target.listenPort,
+        mode: streamConfig()?.mode ?? "enhanced",
+        quality: streamConfig()?.quality ?? false,
+        remoteHost: target.remoteHost,
+        remotePort: target.remotePort,
+    };
+    delete data().streamTarget;
     await core.saveState();
     await encoder().validate(cfg); // fail before touching srtla_send
 
@@ -411,7 +420,7 @@ async function dispatch(method: string, p: Params): Promise<unknown> {
                 optionalInt(
                     p,
                     "listenPort",
-                    Number(data().streamTarget?.listenPort ?? 9000),
+                    Number(data().stream?.listenPort ?? 9000),
                     1,
                     65535,
                 ),
@@ -426,6 +435,22 @@ async function dispatch(method: string, p: Params): Promise<unknown> {
             core.cancelAutostart();
             await stopStream();
             return streamView();
+        case "stream.stats": {
+            // Latest retained frame, if any (the live source is the pushed
+            // `stream.stats` event; see `events`).
+            return sendLeg().control.latest() ?? null;
+        }
+        case "stream.options": {
+            const opts: SrtlaOptions = {};
+            if (p.mode !== undefined)
+                opts.mode = oneOf(p.mode, "mode", SRTLA_MODES);
+            if (p.quality !== undefined)
+                opts.quality = requireBoolean(p, "quality");
+            return setStreamOptions(opts);
+        }
+        case "stream.reload":
+            await reloadSrtlaSend();
+            return { reloaded: true };
         default:
             return pipelineMethod(method, p);
     }
@@ -459,6 +484,9 @@ const encoderModule: BackendModule<ModuleCore> = {
         "ceracoder.set",
         "stream.start",
         "stream.stop",
+        "stream.stats",
+        "stream.options",
+        "stream.reload",
         "pipelines.list",
         "pipelines.get",
         "pipelines.create",
@@ -469,12 +497,39 @@ const encoderModule: BackendModule<ModuleCore> = {
         "pipelines.repositories.update",
         "pipelines.repositories.updateAll",
     ],
-    events: [],
+    events: ["stream.stats"],
     log,
     bind: bindCore,
     async start(ctx: ModuleStartContext<ModuleCore>) {
         bindCore(ctx.core);
+        emit = ctx.emit;
         uplinks = requireCapability<Uplinks>("network.uplinks");
+        // One-shot legacy `streamTarget` adoption; options default like the relay.
+        const section = data();
+        if (section.streamTarget && !section.stream) {
+            core.logEvent("info", "SRTLA_SEND", t("log.legacy_target", {
+                listenPort: section.streamTarget.listenPort,
+                remoteHost: section.streamTarget.remoteHost,
+                remotePort: section.streamTarget.remotePort,
+            }));
+            section.stream = {
+                listenPort: section.streamTarget.listenPort,
+                mode: "enhanced",
+                quality: false,
+                remoteHost: section.streamTarget.remoteHost,
+                remotePort: section.streamTarget.remotePort,
+            };
+        }
+        // 1 Hz per-link stats → client; control-state changes invalidate status.
+        sendLeg().control.onStats(
+            (ev) =>
+                emit?.("stream.stats", ev, {
+                    throttle: true,
+                    retain: !!ev.stats,
+                    summary: srtlaStatsSummary(ev),
+                }),
+        );
+        sendLeg().control.onChange(() => core.notifyStateChange());
         // Reload srtla_send whenever the network module rewrites the uplinks file.
         uplinksUnsub = uplinks.onChanged(async () => {
             console.log("Uplinks changed — reloading srtla_send");
@@ -488,12 +543,20 @@ const encoderModule: BackendModule<ModuleCore> = {
     },
     dispatch,
 
-    /** Autostart: the last encoder config into the saved SRTLA target. */
+    /** Autostart: the last encoder config into the saved SRTLA stream. */
     async resume() {
         const cfg = data().encoder;
-        const target = data().streamTarget;
-        if (!cfg || !target) return false;
-        if (!encoder().status().running) await startStream(target, cfg);
+        const stream = data().stream;
+        if (!cfg || !stream) return false;
+        if (!encoder().status().running)
+            await startStream(
+                {
+                    listenPort: stream.listenPort,
+                    remoteHost: stream.remoteHost,
+                    remotePort: stream.remotePort,
+                },
+                cfg,
+            );
         return true;
     },
 
@@ -502,8 +565,12 @@ const encoderModule: BackendModule<ModuleCore> = {
         return {
             state: {
                 encoder: state,
-                stream: data().streamTarget,
+                srtla: srtlaState(),
+                stream: data().stream,
+                streamOptions: streamOptions() ?? {},
+                srtlaMonitor: { reloadMode: RELOAD_MODE },
             },
+            srtlaControl: sendLeg().control.state(),
             audioSources: await listAudioSources(),
             // null when the encoder binary is not ceracoder; the UI hides its settings then
             ceracoder: ceracoderConfig(),
@@ -525,7 +592,15 @@ const encoderModule: BackendModule<ModuleCore> = {
         const { remoteHost, remotePort } = encoderDestination(p);
         return () => {
             data().encoder = cfg;
-            data().streamTarget = { listenPort, remoteHost, remotePort };
+            data().stream = {
+                listenPort,
+                // The wizard predates scheduler options; keep any configured values.
+                mode: data().stream?.mode ?? "enhanced",
+                quality: data().stream?.quality ?? false,
+                remoteHost,
+                remotePort,
+            };
+            delete data().streamTarget;
         };
     },
 
@@ -570,6 +645,12 @@ const encoderModule: BackendModule<ModuleCore> = {
             icon: "⏹",
             method: "stream.stop",
             confirm: true,
+        },
+        {
+            id: "srtla-reload",
+            label: "act.encoder.reload",
+            icon: "↻",
+            method: "stream.reload",
         },
     ],
 };

@@ -44,6 +44,9 @@ import type {
 	EncoderState,
 	EncoderStatus,
 	Pipeline,
+	SrtlaOptions,
+	SrtlaStats,
+	SrtlaStatsEvent,
 } from "./types";
 import { BITRATE_KBPS } from "./types";
 import "./styles.css";
@@ -89,6 +92,79 @@ const encoderStates = new WeakMap<DeviceCard, EncoderCardState>();
 /** The card's last status push, as the encoder module reads it. */
 const currentStatus = (host: DeviceCard): EncoderStatus | null =>
 	host.st.status as EncoderStatus | null;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null;
+
+function isSrtlaStats(value: unknown): value is SrtlaStats {
+	return (
+		isRecord(value) &&
+		typeof value.active_links === "number" &&
+		typeof value.total_links === "number" &&
+		typeof value.total_in_flight === "number" &&
+		typeof value.total_window === "number" &&
+		Array.isArray(value.links)
+	);
+}
+
+function isSrtlaStatsEvent(value: unknown): value is SrtlaStatsEvent {
+	return (
+		isRecord(value) &&
+		typeof value.at === "number" &&
+		(value.stats === null || isSrtlaStats(value.stats))
+	);
+}
+
+/** The last pushed 1 Hz per-link stats frame, if any. */
+const statsFrame = (host: DeviceCard) => {
+	const entry = host.st.events.get("stream.stats");
+	return entry && isSrtlaStatsEvent(entry.data)
+		? { ...entry, value: entry.data }
+		: undefined;
+};
+
+/** The srtla leg's last reported stats, while the leg runs. */
+const liveStats = (host: DeviceCard) =>
+	currentStatus(host)?.state.srtla.running
+		? (statsFrame(host)?.value.stats ?? null)
+		: null;
+
+/** Scheduler options: the saved settings, else what the running srtla_send reports, else its defaults. */
+const modeValue = (host: DeviceCard): string =>
+	currentStatus(host)?.state.streamOptions?.mode ??
+	liveStats(host)?.mode ??
+	"enhanced";
+const qualityValue = (host: DeviceCard): boolean =>
+	currentStatus(host)?.state.streamOptions?.quality ??
+	liveStats(host)?.quality_enabled ??
+	false;
+
+async function setOption(
+	host: DeviceCard,
+	key: keyof SrtlaOptions,
+	value: string | boolean,
+): Promise<void> {
+	const result = await host.act<{ options: SrtlaOptions }>(
+		`srtla-${key}`,
+		"stream.options",
+		{ [key]: value },
+	);
+	// The status push is debounced; do not flash the old value until it arrives
+	const status = currentStatus(host);
+	if (result && status) status.state.streamOptions = result.options;
+}
+
+function controlBadge(status: EncoderStatus): Child {
+	const c = status.srtlaControl;
+	if (c?.connected) return <Badge text={t("dev.connected")} kind="on" />;
+	if (c?.supported)
+		return <Badge text={t("dev.control_connecting")} kind="warn" />;
+	return (
+		<span class="muted" title={t("dev.control_unavailable_title")}>
+			{t("dev.control_unavailable")}
+		</span>
+	);
+}
 
 function encoderState(host: DeviceCard): EncoderCardState {
 	let state = encoderStates.get(host);
@@ -586,6 +662,11 @@ function streamButtons(host: DeviceCard): m.Children {
 				disabled={!canStop || host.pending("encoder-stop")}
 				onclick={() => host.press("encoder-stop", "stream.stop")}
 			/>
+			<Button
+				label={t("ui.reload")}
+				disabled={!canStop || host.pending("encoder-reload")}
+				onclick={() => host.press("encoder-reload", "stream.reload")}
+			/>
 		</Actions>
 	);
 }
@@ -720,7 +801,7 @@ function statusRows(
 	status: EncoderStatus,
 ): [string, Child][] {
 	const { fields } = encoderState(host);
-	const { encoder: e, stream } = status.state;
+	const { encoder: e, srtla, stream } = status.state;
 	const cfg = e.config;
 	const audioName = status.audioSources.find(
 		(a) => a.id === fields.audioSource,
@@ -757,6 +838,17 @@ function statusRows(
 		],
 		[t("mlog.done.started"), e.running ? since(e.startedAt) : null],
 		[t("dev.row.restarts"), e.running ? (e.restarts ?? 0) : null],
+		[
+			t("dev.reloads"),
+			srtla?.running
+				? t("dev.reloads_detail", {
+						reloads: srtla.reloadCount ?? 0,
+						last: since(srtla.lastReloadAt),
+						mode: status.state.srtlaMonitor?.reloadMode ?? "signal",
+					})
+				: null,
+		],
+		[t("dev.control"), srtla?.running ? controlBadge(status) : null],
 	];
 }
 
@@ -924,6 +1016,51 @@ export function encoderCardBody(
 								target={fields}
 								prop="streamid"
 								placeholder={t("ui.optional")}
+							/>
+						}
+					/>
+					<Break />
+					<Field
+						label={t("dev.scheduler")}
+						control={
+							<select
+								disabled={host.pending("srtla-mode")}
+								value={modeValue(host)}
+								onchange={(e: Event) =>
+									void setOption(
+										host,
+										"mode",
+										(e.target as HTMLSelectElement).value,
+									)
+								}
+							>
+								<Options
+									pairs={[
+										["enhanced", t("dev.scheduler_enhanced")],
+										["classic", t("dev.scheduler_classic")],
+									]}
+								/>
+							</select>
+						}
+					/>
+					<CheckField
+						label={t("dev.quality_scoring")}
+						title={t("dev.quality_scoring_title")}
+						control={
+							<input
+								type="checkbox"
+								checked={qualityValue(host)}
+								disabled={
+									host.pending("srtla-quality") ||
+									modeValue(host) === "classic"
+								}
+								onchange={(e: Event) =>
+									void setOption(
+										host,
+										"quality",
+										(e.target as HTMLInputElement).checked,
+									)
+								}
 							/>
 						}
 					/>

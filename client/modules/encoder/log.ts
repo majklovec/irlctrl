@@ -24,6 +24,21 @@ const log: LogWording = {
         ),
         "stream.start": wording("Stream", "Start", "mlog.done.started"),
         "stream.stop": wording("Stream", "Stop", "mlog.done.stopped"),
+        "stream.reload": wording("SRTLA", "Reload", "mlog.done.reloaded"),
+        "stream.options": wording("SRTLA", "Options update", (p) =>
+            [
+                p.mode !== undefined &&
+                    logTranslate("mlog.done.mode", { mode: p.mode }),
+                p.quality !== undefined &&
+                    logTranslate(
+                        p.quality
+                            ? "mlog.done.quality_on"
+                            : "mlog.done.quality_off",
+                    ),
+            ]
+                .filter(Boolean)
+                .join(", "),
+        ),
         "pipelines.create": wording("Pipelines", "Create", (p) =>
             logTranslate("mlog.done.pipeline_created", { id: p.id }),
         ),
@@ -60,12 +75,19 @@ const log: LogWording = {
     reads: {
         "pipelines.list": wording("Pipelines", "Load", "mlog.done.loaded"),
     },
-    sections: { encoder: "Encoder", stream: "Stream", pipelines: "Pipelines" },
+    sections: {
+        encoder: "Encoder",
+        stream: "Stream",
+        pipelines: "Pipelines",
+        SRTLA_SEND: "SRTLA",
+    },
     labels: {
         Encoder: "wtype.encoder",
         Pipelines: "mlog.section.pipelines",
         Stream: "mgmt.th.stream",
+        SRTLA: "dev.group.srt",
         "Bitrate change": "mlog.action.bitrate",
+        "Options update": "mlog.action.options",
     },
 };
 

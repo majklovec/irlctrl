@@ -1,7 +1,8 @@
 /*
  * srtla module: srtla_send process management — start / stop / reload (SIGHUP
- * or restart), the scheduler options applied over the control socket
- * (control.ts) and the per-link stats push.
+ * or restart), the scheduler options applied over the control socket and the
+ * per-link stats push. The leg itself is the shared `SrtlaSend` supervisor
+ * (shared/srtla.ts, also used by the encoder).
  *
  * The bonding / uplinks-file layer lives in the network module: this module
  * points `srtla_send` at the `network.uplinks` file and reloads on change.
@@ -9,11 +10,13 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { argEnv, argv, enumArgEnv, intArgEnv } from "../../../shared/args";
+import { requireCapability } from "../../../shared/capabilities";
 import type {
     BackendModule,
     Emit,
     Params,
 } from "../../../shared/contracts/backend_module";
+import type { Uplinks } from "../../../shared/contracts/module_capabilities";
 import { t } from "../../../shared/i18n";
 import {
     ApiError,
@@ -24,16 +27,13 @@ import {
     requireString,
 } from "../../../shared/params";
 import {
+    SrtlaSend,
     srtlaRecArgs,
-    srtlaSendCapabilities,
-    srtlaSendFlags,
+    srtlaStatsSummary,
     waitForUdpPort,
 } from "../../../shared/srtla";
 import { errorMessage } from "../../../shared/util";
-import { requireCapability } from "../../../shared/capabilities";
 import type { ModuleCore } from "../../backend/module_core";
-import type { Uplinks } from "../../../shared/contracts/module_capabilities";
-import * as control from "./control";
 import log from "./log";
 import {
     type RelayConfig,
@@ -41,7 +41,6 @@ import {
     type SrtlaOptions,
     type SrtlaOptionsResult,
     type SrtlaState,
-    type SrtlaStatsEvent,
     type SrtlaTarget,
 } from "./types";
 
@@ -71,7 +70,7 @@ const SRTLA_LISTEN_PORT = intArgEnv(
 const SRT_INTERNAL_PORT = intArgEnv(
     "--srt-internal-port",
     "SRT_INTERNAL_PORT",
-    5000,
+    9000,
     1,
     65535,
 );
@@ -134,81 +133,52 @@ async function save(patch: Partial<RelayConfig>): Promise<void> {
 // ----------------------------------------------------------------------
 // Process
 // ----------------------------------------------------------------------
-let sup: InstanceType<ModuleCore["Supervisor"]> | undefined;
-const supervisor = () =>
-    (sup ??= new core.Supervisor("SRTLA", RESTART_DELAY_MS, onRelayExit));
+let send: InstanceType<typeof SrtlaSend> | undefined;
+/** The supervised srtla_send leg (shared with the encoder's leg). */
+const sendLeg = (): SrtlaSend =>
+    (send ??= new SrtlaSend(
+        {
+            Supervisor: core.Supervisor,
+            dryRun: core.config.DRY_RUN,
+            logEvent: core.logEvent,
+            notifyStateChange: () => core.notifyStateChange(),
+        },
+        {
+            section: "SRTLA",
+            controlSocket: SRTLA_SOCKET,
+            restartDelayMs: RESTART_DELAY_MS,
+            reloadMode: RELOAD_MODE,
+        },
+    ));
 
 let recSup: InstanceType<ModuleCore["Supervisor"]> | undefined;
 const recSupervisor = () =>
     (recSup ??= new core.Supervisor("SRTLA_REC", RESTART_DELAY_MS, onRecExit));
 
 /** The running (or last) srtla_send: pid, target, counters. */
-let live: SrtlaState = { running: false };
-let dryRunActive = false; // --dry-run has no process to track
+const live = (): SrtlaState => sendLeg().state();
 
-const isRunning = (): boolean =>
-    core.config.DRY_RUN ? dryRunActive : supervisor().running;
+const isRunning = (): boolean => sendLeg().running;
 
 function relayStatus(): SrtlaState {
-    if (isRunning()) return live;
+    if (isRunning()) return live();
     // Keep the last target so the UI can prefill the form after a stop
     const last = target() ?? {
-        listenPort: live.listenPort ?? "",
-        remoteHost: live.remoteHost ?? "",
-        remotePort: live.remotePort ?? "",
+        listenPort: live().listenPort ?? "",
+        remoteHost: live().remoteHost ?? "",
+        remotePort: live().remotePort ?? "",
     };
     return {
         running: false,
         ...last,
-        reloadCount: live.reloadCount,
-        lastReloadAt: live.lastReloadAt,
+        reloadCount: live().reloadCount,
+        lastReloadAt: live().lastReloadAt,
     };
-}
-
-/** Send SIGHUP to srtla_send (asking it to re-read the uplinks file); true when delivered. */
-function signalRelayReload(): boolean {
-    if (core.config.DRY_RUN) {
-        console.log("[DRY-RUN] SIGHUP srtla_send");
-        return true;
-    }
-    const pid = isRunning() ? supervisor().pid : undefined;
-    if (!pid) return false;
-    try {
-        process.kill(pid, "SIGHUP");
-        console.log(`Sent SIGHUP to srtla_send (pid ${pid})`);
-        return true;
-    } catch (err: unknown) {
-        console.warn(`Failed to signal srtla_send: ${errorMessage(err)}`);
-        return false;
-    }
 }
 
 /** Reload srtla_send after an uplinks-file change: SIGHUP by default, restart as fallback / on request. */
 async function reloadRelay(): Promise<void> {
-    if (!isRunning()) return;
-
-    if (RELOAD_MODE === "signal") {
-        if (signalRelayReload()) {
-            live = {
-                ...live,
-                lastReloadAt: Date.now(),
-                reloadCount: (live.reloadCount ?? 0) + 1,
-            };
-            core.notifyStateChange();
-            return;
-        }
-        console.warn("SIGHUP failed — falling back to restart");
-    }
-
-    const { listenPort, remoteHost, remotePort } = live;
-    if (!listenPort || !remoteHost || !remotePort) {
-        console.warn("No srtla_send args cached — cannot restart");
-        return;
-    }
-    console.log("Restarting srtla_send to pick up new uplinks file...");
-    await stopRelay();
-    await Bun.sleep(200);
-    await startRelay(listenPort, remoteHost, remotePort);
+    await sendLeg().reload();
 }
 
 /**
@@ -226,8 +196,6 @@ async function startRelay(
     const sendPort = String(SRT_INTERNAL_PORT);
     const bin = process.env.SRTLA_SEND_BIN ?? "srtla_send";
     const recBin = "srtla_rec";
-    // Only pass flags this srtla_send build understands (the BELABOX C version has none of them).
-    const caps = core.config.DRY_RUN ? null : await srtlaSendCapabilities(bin);
     if (isRunning() && target())
         throw new Error("srtla_send is already running");
 
@@ -238,80 +206,30 @@ async function startRelay(
     const uplinksFile = uplinks.file();
     const recArgs = srtlaRecArgs(srtlaPort, "127.0.0.1", SRT_INTERNAL_PORT);
     console.log(`Starting ${recBin} ${recArgs.join(" ")}`);
-    console.log(
-        `Starting ${bin} ${[
-            ...srtlaSendFlags(
-                caps ?? { controlSocket: true, mode: true, quality: true },
-                options() ?? {},
-                SRTLA_SOCKET,
-            ),
-            sendPort,
-            remoteHost,
-            remotePort,
-                uplinksFile,
-        ].join(" ")}`,
-    );
-
-    const started = (pid?: number): SrtlaState => ({
-        running: true,
-        listenPort: String(srtlaPort),
+    const state = await sendLeg().start(bin, {
         sendPort,
         remoteHost,
         remotePort,
-        startedAt: Date.now(),
-        ...(pid === undefined
-            ? {}
-            : { pid, reloadCount: live.reloadCount ?? 0 }),
+        uplinksFile,
+        options: options(),
     });
-    if (caps) {
-        // srtla_send first, then srtla_rec once its loopback SRT listener is up.
-        await supervisor().start(() => {
-            const flags = srtlaSendFlags(caps, options() ?? {}, SRTLA_SOCKET);
-            const withControl = !!SRTLA_SOCKET && caps.controlSocket;
-            control.prepareSrtlaControl(SRTLA_SOCKET, withControl);
-            const proc = Bun.spawn(
-                [bin, ...flags, sendPort, remoteHost, remotePort, uplinksFile],
-                { stdout: "inherit", stderr: "inherit", stdin: "inherit" },
+    if (core.config.DRY_RUN) return state;
+    // srtla_rec second: it only works once srtla_send's loopback SRT listener is up.
+    // The starter re-runs on supervisor restarts, so the readiness gate
+    // (loopback SRT listener) is applied on every (re)spawn.
+    await recSupervisor().start(async () => {
+        const open = await waitForUdpPort(SRT_INTERNAL_PORT, 5_000);
+        if (!open)
+            console.warn(
+                `srtla_rec: loopback SRT port ${SRT_INTERNAL_PORT} did not open in 5s — starting anyway`,
             );
-            if (withControl) control.startSrtlaControl(SRTLA_SOCKET);
-            live = started(proc.pid);
-            return proc;
+        return Bun.spawn([recBin, ...recArgs], {
+            stdout: "inherit",
+            stderr: "inherit",
+            stdin: "inherit",
         });
-        // The starter re-runs on supervisor restarts, so the readiness gate
-        // (loopback SRT listener) is applied on every (re)spawn.
-        await recSupervisor().start(async () => {
-            const open = await waitForUdpPort(SRT_INTERNAL_PORT, 5_000);
-            if (!open)
-                console.warn(
-                    `srtla_rec: loopback SRT port ${SRT_INTERNAL_PORT} did not open in 5s — starting anyway`,
-                );
-            return Bun.spawn([recBin, ...recArgs], {
-                stdout: "inherit",
-                stderr: "inherit",
-                stdin: "inherit",
-            });
-        });
-    } else {
-        dryRunActive = true;
-        live = started();
-    }
-    core.notifyStateChange();
-    return live;
-}
-
-/** srtla_send died on its own (e.g. all uplinks lost): keep retrying like belaUI does. */
-function onRelayExit(code: number | null): void {
-    console.log(`srtla_send exited with code ${code}`);
-    control.stopSrtlaControl();
-    live = { ...live, running: false, pid: undefined };
-    core.notifyStateChange();
-    if (!supervisor().wanted) return;
-    core.logEvent(
-        "warn",
-        "SRTLA",
-        t("log.srtla_exited", { code, delay: RESTART_DELAY_MS / 1000 }),
-    );
-    supervisor().scheduleRestart();
+    });
+    return state;
 }
 
 /** srtla_rec died on its own: keep retrying like belaUI does. */
@@ -327,13 +245,9 @@ function onRecExit(code: number | null): void {
 }
 
 async function stopRelay(): Promise<void> {
-    if (!sup && !recSup && !dryRunActive)
-        return; // never started in this process — nothing to stop
+    if (!recSup && !sendLeg().running && !send) return; // never started in this process — nothing to stop
     await recSup?.stop();
-    await sup?.stop();
-    control.stopSrtlaControl();
-    dryRunActive = false;
-    live = { ...live, running: false, pid: undefined };
+    await sendLeg().stop();
     core.notifyStateChange();
 }
 
@@ -345,20 +259,8 @@ async function setSrtlaOptions(
     opts: SrtlaOptions,
 ): Promise<SrtlaOptionsResult> {
     await save(opts);
-    const result = (applied: boolean) => ({
-        options: options() ?? {},
-        applied,
-    });
-    if (core.config.DRY_RUN) {
-        console.log(`[DRY-RUN] srtla_send options ${JSON.stringify(opts)}`);
-        return result(isRunning());
-    }
-    if (!isRunning() || !control.srtlaControlState().connected)
-        return result(false);
-    if (opts.mode) await control.rpc("set_mode", { mode: opts.mode });
-    if (opts.quality !== undefined)
-        await control.rpc("set_quality", { enabled: opts.quality });
-    return result(true);
+    const applied = await sendLeg().applyOptions(opts);
+    return { options: options() ?? {}, applied };
 }
 
 /** Honor `--start-srtla <listenPort> <remoteHost> <remotePort>` if present. */
@@ -373,30 +275,6 @@ async function maybeStartRelay(): Promise<void> {
     }
     await startRelay(argv[i + 1], argv[i + 2], argv[i + 3]);
 }
-
-// ----------------------------------------------------------------------
-// Pushes: link stats (throttled, retained while flowing) + control up/down
-// ----------------------------------------------------------------------
-const statsSummary = ({ stats }: SrtlaStatsEvent) =>
-    stats
-        ? {
-              bitrate: stats.links.reduce(
-                  (sum, l) => sum + (l.bitrate_bytes_per_sec || 0),
-                  0,
-              ),
-              activeLinks: stats.active_links,
-              totalLinks: stats.total_links,
-          }
-        : {};
-
-control.onRelayStats((ev) =>
-    emit?.("relay.stats", ev, {
-        throttle: true,
-        retain: !!ev.stats,
-        summary: statsSummary(ev),
-    }),
-);
-control.onSrtlaControlChange(() => core.notifyStateChange());
 
 // ----------------------------------------------------------------------
 // Registration
@@ -461,6 +339,16 @@ const registration: BackendModule<ModuleCore> = {
         core = c;
         adoptLegacySection(c);
         uplinks = requireCapability<Uplinks>("network.uplinks");
+        // The leg's stats become the module's `relay.stats` push (throttled,
+        // retained while flowing); control up/down refreshes the status.
+        sendLeg().control.onStats((ev) =>
+            emit?.("relay.stats", ev, {
+                throttle: true,
+                retain: !!ev.stats,
+                summary: srtlaStatsSummary(ev),
+            }),
+        );
+        sendLeg().control.onChange(() => core.notifyStateChange());
     },
     async start(ctx) {
         core = ctx.core;
@@ -514,7 +402,7 @@ const registration: BackendModule<ModuleCore> = {
                 await reloadRelay();
                 return { relay: relayStatus() };
             case "relay.stats":
-                return control.latestSrtlaStats();
+                return sendLeg().control.latest();
             case "relay.options": {
                 const opts: SrtlaOptions = {};
                 if (p.mode !== undefined)
@@ -544,7 +432,7 @@ const registration: BackendModule<ModuleCore> = {
                 relayOptions: options() ?? {},
                 srtlaMonitor: { reloadMode: RELOAD_MODE },
             },
-            srtlaControl: control.srtlaControlState(),
+            srtlaControl: sendLeg().control.state(),
             summary: { relay: relayStatus() },
         };
     },

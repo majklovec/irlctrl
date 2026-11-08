@@ -1,26 +1,20 @@
-/* Encoder-specific types and the SRTLA capability shape consumed by encoder. */
+/* Encoder-specific types; SRTLA shapes are re-exported from shared/srtla. */
 import type {
     DeviceSummary,
     Settings,
     SetupInfo,
     Status,
 } from "../../../shared/contracts/wire";
-export interface SrtlaTarget {
-    listenPort: string;
-    remoteHost: string;
-    remotePort: string;
-}
-
-export interface SrtlaState {
-    running: boolean;
-    pid?: number;
-    listenPort?: string;
-    remoteHost?: string;
-    remotePort?: string;
-    startedAt?: number;
-    lastReloadAt?: number;
-    reloadCount?: number;
-}
+export type {
+    SrtlaConfig,
+    SrtlaControlState,
+    SrtlaOptions,
+    SrtlaOptionsResult,
+    SrtlaState,
+    SrtlaStats,
+    SrtlaStatsEvent,
+    SrtlaTarget,
+} from "../../../shared/srtla";
 
 /** One GStreamer pipeline file found under the pipelines dir. */
 export interface Pipeline {
@@ -92,12 +86,23 @@ export interface CeraConfig {
 /** Bitrate bounds (kbps) shared by wire validation and the UI, single source. */
 export const BITRATE_KBPS = { min: 300, max: 30_000 } as const;
 
-/** The status envelope as the encoder card reads it (encoder fragment + the saved SRTLA target). */
+import type {
+    SrtlaConfig,
+    SrtlaControlState,
+    SrtlaState,
+} from "../../../shared/srtla";
+
+/** The status envelope as the encoder card reads it (encoder fragment + the saved SRTLA stream). */
 export type EncoderStatus = Status & {
     state: {
         encoder: EncoderState;
-        stream?: SrtlaTarget;
+        /** The supervised srtla_send leg (running, pid, reloads). */
+        srtla: SrtlaState;
+        stream?: SrtlaConfig;
+        streamOptions?: { mode?: string; quality?: boolean };
+        srtlaMonitor: { reloadMode: string };
     };
+    srtlaControl: SrtlaControlState;
     audioSources: AudioSource[];
     ceracoder: CeraConfig | null;
 };

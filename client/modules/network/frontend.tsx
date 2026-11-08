@@ -1,7 +1,8 @@
 /* Network card: interface detection, bond selection per interface, and the
  * live srtla_send link stats matched to interfaces by source IP (shown on
- * the roles that push `relay.stats` — the relay; on the encoder the link
- * columns sit muted until/unless stats arrive).
+ * the roles that push the SRTLA leg's stats — `relay.stats` on the relay,
+ * `stream.stats` on the encoder; the link columns sit muted until/unless
+ * stats arrive).
  */
 import "./styles.css";
 import { Badge, Card, type Child, IconButton } from "@ui/components/";
@@ -21,20 +22,30 @@ import type { Iface, NetworkStatus, SrtlaLinkStats } from "./types";
 const STATS_STALE_MS = 5_000;
 const LINK_COLUMNS = 7;
 
-/** The `relay.stats` push frame with its payload, once validated. */
+/** The SRTLA leg's stats push names, per role (a device runs one of them). */
+const SRTLA_STATS_EVENTS = ["relay.stats", "stream.stats"] as const;
+
+/** The newest valid SRTLA stats push frame with its payload. */
 function statsFrame(
 	host: DeviceCard,
 ):
 	| { at: number; data: { stats: { links?: SrtlaLinkStats[] } | null } }
 	| undefined {
-	const entry = host.st.events.get("relay.stats");
-	if (!entry) return undefined;
-	const data = entry.data as
-		| { stats?: { links?: SrtlaLinkStats[] } | null }
+	let frame:
+		| { at: number; data: { stats: { links?: SrtlaLinkStats[] } | null } }
 		| undefined;
-	if (!data || (data.stats && !Array.isArray(data.stats.links)))
-		return undefined;
-	return { at: entry.at, data: { stats: data.stats ?? null } };
+	for (const name of SRTLA_STATS_EVENTS) {
+		const entry = host.st.events.get(name);
+		if (!entry) continue;
+		const data = entry.data as
+			| { stats?: { links?: SrtlaLinkStats[] } | null }
+			| undefined;
+		if (!data || (data.stats && !Array.isArray(data.stats.links)))
+			continue;
+		if (!frame || entry.at > frame.at)
+			frame = { at: entry.at, data: { stats: data.stats ?? null } };
+	}
+	return frame;
 }
 
 /** Signal-quality meter with its percentage. */

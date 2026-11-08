@@ -40,6 +40,7 @@
     "dev.row.restarts": "Redémarrages",
     "dev.row.target": "Cible",
     "log.encoder_exited": "l'encodeur s'est arrêté avec le code {{code}}; redémarrage dans {{delay}}s",
+    "log.legacy_target": "cible SRTLA précédente adoptée : {{listenPort}} → {{remoteHost}}:{{remotePort}}",
     "mlog.action.bitrate": "Changement de débit",
     "mlog.done.bitrate": "Débit défini à min {{minBitrate}} / max {{maxBitrate}} kbps",
     "mlog.done.cera_settings": "Paramètres de contrôle du débit appliqués",
@@ -93,6 +94,7 @@
     "act.encoder.bitrate_high": "Débit 6 Mbit/s",
     "act.encoder.start": "Démarrer l’encodeur",
     "act.encoder.stream_stop": "Arrêter le flux",
+    "act.encoder.reload": "Recharger SRTLA",
     "role.encoder": "encodeur",
     "setup.role.encoder": "Encodeur",
     "setup.role.encoder_tag": "Capture une pipeline GStreamer et l'envoie via SRT"

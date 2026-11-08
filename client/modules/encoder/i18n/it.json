@@ -40,6 +40,7 @@
     "dev.row.restarts": "Riavvii",
     "dev.row.target": "Destinazione",
     "log.encoder_exited": "l'encoder è uscito con codice {{code}}; riavvio tra {{delay}}s",
+    "log.legacy_target": "destinazione SRTLA legacy adottata: {{listenPort}} → {{remoteHost}}:{{remotePort}}",
     "mlog.action.bitrate": "Cambio bitrate",
     "mlog.done.bitrate": "Bitrate impostato a min {{minBitrate}} / max {{maxBitrate}} kbps",
     "mlog.done.cera_settings": "Impostazioni controllo bitrate applicate",
@@ -93,6 +94,7 @@
     "act.encoder.bitrate_high": "Bitrate 6 Mbps",
     "act.encoder.start": "Avvia encoder",
     "act.encoder.stream_stop": "Ferma stream",
+    "act.encoder.reload": "Ricarica SRTLA",
     "role.encoder": "encoder",
     "setup.role.encoder": "Encoder",
     "setup.role.encoder_tag": "Acquisisce una pipeline GStreamer e la invia su SRT"

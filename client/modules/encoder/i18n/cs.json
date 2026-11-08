@@ -40,6 +40,7 @@
     "dev.row.restarts": "Restarty",
     "dev.row.target": "Cíl",
     "log.encoder_exited": "kódování bylo ukončeno s kódem {{code}}; bude restartováno za {{delay}}s",
+    "log.legacy_target": "převzet starý SRTLA cíl {{listenPort}} → {{remoteHost}}:{{remotePort}}",
     "mlog.action.bitrate": "Změna rychlosti",
     "mlog.done.bitrate": "Rychlost nastavena na min. {{minBitrate}} / max. {{maxBitrate}} kbps",
     "mlog.done.cera_settings": "Nastavení řízení bitrate použita",
@@ -93,6 +94,7 @@
     "act.encoder.bitrate_high": "Bitrate 6 Mb/s",
     "act.encoder.start": "Spustit enkodér",
     "act.encoder.stream_stop": "Zastavit stream",
+    "act.encoder.reload": "Obnovit SRTLA",
     "role.encoder": "enkodér",
     "setup.role.encoder": "Enkodér",
     "setup.role.encoder_tag": "Zachycuje video a posílá ho přes SRT"

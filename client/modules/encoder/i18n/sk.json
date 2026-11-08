@@ -40,6 +40,7 @@
     "dev.row.restarts": "Reštarty",
     "dev.row.target": "Cieľ",
     "log.encoder_exited": "enkodér skončil s kódom {{code}}; reštart za {{delay}}s",
+    "log.legacy_target": "priebraný starý SRTLA cieľ {{listenPort}} → {{remoteHost}}:{{remotePort}}",
     "mlog.action.bitrate": "Zmena bitrate",
     "mlog.done.bitrate": "Bitrate nastavený na min {{minBitrate}} / max {{maxBitrate}} kbps",
     "mlog.done.cera_settings": "Nastavenia riadenia bitrate použité",
@@ -93,6 +94,7 @@
     "act.encoder.bitrate_high": "Bitrate 6 Mb/s",
     "act.encoder.start": "Spustiť enkodér",
     "act.encoder.stream_stop": "Zastaviť stream",
+    "act.encoder.reload": "Obnoviť SRTLA",
     "role.encoder": "enkodér",
     "setup.role.encoder": "Enkodér",
     "setup.role.encoder_tag": "Zachytáva GStreamer pipeline a odosiela ho cez SRT"
