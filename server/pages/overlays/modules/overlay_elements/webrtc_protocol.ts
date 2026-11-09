@@ -58,13 +58,16 @@ export interface RoomState {
 /**
  * Server → client. `room-state` is the authoritative occupancy snapshot
  * (sent on every join and on every `sync`); `peer-joined` / `peer-left`
- * tell a peer that its counterpart appeared or went away; `offer` /
- * `answer` / `ice` are the relayed media handshake frames.
+ * tell a peer that its counterpart appeared or went away; `hijacked` tells a
+ * sender that a SECOND sender opened the same link and took its slot (the
+ * displaced sender stops and must not reconnect); `offer` / `answer` / `ice`
+ * are the relayed media handshake frames.
  */
 export type WebrtcServerMessage =
 	| { type: "room-state"; state: RoomState }
 	| { type: "peer-joined"; role: WebrtcRole }
 	| { type: "peer-left" }
+	| { type: "hijacked" }
 	| { type: "offer"; sdp: RTCSessionDescriptionInit }
 	| { type: "answer"; sdp: RTCSessionDescriptionInit }
 	| { type: "ice"; candidate: RTCIceCandidateInit };

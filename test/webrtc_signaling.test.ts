@@ -109,6 +109,23 @@ describe("webrtc room manager", () => {
 		expect(receiver.matches(st(true, true, true, 1))).toBe(true);
 	});
 
+	test("a second sender displaces the first and notifies it", () => {
+		const m = new WebrtcRoomManager();
+		const oldSender = new FakeSocket();
+		m.join("s1", "sender", oldSender);
+
+		const newSender = new FakeSocket();
+		m.join("s1", "sender", newSender);
+
+		// The displaced old sender is told it was hijacked.
+		expect(oldSender.matches({ type: "hijacked" })).toBe(true);
+		// The new sender becomes the slot holder and (with nobody else) has a
+		// sender-only room: token 0, no primary.
+		expect(newSender.matches(st(true, false, false, 0))).toBe(true);
+		// The room now occupies the sender slot.
+		expect(m.occupancy()["s1"]).toBeDefined();
+	});
+
 	test("relay delivers a frame only to the primary peer", () => {
 		const m = new WebrtcRoomManager();
 		const sender = new FakeSocket();

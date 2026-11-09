@@ -49,6 +49,12 @@ interface SenderState {
 	 * to it; the old peer (bound to the demoted receiver) is closed first.
 	 */
 	primary: number | null;
+	/**
+	 * True once a SECOND sender took this link (`hijacked`). When set the
+	 * socket-close handler must NOT reconnect, because reconnecting would
+	 * simply re-trigger the hijack and fight the (legitimate) new sender.
+	 */
+	hijacked: boolean;
 }
 
 interface ServerMessage {
@@ -89,6 +95,7 @@ const state: SenderState = {
 	source: null,
 	negotiating: false,
 	primary: null,
+	hijacked: false,
 };
 
 function setStatus(text: string, kind: StatusKind = "idle"): void {
@@ -105,6 +112,7 @@ function stopAll(): void {
 	state.source = null;
 	state.negotiating = false;
 	state.primary = null;
+	state.hijacked = false;
 	state.pc?.close();
 	state.pc = null;
 	if (state.ws && state.ws.readyState === WebSocket.OPEN) state.ws.close();
@@ -371,13 +379,32 @@ function connect(): void {
 						setStatus("Receiver disconnected – reconnecting…", "waiting");
 				}
 				break;
+			case "hijacked":
+				// A SECOND sender opened the same link and took the slot. Tear
+				// down everything and tell the user. Crucially, flag
+				// `state.hijacked` so the socket-close that follows does NOT
+				// auto-reconnect — reconnecting would re-trigger the hijack and
+				// ping-pong with the (legitimate) new sender.
+				if (state.ws !== ws) break;
+				state.hijacked = true;
+				state.ws = null;
+				state.negotiating = false;
+				state.pc?.close();
+				state.pc = null;
+				stopAll();
+				setStatus(
+					"Your link was taken over by a new sender. This page has stopped.",
+					"error",
+				);
+				break;
 		}
 	};
 	// A dropped signaling link (network blip, server restart) keeps the media
 	// running and re-opens the socket so it re-joins the room and picks up a
-	// (re)loaded receiver.
+	// (re)loaded receiver. Skipped after a hijack (we were displaced, not a
+	// transient drop — reconnecting would just re-trigger the hijack).
 	ws.onclose = () => {
-		if (state.ws !== ws) return; // a newer socket already took over
+		if (state.ws !== ws || state.hijacked) return; // taken over / hijacked
 		state.ws = null;
 		state.negotiating = false;
 		state.pc?.close();

@@ -161,7 +161,9 @@ export class WebrtcRoomManager {
 	}
 
 	/**
-	 * Add `sock` to `streamId` in `role`. For a receiver this promotes it to
+	 * Add `sock` to `streamId` in `role`. A sender claims the single sender
+	 * slot; a different sender already holding it is displaced and told
+	 * `hijacked` (it stops and must not reconnect). A receiver is promoted to
 	 * the primary slot when `priority` (or the slot is empty); a displaced
 	 * primary is demoted to shadow (not told `peer-left`), so it keeps its last
 	 * frame and shows the "overlay has the feed" note. An existing socket
@@ -181,7 +183,10 @@ export class WebrtcRoomManager {
 		if (role === "sender") {
 			const existing = room.sender;
 			if (existing && existing !== sock)
-				sendJson(existing, { type: "peer-left" });
+				// A SECOND sender opened the same link: the first one is
+				// displaced and learns it specifically (it stops and does not
+				// reconnect — reconnecting would just re-trigger the hijack).
+				sendJson(existing, { type: "hijacked" });
 			room.sender = sock;
 		} else {
 			if (room.receivers.includes(sock)) {
