@@ -21,6 +21,14 @@ const SOURCE_NAMES: Record<Source, string> = {
 	screen: "Screen",
 };
 
+/** True when the browser can capture the screen via `getDisplayMedia`. Mobile
+ * browsers (Chrome / Firefox / Samsung Internet on Android) don't implement it
+ * at all, so the "Share screen" button is hidden for them. */
+const supportsScreenShare =
+	typeof navigator !== "undefined" &&
+	!!navigator.mediaDevices &&
+	"getDisplayMedia" in navigator.mediaDevices;
+
 interface SenderState {
 	pc: RTCPeerConnection | null;
 	ws: WebSocket | null;
@@ -299,11 +307,13 @@ function App(): m.Vnode {
 					{m(SourceButton, { source: "user", label: "Front camera" })}
 					{m(SourceButton, { source: "environment", label: "Back camera" })}
 				</div>
-				{m(SourceButton, {
-					source: "screen",
-					label: "Share screen",
-					secondary: true,
-				})}
+				{supportsScreenShare
+					? m(SourceButton, {
+							source: "screen",
+							label: "Share screen",
+							secondary: true,
+					  })
+					: null}
 				<button
 					type="button"
 					class="secondary"
