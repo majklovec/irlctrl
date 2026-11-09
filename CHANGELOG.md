@@ -1,3 +1,10 @@
+# [6.4.0](https://github.com/majklovec/irlctrl/compare/v6.3.0...v6.4.0) (2026-11-09)
+
+
+### Features
+
+* **webrtc:** add sender hijack handling ([4b6f6e3](https://github.com/majklovec/irlctrl/commit/4b6f6e3b8f44d62229a5a323abc120593b8f29c1))
+
 # [6.3.0](https://github.com/majklovec/irlctrl/compare/v6.2.0...v6.3.0) (2026-11-09)
 
 
