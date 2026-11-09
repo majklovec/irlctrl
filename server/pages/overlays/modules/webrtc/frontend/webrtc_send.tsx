@@ -35,6 +35,23 @@ const supportsCameraEnum =
 	!!navigator.mediaDevices &&
 	"enumerateDevices" in navigator.mediaDevices;
 
+/** True when the peer has reached a usable connection, on any browser.
+ * `connectionState` is missing in older Firefox / some WebViews, so fall back
+ * to `iceConnectionState` (which is present everywhere). */
+function isConnected(pc: RTCPeerConnection): boolean {
+	if (pc.connectionState === "connected") return true;
+	const ice = pc.iceConnectionState;
+	return ice === "connected" || ice === "completed";
+}
+
+/** True only on a hard failure (not the transient `disconnected`). Same
+ * `connectionState`-absent fallback as `isConnected`. */
+function isFailed(pc: RTCPeerConnection): boolean {
+	return (
+		pc.connectionState === "failed" || pc.iceConnectionState === "failed"
+	);
+}
+
 interface SenderState {
 	pc: RTCPeerConnection | null;
 	ws: WebSocket | null;
@@ -55,6 +72,9 @@ interface SenderState {
 	 * simply re-trigger the hijack and fight the (legitimate) new sender.
 	 */
 	hijacked: boolean;
+	/** ICE candidates that arrived before the remote (answer) description was
+	 * applied. Flushed once `setRemoteDescription` resolves. */
+	pendingCandidates: RTCIceCandidateInit[];
 }
 
 interface ServerMessage {
@@ -96,6 +116,7 @@ const state: SenderState = {
 	negotiating: false,
 	primary: null,
 	hijacked: false,
+	pendingCandidates: [],
 };
 
 function setStatus(text: string, kind: StatusKind = "idle"): void {
@@ -113,6 +134,7 @@ function stopAll(): void {
 	state.negotiating = false;
 	state.primary = null;
 	state.hijacked = false;
+	state.pendingCandidates = [];
 	state.pc?.close();
 	state.pc = null;
 	if (state.ws && state.ws.readyState === WebSocket.OPEN) state.ws.close();
@@ -256,6 +278,7 @@ function preparePeer(): RTCPeerConnection | null {
 		iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 	});
 	state.pc = pc;
+	state.pendingCandidates = [];
 	for (const track of stream.getTracks()) pc.addTrack(track, stream);
 	pc.onicecandidate = (e) => {
 		if (e.candidate && state.ws?.readyState === WebSocket.OPEN) {
@@ -264,10 +287,10 @@ function preparePeer(): RTCPeerConnection | null {
 			);
 		}
 	};
-	pc.onconnectionstatechange = () => {
-		if (pc.connectionState === "connected") {
+	const onStateChange = () => {
+		if (isConnected(pc)) {
 			setStatus("Live.", "live");
-		} else if (pc.connectionState === "failed") {
+		} else if (isFailed(pc)) {
 			// A hard ICE fail usually clears with a fresh renegotiation; the
 			// receiver is (presumably) still present, so re-offer.
 			state.negotiating = false;
@@ -276,6 +299,11 @@ function preparePeer(): RTCPeerConnection | null {
 			offerFresh();
 		}
 	};
+	pc.onconnectionstatechange = onStateChange;
+	// Older Firefox (<113) has no `connectionState`/`connectionstatechange`;
+	// `iceConnectionState` is the portable fallback and is safe to listen to
+	// unconditionally (it's a no-op on browsers that have both).
+	pc.oniceconnectionstatechange = onStateChange;
 	return pc;
 }
 
@@ -356,14 +384,32 @@ function connect(): void {
 			case "answer":
 				if (state.pc && msg.sdp) {
 					await state.pc.setRemoteDescription(msg.sdp);
+					// Flush candidates that arrived while we were waiting for the
+					// answer — adding them earlier (no remote description) would
+					// have thrown and dropped them.
+					const pending = state.pendingCandidates;
+					state.pendingCandidates = [];
+					for (const candidate of pending) {
+						try {
+							await state.pc.addIceCandidate(candidate);
+						} catch {
+							/* candidate can reference a stale generation; ignore */
+						}
+					}
 				}
 				break;
 			case "ice":
 				if (state.pc && msg.candidate) {
-					try {
-						await state.pc.addIceCandidate(msg.candidate);
-					} catch {
-						/* candidates can race the remote description; ignore */
+					if (state.pc.remoteDescription) {
+						try {
+							await state.pc.addIceCandidate(msg.candidate);
+						} catch {
+							/* ignore */
+						}
+					} else {
+						// Remote description not set yet — buffer until the
+						// answer arrives.
+						state.pendingCandidates.push(msg.candidate);
 					}
 				}
 				break;

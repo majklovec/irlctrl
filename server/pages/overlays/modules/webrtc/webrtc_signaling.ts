@@ -140,6 +140,11 @@ export class WebrtcRoomManager {
 		if (frame.type === "sync") {
 			return { type: "room-state", state: this.stateFor(streamId, sock) };
 		}
+		if (frame.type === "offer" && role === "receiver") {
+			// The sender is the ONLY offerer. A receiver offer would dead-end
+			// the negotiation (the sender only answers), so drop it.
+			return null;
+		}
 		this.relay(streamId, role, frame);
 		return null;
 	}

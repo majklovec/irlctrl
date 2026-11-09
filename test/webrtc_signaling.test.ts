@@ -155,6 +155,23 @@ describe("webrtc room manager", () => {
 		});
 	});
 
+	test("an offer from a receiver is dropped, not relayed", () => {
+		const m = new WebrtcRoomManager();
+		const sender = new FakeSocket();
+		const receiver = new FakeSocket();
+		m.join("s1", "sender", sender);
+		m.join("s1", "receiver", receiver);
+		// The sender is the only offerer; a receiver offer would dead-end the
+		// negotiation, so the manager drops it.
+		m.message("s1", "receiver", receiver, {
+			type: "offer",
+			sdp: { type: "offer", sdp: "v=0" },
+		});
+		expect(
+			sender.matches({ type: "offer", sdp: { type: "offer", sdp: "v=0" } }),
+		).toBe(false);
+	});
+
 	test("rooms are isolated per stream id (no cross-talk)", () => {
 		const m = new WebrtcRoomManager();
 		const aSender = new FakeSocket();
