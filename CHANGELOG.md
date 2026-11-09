@@ -1,3 +1,10 @@
+## [6.0.1](https://github.com/majklovec/irlctrl/compare/v6.0.0...v6.0.1) (2026-11-09)
+
+
+### Bug Fixes
+
+* **webrtc:** use standard facing modes ([52b0718](https://github.com/majklovec/irlctrl/commit/52b0718a51f2105e1946b29e0e3663ccb3a1f8cd))
+
 # [6.0.0](https://github.com/majklovec/irlctrl/compare/v5.2.0...v6.0.0) (2026-11-08)
 
 
