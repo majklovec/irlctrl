@@ -63,7 +63,6 @@ import type {
     SrtlaState,
     SrtlaTarget,
 } from "./types";
-import { requireCapability } from "../../../shared/capabilities";
 import type { Uplinks } from "../../../shared/contracts/module_capabilities";
 
 /** Map a start failure to a status code: conflicts 409, bad pipeline / audio 400, else 500. */
@@ -132,8 +131,14 @@ const SRTLA_SOCKET = argEnv(
     "SRTLA_CONTROL_SOCKET",
     join(tmpdir(), "srtla_send.sock"),
 );
-/** The network module's bonded uplinks file + change hook. */
-let uplinks: Uplinks;
+/**
+ * The network module's bonded uplinks file + change hook. Resolved lazily —
+ * `stream.start` must work even when the module's `start` never ran (disabled
+ * slice), so the capability is fetched on first use, not only at start.
+ */
+let uplinks: Uplinks | undefined;
+const uplinksImpl = (): Uplinks =>
+    (uplinks ??= core.requireCapability<Uplinks>("network.uplinks"));
 /** Unregister the uplinks-change handler on stop. */
 let uplinksUnsub: (() => void) | undefined;
 /** Push channel, available from start on. */
@@ -186,12 +191,12 @@ async function startSrtlaSend(target: SrtlaTarget): Promise<void> {
     }
 
     // The bonded uplinks file from the network module (same file the relay reloads on).
-    await uplinks.ensure();
+    await uplinksImpl().ensure();
     await sendLeg().start(srtlaSendBin(), {
         sendPort: target.listenPort,
         remoteHost: target.remoteHost,
         remotePort: target.remotePort,
-        uplinksFile: uplinks.file(),
+        uplinksFile: uplinksImpl().file(),
         options: streamOptions(),
     });
 }
@@ -503,7 +508,6 @@ const encoderModule: BackendModule<ModuleCore> = {
     async start(ctx: ModuleStartContext<ModuleCore>) {
         bindCore(ctx.core);
         emit = ctx.emit;
-        uplinks = requireCapability<Uplinks>("network.uplinks");
         // One-shot legacy `streamTarget` adoption; options default like the relay.
         const section = data();
         if (section.streamTarget && !section.stream) {
@@ -531,7 +535,7 @@ const encoderModule: BackendModule<ModuleCore> = {
         );
         sendLeg().control.onChange(() => core.notifyStateChange());
         // Reload srtla_send whenever the network module rewrites the uplinks file.
-        uplinksUnsub = uplinks.onChanged(async () => {
+        uplinksUnsub = uplinksImpl().onChanged(async () => {
             console.log("Uplinks changed — reloading srtla_send");
             await reloadSrtlaSend();
         });

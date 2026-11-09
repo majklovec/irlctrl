@@ -268,6 +268,26 @@ let lastAppliedPlanEntries: RoutePlanEntry[] = [];
 const isManagedTable = (table: number): boolean =>
     table >= TABLE_BASE && table < TABLE_BASE + Math.max(managedTableCount, 1);
 
+/**
+ * Seed `managedTableCount` from the live `ip rule` tables. After a process
+ * restart the in-memory counter is 0, so monitor events for tables this
+ * process has not re-applied yet would look foreign until the next full
+ * re-apply — recognising them keeps the monitor quiet.
+ */
+export async function seedManagedTableCount(): Promise<void> {
+    try {
+        const rules = await ip(["rule", "show"], true);
+        for (const match of rules.matchAll(/\blookup (\d+)\b/g)) {
+            const table = parseInt(match[1], 10);
+            if (table >= TABLE_BASE)
+                managedTableCount = Math.max(
+                    managedTableCount,
+                    table - TABLE_BASE + 1,
+                );
+        }
+    } catch {}
+}
+
 async function routingIntact(plan: RoutePlanEntry[]): Promise<boolean> {
     const rules = await ip(["rule", "show"], true);
     for (const p of plan) {
@@ -526,7 +546,6 @@ export async function reconfigure(): Promise<ReconfigureResult> {
             await applyRouting(plan);
 
             const ips = selected.map((i) => i.ip);
-            console.log(`Detected IPs: ${ips.join(", ")}`);
             const content = `${ips.join("\n")}\n`;
             const previous =
                 lastUplinksContent ??
@@ -612,20 +631,19 @@ async function runReconcile(reason: string): Promise<void> {
     }
     monitorBusy = true;
     try {
-        console.log(`\n[monitor] ${reason} — reconciling...`);
         const result = await reconfigure();
         if (!result.ok) {
             console.warn(`[monitor] reconfigure failed: ${result.error}`);
             return;
         }
-        console.log(`[monitor] active uplinks: ${result.ips.join(", ")}`);
-
         if (result.changed) {
+            // `Uplinks file updated: ...` (from reconfigure) carries the IPs.
+            console.log(
+                `[monitor] ${reason}: uplinks changed — reloading srtla_send`,
+            );
             await fireUplinksChanged();
         } else {
-            console.log(
-                "[monitor] no change to uplinks file — skipping reload",
-            );
+            console.log(`[monitor] ${reason}: uplinks unchanged — no reload`);
         }
     } catch (err: unknown) {
         console.error("[monitor] error:", errorMessage(err));
@@ -664,8 +682,11 @@ async function tableIdByName(name: string): Promise<number | undefined> {
             if (id === undefined || name === undefined) continue;
             if (/^\d+$/.test(id)) rtTableIds.set(name, parseInt(id, 10));
         }
+        // An empty read is not cached: the file may appear later, so a
+        // missing mapping is re-read on the next miss.
+        if (rtTableIds.size === 0) rtTableIds = null;
     }
-    return rtTableIds.get(name);
+    return rtTableIds?.get(name);
 }
 
 export async function isSelfGeneratedEvent(line: string): Promise<boolean> {
@@ -685,6 +706,7 @@ export function startInterfaceMonitor(): void {
     monitorWanted = true;
     if (monitorProc) return;
 
+    void seedManagedTableCount();
     console.log(
         "Starting interface monitor (ip monitor address link route)...",
     );

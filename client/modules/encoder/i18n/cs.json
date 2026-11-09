@@ -24,7 +24,7 @@
     "dev.field.srt_latency": "Latence SRT (ms)",
     "dev.field.stream_host": "Stream server",
     "dev.field.stream_id": "Stream ID",
-    "dev.field.stream_srtla_port": "SRTLS port streamu",
+    "dev.field.stream_srtla_port": "SRTLA port streamu",
     "dev.row.audio": "Zvuk",
     "dev.row.bitrate": "Bitrate",
     "dev.group.srt": "SRTLA výstup",

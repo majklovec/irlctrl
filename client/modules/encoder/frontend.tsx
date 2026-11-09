@@ -345,7 +345,6 @@ const encoderSetupStep: ModuleSetupStep = {
 						/>
 					}
 				/>
-				,
 				<Field
 					label={t("dev.field.stream_srtla_port")}
 					required={true}
@@ -1051,8 +1050,7 @@ export function encoderCardBody(
 								type="checkbox"
 								checked={qualityValue(host)}
 								disabled={
-									host.pending("srtla-quality") ||
-									modeValue(host) === "classic"
+									host.pending("srtla-quality") || modeValue(host) === "classic"
 								}
 								onchange={(e: Event) =>
 									void setOption(

@@ -7,6 +7,7 @@ import {
     bindRouting,
     defaultRouteDetails,
     isSelfGeneratedEvent,
+    seedManagedTableCount,
     setRtTablesFileForTest,
 } from "../client/modules/network/routing";
 import { defaultRouteRowIndex } from "../client/modules/network/route_view";
@@ -99,5 +100,54 @@ describe("self-generated route event filtering", () => {
                 ),
             ).toBe(false);
             setRtTablesFileForTest(null);
+        });
+
+        test("seeds the managed table count from live ip rules after a restart", async () => {
+            bindRouting(
+                {
+                    run: async () =>
+                        [
+                            "0:\tfrom all lookup local",
+                            "32766:\tfrom all lookup main",
+                            "32767:\tfrom all lookup default",
+                            "10000:\tfrom 10.0.1.65 lookup 100",
+                            "10001:\tfrom 10.214.189.184 lookup 101",
+                            "10002:\tfrom 192.168.8.153 lookup 102",
+                        ].join("\n"),
+                } as unknown as ModuleCore,
+                { detect: async () => [], modemIface: async () => null },
+            );
+
+            await seedManagedTableCount();
+
+            // Events for tables the previous run left behind are recognised
+            // right after a restart, not only after the next full re-apply.
+            expect(
+                await isSelfGeneratedEvent("default dev usb0 table 102"),
+            ).toBe(true);
+            expect(
+                await isSelfGeneratedEvent("default dev usb0 table 103"),
+            ).toBe(false);
+        });
+
+        test("re-reads rt_tables when the first read finds no entries", async () => {
+            const rtTables = join(
+                tmpdir(),
+                `irtctrl_rt_tables_late.${process.pid}`,
+            );
+            setRtTablesFileForTest(rtTables);
+
+            // No file yet: the name cannot be resolved — and the empty read
+            // must not be cached, or the filter would stay blind forever.
+            expect(
+                await isSelfGeneratedEvent("default dev usb0 table usb0"),
+            ).toBe(false);
+
+            writeFileSync(rtTables, "100\tusb0\n");
+            expect(
+                await isSelfGeneratedEvent("default dev usb0 table usb0"),
+            ).toBe(true);
+            setRtTablesFileForTest(null);
+            rmSync(rtTables, { force: true });
         });
 });
