@@ -42,6 +42,13 @@ job "[[.DOMAIN]]" {
       env {
         DB_FILE     = "/config/db.sqlite"
         STORAGE_DIR = "/assets"
+
+        # WebRTC TURN: the server mints time-limited credentials for the
+        # coturn group above (use-auth-secret). The host is the coturn realm
+        # and the secret must match coturn's `static-auth-secret`. Leave both
+        # unset to fall back to STUN-only.
+        TURN_HOST   = "turn.[[.DOMAIN]]"
+        TURN_SECRET = "[[.TURN_SECRET]]"
       }
 
       resources {
