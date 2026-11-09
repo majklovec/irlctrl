@@ -1,3 +1,10 @@
+# [6.1.0](https://github.com/majklovec/irlctrl/compare/v6.0.2...v6.1.0) (2026-11-09)
+
+
+### Features
+
+* **webrtc:** select cameras by device id ([9e5a1fb](https://github.com/majklovec/irlctrl/commit/9e5a1fb2acad8ac54d891fb18cf0ae1a07b3a07f))
+
 ## [6.0.2](https://github.com/majklovec/irlctrl/compare/v6.0.1...v6.0.2) (2026-11-09)
 
 
