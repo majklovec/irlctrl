@@ -32,12 +32,27 @@ export type WebrtcClientMessage =
 	| { type: "sync" };
 
 /**
- * A snapshot of a room's occupancy: which peer roles are present (a peer
- * reads `hasX` to decide whether to start the media handshake).
+ * A snapshot of a room's occupancy: which roles are present. `sender` /
+ * `receiver` are booleans (a stream may have several receivers), so they carry
+ * no per-peer meaning. `active` is the per-recipient half of a snapshot: it is
+ * set ONLY in frames addressed to a receiver and says whether THAT receiver is
+ * the one carrying the live media (the `primary`). The single sender reads
+ * `receiver` (some receiver is present → offer). A receiver reads `active`:
+ * true → it carries the live feed; false → it is a secondary and shows its
+ * last frame with a "the overlay has the live feed" note.
  */
 export interface RoomState {
 	sender: boolean;
 	receiver: boolean;
+	/** True when addressed to the receiver that currently carries the media. */
+	active: boolean;
+	/**
+	 * Changes whenever the primary receiver is replaced (a new primary takes
+	 * the live-media slot, the primary is demoted, or the primary closes).
+	 * Only the sender reads it: a change means it must re-offer to the new
+	 * primary. Receivers ignore it (they use `active`).
+	 */
+	primary: number;
 }
 
 /**

@@ -52,6 +52,7 @@
   "overlay.fade_size": "淡出大小 (px)",
   "overlay.iframe_url": "URL",
   "overlay.webrtc_sender_url": "发送地址",
+  "overlay.webrtc_shadow": "直播画面正在叠加页面上播放",
   "overlay.webrtc_copy": "复制",
   "overlay.webrtc_qr": "QR code",
   "overlay.webrtc_hint": "正在等待发送方",

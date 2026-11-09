@@ -7,10 +7,14 @@
  * sender URL the owner shares with a phone; the page at that URL dials the
  * control server's signaling WebSocket as `sender` and publishes its media.
  *
- * The receiver connects in BOTH the editor (live preview) and the runtime page,
- * mirroring the self-contained `chat` element: the room holds a single receiver
- * slot, and a late receiver (e.g. the OBS page opening) simply replaces the
- * earlier one. The hint text shows while no sender has connected yet.
+ * The receiver connects in BOTH the editor (live preview) and the runtime page.
+ * Any number of receivers may watch one stream at once: the OBS runtime page is
+ * the `priority` receiver (its context carries `activeTriggers`, which only the
+ * runtime builds) and carries the live media. Every other concurrent receiver
+ * is a `shadow`: it keeps its last frame and shows a note that the overlay has
+ * the live feed, without a peer connection of its own. When the primary leaves,
+ * the newest remaining receiver is promoted and the sender renegotiates with it.
+ * The hint text shows while this receiver is active and no sender has the feed.
  */
 
 import { Icon } from "@ui/components/icons";
@@ -35,12 +39,19 @@ export interface WebrtcProps {
 export const DEFAULT_WEBRTC_PROPS: Required<WebrtcProps> = { streamId: "" };
 
 interface ReceiverState {
-	pc: RTCPeerConnection;
+	/** The live peer connection; null while this receiver is a shadow. */
+	pc: RTCPeerConnection | null;
 	ws: WebSocket;
 	video: HTMLVideoElement;
-	/** The "Waiting for a sender" hint; hidden the moment media lands. */
+	/** The "Waiting for a sender" hint; hidden while media lands or shadowed. */
 	hint: HTMLSpanElement | null;
-	/** True once a remote track has been rendered; drives the hint. */
+	/** The "the overlay has the live feed" note; shown only when shadowed. */
+	note: HTMLSpanElement | null;
+	/** True when this is the OBS runtime page (claims the live receiver slot). */
+	priority: boolean;
+	/** True while this receiver is a non-active shadow (note + last frame). */
+	shadow: boolean;
+	/** True once a remote track of the CURRENT peer has been rendered. */
 	hasTrack: boolean;
 }
 
@@ -50,91 +61,51 @@ const receivers = new Map<string, ReceiverState>();
 /**
  * The signaling WebSocket for a stream id. The route is shared by sender and
  * receiver; the role is a query param read by the server on upgrade (no
- * `join` frame).
+ * `join` frame). A `priority` receiver (the OBS runtime page) additionally
+ * claims the live-media receiver slot, demoting any concurrent shadow.
  */
-function signalingUrl(streamId: string): string {
+function signalingUrl(streamId: string, priority: boolean): string {
+	const suffix = priority ? "&priority=1" : "";
 	return (
 		(location.protocol === "https:" ? "wss://" : "ws://") +
 		location.host +
-		`/api/webrtc/stream/${encodeURIComponent(streamId)}/ws?role=receiver`
+		`/api/webrtc/stream/${encodeURIComponent(streamId)}/ws?role=receiver` +
+		suffix
 	);
 }
 
-/** Open the signaling socket + peer connection and drive the answerer. */
+/** Open the signaling socket and drive the answerer / shadow state machine. */
 function attachReceiver(
 	streamId: string,
 	video: HTMLVideoElement,
 	hint: HTMLSpanElement | null,
+	note: HTMLSpanElement | null,
+	priority: boolean,
 ): ReceiverState {
 	const state: ReceiverState = {
-		pc: null as unknown as RTCPeerConnection,
+		pc: null,
 		ws: null as unknown as WebSocket,
 		video,
 		hint,
+		note,
+		priority,
+		// The first room-state (the `sync` reply) is the authority; this only
+		// seeds the pre-layout moment (the hint, "waiting for a sender").
+		shadow: false,
 		hasTrack: false,
 	};
-	const showHint = () => {
-		state.hasTrack = false;
-		if (state.hint) state.hint.style.display = "";
-	};
-	const ws = new WebSocket(signalingUrl(streamId));
-	ws.onopen = () => {
-		// Joining is implicit in the WS upgrade (role in the query). Now ask
-		// for the room layout in the open channel: the on-join room-state
-		// snapshot can race this listener's setup, while a `sync` reply
-		// always arrives after the socket is usable.
-		ws.send(JSON.stringify({ type: "sync" }));
-	};
-	const pc = new RTCPeerConnection({
-		iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-	});
-	state.pc = pc;
-	state.ws = ws;
-	console.info(`[webrtc] receiver connecting (stream ${streamId})`);
-	ws.onerror = () =>
-		console.warn(`[webrtc] receiver signaling error (stream ${streamId})`);
 
-	pc.ontrack = (ev) => {
-		if (ev.streams[0]) {
-			console.info(`[webrtc] receiver got media track (stream ${streamId})`);
-			video.srcObject = ev.streams[0];
-			state.hasTrack = true;
-			if (state.hint) state.hint.style.display = "none";
-			// muted (set by draw) is what lets the browser autoplay it.
-			void video.play().catch(() => {});
-		}
+	const setDisplay = (el: HTMLElement | null, display: string): void => {
+		if (el) el.style.display = display;
 	};
-	pc.onicecandidate = (e) => {
-		if (e.candidate && ws.readyState === WebSocket.OPEN) {
-			ws.send(JSON.stringify({ type: "ice", candidate: e.candidate.toJSON() }));
-		}
-	};
-	pc.onconnectionstatechange = () => {
-		if (pc.connectionState === "failed" || pc.connectionState === "closed") {
-			video.srcObject = null;
-			showHint();
-		}
-	};
+	const showHint = () => setDisplay(state.hint, "");
+	const hideHint = () => setDisplay(state.hint, "none");
+	const showNote = () => setDisplay(state.note, "flex");
+	const hideNote = () => setDisplay(state.note, "none");
+	// Before the first room-state, the note is hidden and the hint is shown.
+	hideNote();
 
-	// The room join is implicit in the upgrade (role in the URL); the receiver
-	// just answers the sender's offer. Signaling frames are SERIALIZED: an ICE
-	// candidate can race the offer (and `addIceCandidate` before a remote
-	// description throws, wedging the peer), so frames queue in arrival order
-	// and candidates that beat the offer are replayed after it is applied.
 	let pendingCandidates: RTCIceCandidateInit[] = [];
-	const flushCandidates = async () => {
-		const queue = pendingCandidates;
-		pendingCandidates = [];
-		// a candidate that fails here is stale (a re-negotiation replaced the
-		// peer's state); drop it silently
-		for (const candidate of queue) {
-			try {
-				await pc.addIceCandidate(candidate);
-			} catch {
-				/* stale */
-			}
-		}
-	};
 	let chain: Promise<void> = Promise.resolve();
 	const enqueue = (fn: () => Promise<void>): void => {
 		chain = chain
@@ -146,6 +117,103 @@ function attachReceiver(
 				),
 			);
 	};
+	const flushCandidates = async () => {
+		const queue = pendingCandidates;
+		pendingCandidates = [];
+		const pc = state.pc;
+		if (!pc) return;
+		// a candidate that fails here is stale (a re-negotiation replaced the
+		// peer's state); drop it silently
+		for (const candidate of queue) {
+			try {
+				await pc.addIceCandidate(candidate);
+			} catch {
+				/* stale */
+			}
+		}
+	};
+
+	/** The live peer, created lazily when this receiver becomes active. */
+	const ensurePeer = (): RTCPeerConnection => {
+		const existing = state.pc;
+		if (existing) return existing;
+		const ws = state.ws;
+		const pc = new RTCPeerConnection({
+			iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+		});
+		state.pc = pc;
+		pc.ontrack = (ev) => {
+			if (ev.streams[0]) {
+				console.info(`[webrtc] receiver got media track (stream ${streamId})`);
+				video.srcObject = ev.streams[0];
+				state.hasTrack = true;
+				hideHint();
+				// muted (set by draw) is what lets the browser autoplay it.
+				void video.play().catch(() => {});
+			}
+		};
+		pc.onicecandidate = (e) => {
+			// Only the primary's candidates reach the sender (server relay).
+			if (e.candidate && ws && ws.readyState === WebSocket.OPEN) {
+				ws.send(JSON.stringify({ type: "ice", candidate: e.candidate.toJSON() }));
+			}
+		};
+		pc.onconnectionstatechange = () => {
+			if (
+				pc.connectionState === "failed" ||
+				pc.connectionState === "closed"
+			) {
+				if (!state.shadow) {
+					// Active peer dropped; the sender re-offers on room-state.
+					video.srcObject = null;
+					state.hasTrack = false;
+					showHint();
+				}
+			}
+		};
+		return pc;
+	};
+
+	/** Drop the live peer (demote to shadow); the video keeps its last frame. */
+	const dropPeer = () => {
+		if (state.pc) {
+			state.pc.close();
+			state.pc = null;
+		}
+		pendingCandidates = [];
+		chain = Promise.resolve();
+	};
+
+	/** Apply a room-state layout: `active` = is this the live receiver. */
+	const applyLayout = (active: boolean, hasSender: boolean) => {
+		if (active) {
+			state.shadow = false;
+			ensurePeer();
+			hideNote();
+			if (!hasSender) showHint(); // waiting for the sender to (re)offer
+		} else {
+			// Shadow: freeze the last frame, show the note, drop the peer.
+			state.shadow = true;
+			dropPeer();
+			hideHint();
+			showNote();
+		}
+	};
+
+	const ws = new WebSocket(signalingUrl(streamId, priority));
+	state.ws = ws;
+	console.info(
+		`[webrtc] receiver ${priority ? "(priority)" : "(shadow)"} connecting (stream ${streamId})`,
+	);
+	ws.onerror = () =>
+		console.warn(`[webrtc] receiver signaling error (stream ${streamId})`);
+	ws.onopen = () => {
+		// Joining is implicit in the WS upgrade (role in the query). Ask for the
+		// layout in the open channel: the on-join room-state snapshot can race
+		// this listener's setup, while a `sync` reply always arrives after the
+		// socket is usable.
+		ws.send(JSON.stringify({ type: "sync" }));
+	};
 	ws.onmessage = async (ev) => {
 		// SDP frames are large; a WebSocket client may hand us a `Blob` for
 		// them, so normalise to text before parsing.
@@ -155,7 +223,11 @@ function attachReceiver(
 			type?: string;
 			sdp?: RTCSessionDescriptionInit;
 			candidate?: RTCIceCandidateInit;
-			state?: { sender?: boolean; receiver?: boolean };
+			state?: {
+				sender?: boolean;
+				receiver?: boolean;
+				active?: boolean;
+			};
 		};
 		try {
 			msg = JSON.parse(text);
@@ -163,16 +235,23 @@ function attachReceiver(
 			return;
 		}
 		switch (msg.type) {
+			case "room-state":
+				// The layout is authoritative: `active` says whether THIS
+				// receiver carries the live media now.
+				applyLayout(!!msg.state?.active, !!msg.state?.sender);
+				break;
 			case "offer": {
+				// Only the primary ever receives offers; a shadow ignores any.
 				const sdp = msg.sdp;
-				if (sdp)
+				if (sdp && !state.shadow)
 					enqueue(async () => {
+						const pc = ensurePeer();
 						console.info(`[webrtc] receiver got offer (stream ${streamId})`);
 						await pc.setRemoteDescription(sdp);
 						const answer = await pc.createAnswer();
 						await pc.setLocalDescription(answer);
-						if (ws.readyState === WebSocket.OPEN)
-							ws.send(JSON.stringify({ type: "answer", sdp: answer }));
+						if (state.ws?.readyState === WebSocket.OPEN)
+							state.ws.send(JSON.stringify({ type: "answer", sdp: answer }));
 						await flushCandidates();
 					});
 				break;
@@ -181,20 +260,30 @@ function attachReceiver(
 				const candidate = msg.candidate;
 				if (candidate)
 					enqueue(async () => {
-						// A candidate that arrives before the offer's remote
-						// description throws; queue it and let the offer
-						// handler replay it (flushCandidates).
-						try {
-							await pc.addIceCandidate(candidate);
-						} catch {
-							pendingCandidates.push(candidate);
+						const pc = state.pc;
+						let applied = false;
+						if (pc) {
+							try {
+								await pc.addIceCandidate(candidate);
+								applied = true;
+							} catch {
+								/* stale — requeue */
+							}
 						}
+						// A candidate that beat the offer (no peer yet, or a
+						// stale one) is played back after the offer is applied.
+						if (!applied) pendingCandidates.push(candidate);
 					});
 				break;
 			}
 			case "peer-left":
-				video.srcObject = null;
-				showHint();
+				// The sender left. Active: clear the feed and wait for it to
+				// return. A shadow keeps its note (it is not carrying media).
+				if (!state.shadow) {
+					video.srcObject = null;
+					state.hasTrack = false;
+					showHint();
+				}
 				break;
 		}
 	};
@@ -202,8 +291,11 @@ function attachReceiver(
 		if (ws === state.ws) {
 			// The signaling dropped (server restarted / element removed).
 			// Clear the feed; a fresh receiver attaches when the DOM
-			// re-creates the element.
+			// re-creates the element (onremove -> detachReceiver).
+			dropPeer();
 			video.srcObject = null;
+			state.hasTrack = false;
+			hideNote();
 			showHint();
 		}
 	};
@@ -215,18 +307,21 @@ function attachReceiver(
 function detachReceiver(streamId: string): void {
 	const state = receivers.get(streamId);
 	if (!state) return;
-	state.pc.close();
+	state.pc?.close();
 	state.ws.close();
 	state.video.srcObject = null;
 	receivers.delete(streamId);
 }
 
-function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
+function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	const streamId =
 		typeof element.props.streamId === "string" ? element.props.streamId : "";
-	// Connect in both the editor (live preview) and the runtime page; the room
-	// holds a single receiver slot and a late receiver replaces the earlier
-	// one (see header comment), so both can connect safely.
+	// Connect in both the editor (live preview) and the runtime page. The OBS
+	// runtime page — identified by its `activeTriggers` context, which only the
+	// runtime builds — is `priority` and claims the live-media receiver slot;
+	// the editor (and any other concurrent receiver) runs as a shadow that
+	// keeps its last frame plus a note that the overlay has the feed.
+	const priority = ctx.activeTriggers !== undefined;
 	const live = streamId.length > 0;
 	return (
 		<div
@@ -250,8 +345,14 @@ function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 				const hint = container.querySelector(
 					".overlay-webrtc-hint",
 				) as HTMLSpanElement | null;
+				const note = container.querySelector(
+					".overlay-webrtc-note",
+				) as HTMLSpanElement | null;
 				if (live && !receivers.has(streamId)) {
-					receivers.set(streamId, attachReceiver(streamId, video, hint));
+					receivers.set(
+						streamId,
+						attachReceiver(streamId, video, hint, note, priority),
+					);
 				}
 			}}
 			onremove={() => {
@@ -283,6 +384,25 @@ function draw(element: OverlayElement, _ctx: ElementContext): Vnode {
 					},
 				},
 				t("overlay.webrtc_hint"),
+			)}
+			{m(
+				"span.overlay-webrtc-note",
+				{
+					style: {
+						position: "absolute",
+						inset: "0",
+						display: "none",
+						alignItems: "center",
+						justifyContent: "center",
+						textAlign: "center",
+						padding: "8px",
+						pointerEvents: "none",
+						color: "rgba(255,255,255,0.85)",
+						fontSize: "13px",
+						background: "rgba(0,0,0,0.45)",
+					},
+				},
+				t("overlay.webrtc_shadow"),
 			)}
 		</div>
 	);

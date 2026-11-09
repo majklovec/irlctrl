@@ -52,6 +52,7 @@
   "overlay.fade_size": "Größe des Ausblendens (px)",
   "overlay.iframe_url": "URL",
   "overlay.webrtc_sender_url": "Sender-URL",
+  "overlay.webrtc_shadow": "Das Live-Feed läuft auf dem Overlay",
   "overlay.webrtc_copy": "Kopieren",
   "overlay.webrtc_qr": "QR code",
   "overlay.webrtc_hint": "Warte auf einen Sender",

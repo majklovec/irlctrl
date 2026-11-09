@@ -52,6 +52,7 @@
     "overlay.fade_size": "Velikost ztmavování (px)",
     "overlay.iframe_url": "URL",
     "overlay.webrtc_sender_url": "Odkaz odesílatele",
+    "overlay.webrtc_shadow": "Live video je v OBS overlay",
     "overlay.webrtc_copy": "Kopírovat",
     "overlay.webrtc_qr": "QR code",
     "overlay.webrtc_hint": "Čeká se na odesílatele",

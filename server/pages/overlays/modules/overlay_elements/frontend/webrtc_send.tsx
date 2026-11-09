@@ -42,6 +42,13 @@ interface SenderState {
 	source: Source | null;
 	/** true once an offer has been sent; guards against double-negotiating. */
 	negotiating: boolean;
+	/**
+	 * Last `primary` token seen in a room-state with a receiver present.
+	 * `null` when there is no receiver. A change (with a receiver present)
+	 * means a NEW receiver took the live-media slot, so the sender must re-offer
+	 * to it; the old peer (bound to the demoted receiver) is closed first.
+	 */
+	primary: number | null;
 }
 
 interface ServerMessage {
@@ -50,7 +57,12 @@ interface ServerMessage {
 	sdp?: RTCSessionDescriptionInit;
 	candidate?: RTCIceCandidateInit;
 	/** room-state snapshot: which peers are present in the room */
-	state?: { sender?: boolean; receiver?: boolean };
+	state?: {
+		sender?: boolean;
+		receiver?: boolean;
+		/** primary-token: changes when the live-media receiver changes. */
+		primary?: number;
+	};
 }
 
 const params = new URLSearchParams(location.search);
@@ -76,6 +88,7 @@ const state: SenderState = {
 	stream: null,
 	source: null,
 	negotiating: false,
+	primary: null,
 };
 
 function setStatus(text: string, kind: StatusKind = "idle"): void {
@@ -91,6 +104,7 @@ function stopAll(): void {
 	state.stream = null;
 	state.source = null;
 	state.negotiating = false;
+	state.primary = null;
 	state.pc?.close();
 	state.pc = null;
 	if (state.ws && state.ws.readyState === WebSocket.OPEN) state.ws.close();
@@ -257,8 +271,18 @@ function preparePeer(): RTCPeerConnection | null {
 	return pc;
 }
 
-/** Build the peer (if needed) and send a fresh offer, at most once. */
-function offerFresh(): void {
+/**
+ * Build the peer (if needed) and send a fresh offer, at most once. With
+ * `force` (a NEW primary receiver took the live-media slot) the existing peer
+ * — bound to the receiver that was demoted to a shadow — is closed first so the
+ * fresh offer negotiates clean ICE with the new receiver.
+ */
+function offerFresh(force = false): void {
+	if (force) {
+		state.negotiating = false;
+		state.pc?.close();
+		state.pc = null;
+	}
 	if (state.negotiating) return;
 	if (preparePeer()) void sendOffer();
 }
@@ -296,10 +320,28 @@ function connect(): void {
 		// a trustworthy snapshot of who is present (authoritative over
 		// peer-joined, which can be missed during connection setup).
 		switch (msg.type) {
-			case "room-state":
-				// A receiver is present (fresh, or it just reloaded): offer.
-				if (msg.state?.receiver) offerFresh();
+			case "room-state": {
+				const st = msg.state;
+				if (st?.receiver) {
+					const token = st.primary ?? 0;
+					if (state.primary !== null && state.primary !== token) {
+						// A DIFFERENT receiver became the primary (a priority
+						// one — the OBS page — took the slot, or the primary
+						// left and another promoted). Re-offer to the new
+						// primary; the old peer (bound to the now-shadow
+						// receiver) is dropped.
+						offerFresh(true);
+					} else {
+						offerFresh();
+					}
+					state.primary = token;
+				} else {
+					// No receiver left: forget the primary so a fresh join
+					// negotiates clean.
+					state.primary = null;
+				}
 				break;
+			}
 			case "peer-joined":
 				if (msg.role === "receiver") offerFresh();
 				break;

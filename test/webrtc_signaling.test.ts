@@ -83,38 +83,38 @@ class FakeSocket {
 }
 
 describe("webrtc room manager", () => {
+	// A room-state frame expectation. `active` is true only for the primary
+	// receiver; `primary` is the handover token (it changes when the identity
+	// of the primary changes, which is what makes the sender renegotiate).
+	const st = (
+		sender: boolean,
+		receiver: boolean,
+		active = false,
+		primary = 0,
+	): { type: "room-state"; state: RoomState } => ({
+		type: "room-state",
+		state: { sender, receiver, active, primary },
+	});
+
 	test("a join announces the room layout to both peers", () => {
 		const m = new WebrtcRoomManager();
 		const sender = new FakeSocket();
 		m.join("s1", "sender", sender);
-		expect(
-			sender.matches({
-				type: "room-state",
-				state: { sender: true, receiver: false },
-			}),
-		).toBe(true);
+		// sender-only room: no primary, token 0
+		expect(sender.matches(st(true, false, false, 0))).toBe(true);
 		const receiver = new FakeSocket();
 		m.join("s1", "receiver", receiver);
-		expect(
-			sender.matches({
-				type: "room-state",
-				state: { sender: true, receiver: true },
-			}),
-		).toBe(true);
-		expect(
-			receiver.matches({
-				type: "room-state",
-				state: { sender: true, receiver: true },
-			}),
-		).toBe(true);
+		// the receiver is the (only) primary; the token bumps 0 -> 1
+		expect(sender.matches(st(true, true, false, 1))).toBe(true);
+		expect(receiver.matches(st(true, true, true, 1))).toBe(true);
 	});
 
-	test("relay delivers a frame only to the peer holding the other role", () => {
+	test("relay delivers a frame only to the primary peer", () => {
 		const m = new WebrtcRoomManager();
 		const sender = new FakeSocket();
 		const receiver = new FakeSocket();
 		m.join("s1", "sender", sender);
-		m.join("s1", "receiver", receiver);
+		m.join("s1", "receiver", receiver); // becomes the primary
 		m.relay("s1", "sender", {
 			type: "offer",
 			sdp: { type: "offer", sdp: "v=0" },
@@ -123,8 +123,7 @@ describe("webrtc room manager", () => {
 			type: "offer",
 			sdp: { type: "offer", sdp: "v=0" },
 		});
-		// the sender saw only its own room-state announcements, not the
-		// frame it sent
+		// the sender saw only its two room-state announcements, not its own frame
 		expect(sender.frames.length).toBe(2);
 		expect(
 			sender.matches({ type: "offer", sdp: { type: "offer", sdp: "v=0" } }),
@@ -148,18 +147,8 @@ describe("webrtc room manager", () => {
 		const bReceiver = new FakeSocket();
 		m.join("b", "receiver", bReceiver);
 		// the stream-a peer only ever hears about its own (empty) room
-		expect(
-			aSender.matches({
-				type: "room-state",
-				state: { sender: true, receiver: false },
-			}),
-		).toBe(true);
-		expect(
-			aSender.matches({
-				type: "room-state",
-				state: { sender: true, receiver: true },
-			}),
-		).toBe(false);
+		expect(aSender.matches(st(true, false, false, 0))).toBe(true);
+		expect(aSender.matches(st(true, true, false, 0))).toBe(false);
 		expect(bSender.matches({ type: "offer" })).toBe(false);
 		m.relay("b", "receiver", {
 			type: "offer",
@@ -170,70 +159,104 @@ describe("webrtc room manager", () => {
 		).toBe(false);
 	});
 
-	test("leaving tells the other peer and drops the emptied room", () => {
+	test("a receiver leaving announces the reduced layout (no peer-left to the sender)", () => {
 		const m = new WebrtcRoomManager();
 		const sender = new FakeSocket();
 		const receiver = new FakeSocket();
 		m.join("s1", "sender", sender);
-		m.join("s1", "receiver", receiver);
-		m.leave("s1", "receiver");
-		expect(sender.matches({ type: "peer-left" })).toBe(true);
-		expect(
-			sender.frames.at(-1)
-				? (sender.frames.at(-1) as { type: string }).type
-				: null,
-		).toBe("peer-left");
-		// the peer that left is not told it left
-		expect(receiver.matches({ type: "peer-left" })).toBe(false);
-		// the room is gone: a fresh receiver now re-meets the sender
-		const fresh = new FakeSocket();
-		m.join("s1", "receiver", fresh);
-		expect(
-			sender.matches({
-				type: "room-state",
-				state: { sender: true, receiver: true },
-			}),
-		).toBe(true);
+		m.join("s1", "receiver", receiver); // primary, token 1
+		m.leave("s1", "receiver", receiver);
+		// the sender learns the receiver is gone via room-state, NOT peer-left;
+		// the token bumps again (a primary left)
+		expect(sender.matches({ type: "peer-left" })).toBe(false);
+		expect(sender.frames.at(-1)).toEqual(st(true, false, false, 2));
 	});
 
-	test("a fresh receiver replaces the stale one (the old one is told it left)", () => {
+	test("a second (non-priority) receiver joins as a shadow, not primary", () => {
 		const m = new WebrtcRoomManager();
 		const sender = new FakeSocket();
-		const oldReceiver = new FakeSocket();
+		const first = new FakeSocket();
 		m.join("s1", "sender", sender);
-		m.join("s1", "receiver", oldReceiver);
-		const newReceiver = new FakeSocket();
-		m.join("s1", "receiver", newReceiver);
-		expect(oldReceiver.matches({ type: "peer-left" })).toBe(true);
-		expect(
-			sender.matches({
-				type: "room-state",
-				state: { sender: true, receiver: true },
-			}),
-		).toBe(true);
-		expect(
-			newReceiver.matches({
-				type: "room-state",
-				state: { sender: true, receiver: true },
-			}),
-		).toBe(true);
+		m.join("s1", "receiver", first); // primary, token 1
+		const second = new FakeSocket();
+		m.join("s1", "receiver", second); // slot taken -> shadow
+		expect(first.matches(st(true, true, true, 1))).toBe(true);
+		expect(second.matches(st(true, true, false, 1))).toBe(true);
+		// the token did NOT bump (the primary is unchanged)
+		expect(sender.frames.at(-1)).toEqual(st(true, true, false, 1));
 	});
 
-	test("sync answers with the current room state", () => {
+	test("a priority receiver (the OBS page) takes the live slot and demotes the primary", () => {
 		const m = new WebrtcRoomManager();
 		const sender = new FakeSocket();
-		const receiver = new FakeSocket();
+		const editor = new FakeSocket();
 		m.join("s1", "sender", sender);
-		m.join("s1", "receiver", receiver);
-		// the manager returns the reply frame the route should send back to the
-		// caller carrying the caller's view of the room
-		expect(m.message("s1", "sender", { type: "sync" })).toEqual({
-			type: "room-state",
-			state: { sender: true, receiver: true },
+		m.join("s1", "receiver", editor); // editor is primary, token 1
+		const obs = new FakeSocket();
+		m.join("s1", "receiver", obs, true); // OBS priority, token 2
+		// the editor is demoted to a shadow — told via room-state active:false,
+		// NOT peer-left (it keeps its last frame + the note)
+		expect(editor.matches({ type: "peer-left" })).toBe(false);
+		expect(editor.matches(st(true, true, false, 2))).toBe(true);
+		// obs is now the primary (active:true)
+		expect(obs.matches(st(true, true, true, 2))).toBe(true);
+		// the sender sees the token change -> renegotiates with the new primary
+		expect(sender.matches(st(true, true, false, 2))).toBe(true);
+		// a fresh offer goes ONLY to the new primary (obs), not the shadow
+		m.relay("s1", "sender", {
+			type: "offer",
+			sdp: { type: "offer", sdp: "obs" },
 		});
-		// a media-handshake frame is relayed to the other peer with no direct reply
+		expect(obs.frames.at(-1)).toEqual({
+			type: "offer",
+			sdp: { type: "offer", sdp: "obs" },
+		});
+		expect(editor.matches({ type: "offer", sdp: { type: "offer", sdp: "obs" } })).toBe(
+			false,
+		);
+	});
+
+	test("when the primary leaves, the newest remaining receiver is promoted", () => {
+		const m = new WebrtcRoomManager();
+		const sender = new FakeSocket();
+		const obs = new FakeSocket();
+		const editor = new FakeSocket();
+		m.join("s1", "sender", sender);
+		m.join("s1", "receiver", obs, true); // obs primary, token 1
+		m.join("s1", "receiver", editor); // editor shadow
+		m.leave("s1", "receiver", obs); // the primary leaves -> token 2
+		// the editor is promoted to primary (active:true)
+		expect(editor.matches(st(true, true, true, 2))).toBe(true);
+		// the sender sees the token change -> renegotiates with the editor
+		expect(sender.frames.at(-1)).toEqual(st(true, true, false, 2));
+	});
+
+	test("a receiver that rejoins after the last one left re-meets the sender", () => {
+		const m = new WebrtcRoomManager();
+		const sender = new FakeSocket();
+		const receiver = new FakeSocket();
+		m.join("s1", "sender", sender);
+		m.join("s1", "receiver", receiver); // token 1
+		m.leave("s1", "receiver", receiver); // token 2 (the primary left)
+		const fresh = new FakeSocket();
+		m.join("s1", "receiver", fresh); // token 3 (a new primary)
+		expect(fresh.matches(st(true, true, true, 3))).toBe(true);
+		expect(sender.matches(st(true, true, false, 3))).toBe(true);
+	});
+
+	test("sync answers with the caller's own room state (active is per-recipient)", () => {
+		const m = new WebrtcRoomManager();
+		const sender = new FakeSocket();
+		const receiver = new FakeSocket();
+		m.join("s1", "sender", sender);
+		m.join("s1", "receiver", receiver); // primary, token 1
+		// the receiver is the primary, so its sync reply says active:true
+		expect(m.message("s1", "receiver", receiver, { type: "sync" })).toEqual(
+			st(true, true, true, 1),
+		);
+		// a media-handshake frame is relayed to the primary with no direct reply
 		expect(
-			m.message("s1", "sender", {
+			m.message("s1", "sender", sender, {
 				type: "ice",
 				candidate: { candidate: "c", sdpMid: "0" },
 			}),

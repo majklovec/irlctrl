@@ -1,12 +1,19 @@
 /*
  * The WebRTC element's signaling relay. A room per stream id pairs one sender
- * and one receiver and routes the SDP/ICE handshake between them (the relay
- * never touches media). The room manager is a pure, dependency-free class so
- * the pair/relay/cleanup behaviour can be unit-tested without a live socket.
+ * with one or more receivers and routes the SDP/ICE handshake between the
+ * sender and the PRIME receiver (the relay never touches media). The room
+ * manager is a pure, dependency-free class so the join/relay/cleanup behaviour
+ * can be unit-tested without a live socket.
  *
- * Join order is symmetric: whichever peer joins second is told the first is
- * already present, and the first is told about the newcomer, so the sender
- * (which always offers) starts the negotiation in BOTH orders.
+ * Only ONE receiver — the `primary` — carries the live media. The OBS runtime
+ * page joins with `priority=1` so it is always the primary (its feed is the
+ * one actually streamed to viewers); any concurrent receiver (the editor's
+ * live preview) is a shadow: it is relayed no media and its UI shows its last
+ * frame with a note that the overlay has the feed. When the primary leaves,
+ * the next receiver promotes and the sender re-offers to it.
+ *
+ * Join order is symmetric: the sender (which always offers) learns a receiver
+ * is present via `room-state.receiver` in BOTH orders and offers it.
  */
 import { type AnyElysia, Elysia } from "elysia";
 import { upgradeRequired } from "../../../../../shared/http";
@@ -20,11 +27,41 @@ import {
 	type WebrtcServerMessage,
 } from "./webrtc_protocol";
 
-/** The subset of a live WebSocket the relay drives (both roles symmetric). */
+/** The contract the relay drives (both roles symmetric; tests fake it). */
 interface SignalingSocket {
 	readonly readyState: number;
 	send(message: string): void;
 	close(code?: number, reason?: string): void;
+}
+
+/**
+ * A STABLE handle for one signaling connection. Elysia hands a DIFFERENT `ws`
+ * object to `open` than to `close` (only `ws.data` survives the lifecycle), so
+ * a manager that compares the raw socket with `===` would never recognise the
+ * peer that is leaving. The handle is created once per connection and stored in
+ * `ws.data`, so its identity is stable; it delegates `send`/`readyState`/
+ * `close` to whichever live socket Elysia most recently passed, so delivery
+ * always reaches the real connection.
+ */
+class ConnectionHandle implements SignalingSocket {
+	#live: SignalingSocket | null = null;
+
+	/** Point the handle at the current live socket (call on every event). */
+	attach(socket: SignalingSocket): void {
+		this.#live = socket;
+	}
+
+	get readyState(): number {
+		return this.#live?.readyState ?? 3;
+	}
+
+	send(message: string): void {
+		this.#live?.send(message);
+	}
+
+	close(code?: number, reason?: string): void {
+		this.#live?.close(code, reason);
+	}
 }
 
 /** A socket is only usable for delivery while it is open. */
@@ -32,17 +69,36 @@ const OPEN = 1;
 
 interface Room {
 	sender?: SignalingSocket;
-	receiver?: SignalingSocket;
+	/** Every connected receiver; at most one is the `primary` (live media). */
+	receivers: SignalingSocket[];
+	/** Increments whenever the primary-identity changes (handover/new primary). */
+	primaryGen: number;
 }
 
 const sendJson = (sock: SignalingSocket, msg: WebrtcServerMessage): void => {
 	if (sock.readyState === OPEN) sock.send(JSON.stringify(msg));
 };
 
+/** The receiver that carries the live media (the slot the sender offers). */
+const primary = (room: Room | undefined): SignalingSocket | undefined =>
+	room?.receivers.find((s) => s.readyState === OPEN);
+
+/** The room's shared state (no per-peer `active` — that is added per socket). */
+const baseState = (room: Room | undefined): RoomState => ({
+	sender: !!room?.sender,
+	receiver: (room?.receivers.length ?? 0) > 0,
+	active: false,
+	primary: room?.primaryGen ?? 0,
+});
+
 /**
- * One room per stream id. `join` claims a role slot (replacing a stale holder
- * of the same role), tells both peers about the current occupancy, and `relay`
- * forwards a media-handshake frame to the peer holding the other role.
+ * One room per stream id. A single sender plus any number of receivers: the
+ * FIRST open receiver is the `primary` and carries the live media, the rest are
+ * shadows (their UI shows a note + last frame). `join` adds a receiver (a
+ * `priority` join — the OBS runtime page — takes the primary slot immediately,
+ * a non-priority one only when none exists) and `relay` forwards media frames
+ * ONLY to the primary. `announce` tells every occupant the role layout plus its
+ * own `active` flag, so a receiver demoted to shadow degrades in place.
  */
 export class WebrtcRoomManager {
 	#rooms = new Map<string, Room>();
@@ -53,85 +109,143 @@ export class WebrtcRoomManager {
 		for (const [id, room] of this.#rooms) {
 			const roles: string[] = [];
 			if (room.sender) roles.push("sender");
-			if (room.receiver) roles.push("receiver");
+			for (let i = 0; i < room.receivers.length; i++)
+				roles.push(i === 0 ? "receiver" : "receiver*");
 			out[id] = roles;
 		}
 		return out;
 	}
 
-	/** A snapshot of the room's occupancy (an absent room is empty). */
-	state(streamId: string): RoomState {
+	/** A snapshot of the room addressed to `sock`: the role flags are the
+	 * same for everyone; `active` is true only when `sock` is the primary. */
+	stateFor(streamId: string, sock: SignalingSocket): RoomState {
 		const room = this.#rooms.get(streamId);
-		return {
-			sender: !!room?.sender,
-			receiver: !!room?.receiver,
-		};
+		return { ...baseState(room), active: primary(room) === sock };
 	}
 
 	/**
 	 * Handle one parsed client frame and return the response frame to send back
 	 * to the caller (if any). A `sync` frame is answered with a `room-state`
-	 * snapshot — this is the reliable re-sync path, since the on-join snapshot
-	 * can race the client's `onopen` listener setup. Media-handshake frames are
-	 * relayed to the other peer and have no direct reply.
+	 * snapshot addressed to the caller — this is the reliable re-sync path,
+	 * since the on-join snapshot can race the client's `onopen` listener setup.
+	 * Media-handshake frames are relayed to the primary receiver and have no
+	 * direct reply.
 	 */
 	message(
 		streamId: string,
 		role: WebrtcRole,
+		sock: SignalingSocket,
 		frame: WebrtcClientMessage,
 	): WebrtcServerMessage | null {
 		if (frame.type === "sync") {
-			return { type: "room-state", state: this.state(streamId) };
+			return { type: "room-state", state: this.stateFor(streamId, sock) };
 		}
 		this.relay(streamId, role, frame);
 		return null;
 	}
 
-	/** Broadcast the current room state to both occupants. */
+	/** Broadcast the room state to every occupant, each addressed to itself. */
 	announce(streamId: string): void {
 		const room = this.#rooms.get(streamId);
 		if (!room) return;
-		const state = {
-			sender: !!room.sender,
-			receiver: !!room.receiver,
-		} satisfies RoomState;
-		if (room.sender) sendJson(room.sender, { type: "room-state", state });
-		if (room.receiver) sendJson(room.receiver, { type: "room-state", state });
+		if (room.sender)
+			sendJson(room.sender, {
+				type: "room-state",
+				state: this.stateFor(streamId, room.sender),
+			});
+		for (const s of room.receivers)
+			sendJson(s, {
+				type: "room-state",
+				state: this.stateFor(streamId, s),
+			});
 	}
 
-	/** Claim `role` in `streamId`; refresh the room state for both peers. */
-	join(streamId: string, role: WebrtcRole, sock: SignalingSocket): void {
+	/**
+	 * Add `sock` to `streamId` in `role`. For a receiver this promotes it to
+	 * the primary slot when `priority` (or the slot is empty); a displaced
+	 * primary is demoted to shadow (not told `peer-left`), so it keeps its last
+	 * frame and shows the "overlay has the feed" note. An existing socket
+	 * reconnecting is left in place. `announce` refreshes everyone.
+	 */
+	join(
+		streamId: string,
+		role: WebrtcRole,
+		sock: SignalingSocket,
+		priority = false,
+	): void {
 		let room = this.#rooms.get(streamId);
 		if (!room) {
-			room = {};
+			room = { receivers: [], primaryGen: 0 };
 			this.#rooms.set(streamId, room);
 		}
-		// A fresh socket takes the role slot; a previous live holder is told it
-		// was replaced so it tears down (e.g. the receiver's editor tab reloaded).
-		const existing = room[role];
-		if (existing && existing !== sock)
-			sendJson(existing, { type: "peer-left" });
-		room[role] = sock;
-		// A room-state snapshot reaches BOTH occupants, so a peer that joins
-		// while the other is mid-handshake (or that misses the first snapshot
-		// during its own connection setup) always learns the room layout.
+		if (role === "sender") {
+			const existing = room.sender;
+			if (existing && existing !== sock)
+				sendJson(existing, { type: "peer-left" });
+			room.sender = sock;
+		} else {
+			if (room.receivers.includes(sock)) {
+				// Reconnect/duplicate: just re-announce the layout.
+				this.announce(streamId);
+				return;
+			}
+			const cur = primary(room);
+			const goPrimary = priority || !cur;
+			if (goPrimary) {
+				room.receivers.unshift(sock);
+				// A new receiver will carry the media — the sender renegotiates
+				// with it after seeing `primary` change in the room-state.
+				room.primaryGen += 1;
+			} else {
+				room.receivers.push(sock);
+			}
+		}
 		this.announce(streamId);
 	}
 
-	/** Forward a handshake frame to the peer holding the other role. */
+	/**
+	 * Forward a media-handshake frame. From the sender it goes ONLY to the
+	 * primary receiver (shadows never see the media — that is how they stay
+	 * lightweight); from the primary receiver it goes to the sender.
+	 */
 	relay(streamId: string, from: WebrtcRole, frame: WebrtcServerMessage): void {
-		const other = this.#rooms.get(streamId)?.[otherRole(from)];
-		if (other) sendJson(other, frame);
-	}
-
-	/** Release `role` in `streamId`, telling the other peer it left. */
-	leave(streamId: string, role: WebrtcRole): void {
 		const room = this.#rooms.get(streamId);
 		if (!room) return;
-		room[role] = undefined;
-		const other = room[otherRole(role)];
-		if (other) sendJson(other, { type: "peer-left" });
-		if (!room.sender && !room.receiver) this.#rooms.delete(streamId);
+		const target =
+			from === "sender"
+				? primary(room)
+				: from === "receiver" && primary(room)
+					? room.sender
+					: undefined;
+		if (target) sendJson(target, frame);
+	}
+
+	/**
+	 * Remove `sock` from `role` in `streamId`. If the primary receiver left,
+	 * the remaining receivers promote (the new primary re-arms and the sender
+	 * re-offers via `room-state.receiver`); if the sender left, every receiver
+	 * is told `peer-left` so non-active ones clear to "waiting for a sender".
+	 */
+	leave(streamId: string, role: WebrtcRole, sock: SignalingSocket): void {
+		const room = this.#rooms.get(streamId);
+		if (!room) return;
+		if (role === "sender") {
+			if (room.sender === sock) room.sender = undefined;
+			if (room.sender) return; // a (re)connected sender is present
+			for (const s of room.receivers)
+				if (s.readyState === OPEN)
+					sendJson(s, { type: "peer-left" });
+		} else {
+			const i = room.receivers.indexOf(sock);
+			if (i >= 0) {
+				const wasPrimary = primary(room) === sock;
+				room.receivers.splice(i, 1);
+				if (wasPrimary) room.primaryGen += 1; // primary identity changed
+			}
+		}
+		if (!room.sender && room.receivers.length === 0)
+			this.#rooms.delete(streamId);
+		else this.announce(streamId);
 	}
 }
 
@@ -139,6 +253,12 @@ export class WebrtcRoomManager {
 interface WebrtcWsData {
 	streamId?: string;
 	role?: WebrtcRole;
+	/**
+	 * The STABLE handle for this connection. Elysia gives a fresh `ws` object to
+	 * each lifecycle event, so `ws.data` (stable) carries the handle and every
+	 * handler attaches the current socket to it before the room manager sees it.
+	 */
+	sock?: ConnectionHandle;
 }
 
 /**
@@ -162,13 +282,28 @@ export function webrtcSignalingRoutes(manager: WebrtcRoomManager): AnyElysia {
 					return ws.close(1008, "Invalid stream id");
 				if (role !== "sender" && role !== "receiver")
 					return ws.close(1008, "Invalid role");
-				(ws.data as WebrtcWsData).streamId = id;
-				(ws.data as WebrtcWsData).role = role;
-				manager.join(id, role, ws);
+				// One stable handle per connection (Elysia's raw `ws` differs per
+				// event); it is stored on ws.data so close() can find it.
+				const sock = new ConnectionHandle();
+				sock.attach(ws);
+				const data = ws.data as WebrtcWsData;
+				data.streamId = id;
+				data.role = role;
+				data.sock = sock;
+				// A runtime (OBS) overlay page passes `priority=1` so it wins
+				// the live-media receiver slot and any concurrent editor preview
+				// degrades to a shadow. The editor omits it.
+				manager.join(
+					id,
+					role,
+					sock,
+					url.searchParams.get("priority") === "1",
+				);
 			},
 			message(ws, message) {
 				const data = ws.data as WebrtcWsData;
-				if (!data.streamId || !data.role) return;
+				if (!data.streamId || !data.role || !data.sock) return;
+				data.sock.attach(ws);
 				// Elysia pre-parses JSON text frames (a non-JSON frame stays a
 				// string). Restore an object, tolerating a malformed frame.
 				let frame: unknown;
@@ -180,15 +315,22 @@ export function webrtcSignalingRoutes(manager: WebrtcRoomManager): AnyElysia {
 				const parsed = parseWebrtcClientMessage(frame);
 				if (!parsed) return;
 				// `sync` asks for the room layout; the manager answers with a
-				// snapshot (the reliable re-sync path — a snapshot sent during
-				// the connection upgrade can race the client's listener setup).
-				// Media-handshake frames are relayed with no direct reply.
-				const reply = manager.message(data.streamId, data.role, parsed);
+				// snapshot addressed to this peer (the reliable re-sync path —
+				// a snapshot sent during the connection upgrade can race the
+				// client's listener setup). Media-handshake frames are relayed
+				// to the primary receiver only, with no direct reply.
+				const reply = manager.message(
+					data.streamId,
+					data.role,
+					data.sock,
+					parsed,
+				);
 				if (reply) sendJson(ws, reply);
 			},
 			close(ws) {
 				const data = ws.data as WebrtcWsData;
-				if (data.streamId && data.role) manager.leave(data.streamId, data.role);
+				if (data.streamId && data.role && data.sock)
+					manager.leave(data.streamId, data.role, data.sock);
 			},
 		});
 }
