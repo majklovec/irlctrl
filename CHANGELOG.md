@@ -1,3 +1,11 @@
+# [6.5.0](https://github.com/majklovec/irlctrl/compare/v6.4.0...v6.5.0) (2026-11-09)
+
+
+### Features
+
+* **webrtc:** add overlay element and sender ([c88a770](https://github.com/majklovec/irlctrl/commit/c88a77009a91bfc66a8e9e5eea04602a9e1898f0))
+* **webrtc:** add turn support and split module ([6dbc4c1](https://github.com/majklovec/irlctrl/commit/6dbc4c1ca3fe8a53e9967ed7c3a9cf9589a8ee21))
+
 # [6.4.0](https://github.com/majklovec/irlctrl/compare/v6.3.0...v6.4.0) (2026-11-09)
 
 
