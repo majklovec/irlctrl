@@ -1,3 +1,10 @@
+## [7.0.1](https://github.com/majklovec/irlctrl/compare/v7.0.0...v7.0.1) (2026-11-09)
+
+
+### Bug Fixes
+
+* **srtla:** resolve uplinks and seed tables ([65f98fe](https://github.com/majklovec/irlctrl/commit/65f98fe86c77f678b6d668c219652603762406e1))
+
 # [7.0.0](https://github.com/majklovec/irlctrl/compare/v6.5.0...v7.0.0) (2026-11-09)
 
 
