@@ -2,6 +2,7 @@ import { apiJson, apiTry } from "@ui/api_client";
 import { uuid } from "@ui/util";
 import m from "mithril";
 import { serverLive } from "../../../shell/live";
+import { getActiveProjectId } from "../../../shell/project_select";
 import type {
     Overlay,
     OverlayElement,
@@ -43,8 +44,9 @@ export const state = {
     overlays: [] as OverlaySummary[],
     /** the overlay the editor page has loaded (full state), or null. */
     overlay: null as Overlay | null,
-    /** the current user's device token (owner user-token auth for runtime
-     * URLs); fetched from the profile so runtime URLs name this user. */
+    /** the active project's device token (owner user-token auth for runtime
+     * URLs); fetched from the project's token list so runtime URLs resolve
+     * to the overlay's project. */
     token: "",
     selectedOverlayId: null as string | null,
     selectedElementId: null as string | null,
@@ -225,8 +227,8 @@ export function resolvedTransform(e: OverlayElement): Transform {
     return resolveElement(e, ctx().variables).transform;
 }
 
-/** The runtime URL for an overlay: the overlay's id + the owner's user token
- * (which auth resolves to the overlay's owner). */
+/** The runtime URL for an overlay: the overlay's id + the active project's
+ * device token (which auth resolves to the overlay's project). */
 export function runtimeUrl(id: string): string {
     return (
         location.origin +
@@ -297,13 +299,17 @@ export function variableUsage(variableId: string): number {
 /** Fetch the overlay list; an editor page also loads the overlay its URL
  * names. */
 export async function load(overlayId: string | null = null): Promise<void> {
-    // runtime URLs authenticate with the owner's user token, so fetch this
-    // user's device token from the profile (the overlay API no longer carries
-    // a per-overlay token).
-    const profile = await apiTry<{
-        tokens?: { token: string }[];
-    }>("/api/profile");
-    state.token = profile?.tokens?.[0]?.token ?? "";
+    // runtime URLs authenticate with the owner's device token, which is
+    // project-scoped: fetch the active project's tokens (the overlay API no
+    // longer carries a per-overlay token, and /api/profile no longer lists
+    // tokens).
+    const projectId = getActiveProjectId();
+    const tokens = projectId
+        ? await apiTry<{ tokens?: { token: string }[] }>(
+              `/api/projects/${encodeURIComponent(projectId)}/tokens`,
+          )
+        : null;
+    state.token = tokens?.tokens?.[0]?.token ?? "";
     const list = await apiTry<{ overlays: OverlaySummary[] }>("/api/overlays");
     if (list?.overlays) state.overlays = list.overlays;
     if (overlayId) {
