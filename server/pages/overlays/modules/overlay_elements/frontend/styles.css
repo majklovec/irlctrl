@@ -39,6 +39,10 @@ h1 {
 }
 button {
     flex: 1 1 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     padding: 14px 16px;
     font: inherit;
     font-weight: 600;
@@ -47,6 +51,16 @@ button {
     border: 0;
     border-radius: 12px;
     cursor: pointer;
+}
+.src-icon {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 button:disabled {
     opacity: 0.5;

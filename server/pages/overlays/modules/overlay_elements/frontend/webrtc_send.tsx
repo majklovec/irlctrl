@@ -406,15 +406,31 @@ function syncPreview(preview: HTMLVideoElement): void {
 	if (stream) void preview.play().catch(() => {});
 }
 
+/** Inline source glyphs (the page is standalone — no shared icon import).
+ * 24×24 outline shapes stroked with the button's text colour (see styles.css). */
+const CAMERA_ICON = (
+	<svg class="src-icon" viewBox="0 0 24 24" aria-hidden="true">
+		<rect x="3" y="6" width="13" height="12" rx="2" />
+		<path d="m16 10.5 5-3v9l-5-3" />
+	</svg>
+);
+const SCREEN_ICON = (
+	<svg class="src-icon" viewBox="0 0 24 24" aria-hidden="true">
+		<rect x="2" y="4" width="20" height="13" rx="2" />
+		<path d="M8 21h8M12 17v4" />
+	</svg>
+);
+
 interface SourceButtonAttrs {
 	source: Source;
 	label: string;
+	icon: "camera" | "screen";
 	secondary?: boolean;
 }
 
 const SourceButton: m.Component<SourceButtonAttrs> = {
 	view(vnode) {
-		const { source, label, secondary = false } = vnode.attrs;
+		const { source, label, icon, secondary = false } = vnode.attrs;
 		return (
 			<button
 				type="button"
@@ -422,6 +438,7 @@ const SourceButton: m.Component<SourceButtonAttrs> = {
 				disabled={!validStreamId}
 				onclick={() => void start(source)}
 			>
+				{icon === "camera" ? CAMERA_ICON : SCREEN_ICON}
 				{label}
 			</button>
 		);
@@ -472,6 +489,7 @@ function App(): m.Vnode {
 								key: camera.deviceId,
 								source: camera,
 								label: camera.label,
+								icon: "camera",
 							}),
 						)
 					: null}
@@ -479,6 +497,7 @@ function App(): m.Vnode {
 					? m(SourceButton, {
 							source: { kind: "screen" as const },
 							label: "Share screen",
+							icon: "screen",
 						})
 					: null}
 				<button
