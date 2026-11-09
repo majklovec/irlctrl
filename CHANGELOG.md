@@ -1,3 +1,10 @@
+# [6.2.0](https://github.com/majklovec/irlctrl/compare/v6.1.1...v6.2.0) (2026-11-09)
+
+
+### Features
+
+* **webrtc:** support shadow receivers ([24214f9](https://github.com/majklovec/irlctrl/commit/24214f9d82e35f7bafbfd381b3bab3479e955609))
+
 ## [6.1.1](https://github.com/majklovec/irlctrl/compare/v6.1.0...v6.1.1) (2026-11-09)
 
 
