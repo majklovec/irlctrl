@@ -1,0 +1,14 @@
+{
+  "overlay.add_webrtc": "WebRTC",
+  "overlay.catalog_desc_webrtc": "Живая камера или экран с телефона",
+  "overlay.webrtc_copy": "Копировать",
+  "overlay.webrtc_hint": "Ожидание отправителя",
+  "overlay.webrtc_hint_form": "Откройте эту ссылку на устройстве, которое будет передавать камеру или экран.",
+  "overlay.webrtc_qr": "QR code",
+  "overlay.webrtc_sender_url": "URL отправителя",
+  "overlay.webrtc_shadow": "Прямой поток идёт на оверлее экрана",
+  "overlay.webrtc_turn_hint": "Необязательно. TURN-сервер помогает потоку проходить через строгие NAT — укажите хост, имя пользователя и пароль вашего TURN-провайдера.",
+  "overlay.webrtc_turn_host": "TURN-сервер",
+  "overlay.webrtc_turn_password": "Пароль TURN",
+  "overlay.webrtc_turn_username": "Имя пользователя TURN"
+}

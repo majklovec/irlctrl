@@ -1,0 +1,14 @@
+{
+  "overlay.add_webrtc": "WebRTC",
+  "overlay.catalog_desc_webrtc": "Cámara o pantalla en vivo desde un móvil",
+  "overlay.webrtc_copy": "Copiar",
+  "overlay.webrtc_hint": "Esperando un emisor",
+  "overlay.webrtc_hint_form": "Abre esta URL en el dispositivo que enviará su cámara o pantalla.",
+  "overlay.webrtc_qr": "QR code",
+  "overlay.webrtc_sender_url": "URL del emisor",
+  "overlay.webrtc_shadow": "El flujo en directo está en el overlay de OBS",
+  "overlay.webrtc_turn_hint": "Opcional. Un servidor TURN ayuda a que el feed atraviese NATs restrictivos; introduce el host, el usuario y la contraseña de tu proveedor TURN.",
+  "overlay.webrtc_turn_host": "Servidor TURN",
+  "overlay.webrtc_turn_password": "Contraseña TURN",
+  "overlay.webrtc_turn_username": "Usuario TURN"
+}

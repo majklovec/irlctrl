@@ -4,11 +4,11 @@ import {
 	parseWebrtcClientMessage,
 	type RoomState,
 	WEBRTC_STREAM_ID_RE,
-} from "../server/pages/overlays/modules/overlay_elements/webrtc_protocol";
+} from "../server/pages/overlays/modules/webrtc/webrtc_protocol";
 import {
 	WebrtcRoomManager,
 	webrtcSignalingRoutes,
-} from "../server/pages/overlays/modules/overlay_elements/webrtc_signaling";
+} from "../server/pages/overlays/modules/webrtc/webrtc_signaling";
 
 // ── wire-protocol parser ────────────────────────────────────────────────────
 
@@ -49,6 +49,36 @@ describe("webrtc protocol parser", () => {
 		expect(parseWebrtcClientMessage({ type: "offer", sdp: {} })).toBeNull();
 		expect(
 			parseWebrtcClientMessage({ type: "offer", sdp: { type: "offer" } }),
+		).toBeNull();
+	});
+
+	test("accepts a valid ice-config and rejects malformed ones", () => {
+		const servers = [
+			{ urls: "stun:stun.l.google.com:19302" },
+			{ urls: "turn:turn.example.com", username: "u", credential: "p" },
+		];
+		expect(parseWebrtcClientMessage({ type: "ice-config", servers })).toEqual({
+			type: "ice-config",
+			servers,
+		});
+		// a bare url-string entry is not a valid RTCIceServer — rejected
+		expect(
+			parseWebrtcClientMessage({
+				type: "ice-config",
+				servers: ["stun:stun.l.google.com:19302"],
+			}),
+		).toBeNull();
+		expect(
+			parseWebrtcClientMessage({ type: "ice-config", servers: "nope" }),
+		).toBeNull();
+		expect(
+			parseWebrtcClientMessage({ type: "ice-config", servers: [{ urls: "" }] }),
+		).toBeNull();
+		expect(
+			parseWebrtcClientMessage({
+				type: "ice-config",
+				servers: [{ urls: "turn:x", username: 5 }],
+			}),
 		).toBeNull();
 	});
 
@@ -124,6 +154,44 @@ describe("webrtc room manager", () => {
 		expect(newSender.matches(st(true, false, false, 0))).toBe(true);
 		// The room now occupies the sender slot.
 		expect(m.occupancy()["s1"]).toBeDefined();
+	});
+
+	test("a receiver's ice-config is relayed to a present sender", () => {
+		const m = new WebrtcRoomManager();
+		const sender = new FakeSocket();
+		const receiver = new FakeSocket();
+		m.join("s1", "sender", sender);
+		m.join("s1", "receiver", receiver);
+
+		const servers = [
+			{ urls: "stun:stun.l.google.com:19302" },
+			{ urls: "turn:turn.example.com", username: "u", credential: "p" },
+		];
+		m.message("s1", "receiver", receiver, {
+			type: "ice-config",
+			servers,
+		});
+		// The sender is handed the servers (to build its peer with the same TURN).
+		expect(sender.matches({ type: "ice-config", servers })).toBe(true);
+		// The receiver does not get its own config echoed back.
+		expect(receiver.matches({ type: "ice-config", servers })).toBe(false);
+	});
+
+	test("a sender joining after the receiver gets the stored ice-config", () => {
+		const m = new WebrtcRoomManager();
+		const receiver = new FakeSocket();
+		m.join("s1", "receiver", receiver);
+		const servers = [{ urls: "turn:turn.example.com", username: "u" }];
+		m.message("s1", "receiver", receiver, {
+			type: "ice-config",
+			servers,
+		});
+
+		// The sender connects LATER (the overlay is up first) and learns the
+		// servers on join.
+		const sender = new FakeSocket();
+		m.join("s1", "sender", sender);
+		expect(sender.matches({ type: "ice-config", servers })).toBe(true);
 	});
 
 	test("relay delivers a frame only to the primary peer", () => {

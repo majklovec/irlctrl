@@ -1,0 +1,14 @@
+{
+  "overlay.add_webrtc": "WebRTC",
+  "overlay.catalog_desc_webrtc": "Caméra ou écran en direct depuis un mobile",
+  "overlay.webrtc_copy": "Copier",
+  "overlay.webrtc_hint": "En attente d'un émetteur",
+  "overlay.webrtc_hint_form": "Ouvre cette URL sur l'appareil qui enverra sa caméra ou son écran.",
+  "overlay.webrtc_qr": "QR code",
+  "overlay.webrtc_sender_url": "URL de l'émetteur",
+  "overlay.webrtc_shadow": "Le flux en direct est sur le calque OBS",
+  "overlay.webrtc_turn_hint": "Facultatif. Un serveur TURN aide le flux à traverser les NAT restrictifs — entrez l'hôte, le nom d'utilisateur et le mot de passe de votre fournisseur TURN.",
+  "overlay.webrtc_turn_host": "Serveur TURN",
+  "overlay.webrtc_turn_password": "Mot de passe TURN",
+  "overlay.webrtc_turn_username": "Nom d'utilisateur TURN"
+}

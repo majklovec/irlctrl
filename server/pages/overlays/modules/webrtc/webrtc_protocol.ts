@@ -17,19 +17,29 @@ export const otherRole = (role: WebrtcRole): WebrtcRole =>
 export const WEBRTC_STREAM_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
 /**
+ * The ICE servers a stream uses (always STUN, plus an element-configured TURN
+ * server). Carried `ice-config` frames let the standalone sender page — which
+ * only knows the stream id — build a peer with the same servers the receiver
+ * uses, so a phone behind a restrictive NAT can still reach the receiver.
+ */
+export type IceServers = RTCIceServer[];
+
+/**
  * Client → server. A peer joins its room simply by opening the WebSocket
  * (the stream id is the path, the role the query param) — the server claims
  * the slot in `ws.open`. `sync` requests a fresh room snapshot (the server
  * answers with `room-state`); a peer sends it on open and again after a
  * dropped connection to re-learn the room without a full reconnect. The
  * media-handshake frames are relayed unchanged to the peer holding the
- * other role.
+ * other role. `ice-config` publishes the stream's ICE servers (the element's
+ * TURN settings) so the server can hand them to the sender.
  */
 export type WebrtcClientMessage =
 	| { type: "offer"; sdp: RTCSessionDescriptionInit }
 	| { type: "answer"; sdp: RTCSessionDescriptionInit }
 	| { type: "ice"; candidate: RTCIceCandidateInit }
-	| { type: "sync" };
+	| { type: "sync" }
+	| { type: "ice-config"; servers: IceServers };
 
 /**
  * A snapshot of a room's occupancy: which roles are present. `sender` /
@@ -61,13 +71,15 @@ export interface RoomState {
  * tell a peer that its counterpart appeared or went away; `hijacked` tells a
  * sender that a SECOND sender opened the same link and took its slot (the
  * displaced sender stops and must not reconnect); `offer` / `answer` / `ice`
- * are the relayed media handshake frames.
+ * are the relayed media handshake frames. `ice-config` hands the stream's ICE
+ * servers to the sender (the server learned them from the receiver).
  */
 export type WebrtcServerMessage =
 	| { type: "room-state"; state: RoomState }
 	| { type: "peer-joined"; role: WebrtcRole }
 	| { type: "peer-left" }
 	| { type: "hijacked" }
+	| { type: "ice-config"; servers: IceServers }
 	| { type: "offer"; sdp: RTCSessionDescriptionInit }
 	| { type: "answer"; sdp: RTCSessionDescriptionInit }
 	| { type: "ice"; candidate: RTCIceCandidateInit };
@@ -87,6 +99,10 @@ export function parseWebrtcClientMessage(
 		case "ice":
 			return isCandidate(msg.candidate)
 				? { type: "ice", candidate: msg.candidate }
+				: null;
+		case "ice-config":
+			return isIceServers(msg.servers)
+				? { type: "ice-config", servers: msg.servers }
 				: null;
 		case "sync":
 			return { type: "sync" };
@@ -111,4 +127,28 @@ function isCandidate(value: unknown): value is RTCIceCandidateInit {
 	// An `end-of-candidates` marker has no `candidate` field; allow it so a
 	// peer can signal ICE complete without a real candidate.
 	return c.candidate === undefined || typeof c.candidate === "string";
+}
+
+/**
+ * `RTCIceServer[]`: a list of `{urls, username?, credential?}` objects. Each
+ * entry must carry a non-empty `urls` (string or string array) and, when
+ * present, string `username`/`credential`.
+ */
+function isIceServers(value: unknown): value is IceServers {
+	if (!Array.isArray(value)) return false;
+	for (const s of value) {
+		if (typeof s !== "object" || s === null) return false;
+		const o = s as Record<string, unknown>;
+		const urls =
+			(typeof o.urls === "string" && o.urls !== "") ||
+			(Array.isArray(o.urls) &&
+				o.urls.length > 0 &&
+				o.urls.every((u) => typeof u === "string"));
+		if (!urls) return false;
+		if (o.username !== undefined && typeof o.username !== "string")
+			return false;
+		if (o.credential !== undefined && typeof o.credential !== "string")
+			return false;
+	}
+	return true;
 }

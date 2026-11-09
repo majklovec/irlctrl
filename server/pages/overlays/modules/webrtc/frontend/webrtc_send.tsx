@@ -52,6 +52,16 @@ function isFailed(pc: RTCPeerConnection): boolean {
 	);
 }
 
+/**
+ * The ICE servers this peer uses. Defaults to STUN only; the receiver publishes
+ * the stream's servers (STUN + the element's TURN, if configured) via the
+ * signaling `ice-config`, and this is replaced with them so both ends negotiate
+ * with identical servers — essential for a phone behind a restrictive NAT.
+ */
+const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
+	{ urls: "stun:stun.l.google.com:19302" },
+];
+
 interface SenderState {
 	pc: RTCPeerConnection | null;
 	ws: WebSocket | null;
@@ -75,6 +85,12 @@ interface SenderState {
 	/** ICE candidates that arrived before the remote (answer) description was
 	 * applied. Flushed once `setRemoteDescription` resolves. */
 	pendingCandidates: RTCIceCandidateInit[];
+	/**
+	 * The ICE servers the current peer must use (STUN always, plus the element's
+	 * TURN if the receiver published it). A peer already built with a different
+	 * set is torn down and re-offered when this changes.
+	 */
+	iceServers: RTCIceServer[];
 }
 
 interface ServerMessage {
@@ -82,6 +98,8 @@ interface ServerMessage {
 	role?: string;
 	sdp?: RTCSessionDescriptionInit;
 	candidate?: RTCIceCandidateInit;
+	/** ICE servers (STUN + the element's TURN) the receiver published. */
+	servers?: RTCIceServer[];
 	/** room-state snapshot: which peers are present in the room */
 	state?: {
 		sender?: boolean;
@@ -117,6 +135,7 @@ const state: SenderState = {
 	primary: null,
 	hijacked: false,
 	pendingCandidates: [],
+	iceServers: DEFAULT_ICE_SERVERS,
 };
 
 function setStatus(text: string, kind: StatusKind = "idle"): void {
@@ -135,6 +154,7 @@ function stopAll(): void {
 	state.primary = null;
 	state.hijacked = false;
 	state.pendingCandidates = [];
+	state.iceServers = DEFAULT_ICE_SERVERS;
 	state.pc?.close();
 	state.pc = null;
 	if (state.ws && state.ws.readyState === WebSocket.OPEN) state.ws.close();
@@ -274,9 +294,9 @@ function preparePeer(): RTCPeerConnection | null {
 	const stream = state.stream;
 	if (!stream) return null;
 	if (state.pc) return state.pc;
-	const pc = new RTCPeerConnection({
-		iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-	});
+	// Use the servers the receiver published (STUN + the element's TURN, if the
+	// receiver had already sent `ice-config`), else the STUN-only default.
+	const pc = new RTCPeerConnection({ iceServers: state.iceServers });
 	state.pc = pc;
 	state.pendingCandidates = [];
 	for (const track of stream.getTracks()) pc.addTrack(track, stream);
@@ -380,6 +400,26 @@ function connect(): void {
 			}
 			case "peer-joined":
 				if (msg.role === "receiver") offerFresh();
+				break;
+			case "ice-config":
+				// The receiver published this stream's ICE servers (STUN + the
+				// element's TURN, if set). Adopt them so our peer negotiates
+				// with the same servers the receiver does. If a peer is already
+				// up with a DIFFERENT set, tear it down and re-offer so the new
+				// servers take effect; otherwise the next peer just uses them.
+				if (state.ws !== ws || !msg.servers) break;
+				if (
+					JSON.stringify(msg.servers) !==
+					JSON.stringify(state.iceServers)
+				) {
+					state.iceServers = msg.servers;
+					if (state.pc) {
+						state.negotiating = false;
+						state.pc.close();
+						state.pc = null;
+						offerFresh();
+					}
+				}
 				break;
 			case "answer":
 				if (state.pc && msg.sdp) {

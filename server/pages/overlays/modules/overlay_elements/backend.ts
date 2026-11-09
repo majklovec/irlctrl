@@ -8,14 +8,11 @@
 import { type AnyElysia, Elysia } from "elysia";
 import type { ControlRouteContext } from "../../../../../shared/contracts/backend_module";
 import { chatOverlayRoutes } from "./overlay_server";
-import { webrtcRoutes } from "./webrtc_routes";
 
 export default {
 	id: "overlay_elements",
 	kind: "widget" as const,
 	title: "Overlay elements",
 	controlRoutes: (context: ControlRouteContext): AnyElysia =>
-		new Elysia({ name: "overlay-elements" })
-			.use(chatOverlayRoutes(context))
-			.use(webrtcRoutes(context)),
+		new Elysia({ name: "overlay-elements" }).use(chatOverlayRoutes(context)),
 };

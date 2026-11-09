@@ -20,6 +20,7 @@ import { upgradeRequired } from "../../../../../shared/http";
 import {
 	otherRole,
 	parseWebrtcClientMessage,
+	type IceServers,
 	type RoomState,
 	WEBRTC_STREAM_ID_RE,
 	type WebrtcClientMessage,
@@ -73,6 +74,12 @@ interface Room {
 	receivers: SignalingSocket[];
 	/** Increments whenever the primary-identity changes (handover/new primary). */
 	primaryGen: number;
+	/**
+	 * The stream's ICE servers, published by its receiver (the element's TURN
+	 * settings). Remembered so a sender that joins AFTER the receiver gets
+	 * them immediately; the sender must use the same servers to build its peer.
+	 */
+	iceServers?: IceServers;
 }
 
 const sendJson = (sock: SignalingSocket, msg: WebrtcServerMessage): void => {
@@ -145,6 +152,22 @@ export class WebrtcRoomManager {
 			// the negotiation (the sender only answers), so drop it.
 			return null;
 		}
+		if (frame.type === "ice-config") {
+			// A receiver publishes the stream's ICE servers (the element's TURN
+			// settings). Remember them and hand them to the sender, which only
+			// knows the stream id and would otherwise build a STUN-only peer.
+			// Every receiver of the same element publishes the same servers, so
+			// the role check is cosmetic — any publisher is authoritative.
+			const room = this.#rooms.get(streamId);
+			if (!room) return null;
+			room.iceServers = frame.servers;
+			if (room.sender)
+				sendJson(room.sender, {
+					type: "ice-config",
+					servers: frame.servers,
+				});
+			return null;
+		}
 		this.relay(streamId, role, frame);
 		return null;
 	}
@@ -193,6 +216,11 @@ export class WebrtcRoomManager {
 				// reconnect — reconnecting would just re-trigger the hijack).
 				sendJson(existing, { type: "hijacked" });
 			room.sender = sock;
+			// If a receiver already published the stream's ICE servers (the
+			// common case: the overlay is up before a phone opens the link),
+			// hand them to the new sender so it builds its peer with TURN.
+			if (room.iceServers)
+				sendJson(sock, { type: "ice-config", servers: room.iceServers });
 		} else {
 			if (room.receivers.includes(sock)) {
 				// Reconnect/duplicate: just re-announce the layout.

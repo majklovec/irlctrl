@@ -1,0 +1,14 @@
+{
+  "overlay.add_webrtc": "WebRTC",
+  "overlay.catalog_desc_webrtc": "Live-Kamera oder Bildschirm vom Handy",
+  "overlay.webrtc_copy": "Kopieren",
+  "overlay.webrtc_hint": "Warte auf einen Sender",
+  "overlay.webrtc_hint_form": "Öffne diesen Link auf dem Gerät, das Kamera oder Bildschirm senden soll.",
+  "overlay.webrtc_qr": "QR code",
+  "overlay.webrtc_sender_url": "Sender-URL",
+  "overlay.webrtc_shadow": "Das Live-Feed läuft auf dem Overlay",
+  "overlay.webrtc_turn_hint": "Optional. Ein TURN-Server hilft dem Feed, restriktive NATs zu durchdringen — geben Sie Host, Benutzername und Passwort Ihres TURN-Anbieters ein.",
+  "overlay.webrtc_turn_host": "TURN-Server",
+  "overlay.webrtc_turn_password": "TURN-Passwort",
+  "overlay.webrtc_turn_username": "TURN-Benutzername"
+}

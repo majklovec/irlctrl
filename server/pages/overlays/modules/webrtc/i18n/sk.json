@@ -1,0 +1,14 @@
+{
+  "overlay.add_webrtc": "WebRTC",
+  "overlay.catalog_desc_webrtc": "Živá kamera alebo obrazovka z telefónu",
+  "overlay.webrtc_copy": "Kopírovať",
+  "overlay.webrtc_hint": "Čaká sa na odosielateľa",
+  "overlay.webrtc_hint_form": "Tento odkaz otvorte na zariadení, ktoré bude posielať kameru alebo obrazovku.",
+  "overlay.webrtc_qr": "QR code",
+  "overlay.webrtc_sender_url": "Odkaz odosielateľa",
+  "overlay.webrtc_shadow": "Živý prenos beží v OBS overlayi",
+  "overlay.webrtc_turn_hint": "Voliteľné. TURN server pomáha streamu preraziť cez restriktívne NAT — zadajte hostiteľa, používateľské meno a heslo svojho TURN poskytovateľa.",
+  "overlay.webrtc_turn_host": "TURN server",
+  "overlay.webrtc_turn_password": "Heslo TURN",
+  "overlay.webrtc_turn_username": "Používateľské meno TURN"
+}
