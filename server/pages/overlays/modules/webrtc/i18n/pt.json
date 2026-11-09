@@ -6,9 +6,5 @@
   "overlay.webrtc_hint_form": "Abra esta URL no dispositivo que enviará a sua câmara ou ecrã.",
   "overlay.webrtc_qr": "QR code",
   "overlay.webrtc_sender_url": "URL do transmissor",
-  "overlay.webrtc_shadow": "O sinal ao vivo está na sobreposição do ecrã",
-  "overlay.webrtc_turn_hint": "Opcional. Um servidor TURN ajuda o sinal a atravessar NATs restritivos — indique o host, o utilizador e a palavra-passe do seu fornecedor TURN.",
-  "overlay.webrtc_turn_host": "Servidor TURN",
-  "overlay.webrtc_turn_password": "Palavra-passe TURN",
-  "overlay.webrtc_turn_username": "Utilizador TURN"
+  "overlay.webrtc_shadow": "O sinal ao vivo está na sobreposição do ecrã"
 }

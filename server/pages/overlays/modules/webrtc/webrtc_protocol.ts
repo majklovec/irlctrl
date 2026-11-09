@@ -17,10 +17,11 @@ export const otherRole = (role: WebrtcRole): WebrtcRole =>
 export const WEBRTC_STREAM_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
 /**
- * The ICE servers a stream uses (always STUN, plus an element-configured TURN
- * server). Carried `ice-config` frames let the standalone sender page — which
- * only knows the stream id — build a peer with the same servers the receiver
- * uses, so a phone behind a restrictive NAT can still reach the receiver.
+ * The ICE servers a stream uses (always STUN, plus the deployment's TURN
+ * server with a freshly minted time-limited credential). Carried on every
+ * `room-state` snapshot so both the standalone sender page — which only knows
+ * the stream id — and the receiver build a peer with the same servers, letting
+ * a phone behind a restrictive NAT still reach the receiver.
  */
 export type IceServers = RTCIceServer[];
 
@@ -31,15 +32,14 @@ export type IceServers = RTCIceServer[];
  * answers with `room-state`); a peer sends it on open and again after a
  * dropped connection to re-learn the room without a full reconnect. The
  * media-handshake frames are relayed unchanged to the peer holding the
- * other role. `ice-config` publishes the stream's ICE servers (the element's
- * TURN settings) so the server can hand them to the sender.
+ * other role. (The stream's ICE servers travel on `room-state`, not as a
+ * separate client frame — the server is the source of truth.)
  */
 export type WebrtcClientMessage =
 	| { type: "offer"; sdp: RTCSessionDescriptionInit }
 	| { type: "answer"; sdp: RTCSessionDescriptionInit }
 	| { type: "ice"; candidate: RTCIceCandidateInit }
-	| { type: "sync" }
-	| { type: "ice-config"; servers: IceServers };
+	| { type: "sync" };
 
 /**
  * A snapshot of a room's occupancy: which roles are present. `sender` /
@@ -63,23 +63,31 @@ export interface RoomState {
 	 * primary. Receivers ignore it (they use `active`).
 	 */
 	primary: number;
+	/**
+	 * The stream's ICE servers (STUN + the deployment's TURN, with a freshly
+	 * minted time-limited credential when TURN is configured). Present in every
+	 * snapshot so a peer that joins / re-syncs learns the servers the whole
+	 * room uses. Absent when the deployment has no TURN (peers then fall back
+	 * to STUN-only, the browser default this app relies on).
+	 */
+	iceServers?: IceServers;
 }
 
 /**
  * Server → client. `room-state` is the authoritative occupancy snapshot
- * (sent on every join and on every `sync`); `peer-joined` / `peer-left`
- * tell a peer that its counterpart appeared or went away; `hijacked` tells a
- * sender that a SECOND sender opened the same link and took its slot (the
- * displaced sender stops and must not reconnect); `offer` / `answer` / `ice`
- * are the relayed media handshake frames. `ice-config` hands the stream's ICE
- * servers to the sender (the server learned them from the receiver).
+ * (sent on every join and on every `sync`); it also carries the stream's ICE
+ * servers, so a peer that joins / re-syncs learns them from the server (the
+ * source of truth). `peer-joined` / `peer-left` tell a peer that its
+ * counterpart appeared or went away; `hijacked` tells a sender that a SECOND
+ * sender opened the same link and took its slot (the displaced sender stops
+ * and must not reconnect); `offer` / `answer` / `ice` are the relayed media
+ * handshake frames.
  */
 export type WebrtcServerMessage =
 	| { type: "room-state"; state: RoomState }
 	| { type: "peer-joined"; role: WebrtcRole }
 	| { type: "peer-left" }
 	| { type: "hijacked" }
-	| { type: "ice-config"; servers: IceServers }
 	| { type: "offer"; sdp: RTCSessionDescriptionInit }
 	| { type: "answer"; sdp: RTCSessionDescriptionInit }
 	| { type: "ice"; candidate: RTCIceCandidateInit };
@@ -99,10 +107,6 @@ export function parseWebrtcClientMessage(
 		case "ice":
 			return isCandidate(msg.candidate)
 				? { type: "ice", candidate: msg.candidate }
-				: null;
-		case "ice-config":
-			return isIceServers(msg.servers)
-				? { type: "ice-config", servers: msg.servers }
 				: null;
 		case "sync":
 			return { type: "sync" };
@@ -130,25 +134,44 @@ function isCandidate(value: unknown): value is RTCIceCandidateInit {
 }
 
 /**
- * `RTCIceServer[]`: a list of `{urls, username?, credential?}` objects. Each
- * entry must carry a non-empty `urls` (string or string array) and, when
- * present, string `username`/`credential`.
+ * Mint a time-limited TURN credential for a deployment using coturn's
+ * `use-auth-secret` (shared-secret) scheme — the same auth the `irlctrl.nomad`
+ * job turns on (`static-auth-secret` + no static users). The username is the
+ * credential's expiry as a unix timestamp (seconds); the credential is
+ * `base64(HMAC-SHA1(secret, username))`. Because the secret never leaves the
+ * server, a minted pair can only be used for at most its TTL.
  */
-function isIceServers(value: unknown): value is IceServers {
-	if (!Array.isArray(value)) return false;
-	for (const s of value) {
-		if (typeof s !== "object" || s === null) return false;
-		const o = s as Record<string, unknown>;
-		const urls =
-			(typeof o.urls === "string" && o.urls !== "") ||
-			(Array.isArray(o.urls) &&
-				o.urls.length > 0 &&
-				o.urls.every((u) => typeof u === "string"));
-		if (!urls) return false;
-		if (o.username !== undefined && typeof o.username !== "string")
-			return false;
-		if (o.credential !== undefined && typeof o.credential !== "string")
-			return false;
-	}
-	return true;
+export async function mintTurnCredential(
+	host: string,
+	secret: string,
+	ttlSeconds = 7200,
+): Promise<RTCIceServer> {
+	const expiry = Math.max(
+		1,
+		Math.floor(Date.now() / 1000) + ttlSeconds,
+	);
+	const username = String(expiry);
+	const credential = await hmacSha1Base64(secret, username);
+	return { urls: [`turn:${host}:3478?transport=udp`], username, credential };
+}
+
+/** `base64(HMAC-SHA1(key, message))`, using Web Crypto (works in Bun and the browser). */
+export async function hmacSha1Base64(
+	key: string,
+	message: string,
+): Promise<string> {
+	const enc = new TextEncoder();
+	const cryptoKey = await crypto.subtle.importKey(
+		"raw",
+		enc.encode(key),
+		{ name: "HMAC", hash: "SHA-1" },
+		false,
+		["sign"],
+	);
+	const sig = new Uint8Array(
+		await crypto.subtle.sign("HMAC", cryptoKey, enc.encode(message)),
+	);
+	let bin = "";
+	for (let i = 0; i < sig.length; i++) bin += String.fromCharCode(sig[i]);
+	return btoa(bin);
 }

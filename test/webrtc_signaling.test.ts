@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { Elysia } from "elysia";
 import {
+	hmacSha1Base64,
+	mintTurnCredential,
 	parseWebrtcClientMessage,
+	type IceServers,
 	type RoomState,
 	WEBRTC_STREAM_ID_RE,
 } from "../server/pages/overlays/modules/webrtc/webrtc_protocol";
@@ -52,34 +55,43 @@ describe("webrtc protocol parser", () => {
 		).toBeNull();
 	});
 
-	test("accepts a valid ice-config and rejects malformed ones", () => {
-		const servers = [
-			{ urls: "stun:stun.l.google.com:19302" },
-			{ urls: "turn:turn.example.com", username: "u", credential: "p" },
-		];
-		expect(parseWebrtcClientMessage({ type: "ice-config", servers })).toEqual({
-			type: "ice-config",
-			servers,
-		});
-		// a bare url-string entry is not a valid RTCIceServer — rejected
+	test("rejects the removed ice-config frame", () => {
 		expect(
 			parseWebrtcClientMessage({
 				type: "ice-config",
-				servers: ["stun:stun.l.google.com:19302"],
+				servers: [{ urls: "stun:stun.l.google.com:19302" }],
 			}),
 		).toBeNull();
+	});
+
+	test("hmacSha1Base64 matches a known HMAC-SHA1 vector", async () => {
+		// base64(HMAC-SHA1("key", "The quick brown fox jumps over the lazy dog"))
+		const node = await import("node:crypto");
+		const expected = node
+			.createHmac("sha1", "key")
+			.update("The quick brown fox jumps over the lazy dog")
+			.digest("base64");
 		expect(
-			parseWebrtcClientMessage({ type: "ice-config", servers: "nope" }),
-		).toBeNull();
-		expect(
-			parseWebrtcClientMessage({ type: "ice-config", servers: [{ urls: "" }] }),
-		).toBeNull();
-		expect(
-			parseWebrtcClientMessage({
-				type: "ice-config",
-				servers: [{ urls: "turn:x", username: 5 }],
-			}),
-		).toBeNull();
+			await hmacSha1Base64("key", "The quick brown fox jumps over the lazy dog"),
+		).toBe(expected);
+	});
+
+	test("mintTurnCredential matches node's HMAC-SHA1 (base64)", async () => {
+		const node = await import("node:crypto");
+		const host = "turn.example.com";
+		const secret = "s3cr3t-turn-key";
+		const server = await mintTurnCredential(host, secret, 7200);
+		// username is the expiry timestamp (~now + ttl seconds)
+		const expiry = Number(server.username);
+		const now = Math.floor(Date.now() / 1000);
+		expect(expiry).toBeGreaterThan(now + 7100);
+		expect(expiry).toBeLessThanOrEqual(now + 7200);
+		const expected = node
+			.createHmac("sha1", secret)
+			.update(String(expiry))
+			.digest("base64");
+		expect(server.credential).toBe(expected);
+		expect(server.urls).toEqual(["turn:turn.example.com:3478?transport=udp"]);
 	});
 
 	test("the stream id regex accepts element ids and rejects junk", () => {
@@ -156,42 +168,46 @@ describe("webrtc room manager", () => {
 		expect(m.occupancy()["s1"]).toBeDefined();
 	});
 
-	test("a receiver's ice-config is relayed to a present sender", () => {
-		const m = new WebrtcRoomManager();
-		const sender = new FakeSocket();
-		const receiver = new FakeSocket();
-		m.join("s1", "sender", sender);
-		m.join("s1", "receiver", receiver);
-
-		const servers = [
+	test("room-state carries the deployment's minted ICE servers", () => {
+		const servers: IceServers = [
 			{ urls: "stun:stun.l.google.com:19302" },
-			{ urls: "turn:turn.example.com", username: "u", credential: "p" },
+			{
+				urls: "turn:turn.example.com:3478?transport=udp",
+				username: "1700000000",
+				credential: "abc",
+			},
 		];
-		m.message("s1", "receiver", receiver, {
-			type: "ice-config",
-			servers,
-		});
-		// The sender is handed the servers (to build its peer with the same TURN).
-		expect(sender.matches({ type: "ice-config", servers })).toBe(true);
-		// The receiver does not get its own config echoed back.
-		expect(receiver.matches({ type: "ice-config", servers })).toBe(false);
-	});
-
-	test("a sender joining after the receiver gets the stored ice-config", () => {
-		const m = new WebrtcRoomManager();
-		const receiver = new FakeSocket();
-		m.join("s1", "receiver", receiver);
-		const servers = [{ urls: "turn:turn.example.com", username: "u" }];
-		m.message("s1", "receiver", receiver, {
-			type: "ice-config",
-			servers,
-		});
-
-		// The sender connects LATER (the overlay is up first) and learns the
-		// servers on join.
+		const m = new WebrtcRoomManager(() => servers);
 		const sender = new FakeSocket();
 		m.join("s1", "sender", sender);
-		expect(sender.matches({ type: "ice-config", servers })).toBe(true);
+		// The on-join snapshot now includes the minted servers (STUN + TURN);
+		// the server is the source of truth — no separate client frame.
+		expect(
+			sender.matches({
+				type: "room-state",
+				state: {
+					sender: true,
+					receiver: false,
+					active: false,
+					primary: 0,
+					iceServers: servers,
+				},
+			}),
+		).toBe(true);
+		const receiver = new FakeSocket();
+		m.join("s1", "receiver", receiver); // becomes the primary
+		expect(
+			receiver.matches({
+				type: "room-state",
+				state: {
+					sender: true,
+					receiver: true,
+					active: true,
+					primary: 1,
+					iceServers: servers,
+				},
+			}),
+		).toBe(true);
 	});
 
 	test("relay delivers a frame only to the primary peer", () => {

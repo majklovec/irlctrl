@@ -6,9 +6,5 @@
   "overlay.webrtc_hint_form": "Otwórz ten adres na urządzeniu, które będzie nadawało kamerę lub ekran.",
   "overlay.webrtc_qr": "QR code",
   "overlay.webrtc_sender_url": "Adres nadawcy",
-  "overlay.webrtc_shadow": "Nadawanie na żywo odbywa się w nakładce na ekranie",
-  "overlay.webrtc_turn_hint": "Opcjonalne. Serwer TURN pomaga strumieniowi przejść przez restrykcyjne NAT — podaj hosta, nazwę użytkownika i hasło swojego dostawcy TURN.",
-  "overlay.webrtc_turn_host": "Serwer TURN",
-  "overlay.webrtc_turn_password": "Hasło TURN",
-  "overlay.webrtc_turn_username": "Nazwa użytkownika TURN"
+  "overlay.webrtc_shadow": "Nadawanie na żywo odbywa się w nakładce na ekranie"
 }

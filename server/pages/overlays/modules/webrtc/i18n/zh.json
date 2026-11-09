@@ -6,9 +6,5 @@
   "overlay.webrtc_hint_form": "在要发送相机或屏幕的设备上打开此地址。",
   "overlay.webrtc_qr": "QR code",
   "overlay.webrtc_sender_url": "发送地址",
-  "overlay.webrtc_shadow": "直播画面正在叠加页面上播放",
-  "overlay.webrtc_turn_hint": "可选。TURN 服务器可帮助画面穿透严格的 NAT —— 请输入你的 TURN 提供商的主机、用户名和密码。",
-  "overlay.webrtc_turn_host": "TURN 服务器",
-  "overlay.webrtc_turn_password": "TURN 密码",
-  "overlay.webrtc_turn_username": "TURN 用户名"
+  "overlay.webrtc_shadow": "直播画面正在叠加页面上播放"
 }

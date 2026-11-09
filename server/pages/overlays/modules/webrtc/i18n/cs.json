@@ -6,9 +6,5 @@
   "overlay.webrtc_hint_form": "Tento odkaz otevřete na zařízení, které bude posílat kameru nebo obrazovku.",
   "overlay.webrtc_qr": "QR code",
   "overlay.webrtc_sender_url": "Odkaz odesílatele",
-  "overlay.webrtc_shadow": "Live video je v OBS overlay",
-  "overlay.webrtc_turn_hint": "Volitelné. TURN server pomáhá streamu projet přes restriktivní NAT — zadejte hostitele, uživatelské jméno a heslo svého TURN poskytovatele.",
-  "overlay.webrtc_turn_host": "TURN server",
-  "overlay.webrtc_turn_password": "Heslo TURN",
-  "overlay.webrtc_turn_username": "Uživatelské jméno TURN"
+  "overlay.webrtc_shadow": "Live video je v OBS overlay"
 }

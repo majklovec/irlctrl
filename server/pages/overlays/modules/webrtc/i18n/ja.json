@@ -6,9 +6,5 @@
   "overlay.webrtc_hint_form": "カメラや画面を送信するデバイスで、この URL を開いてください。",
   "overlay.webrtc_qr": "QR code",
   "overlay.webrtc_sender_url": "送信元 URL",
-  "overlay.webrtc_shadow": "ライブ映像はオーバーレイで再生されています",
-  "overlay.webrtc_turn_hint": "任意。TURNサーバーは restrictive な NAT を回避するのに役立ちます。お使いの TURN プロバイダーのホスト、ユーザー名、パスワードを入力してください。",
-  "overlay.webrtc_turn_host": "TURNサーバー",
-  "overlay.webrtc_turn_password": "TURNパスワード",
-  "overlay.webrtc_turn_username": "TURNユーザー名"
+  "overlay.webrtc_shadow": "ライブ映像はオーバーレイで再生されています"
 }

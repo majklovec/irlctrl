@@ -74,12 +74,6 @@ interface Room {
 	receivers: SignalingSocket[];
 	/** Increments whenever the primary-identity changes (handover/new primary). */
 	primaryGen: number;
-	/**
-	 * The stream's ICE servers, published by its receiver (the element's TURN
-	 * settings). Remembered so a sender that joins AFTER the receiver gets
-	 * them immediately; the sender must use the same servers to build its peer.
-	 */
-	iceServers?: IceServers;
 }
 
 const sendJson = (sock: SignalingSocket, msg: WebrtcServerMessage): void => {
@@ -110,6 +104,15 @@ const baseState = (room: Room | undefined): RoomState => ({
 export class WebrtcRoomManager {
 	#rooms = new Map<string, Room>();
 
+	/**
+	 * Lazily supplies the deployment's ICE servers (STUN + the minted TURN
+	 * credential, when `TURN_SECRET`/`TURN_HOST` are set). Called on every
+	 * snapshot — the minted credential is time-limited, so reading it fresh
+	 * each time keeps every snapshot's servers current. Absent → peers fall
+	 * back to STUN-only (the browser default).
+	 */
+	constructor(private readonly turnServers?: () => IceServers | undefined) {}
+
 	/** Diagnostic: which roles currently occupy which rooms. */
 	occupancy(): Record<string, string[]> {
 		const out: Record<string, string[]> = {};
@@ -127,7 +130,11 @@ export class WebrtcRoomManager {
 	 * same for everyone; `active` is true only when `sock` is the primary. */
 	stateFor(streamId: string, sock: SignalingSocket): RoomState {
 		const room = this.#rooms.get(streamId);
-		return { ...baseState(room), active: primary(room) === sock };
+		return {
+			...baseState(room),
+			active: primary(room) === sock,
+			iceServers: this.turnServers?.(),
+		};
 	}
 
 	/**
@@ -150,22 +157,6 @@ export class WebrtcRoomManager {
 		if (frame.type === "offer" && role === "receiver") {
 			// The sender is the ONLY offerer. A receiver offer would dead-end
 			// the negotiation (the sender only answers), so drop it.
-			return null;
-		}
-		if (frame.type === "ice-config") {
-			// A receiver publishes the stream's ICE servers (the element's TURN
-			// settings). Remember them and hand them to the sender, which only
-			// knows the stream id and would otherwise build a STUN-only peer.
-			// Every receiver of the same element publishes the same servers, so
-			// the role check is cosmetic — any publisher is authoritative.
-			const room = this.#rooms.get(streamId);
-			if (!room) return null;
-			room.iceServers = frame.servers;
-			if (room.sender)
-				sendJson(room.sender, {
-					type: "ice-config",
-					servers: frame.servers,
-				});
 			return null;
 		}
 		this.relay(streamId, role, frame);
@@ -216,11 +207,9 @@ export class WebrtcRoomManager {
 				// reconnect — reconnecting would just re-trigger the hijack).
 				sendJson(existing, { type: "hijacked" });
 			room.sender = sock;
-			// If a receiver already published the stream's ICE servers (the
-			// common case: the overlay is up before a phone opens the link),
-			// hand them to the new sender so it builds its peer with TURN.
-			if (room.iceServers)
-				sendJson(sock, { type: "ice-config", servers: room.iceServers });
+			// The stream's ICE servers (STUN + the minted TURN, when set) travel
+			// on the room-state snapshot the new sender is about to receive —
+			// the server is the source of truth, so no separate frame is sent.
 		} else {
 			if (room.receivers.includes(sock)) {
 				// Reconnect/duplicate: just re-announce the layout.

@@ -40,7 +40,7 @@ import type {
 	OverlayElement,
 	OverlayElementDef,
 } from "@ui/overlay/element";
-import { bindField, bindableForm, type FormRow } from "@ui/overlay/fields";
+import { bindableForm, bindField, type FormRow } from "@ui/overlay/fields";
 import { templateText } from "@ui/overlay/template_tokens";
 import type { Vnode, VnodeDOM } from "mithril";
 import m from "mithril";
@@ -547,7 +547,12 @@ function varsFields(
 	);
 }
 
-function editForm({ element: e, mutate, variables, variableUrl }: ElementProps): Vnode {
+function editForm({
+	element: e,
+	mutate,
+	variables,
+	variableUrl,
+}: ElementProps): Vnode {
 	const p = e.props as unknown as HtmlTemplateProps;
 	const sp = { mutate, variables, variableUrl };
 	// The template's metadata rides the fetched catalog (_catalog.json +
@@ -626,9 +631,7 @@ function editForm({ element: e, mutate, variables, variableUrl }: ElementProps):
 					{
 						path: `props.${propKey}`,
 						labelKey: PROP_LABELS[propKey],
-						label: PROP_LABELS[propKey]
-							? undefined
-							: textSlotLabel(propKey),
+						label: PROP_LABELS[propKey] ? undefined : textSlotLabel(propKey),
 						type: "text",
 						value: String(
 							(p as unknown as Record<string, unknown>)[propKey] ?? "",

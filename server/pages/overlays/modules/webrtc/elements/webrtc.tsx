@@ -25,7 +25,6 @@ import type {
 	OverlayElement,
 	OverlayElementDef,
 } from "@ui/overlay/element";
-import { strProp } from "@ui/overlay/element";
 import { bindableForm } from "@ui/overlay/fields";
 import { uuid } from "@ui/util";
 import type { Vnode } from "mithril";
@@ -36,51 +35,21 @@ import type { OverlayElementSchema } from "../../../../../core/overlay_element";
 export interface WebrtcProps {
 	/** Auto-generated per instance; not user-editable. Seeds the sender URL. */
 	streamId: string;
-	/**
-	 * Optional TURN server host (e.g. `turn.example.com` or a full
-	 * `turn:turn.example.com` url). When set, STUN is supplemented with this
-	 * TURN server so a phone behind a restrictive NAT can still reach the
-	 * receiver. Empty = STUN only.
-	 */
-	turnHost: string;
-	/** Optional TURN auth username (used together with `turnHost`). */
-	turnUsername: string;
-	/** Optional TURN auth credential / password (used with `turnHost`). */
-	turnPassword: string;
 }
 
 export const DEFAULT_WEBRTC_PROPS: Required<WebrtcProps> = {
 	streamId: "",
-	turnHost: "",
-	turnUsername: "",
-	turnPassword: "",
 };
 
 /**
- * Build the ICE servers from the element's TURN settings. STUN is always
- * present (a sensible default that works for most peers); the element's TURN
- * host is added when set. The sender page learns these same servers via the
- * signaling `ice-config`, so both ends negotiate with identical servers.
+ * The default ICE servers (STUN only), used before the server's `room-state`
+ * teaches this receiver the deployment's servers (STUN + the minted TURN, when
+ * configured). The servers are adopted from every room-state snapshot, so the
+ * peer always negotiates with the same set the sender uses.
  */
-function iceServersFromProps(props: WebrtcProps): RTCIceServer[] {
-	const servers: RTCIceServer[] = [
-		{ urls: "stun:stun.l.google.com:19302" },
-	];
-	const host = props.turnHost.trim();
-	if (host) {
-		// Accept a bare host or a full url; normalise to a `turn:` url so the
-		// browser uses the standard port (3478) unless one is given.
-		const url =
-			host.startsWith("turn:") || host.startsWith("turns:")
-				? host
-				: `turn:${host}`;
-		const server: RTCIceServer = { urls: url };
-		if (props.turnUsername) server.username = props.turnUsername;
-		if (props.turnPassword) server.credential = props.turnPassword;
-		servers.push(server);
-	}
-	return servers;
-}
+const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
+	{ urls: "stun:stun.l.google.com:19302" },
+];
 
 interface ReceiverState {
 	/** The live peer connection; null while this receiver is a shadow. */
@@ -125,7 +94,6 @@ function attachReceiver(
 	hint: HTMLSpanElement | null,
 	note: HTMLSpanElement | null,
 	priority: boolean,
-	iceServers: RTCIceServer[],
 ): ReceiverState {
 	const state: ReceiverState = {
 		pc: null,
@@ -151,6 +119,10 @@ function attachReceiver(
 	hideNote();
 
 	let pendingCandidates: RTCIceCandidateInit[] = [];
+	// The room's ICE servers (STUN + the server's minted TURN, when set).
+	// Adopted from each `room-state` snapshot before the peer is created; STUN
+	// only until the first snapshot with servers arrives.
+	let iceServers: RTCIceServer[] = DEFAULT_ICE_SERVERS;
 	let chain: Promise<void> = Promise.resolve();
 	const enqueue = (fn: () => Promise<void>): void => {
 		chain = chain
@@ -254,12 +226,8 @@ function attachReceiver(
 		// Joining is implicit in the WS upgrade (role in the query). Ask for the
 		// layout in the open channel: the on-join room-state snapshot can race
 		// this listener's setup, while a `sync` reply always arrives after the
-		// socket is usable.
+		// socket is usable (and carries the room's ICE servers).
 		ws.send(JSON.stringify({ type: "sync" }));
-		// Publish this stream's ICE servers (the element's TURN settings) so the
-		// server can hand them to the sender — the sender only knows the stream
-		// id and would otherwise build a STUN-only peer.
-		ws.send(JSON.stringify({ type: "ice-config", servers: iceServers }));
 	};
 	ws.onmessage = async (ev) => {
 		// SDP frames are large; a WebSocket client may hand us a `Blob` for
@@ -274,6 +242,7 @@ function attachReceiver(
 				sender?: boolean;
 				receiver?: boolean;
 				active?: boolean;
+				iceServers?: RTCIceServer[];
 			};
 		};
 		try {
@@ -283,6 +252,18 @@ function attachReceiver(
 		}
 		switch (msg.type) {
 			case "room-state":
+				// Adopt the room's ICE servers (STUN + the server's minted TURN,
+				// when configured). A changed set that a live peer was already
+				// negotiating with forces a fresh peer — the sender re-offers
+				// once this receiver drops and re-arms.
+				const servers = msg.state?.iceServers;
+				if (
+					servers &&
+					JSON.stringify(servers) !== JSON.stringify(iceServers)
+				) {
+					iceServers = servers;
+					if (state.pc) dropPeer();
+				}
 				// The layout is authoritative: `active` says whether THIS
 				// receiver carries the live media now.
 				applyLayout(!!msg.state?.active, !!msg.state?.sender);
@@ -363,14 +344,6 @@ function detachReceiver(streamId: string): void {
 function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 	const props = element.props;
 	const streamId = typeof props.streamId === "string" ? props.streamId : "";
-	// The element's optional TURN server (host + credential), resolved once per
-	// draw and fed to the receiver's peer AND published to the sender.
-	const iceServers = iceServersFromProps({
-		streamId,
-		turnHost: typeof props.turnHost === "string" ? props.turnHost : "",
-		turnUsername: typeof props.turnUsername === "string" ? props.turnUsername : "",
-		turnPassword: typeof props.turnPassword === "string" ? props.turnPassword : "",
-	});
 	// Connect in both the editor (live preview) and the runtime page. The OBS
 	// runtime page — identified by its `activeTriggers` context, which only the
 	// runtime builds — is `priority` and claims the live-media receiver slot;
@@ -406,14 +379,7 @@ function draw(element: OverlayElement, ctx: ElementContext): Vnode {
 				if (live && !receivers.has(streamId)) {
 					receivers.set(
 						streamId,
-						attachReceiver(
-							streamId,
-							video,
-							hint,
-							note,
-							priority,
-							iceServers,
-						),
+						attachReceiver(streamId, video, hint, note, priority),
 					);
 				}
 			}}
@@ -535,50 +501,12 @@ function editForm({ element: e, mutate, variables, variableUrl }: ElementProps):
 			})}
 		</div>
 	);
-	const turnHint = (
-		<p
-			style={{
-				color: "var(--text-dim, #9aa3b2)",
-				margin: "6px 0 0",
-				fontSize: "13px",
-			}}
-		>
-			{t("overlay.webrtc_turn_hint")}
-		</p>
-	);
 	return bindableForm({
 		element: e,
 		mutate,
 		variables,
 		variableUrl,
-		rows: [
-			urlField,
-			urlHint,
-			qrField,
-			[
-				{
-					path: "props.turnHost",
-					labelKey: "overlay.webrtc_turn_host",
-					type: "text",
-					value: strProp(e.props, "turnHost", ""),
-				},
-			],
-			[
-				{
-					path: "props.turnUsername",
-					labelKey: "overlay.webrtc_turn_username",
-					type: "text",
-					value: strProp(e.props, "turnUsername", ""),
-				},
-				{
-					path: "props.turnPassword",
-					labelKey: "overlay.webrtc_turn_password",
-					type: "text",
-					value: strProp(e.props, "turnPassword", ""),
-				},
-			],
-			turnHint,
-		],
+		rows: [urlField, urlHint, qrField],
 	});
 }
 
@@ -597,13 +525,8 @@ export const webrtcElement: OverlayElementDef & OverlayElementSchema = {
 	icon: () => <Icon name="video" class="role-icon" />,
 	order: 81,
 	defaultProps: { ...DEFAULT_WEBRTC_PROPS },
-	createProps: () => ({
-		streamId: uuid(),
-		turnHost: "",
-		turnUsername: "",
-		turnPassword: "",
-	}),
-	propKeys: ["streamId", "turnHost", "turnUsername", "turnPassword"],
+	createProps: () => ({ streamId: uuid() }),
+	propKeys: ["streamId"],
 	defaultSize: { width: 640, height: 360 },
 	draw,
 	editForm,
@@ -611,14 +534,8 @@ export const webrtcElement: OverlayElementDef & OverlayElementSchema = {
 	handles: "box",
 	normalizeProps(_props, read) {
 		// Preserve the stored per-instance id; an empty/malformed one is
-		// coerced to "" (the element then renders its placeholder). The TURN
-		// fields are optional and simply coerced to strings ("").
-		return {
-			streamId: read.str("streamId", "", 128),
-			turnHost: read.str("turnHost", "", 256),
-			turnUsername: read.str("turnUsername", "", 128),
-			turnPassword: read.str("turnPassword", "", 128),
-		};
+		// coerced to "" (the element then renders its placeholder).
+		return { streamId: read.str("streamId", "", 128) };
 	},
 };
 

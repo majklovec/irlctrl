@@ -53,9 +53,9 @@ function isFailed(pc: RTCPeerConnection): boolean {
 }
 
 /**
- * The ICE servers this peer uses. Defaults to STUN only; the receiver publishes
- * the stream's servers (STUN + the element's TURN, if configured) via the
- * signaling `ice-config`, and this is replaced with them so both ends negotiate
+ * The ICE servers this peer uses. Defaults to STUN only; the server publishes
+ * the stream's servers (STUN + the minted TURN, if configured) on every
+ * `room-state` snapshot, and this is replaced with them so both ends negotiate
  * with identical servers — essential for a phone behind a restrictive NAT.
  */
 const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
@@ -98,14 +98,14 @@ interface ServerMessage {
 	role?: string;
 	sdp?: RTCSessionDescriptionInit;
 	candidate?: RTCIceCandidateInit;
-	/** ICE servers (STUN + the element's TURN) the receiver published. */
-	servers?: RTCIceServer[];
 	/** room-state snapshot: which peers are present in the room */
 	state?: {
 		sender?: boolean;
 		receiver?: boolean;
 		/** primary-token: changes when the live-media receiver changes. */
 		primary?: number;
+		/** ICE servers (STUN + the server's minted TURN) for this room. */
+		iceServers?: RTCIceServer[];
 	};
 }
 
@@ -294,8 +294,8 @@ function preparePeer(): RTCPeerConnection | null {
 	const stream = state.stream;
 	if (!stream) return null;
 	if (state.pc) return state.pc;
-	// Use the servers the receiver published (STUN + the element's TURN, if the
-	// receiver had already sent `ice-config`), else the STUN-only default.
+	// Use the servers the server published in `room-state` (STUN + the minted
+	// TURN, when configured), else the STUN-only default.
 	const pc = new RTCPeerConnection({ iceServers: state.iceServers });
 	state.pc = pc;
 	state.pendingCandidates = [];
@@ -378,6 +378,23 @@ function connect(): void {
 		switch (msg.type) {
 			case "room-state": {
 				const st = msg.state;
+				if (
+					st?.iceServers &&
+					JSON.stringify(st.iceServers) !== JSON.stringify(state.iceServers)
+				) {
+					// The room's ICE servers changed (TURN credentials were
+					// minted/rotated). A live peer negotiating with the old set
+					// must be renegotiated to pick up the new ones.
+					state.iceServers = st.iceServers;
+					if (state.pc) {
+						state.negotiating = false;
+						state.pc.close();
+						state.pc = null;
+					}
+					state.primary = null;
+					offerFresh(true);
+					break;
+				}
 				if (st?.receiver) {
 					const token = st.primary ?? 0;
 					if (state.primary !== null && state.primary !== token) {
@@ -400,26 +417,6 @@ function connect(): void {
 			}
 			case "peer-joined":
 				if (msg.role === "receiver") offerFresh();
-				break;
-			case "ice-config":
-				// The receiver published this stream's ICE servers (STUN + the
-				// element's TURN, if set). Adopt them so our peer negotiates
-				// with the same servers the receiver does. If a peer is already
-				// up with a DIFFERENT set, tear it down and re-offer so the new
-				// servers take effect; otherwise the next peer just uses them.
-				if (state.ws !== ws || !msg.servers) break;
-				if (
-					JSON.stringify(msg.servers) !==
-					JSON.stringify(state.iceServers)
-				) {
-					state.iceServers = msg.servers;
-					if (state.pc) {
-						state.negotiating = false;
-						state.pc.close();
-						state.pc = null;
-						offerFresh();
-					}
-				}
 				break;
 			case "answer":
 				if (state.pc && msg.sdp) {
