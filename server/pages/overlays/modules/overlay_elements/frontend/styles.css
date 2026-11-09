@@ -37,14 +37,6 @@ h1 {
     flex-wrap: wrap;
     margin-bottom: 20px;
 }
-.camera-row {
-    display: flex;
-    gap: 12px;
-    flex: 1 1 100%;
-}
-.camera-row button {
-    flex: 1 1 0;
-}
 button {
     flex: 1 1 200px;
     padding: 14px 16px;
