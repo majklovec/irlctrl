@@ -1,3 +1,10 @@
+## [6.1.1](https://github.com/majklovec/irlctrl/compare/v6.1.0...v6.1.1) (2026-11-09)
+
+
+### Bug Fixes
+
+* **overlays:** use active project device token ([8eb7690](https://github.com/majklovec/irlctrl/commit/8eb7690eff470169e5d4888fafcb9118c58e5e6b))
+
 # [6.1.0](https://github.com/majklovec/irlctrl/compare/v6.0.2...v6.1.0) (2026-11-09)
 
 
