@@ -1,3 +1,10 @@
+## [6.0.2](https://github.com/majklovec/irlctrl/compare/v6.0.1...v6.0.2) (2026-11-09)
+
+
+### Bug Fixes
+
+* **webrtc:** hide screen share when unsupported ([f02f0ac](https://github.com/majklovec/irlctrl/commit/f02f0ac9114da8186d3baad0de785f86e2cf1f7a))
+
 ## [6.0.1](https://github.com/majklovec/irlctrl/compare/v6.0.0...v6.0.1) (2026-11-09)
 
 
