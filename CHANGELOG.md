@@ -1,3 +1,16 @@
+# [7.0.0](https://github.com/majklovec/irlctrl/compare/v6.5.0...v7.0.0) (2026-11-09)
+
+
+### Features
+
+* **webrtc:** add turn server env ([2174a3e](https://github.com/majklovec/irlctrl/commit/2174a3e072426c6ffa528111d793b493917d63b6))
+* **webrtc:** mint turn credentials server-side ([f441beb](https://github.com/majklovec/irlctrl/commit/f441beb5b0ffb34bd77538cb49cd255cc42b1fbf))
+
+
+### BREAKING CHANGES
+
+* **webrtc:** element TURN props and the ice-config frame are removed.
+
 # [6.5.0](https://github.com/majklovec/irlctrl/compare/v6.4.0...v6.5.0) (2026-11-09)
 
 
