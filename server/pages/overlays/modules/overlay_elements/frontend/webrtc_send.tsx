@@ -13,11 +13,11 @@ import "./styles.css";
 
 type StatusKind = "idle" | "waiting" | "live" | "error";
 
-type Source = "front" | "back" | "screen";
+type Source = "user" | "environment" | "screen";
 
 const SOURCE_NAMES: Record<Source, string> = {
-	front: "Front camera",
-	back: "Back camera",
+	user: "Front camera",
+	environment: "Back camera",
 	screen: "Screen",
 };
 
@@ -264,11 +264,7 @@ const StatusLine: m.Component = {
 			<p
 				class={
 					"status" +
-					(kind === "live"
-						? " is-live"
-						: kind === "error"
-							? " is-error"
-							: "")
+					(kind === "live" ? " is-live" : kind === "error" ? " is-error" : "")
 				}
 			>
 				{text}
@@ -300,8 +296,8 @@ function App(): m.Vnode {
 			<div class="actions">
 				{/* The two camera buttons always share one row, 50/50. */}
 				<div class="camera-row">
-					{m(SourceButton, { source: "front", label: "Front camera" })}
-					{m(SourceButton, { source: "back", label: "Back camera" })}
+					{m(SourceButton, { source: "user", label: "Front camera" })}
+					{m(SourceButton, { source: "environment", label: "Back camera" })}
 				</div>
 				{m(SourceButton, {
 					source: "screen",
