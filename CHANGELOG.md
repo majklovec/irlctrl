@@ -1,3 +1,10 @@
+# [6.3.0](https://github.com/majklovec/irlctrl/compare/v6.2.0...v6.3.0) (2026-11-09)
+
+
+### Features
+
+* **webrtc:** add source icons to sender buttons ([ad5924f](https://github.com/majklovec/irlctrl/commit/ad5924fec883098f71f0c4a4f082de40f7402c50))
+
 # [6.2.0](https://github.com/majklovec/irlctrl/compare/v6.1.1...v6.2.0) (2026-11-09)
 
 
