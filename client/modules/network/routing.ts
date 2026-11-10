@@ -169,6 +169,33 @@ async function getGateway(iface: string): Promise<string | null> {
     return out.match(/via\s+(\S+)/)?.[1] ?? null;
 }
 
+/** Gateway from the ISC `dhclient` lease, the router the server actually
+ * handed the interface. The right source for RNDIS/NDIS modem-ethernet
+ * uplinks — e.g. a phone in USB-tether mode (`ANDROID_METERED`) on usb0 —
+ * that publish no gateway in the main table and are not a ModemManager
+ * bearer. Returns the first `option routers` of the newest lease for
+ * `address` (`null` when the file is absent or has no matching lease). */
+async function dhcpLeaseGateway(
+    iface: string,
+    address: string,
+): Promise<string | null> {
+    const text = await Bun.file(`/var/lib/dhcp/dhclient.${iface}.leases`)
+        .text()
+        .catch(() => null);
+    if (!text) return null;
+    const addrRe = new RegExp(
+        `fixed-address\\s+${address.replace(/\./g, "\\.")}\\s*;`,
+    );
+    // dhclient appends the newest lease last; walk blocks and keep the last match.
+    let routers: string | null = null;
+    for (const block of text.split(/^lease\s*\{/m)) {
+        if (!addrRe.test(block)) continue;
+        const match = block.match(/option\s+routers\s+([0-9.]+)/);
+        if (match) routers = match![1];
+    }
+    return routers;
+}
+
 export async function defaultRouteDetails(): Promise<{
     iface: string;
     ip: string | null;
@@ -190,6 +217,24 @@ function getNetwork(ipAddr: string, prefix: number): string {
     const mask = prefix === 0 ? 0 : (~0 << (32 - prefix)) >>> 0;
     const net = (ipNum & mask) >>> 0;
     return `${[net >>> 24, (net >>> 16) & 0xff, (net >>> 8) & 0xff, net & 0xff].join(".")}/${prefix}`;
+}
+
+/** First usable host of the interface's subnet (network + 1). The gateway for
+ * RNDIS/NDIS CPE/modem uplinks that publish no gateway anywhere (not in the
+ * main table, no ModemManager bearer, no DHCP lease file) — e.g.
+ * 192.168.8.153/24 -> 192.168.8.1. `null` for a malformed IPv4. */
+function subnetFirstHost(ip: string, prefix: number): string | null {
+    const octets = ip.split(".").map((o) => parseInt(o, 10));
+    if (octets.length !== 4 || octets.some((o) => Number.isNaN(o))) return null;
+    const ipNum = octets.reduce((acc, o) => (acc << 8) + o, 0) >>> 0;
+    const mask = prefix === 0 ? 0 : (~0 << (32 - prefix)) >>> 0;
+    const first = ((ipNum & mask) >>> 0) + 1;
+    return [
+        first >>> 24,
+        (first >>> 16) & 0xff,
+        (first >>> 8) & 0xff,
+        first & 0xff,
+    ].join(".");
 }
 
 // ----------------------------------------------------------------------
@@ -552,15 +597,22 @@ export async function reconfigure(): Promise<ReconfigureResult> {
 
             const plan = await Promise.all(
                 selected.map(
-                    async ({ iface, ip: addr, prefix, gateway: bearerGateway }, idx) => ({
-                        iface,
-                        ip: addr,
-                        prefix,
-                        // Cellular uplinks have no gateway in the main table;
-                        // prefer the bearer gateway MM reported for the modem.
-                        gateway: bearerGateway ?? (await getGateway(iface)),
-                        table: TABLE_BASE + idx,
-                    }),
+                    async ({ iface, ip: addr, prefix, gateway: bearerGateway }, idx) => {
+                        // Resolve in priority order:
+                        //  1. the ModemManager bearer gateway (cellular / wwan0),
+                        //  2. an existing main-table default for the interface (ethernet),
+                        //  3. the dhclient lease router (RNDIS/NDIS modem-ethernet — a
+                        //     phone in USB-tether mode on usb0 — whose gateway is DHCPed,
+                        //     not in main and has no MM bearer),
+                        //  4. the subnet's first host (.1) as a last resort for a
+                        //     lease-less RNDIS uplink.
+                        const gateway =
+                            bearerGateway ??
+                            (await getGateway(iface)) ??
+                            (await dhcpLeaseGateway(iface, addr)) ??
+                            subnetFirstHost(addr, prefix);
+                        return { iface, ip: addr, prefix, gateway, table: TABLE_BASE + idx };
+                    },
                 ),
             );
             // Only touch routing when needed: rewriting tables emits netlink
