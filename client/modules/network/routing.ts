@@ -498,13 +498,23 @@ async function enforceDefaultRoute(): Promise<void> {
 
             const seenIps = new Set<string>();
             const accessPoints = await accessPointInterfaces();
-            const candidates = selected.flatMap((entry, idx) => {
-                if (seenIps.has(entry.ip)) return [];
-                seenIps.add(entry.ip);
-                if (accessPoints.has(entry.iface)) return [];
-                const appliedEntry = plan[idx];
-                return appliedEntry ? [{ entry, appliedEntry }] : [];
-            });
+            // Prefer wired ethernet (eth*) for the main default route: cellular
+            // uplinks are cheaper to conserve and should only take the default
+            // when no ethernet uplink is reachable. Stable sort keeps detection
+            // order within each group, so the first reachable eth* wins.
+            const candidates = selected
+                .flatMap((entry, idx) => {
+                    if (seenIps.has(entry.ip)) return [];
+                    seenIps.add(entry.ip);
+                    if (accessPoints.has(entry.iface)) return [];
+                    const appliedEntry = plan[idx];
+                    return appliedEntry ? [{ entry, appliedEntry }] : [];
+                })
+                .sort(
+                    (a, b) =>
+                        Number(b.entry.iface.startsWith("eth")) -
+                        Number(a.entry.iface.startsWith("eth")),
+                );
             const reachability = await Promise.all(
                 candidates.map(({ entry }) =>
                     checkConnectivity(addresses, entry.ip),
