@@ -60,6 +60,10 @@ const VIRTUAL_PREFIXES = [
 ];
 
 const TABLE_BASE = 100;
+/** Priority for our per-source rules. Must sit well above NetworkManager's
+ * per-interface rules (it installs them near 32760–32765, which take the
+ * source first and would bypass our tables entirely). */
+const SOURCE_RULE_PRIORITY = 100;
 let routingQueue: Promise<void> = Promise.resolve();
 
 async function withRoutingLock<T>(operation: () => Promise<T>): Promise<T> {
@@ -150,6 +154,9 @@ export async function detectInterfaces(
                         modem.registrationState?.includes("registered") ??
                         false,
                     connectionState: modem.state,
+                    // Cellular gateways live only in the bearer, not the main
+                    // table — carry it so the plan can route off-link traffic.
+                    gateway: modem.gateway,
                 });
             }
         }),
@@ -234,7 +241,18 @@ async function setupSourceRouting({
 }: RoutePlanEntry): Promise<void> {
     const tableStr = String(table);
     const network = getNetwork(addr, prefix);
-    await ip(["rule", "add", "from", addr, "lookup", tableStr]);
+    // High priority so this source's table is consulted before NetworkManager's
+    // per-interface rules (near 32760) would otherwise bypass it.
+    await ip([
+        "rule",
+        "add",
+        "from",
+        addr,
+        "lookup",
+        tableStr,
+        "priority",
+        String(SOURCE_RULE_PRIORITY),
+    ]);
     await ip([
         "route",
         "add",
@@ -533,13 +551,17 @@ export async function reconfigure(): Promise<ReconfigureResult> {
                 return failure("No interfaces selected for bonding.");
 
             const plan = await Promise.all(
-                selected.map(async ({ iface, ip: addr, prefix }, idx) => ({
-                    iface,
-                    ip: addr,
-                    prefix,
-                    gateway: await getGateway(iface),
-                    table: TABLE_BASE + idx,
-                })),
+                selected.map(
+                    async ({ iface, ip: addr, prefix, gateway: bearerGateway }, idx) => ({
+                        iface,
+                        ip: addr,
+                        prefix,
+                        // Cellular uplinks have no gateway in the main table;
+                        // prefer the bearer gateway MM reported for the modem.
+                        gateway: bearerGateway ?? (await getGateway(iface)),
+                        table: TABLE_BASE + idx,
+                    }),
+                ),
             );
             // Only touch routing when needed: rewriting tables emits netlink
             // events that would otherwise re-trigger the monitor forever.

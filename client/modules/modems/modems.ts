@@ -92,12 +92,29 @@ async function modemDetails(
     return info;
 }
 
+/** The active bearer's IPv4 gateway (carrier route). Cellular gateways never
+ * appear in the main routing table, so the network module reads this to build
+ * a working per-uplink default route. The bearer index comes from the modem
+ * detail (MM 1.20's `mmcli -m N -b` needs an explicit index). */
+async function bearerGateway(index: number): Promise<string | undefined> {
+    const detail = parseKeyvalue(
+        await mmcli("-m", String(index), "--output-keyvalue"),
+    );
+    const bearer = pickField(detail, "modem.generic.bearers.value[1]")?.match(
+        /Bearer\/(\d+)\s*$/,
+    )?.[1];
+    if (!bearer) return undefined;
+    return (await mmcli("-b", bearer)).match(/gateway:\s*(\S+)/)?.[1];
+}
+
 async function scanModems(): Promise<ModemInfo[]> {
     const list = [...(await mmcli("-L")).matchAll(/Modem\/(\d+)\s+(.*)$/gm)];
     return Promise.all(
-        list.map(([, index, label]) =>
-            modemDetails(Number(index), label.trim()),
-        ),
+        list.map(async ([, index, label]) => {
+            const info = await modemDetails(Number(index), label.trim());
+            info.gateway = await bearerGateway(Number(index));
+            return info;
+        }),
     );
 }
 

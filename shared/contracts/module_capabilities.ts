@@ -21,6 +21,10 @@ export interface Modem {
 	primaryPort?: string;
 	deviceId?: string;
 	simPath?: string;
+	/** Carrier IPv4 gateway (from the active bearer). Cellular gateways never
+	 * appear in the main routing table, so the network module needs this to
+	 * build a working per-uplink default route. */
+	gateway?: string;
 }
 
 /** The `modems.source` capability (modems module): enumerate modems and

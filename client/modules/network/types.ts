@@ -20,6 +20,10 @@ export interface Iface {
     accessTech?: string;
     registered?: boolean;
     connectionState?: string;
+    /** Carrier IPv4 gateway (modems only). Cellular gateways are not in the
+     * main routing table, so the reconfigure plan uses this to build a
+     * working per-uplink default route. */
+    gateway?: string;
 }
 
 /** The persisted bond selection (by interface name, else by IP; empty = all). */
