@@ -1,3 +1,10 @@
+# [7.2.0](https://github.com/majklovec/irlctrl/compare/v7.1.0...v7.2.0) (2026-11-10)
+
+
+### Features
+
+* **network:** use cellular bearer gateway ([39a923f](https://github.com/majklovec/irlctrl/commit/39a923f5b4bd11ba4239b820e7579a284e143ba7))
+
 # [7.1.0](https://github.com/majklovec/irlctrl/compare/v7.0.1...v7.1.0) (2026-11-10)
 
 
