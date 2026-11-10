@@ -1,3 +1,10 @@
+# [7.3.0](https://github.com/majklovec/irlctrl/compare/v7.2.0...v7.3.0) (2026-11-10)
+
+
+### Features
+
+* **network:** add dhcp lease gateway ([b5bc055](https://github.com/majklovec/irlctrl/commit/b5bc0559948bf6843de5414c1454f6779c5ae2bf))
+
 # [7.2.0](https://github.com/majklovec/irlctrl/compare/v7.1.0...v7.2.0) (2026-11-10)
 
 
