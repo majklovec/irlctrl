@@ -80,7 +80,13 @@ jobs:
         runs-on: ${{ matrix.os }}
 
         steps:
+            # Check out the release tag, not the trigger commit:
+            # semantic-release commits the package.json bump in the `version`
+            # job, so github.sha still carries the previous version and the
+            # binaries would embed the stale APP_VERSION.
             - uses: actions/checkout@v7
+              with:
+                  ref: ${{ needs.version.outputs.new_tag }}
 
             - uses: oven-sh/setup-bun@v2
               with:
@@ -144,7 +150,11 @@ jobs:
         if: needs.version.outputs.new_tag != ''
         runs-on: ubuntu-latest
         steps:
+            # Same as the build job: check out the tag so the image is built
+            # from the commit carrying the bumped package.json.
             - uses: actions/checkout@v7
+              with:
+                  ref: ${{ needs.version.outputs.new_tag }}
 
             - uses: docker/setup-buildx-action@v4
 
