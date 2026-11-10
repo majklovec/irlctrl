@@ -1,3 +1,10 @@
+## [7.4.1](https://github.com/majklovec/irlctrl/compare/v7.4.0...v7.4.1) (2026-11-10)
+
+
+### Bug Fixes
+
+* **network:** keep default on eth uplink ([2a8bef0](https://github.com/majklovec/irlctrl/commit/2a8bef07a87c1083a6aca0198ba875e61e0ecab9))
+
 # [7.4.0](https://github.com/majklovec/irlctrl/compare/v7.3.0...v7.4.0) (2026-11-10)
 
 
