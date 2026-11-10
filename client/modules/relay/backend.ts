@@ -58,6 +58,8 @@ const SRTLA_SOCKET = argEnv(
     "SRTLA_CONTROL_SOCKET",
     join(tmpdir(), "srtla_send.sock"),
 );
+/** The `srtla_rec` binary to spawn (the encoder → relay SRTLA hop). */
+const SRTLA_REC_BIN = argEnv("--srtla-rec-bin", "SRTLA_REC_BIN", "srtla_rec");
 /** UDP port the inbound `srtla_rec` binds (the encoder → relay SRTLA hop). */
 const SRTLA_LISTEN_PORT = intArgEnv(
     "--srtla-listen-port",
@@ -195,7 +197,7 @@ async function startRelay(
     const srtlaPort = Number(listenPort) || SRTLA_LISTEN_PORT;
     const sendPort = String(SRT_INTERNAL_PORT);
     const bin = process.env.SRTLA_SEND_BIN ?? "srtla_send";
-    const recBin = "srtla_rec";
+    const recBin = SRTLA_REC_BIN;
     if (isRunning() && target())
         throw new Error("srtla_send is already running");
 

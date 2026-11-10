@@ -23,9 +23,9 @@
 import { mkdirSync, rmSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Socket } from "bun";
+import type { Supervisor } from "../client/backend/supervisor";
 import { t } from "./i18n";
 import { errorMessage, textOf } from "./util";
-import type { Supervisor } from "../client/backend/supervisor";
 
 // ----------------------------------------------------------------------
 // Types
@@ -652,15 +652,8 @@ export class SrtlaSend {
             launch.options ?? {},
             this.cfg.controlSocket,
         );
-        const withControl =
-            !!this.cfg.controlSocket && !!caps?.controlSocket;
-        const args = [
-            ...flags,
-            sendPort,
-            remoteHost,
-            remotePort,
-            uplinksFile,
-        ];
+        const withControl = !!this.cfg.controlSocket && !!caps?.controlSocket;
+        const args = [...flags, sendPort, remoteHost, remotePort, uplinksFile];
         console.log(`Starting ${bin} ${args.join(" ")}`);
 
         const started = (pid?: number): SrtlaState => ({
