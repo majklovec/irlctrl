@@ -17,6 +17,8 @@ import {
     detectModems,
     modemSource,
     performModemAction,
+    startModemAutodial,
+    stopModemAutodial,
 } from "./modems";
 import type { ModemInfo } from "./types";
 
@@ -55,8 +57,13 @@ const registration: BackendModule<ModuleCore> = {
     async start(ctx) {
         core = ctx.core;
         bindModemManager(core);
+        // Keep every registered modem on the network: a persistent NM gsm
+        // autoconnect profile dials on boot, and this re-dials on drop.
+        startModemAutodial();
     },
-    async stop() {},
+    async stop() {
+        stopModemAutodial();
+    },
     async dispatch(method, p) {
         switch (method) {
             case "modems.list":
