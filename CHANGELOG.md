@@ -1,3 +1,11 @@
+# [7.1.0](https://github.com/majklovec/irlctrl/compare/v7.0.1...v7.1.0) (2026-11-10)
+
+
+### Features
+
+* **modems:** add gsm auto-dial/reconnect ([9d62e15](https://github.com/majklovec/irlctrl/commit/9d62e158447467823d005d0c781aed40e1f07822))
+* **relay:** add srtla_rec binary option ([ed4fb67](https://github.com/majklovec/irlctrl/commit/ed4fb67759d5ef3dc50ba71d15ff53fde9f7b713))
+
 ## [7.0.1](https://github.com/majklovec/irlctrl/compare/v7.0.0...v7.0.1) (2026-11-09)
 
 
