@@ -171,8 +171,8 @@ async function getGateway(iface: string): Promise<string | null> {
 
 /** Gateway from the ISC `dhclient` lease, the router the server actually
  * handed the interface. The right source for RNDIS/NDIS modem-ethernet
- * uplinks — e.g. a phone in USB-tether mode (`ANDROID_METERED`) on usb0 —
- * that publish no gateway in the main table and are not a ModemManager
+ * uplinks — e.g. a USB LTE modem on usb0 whose `192.168.8.x/24` LAN gateway
+ * is DHCPed, so it is absent from the main table and has no ModemManager
  * bearer. Returns the first `option routers` of the newest lease for
  * `address` (`null` when the file is absent or has no matching lease). */
 async function dhcpLeaseGateway(
@@ -602,8 +602,8 @@ export async function reconfigure(): Promise<ReconfigureResult> {
                         //  1. the ModemManager bearer gateway (cellular / wwan0),
                         //  2. an existing main-table default for the interface (ethernet),
                         //  3. the dhclient lease router (RNDIS/NDIS modem-ethernet — a
-                        //     phone in USB-tether mode on usb0 — whose gateway is DHCPed,
-                        //     not in main and has no MM bearer),
+                        //     USB LTE modem on usb0 whose gateway is DHCPed, not in main
+                        //     and has no MM bearer),
                         //  4. the subnet's first host (.1) as a last resort for a
                         //     lease-less RNDIS uplink.
                         const gateway =
