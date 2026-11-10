@@ -1,0 +1,108 @@
+{
+  "autostart": false,
+  "color": "#f73b3b",
+  "hostname": "encoder-majkl",
+  "language": "en",
+  "passwordHash": "scrypt$d12bbaeb0648beee6a3a56b44204f0fa$59f0b328c3a42e266407e7260d05064e047ce0e763e589d2a3de7dcccf3029f7093acf2d48134d60fd4d0acc166562288a60cd27038a3d5867f396fc2cf9fb68",
+  "remoteToken": "6c3dfa114c0a10acbff41ed88fb8aeede3d9dffda75d97ab",
+  "remoteUrl": "wss://irl.vondracek.dev/device",
+  "role": "encoder",
+  "username": "majkl",
+  "uuid": "a0ccadcb-8167-465c-ba62-67c29571bc49",
+  "ceracoder": {
+    "balancer": "fixed",
+    "minBitrate": 500,
+    "adaptive": {
+      "decrInterval": 200,
+      "decrStep": 100,
+      "incrInterval": 500,
+      "incrStep": 30
+    },
+    "aimd": {
+      "decrInterval": 200,
+      "decrMult": 0.75,
+      "incrInterval": 500,
+      "incrStep": 50
+    }
+  },
+  "encoder": {
+    "audioCodec": "aac",
+    "audioSource": "default",
+    "bitrateOverlay": false,
+    "delay": 0,
+    "host": "127.0.0.1",
+    "latency": 2000,
+    "maxBitrate": 5000,
+    "minBitrate": 300,
+    "pipeline": "test/x264_test_pattern",
+    "port": "9000"
+  },
+  "modules": {
+    "broadcaster": {
+      "enabled": false,
+      "profile": "copy",
+      "profilesDir": "/root/.config/broadcaster/profiles",
+      "outputs": [],
+      "profiles": []
+    },
+    "encoder": {
+      "enabled": true
+    },
+    "modems": {
+      "enabled": true
+    },
+    "network": {
+      "enabled": true
+    },
+    "obs": {
+      "autoSwitch": true,
+      "enabled": false,
+      "failBehaviour": "pause",
+      "instantlySwitchOnRecover": true,
+      "logToFile": true,
+      "obsPassword": "hesloheslo",
+      "obsSourceName": "",
+      "obsUrl": "ws://host.docker.internal:4455",
+      "onlySwitchWhenStreaming": false,
+      "pollIntervalMs": 1000,
+      "retryAttempts": 5,
+      "sceneEvents": true,
+      "optionalScenes": {
+        "ending": "",
+        "privacy": "",
+        "starting": ""
+      },
+      "scenes": {
+        "low": "",
+        "normal": "",
+        "offline": ""
+      },
+      "triggers": {
+        "low": 500,
+        "offline": 400,
+        "rtt": 1500
+      }
+    },
+    "relay": {
+      "enabled": false
+    },
+    "ssh": {
+      "enabled": true
+    }
+  },
+  "network": {
+    "selection": {
+      "modems": [
+        "eno2",
+        "enxce50b2437431"
+      ]
+    }
+  },
+  "stream": {
+    "listenPort": "9000",
+    "mode": "enhanced",
+    "quality": false,
+    "remoteHost": "83.208.44.38",
+    "remotePort": "6000"
+  }
+}
