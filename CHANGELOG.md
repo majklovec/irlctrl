@@ -1,3 +1,10 @@
+# [7.4.0](https://github.com/majklovec/irlctrl/compare/v7.3.0...v7.4.0) (2026-11-10)
+
+
+### Features
+
+* **network:** prefer ethernet default route ([41b7199](https://github.com/majklovec/irlctrl/commit/41b7199021aeffb21bc03327116e5c028fb211f1))
+
 # [7.3.0](https://github.com/majklovec/irlctrl/compare/v7.2.0...v7.3.0) (2026-11-10)
 
 
