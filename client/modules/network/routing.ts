@@ -481,7 +481,14 @@ async function enforceDefaultRoute(): Promise<void> {
             }
             if (addresses.length === 0) return;
 
-            if (await checkConnectivity(addresses)) return;
+            // Keep the main default on a wired eth* uplink even while it is
+            // healthy: this loop is otherwise reactive (it only fires when
+            // connectivity drops), so without the eth check the default can stay
+            // parked on a modem (usb*/wwan*) forever. Re-evaluate whenever the
+            // current default is not on an eth* interface.
+            const defaultIface = (await defaultRouteDetails())?.iface;
+            const defaultOnEthernet = defaultIface?.startsWith("eth") ?? false;
+            if (await checkConnectivity(addresses) && defaultOnEthernet) return;
 
             const selected = resolveSelection(await detectInterfaces());
             const plan = lastAppliedPlanEntries;
