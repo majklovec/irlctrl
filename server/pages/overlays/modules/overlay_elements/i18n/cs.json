@@ -70,7 +70,7 @@
     "overlay.live_map_icon_group_single": "Jednobarevné",
     "overlay.live_map_marker_size": "Velikost značky (px)",
     "overlay.live_map_show_info": "Zobrazit informační box",
-    "overlay.live_map_info_template": "Text informačního boxu ({distance}, {time}, {status}, … nebo název proměnné)",
+    "overlay.live_map_info_template": "Text informačního boxu ({{distance}}, {{time}}, {{status}}, … nebo název proměnné)",
     "overlay.live_map_info_font_size": "Velikost písma (px)",
     "overlay.live_map_info_padding": "Odsazení (px)",
     "overlay.live_map_info_color": "Barva textu",

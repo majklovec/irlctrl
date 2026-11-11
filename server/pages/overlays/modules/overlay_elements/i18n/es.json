@@ -70,7 +70,7 @@
     "overlay.live_map_icon_group_single": "Monocolor",
     "overlay.live_map_marker_size": "Marker size (px)",
     "overlay.live_map_show_info": "Show info box",
-    "overlay.live_map_info_template": "Info box text ({distance}, {time}, {status}, … or a variable name)",
+    "overlay.live_map_info_template": "Info box text ({{distance}}, {{time}}, {{status}}, … or a variable name)",
     "overlay.live_map_info_font_size": "Info font size (px)",
     "overlay.live_map_info_padding": "Info padding (px)",
     "overlay.live_map_info_color": "Info text color",

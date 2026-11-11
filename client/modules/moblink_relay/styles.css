@@ -1,0 +1,14 @@
+/* MobLink LAN relay card */
+.moblink-relay .status {
+    margin: 0.25rem 0 0.5rem;
+}
+.moblink-relay .status[data-state="online"] {
+    color: var(--ok);
+}
+.moblink-relay .status[data-state="offline"] {
+    color: var(--muted);
+}
+/* Settings: input rows */
+.moblink-relay-settings .field + .field {
+    margin-top: 0.75rem;
+}

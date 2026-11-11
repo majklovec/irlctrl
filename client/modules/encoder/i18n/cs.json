@@ -3,7 +3,7 @@
     "dev.apply_cera": "Použít nastavení",
     "dev.audio_pipeline_default": "Výchozí pipeline",
     "dev.badge.restarting": "obnovuje se",
-    "dev.badge.srtla_send_down": "srtla_send dolů",
+    "dev.badge.srtla_send_down": "srtla_send vypnuto",
     "dev.badge.streaming": "enkoduje",
     "dev.balancer.adaptive": "Adaptivní (RTT + buffer)",
     "dev.balancer.aimd": "AIMD (v duchu TCP)",

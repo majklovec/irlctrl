@@ -52,7 +52,7 @@ function headerRight(): m.Children[] {
 				type="button"
 				class="signout"
 				title={t("ui.logout")}
-				onClick={() => void signOut()}
+				onclick={() => void signOut()}
 			>
 				{t("ui.logout")}
 			</button>

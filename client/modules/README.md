@@ -20,6 +20,8 @@ cases.
 │       ├── README.md         # this file
 │       ├── encoder/
 │       ├── modems/
+│       ├── moblink_relay/      # per-interface UDP relays (relay-box side)
+│       ├── moblink_streamer/   # TUN virtual interface (encoder side)
 │       ├── network/
 │       ├── relay/
 │       ├── obs/
@@ -289,9 +291,11 @@ frontend pages must stay free of module feature branches.
 
 ## Capabilities
 
-| name           | provider | consumers | shape                                                                      |
-| -------------- | -------- | --------- | -------------------------------------------------------------------------- |
-| `stream.relay` | relay    | —         | `{ relayStatus(), startRelay(), stopRelay(), reloadRelay(), target() }`    |
+| name                | provider | consumers       | shape                                                                      |
+| ------------------- | -------- | --------------- | -------------------------------------------------------------------------- |
+| `stream.relay`      | relay    | —               | `{ relayStatus(), startRelay(), stopRelay(), reloadRelay(), target() }`    |
+| `network.interfaces`| network  | moblink_relay   | `{ list(), onChanged(), ensureMonitoring() }`                              |
+| `network.uplinks`   | network  | moblink_relay, moblink_streamer | `{ file(), ensure(), onChanged(), add(), remove(), list() }` |
 
 Capabilities are looked up by name; providers and consumers remain isolated
 and depend only on the runtime methods they use.
@@ -300,7 +304,8 @@ and depend only on the runtime methods they use.
 
 `resolveOrder` (in `shared/registry.ts`) topologically sorts modules by their
 `dependencies` (cycle-safe; ids visited alphabetically). Today: `relay` →
-`encoder` → `obs` → `ssh`. `startModules` / `stopModules` (reverse) /
+`encoder` → `obs` → `ssh`; `moblink_streamer` additionally depends on
+`network`. `startModules` / `stopModules` (reverse) /
 `moduleStatuses` / autostart all iterate that order.
 
 ## Adding a module

@@ -28,6 +28,8 @@ const DEVICE_ORDER = [
     "modems",
     "network",
     "encoder",
+    "moblink_relay",
+    "moblink_streamer",
     "obs",
     "relay",
     "ssh",
@@ -355,8 +357,10 @@ describe("role presets from the registrations", () => {
                 .map(([key]) => key)
                 .sort();
         expect(on("relay")).toEqual(["modems", "network", "relay", "ssh"]);
+        // The MobLink streamer runs always on encoders (no start/stop).
         expect(on("encoder")).toEqual([
             "encoder",
+            "moblink_streamer",
             "modems",
             "network",
             "ssh",

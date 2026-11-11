@@ -2,13 +2,20 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+// The "uplinks file rewrite" block below must run before any other test that
+// triggers a file write: the routing module's lastUplinksContent cache would
+// then shadow the fixture file and the re-read under test would not happen.
 import type { ModuleCore } from "../client/backend/module_core";
 import {
+    addProgrammaticUplink,
     bindRouting,
     defaultRouteDetails,
     isSelfGeneratedEvent,
+    leaselessGateway,
+    removeProgrammaticUplink,
     seedManagedTableCount,
     setRtTablesFileForTest,
+    uplinksLines,
 } from "../client/modules/network/routing";
 import { defaultRouteRowIndex } from "../client/modules/network/route_view";
 
@@ -22,6 +29,39 @@ afterAll(() => {
 afterAll(async () => {
     const { bindModules } = await import("../client/backend/modules");
     bindModules();
+});
+
+describe("uplinks file rewrite", () => {
+    test("drops stale uplink ids an older build left in the file", async () => {
+        const file = join(tmpdir(), "srtla_ips.txt");
+        const saved = await Bun.file(file).text().catch(() => null);
+        let written: string | null = null;
+        try {
+            writeFileSync(file, "192.168.1.136\nmoblink:relay0_eno2\n");
+            bindRouting(
+                {
+                    config: { DRY_RUN: false },
+                    writeFileAtomic: async (
+                        _path: string,
+                        content: string,
+                    ) => {
+                        written = content;
+                    },
+                } as unknown as ModuleCore,
+                { detect: async () => [], modemIface: async () => null },
+            );
+            await addProgrammaticUplink(
+                "moblink:relay0_eno2",
+                "10.90.0.1",
+            );
+            expect(written).toContain("192.168.1.136");
+            expect(written).toContain("10.90.0.1");
+            expect(written).not.toContain("moblink:");
+        } finally {
+            if (saved === null) rmSync(file, { force: true });
+            else writeFileSync(file, saved);
+        }
+    });
 });
 
 describe("SRTLA default-route details", () => {
@@ -66,6 +106,47 @@ describe("SRTLA default-route details", () => {
         expect(interfaces.filter((_, index) => index === marked)).toEqual([
             { iface: "eth0", ip: "192.168.32.4" },
         ]);
+    });
+});
+
+describe("uplinks file lines", () => {
+    test("carries programmatic uplink sources as IPs, never their ids", async () => {
+        // The file is consumed by srtla_send, which dials these as addresses.
+        bindRouting(
+            {
+                config: { DRY_RUN: false },
+                writeFileAtomic: async () => {},
+            } as unknown as ModuleCore,
+            { detect: async () => [], modemIface: async () => null },
+        );
+        await addProgrammaticUplink("moblink:relay0_eno2", "10.90.0.1");
+        try {
+            expect(uplinksLines(["192.168.8.153"])).toEqual([
+                "192.168.8.153",
+                "10.90.0.1",
+            ]);
+            // A source that is also a bonded IP is written once.
+            expect(uplinksLines(["10.90.0.1"])).toEqual(["10.90.0.1"]);
+        } finally {
+            // Drop the test's uplink so later tests see a clean registry.
+            await removeProgrammaticUplink("moblink:relay0_eno2");
+        }
+    });
+});
+
+describe("lease-less uplink gateway", () => {
+    test("uses the subnet's first host for a lease-less RNDIS uplink", () => {
+        expect(leaselessGateway("192.168.8.153", 24)).toBe("192.168.8.1");
+    });
+
+    test("has no via-address for a MobLink TUN (its IP is the first host)", () => {
+        // TUN local IPs are 10.{90+x}.{y}.1 — the first host of their /24.
+        expect(leaselessGateway("10.90.0.1", 24)).toBeNull();
+        expect(leaselessGateway("10.91.3.1", 24)).toBeNull();
+    });
+
+    test("returns null for a malformed address", () => {
+        expect(leaselessGateway("not-an-ip", 24)).toBeNull();
     });
 });
 

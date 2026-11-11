@@ -70,7 +70,7 @@
     "overlay.live_map_icon_group_single": "Одноцветные",
     "overlay.live_map_marker_size": "Размер маркера (px)",
     "overlay.live_map_show_info": "Показать информационное окно",
-    "overlay.live_map_info_template": "Текст информационного окна ({distance}, {time}, {status}, … или имя переменной)",
+    "overlay.live_map_info_template": "Текст информационного окна ({{distance}}, {{time}}, {{status}}, … или имя переменной)",
     "overlay.live_map_info_font_size": "Размер шрифта информационного окна (px)",
     "overlay.live_map_info_padding": "Отступ информационного окна (px)",
     "overlay.live_map_info_color": "Цвет текста информационного окна",

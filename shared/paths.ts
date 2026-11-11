@@ -39,6 +39,9 @@ export const PAGE_DIRS = {
 /** The control server's page slices (`server/pages/<id>/…`, 01-refactor). */
 export const PAGES_ROOT = "server/pages";
 
+/** The control server's numbered SQLite schema migrations (`NNNN_<name>.sql`). */
+export const MIGRATIONS_DIR = "server/core/migrations";
+
 /** The core translation catalogs (`i18n/<lang>.json`). */
 export const CORE_I18N_DIR = "i18n";
 

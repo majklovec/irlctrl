@@ -38,4 +38,24 @@ import { ensureGeneratedManifests } from "../../shared/generated_manifests";
 
 // generated/ first: the application graph statically imports the manifests.
 await ensureGeneratedManifests();
+// Persistent-device safety net: a stray uncaught error — most often a native
+// network error surfaced without a JS stack (e.g. a UDP errqueue
+// ECONNREFUSED) — logs with full context and lets the process continue
+// instead of dying. This is a last-resort backstop; the real fix is the
+// per-socket `error` handler in udp_relay (relay.ts / virtual_interface.ts),
+// which consumes network errors at the source.
+process.on("unhandledRejection", (reason: unknown) => {
+    console.error(
+        "[unhandledRejection]",
+        reason instanceof Error
+            ? `${reason.message}\n${reason.stack}`
+            : String(reason),
+    );
+});
+process.on("uncaughtException", (err: unknown) => {
+    console.error(
+        "[uncaughtException]",
+        err instanceof Error ? `${err.message}\n${err.stack}` : String(err),
+    );
+});
 await import("./main");

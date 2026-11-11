@@ -46,7 +46,7 @@ export async function createAuth({
     const db: Database | null = NO_AUTH
         ? null
         : await (async () => {
-              const d = openDatabase(DB_FILE);
+              const d = await openDatabase(DB_FILE);
 
               if (
                   (

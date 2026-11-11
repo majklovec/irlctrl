@@ -1,0 +1,118 @@
+{
+  "autostart": false,
+  "color": "#f73b3b",
+  "hostname": "moblink-encoder",
+  "language": "en",
+  "passwordHash": "scrypt$5566c8a2bda22cb27b289f9efffbdb8c$dff2c24f30bbde4f154bf1ff114fb6f900058801625b8ee854b4d6bf730d5c13a398660459eb24ba660ee0b9ac5af240fb7cfac2d1296052c9765bd5e4f8c2e8",
+  "remoteToken": "6c3dfa114c0a10acbff41ed88fb8aeede3d9dffda75d97ab",
+  "remoteUrl": "wss://irl.vondracek.dev/device",
+  "role": "encoder",
+  "username": "admin",
+  "uuid": "69725fd4-c1c2-4d7d-bd5b-7876d991e0fc",
+  "encoder": {
+    "audioCodec": "aac",
+    "audioSource": "default",
+    "bitrateOverlay": false,
+    "delay": 0,
+    "host": "127.0.0.1",
+    "latency": 2000,
+    "maxBitrate": 5000,
+    "minBitrate": 300,
+    "pipeline": "test/x264_test_pattern",
+    "port": "9000"
+  },
+  "moblinkStreamer": {
+    "autoRegisterUplink": true,
+    "enabled": true,
+    "interfaceName": "moblink0",
+    "keepaliveIntervalMs": 5000,
+    "localIp": "10.3.3.1",
+    "logLevel": "info",
+    "mtu": 1400,
+    "prefixLength": 24,
+    "runtimeStatusFile": "/tmp/moblink-status.json",
+    "tunBaseIp": "10.3.3.0",
+    "relay": {
+      "host": "192.168.1.136",
+      "port": 4000
+    }
+  },
+  "modules": {
+    "broadcaster": {
+      "enabled": false,
+      "profile": "copy",
+      "profilesDir": "/data/home/majkl/.config/broadcaster/profiles",
+      "outputs": [],
+      "profiles": []
+    },
+    "encoder": {
+      "enabled": true
+    },
+    "moblink_relay": {
+      "enabled": false,
+      "listenPortBase": 5000,
+      "logLevel": "info",
+      "destination": {
+        "host": "",
+        "port": 0
+      },
+      "interfaceAllow": [],
+      "interfaceIgnore": [
+        "docker.*",
+        "veth.*"
+      ],
+      "interfaceNameOverrides": {}
+    },
+    "moblink_streamer": {
+      "enabled": false
+    },
+    "modems": {
+      "enabled": true
+    },
+    "network": {
+      "enabled": true
+    },
+    "obs": {
+      "autoSwitch": true,
+      "enabled": false,
+      "failBehaviour": "pause",
+      "instantlySwitchOnRecover": true,
+      "logToFile": true,
+      "obsPassword": "hesloheslo",
+      "obsSourceName": "",
+      "obsUrl": "ws://host.docker.internal:4455",
+      "onlySwitchWhenStreaming": false,
+      "pollIntervalMs": 1000,
+      "retryAttempts": 5,
+      "sceneEvents": true,
+      "optionalScenes": {
+        "ending": "",
+        "privacy": "",
+        "starting": ""
+      },
+      "scenes": {
+        "low": "",
+        "normal": "",
+        "offline": ""
+      },
+      "triggers": {
+        "low": 500,
+        "offline": 400,
+        "rtt": 1500
+      }
+    },
+    "relay": {
+      "enabled": false
+    },
+    "ssh": {
+      "enabled": true
+    }
+  },
+  "stream": {
+    "listenPort": "9000",
+    "mode": "enhanced",
+    "quality": false,
+    "remoteHost": "asd",
+    "remotePort": "6000"
+  }
+}

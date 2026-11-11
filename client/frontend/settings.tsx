@@ -22,7 +22,7 @@ import {
 import { t } from "@ui/i18n";
 import { RpcClient, socketUrl } from "@ui/services/rpc";
 import { HOSTNAME_PATTERN, mountPage, setHeaderColor } from "@ui/util";
-import m from "mithril";
+import m, { type Vnode } from "mithril";
 import type { ModulesView, Settings } from "../../shared/contracts/wire";
 import { errorMessage } from "../../shared/util";
 import { DEFAULT_COLOR } from "../../shared/validate";
@@ -141,14 +141,16 @@ async function save(): Promise<void> {
 	rpc.reconnect();
 }
 
-function settingsCard(): m.Vnode {
+function settingsCard(): Vnode {
 	const tokenPlaceholder = !state.settings
 		? t("set.token_ph_unchanged")
 		: state.settings.hasRemoteToken
 			? t("set.token_ph_configured")
 			: t("set.token_ph_missing");
 	return (
-		<Card>
+		// Keyed: the device card shares the page fragment with the (keyed)
+		// module cards — a mixed keyed/unkeyed fragment throws in Mithril 2.3.
+		<Card key="device">
 			<p class="muted">{t("set.description")}</p>
 			<Form onSubmit={save}>
 				<Field
@@ -230,8 +232,12 @@ const App: m.Component = {
 			}
 			headerRight={<ConnectionBadge connected={state.connected} />}
 		>
-			{settingsCard()}
-			{renderModuleCards()}
+			{/* The device card and the module cards must share ONE children array:
+			 * passing two JSX children would make <main>{children} a fragment of a
+			 * keyed vnode (the device card) next to an unkeyed array (the module
+			 * cards), and a mixed fragment throws in Mithril 2.3. Flattening them
+			 * keeps every child keyed. */}
+			{[settingsCard(), ...renderModuleCards()]}
 		</Page>
 	),
 };

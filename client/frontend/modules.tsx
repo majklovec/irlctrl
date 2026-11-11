@@ -160,18 +160,27 @@ export function renderModuleCards(): Array<m.Vnode | null> {
 			return [];
 		}
 		if (def.selfCards) {
-			// The module renders its own titled Card elements.
+			// The module renders its own titled Card elements. Bundle the cards
+			// and the optional status line into ONE keyed fragment — returning
+			// [fragment, statusLine?] would put a `null` hole (when the message
+			// is empty) next to the keyed fragment, and a fragment mixing keyed
+			// vnodes with a `null` throws in Mithril 2.3 ("In fragments, vnodes
+			// must either all have keys or none have keys"). Nesting the status
+			// line inside the fragment keeps the page fragment uniformly keyed.
 			return [
-				def.render(ctx),
-				ctx.message === "" ? null : (
-					<p class="muted" role="status">
-						{ctx.message}
-					</p>
+				m.fragment(
+					{ key: def.id },
+					[
+						def.render(ctx),
+						ctx.message === ""
+							? null
+							: <p class="muted" role="status">{ctx.message}</p>,
+					] as m.ChildArrayOrPrimitive,
 				),
 			] as unknown as (m.Vnode | null)[];
 		}
 		return [
-			<Card title={t(def.titleKey)}>
+			<Card title={t(def.titleKey)} key={def.id}>
 				{def.render(ctx)}
 				{ctx.message === "" ? null : (
 					<p class="muted" role="status">

@@ -7,15 +7,16 @@
  * module supplies the ModemManager lookups over the `modems.source`
  * capability.
  */
-import { exists, readFile } from "node:fs/promises";
+
 import { resolve4 } from "node:dns/promises";
+import { exists, readFile } from "node:fs/promises";
 import { createConnection } from "node:net";
-import { tmpdir } from "node:os";
+import { networkInterfaces, tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
-import type { ModuleCore } from "../../backend/module_core";
 import { argEnv, intArgEnv } from "../../../shared/args";
 import { errorMessage, readLines } from "../../../shared/util";
+import type { ModuleCore } from "../../backend/module_core";
 import type {
     Iface,
     Modem,
@@ -115,9 +116,7 @@ async function linkSpeed(iface: string): Promise<number | undefined> {
 // Interface detection (IP-level, enriched with modem info)
 // ----------------------------------------------------------------------
 /** IPv4 interfaces usable for bonding; pass `modems` when the caller already listed them. */
-export async function detectInterfaces(
-    modemList?: Modem[],
-): Promise<Iface[]> {
+export async function detectInterfaces(modemList?: Modem[]): Promise<Iface[]> {
     const [addrs, list] = await Promise.all([
         query(["-o", "-4", "addr", "show", "up"]),
         modemList ?? modems.detect(),
@@ -219,6 +218,16 @@ function getNetwork(ipAddr: string, prefix: number): string {
     return `${[net >>> 24, (net >>> 16) & 0xff, (net >>> 8) & 0xff, net & 0xff].join(".")}/${prefix}`;
 }
 
+/** Last-resort gateway for an interface that publishes no gateway anywhere
+ * (no ModemManager bearer, main table, or DHCP lease): the subnet's first
+ * host — e.g. 192.168.8.153/24 -> 192.168.8.1. `null` when that first host is
+ * the interface's own address (a MobLink TUN, whose local IP is the first
+ * host of its /24): its source table gets a plain `default dev <tun>` route. */
+export function leaselessGateway(addr: string, prefix: number): string | null {
+    const first = subnetFirstHost(addr, prefix);
+    return first && first !== addr ? first : null;
+}
+
 /** First usable host of the interface's subnet (network + 1). The gateway for
  * RNDIS/NDIS CPE/modem uplinks that publish no gateway anywhere (not in the
  * main table, no ModemManager bearer, no DHCP lease file) — e.g.
@@ -241,8 +250,8 @@ function subnetFirstHost(ip: string, prefix: number): string | null {
 // Selection (persisted in the network config section)
 // ----------------------------------------------------------------------
 export const selection = (): ModemConfig =>
-    ((core.state.data.network as Record<string, unknown> | undefined)?.selection ??
-        {}) as ModemConfig;
+    ((core.state.data.network as Record<string, unknown> | undefined)
+        ?.selection ?? {}) as ModemConfig;
 
 /** The interfaces chosen for bonding: by name, else by IP, else all of them. */
 export function resolveSelection(all: Iface[]): Iface[] {
@@ -392,7 +401,10 @@ async function applyRouting(plan: RoutePlanEntry[]): Promise<boolean> {
 let failoverTimer: ReturnType<typeof setInterval> | null = null;
 let failoverBusy = false;
 
-function probeAddress(address: string, localAddress?: string): Promise<boolean> {
+function probeAddress(
+    address: string,
+    localAddress?: string,
+): Promise<boolean> {
     return new Promise((resolve) => {
         const socket = createConnection({
             host: address,
@@ -418,7 +430,11 @@ function probeAddress(address: string, localAddress?: string): Promise<boolean> 
             response += chunk.toString("ascii");
             const lineEnd = response.indexOf("\r\n");
             if (lineEnd !== -1) {
-                finish(/^HTTP\/\d(?:\.\d)? 204(?:\s|$)/.test(response.slice(0, lineEnd)));
+                finish(
+                    /^HTTP\/\d(?:\.\d)? 204(?:\s|$)/.test(
+                        response.slice(0, lineEnd),
+                    ),
+                );
             }
         });
         socket.once("error", () => finish(false));
@@ -448,12 +464,10 @@ async function tableDefaultRoute(table: number): Promise<string | null> {
 async function accessPointInterfaces(): Promise<Set<string>> {
     const output = await core.run("iw", ["dev"], true);
     return new Set(
-        output
-            .split(/(?=^\s*Interface\s)/m)
-            .flatMap((section) => {
-                const iface = section.match(/^\s*Interface\s+(\S+)/m)?.[1];
-                return iface && /^\s*type AP\s*$/m.test(section) ? [iface] : [];
-            }),
+        output.split(/(?=^\s*Interface\s)/m).flatMap((section) => {
+            const iface = section.match(/^\s*Interface\s+(\S+)/m)?.[1];
+            return iface && /^\s*type AP\s*$/m.test(section) ? [iface] : [];
+        }),
     );
 }
 
@@ -488,7 +502,8 @@ async function enforceDefaultRoute(): Promise<void> {
             // current default is not on an eth* interface.
             const defaultIface = (await defaultRouteDetails())?.iface;
             const defaultOnEthernet = defaultIface?.startsWith("eth") ?? false;
-            if (await checkConnectivity(addresses) && defaultOnEthernet) return;
+            if ((await checkConnectivity(addresses)) && defaultOnEthernet)
+                return;
 
             const selected = resolveSelection(await detectInterfaces());
             const plan = lastAppliedPlanEntries;
@@ -614,7 +629,10 @@ export async function reconfigure(): Promise<ReconfigureResult> {
 
             const plan = await Promise.all(
                 selected.map(
-                    async ({ iface, ip: addr, prefix, gateway: bearerGateway }, idx) => {
+                    async (
+                        { iface, ip: addr, prefix, gateway: bearerGateway },
+                        idx,
+                    ) => {
                         // Resolve in priority order:
                         //  1. the ModemManager bearer gateway (cellular / wwan0),
                         //  2. an existing main-table default for the interface (ethernet),
@@ -622,13 +640,20 @@ export async function reconfigure(): Promise<ReconfigureResult> {
                         //     USB LTE modem on usb0 whose gateway is DHCPed, not in main
                         //     and has no MM bearer),
                         //  4. the subnet's first host (.1) as a last resort for a
-                        //     lease-less RNDIS uplink.
+                        //     lease-less RNDIS uplink (null for a TUN — it has no
+                        //     via-address, `default dev <tun>` is enough).
                         const gateway =
                             bearerGateway ??
                             (await getGateway(iface)) ??
                             (await dhcpLeaseGateway(iface, addr)) ??
-                            subnetFirstHost(addr, prefix);
-                        return { iface, ip: addr, prefix, gateway, table: TABLE_BASE + idx };
+                            leaselessGateway(addr, prefix);
+                        return {
+                            iface,
+                            ip: addr,
+                            prefix,
+                            gateway,
+                            table: TABLE_BASE + idx,
+                        };
                     },
                 ),
             );
@@ -637,7 +662,8 @@ export async function reconfigure(): Promise<ReconfigureResult> {
             await applyRouting(plan);
 
             const ips = selected.map((i) => i.ip);
-            const content = `${ips.join("\n")}\n`;
+            const lines = uplinksLines(ips);
+            const content = `${lines.join("\n")}\n`;
             const previous =
                 lastUplinksContent ??
                 (await Bun.file(UPLINKS_FILE)
@@ -647,12 +673,18 @@ export async function reconfigure(): Promise<ReconfigureResult> {
             if (changed && !core.config.DRY_RUN) {
                 await core.writeFileAtomic(UPLINKS_FILE, content);
                 lastUplinksContent = content;
-                console.log(`Uplinks file updated: ${ips.join(", ")}`);
+                console.log(`Uplinks file updated: ${lines.join(", ")}`);
             }
 
             // Interfaces / modem details may have changed even if the uplinks did not
             core.notifyStateChange();
-            return { ok: true, selected, uplinksFile: UPLINKS_FILE, ips, changed };
+            return {
+                ok: true,
+                selected,
+                uplinksFile: UPLINKS_FILE,
+                ips,
+                changed,
+            };
         } catch (err: unknown) {
             return failure(errorMessage(err));
         }
@@ -664,13 +696,14 @@ export async function ensureUplinksFile(): Promise<void> {
     if (core.config.DRY_RUN || (await exists(UPLINKS_FILE))) return;
     try {
         const selected = resolveSelection(await detectInterfaces());
-        if (selected.length === 0)
-            throw new Error("No interfaces selected for bonding.");
         const ips = selected.map((i) => i.ip);
-        const content = `${ips.join("\n")}\n`;
+        const lines = uplinksLines(ips);
+        if (lines.length === 0)
+            throw new Error("No interfaces selected for bonding.");
+        const content = `${lines.join("\n")}\n`;
         await core.writeFileAtomic(UPLINKS_FILE, content);
         lastUplinksContent = content;
-        console.log(`Uplinks file created: ${ips.join(", ")}`);
+        console.log(`Uplinks file created: ${lines.join(", ")}`);
     } catch (err: unknown) {
         console.warn(`Could not create ${UPLINKS_FILE}: ${errorMessage(err)}`);
     }
@@ -699,6 +732,139 @@ export function onUplinksChanged(handler: UplinksChangedHandler): () => void {
 /** Run every registered handler (the monitor after a changed file, a manual reconfigure). */
 export async function fireUplinksChanged(): Promise<void> {
     await Promise.all([...uplinksChangedHandlers].map((handler) => handler()));
+}
+
+// ----------------------------------------------------------------------
+// Programmatic uplinks (the `add`/`remove`/`list` capability methods)
+// ----------------------------------------------------------------------
+type UplinkExtra = { source: string; label?: string };
+/** Programmatic uplinks keyed by stable id (e.g. `moblink:moblink0`). */
+const extraUplinks = new Map<string, UplinkExtra>();
+
+/** The uplinks file line set = detected bond IPs + programmatic extras.
+ * The file carries the extras' *source* IPs (srtla_send dials them), never
+ * their ids; a source that is also a bonded IP is written once. Exported as a
+ * test seam. */
+export function uplinksLines(ips: string[]): string[] {
+    return [...ips].filter((ip, i, all) => all.indexOf(ip) === i);
+}
+
+/**
+ * Write the uplinks file from the given bond IPs plus any programmatic
+ * extras. Throws when the merged set is empty (nothing for consumers).
+ * `ensureUplinksFile` catches and only warns.
+ */
+async function writeUplinksFile(ips: string[]): Promise<void> {
+    const lines = uplinksLines(ips);
+    if (lines.length === 0) throw new Error("No uplinks to write.");
+    const content = `${lines.join("\n")}\n`;
+    await core.writeFileAtomic(UPLINKS_FILE, content);
+    lastUplinksContent = content;
+    console.log(`Uplinks file updated: ${lines.join(", ")}`);
+}
+
+/** Rewrite the file keeping the current bond lines (minus extras) + new extras. */
+async function rewriteUplinksWithExtras(): Promise<void> {
+    if (core.config.DRY_RUN) return;
+    const extras = [...extraUplinks.values()].map((e) => e.source);
+    const previous =
+        lastUplinksContent ??
+        (await Bun.file(UPLINKS_FILE)
+            .text()
+            .catch(() => null));
+    // Every legitimate line is a source IPv4 — anything else (e.g. stale
+    // uplink ids an older build wrote) is dropped, not carried forward.
+    const previousLines = (previous ?? "")
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => /^\d+\.\d+\.\d+\.\d+$/.test(l));
+    const bondIps = previousLines.filter((l) => !extras.includes(l));
+    // Dedupe the bond list while preserving order.
+    const deduped: string[] = [];
+    for (const ip of bondIps) if (!deduped.includes(ip)) deduped.push(ip);
+    if (deduped.length === 0 && extraUplinks.size === 0) return;
+    await writeUplinksFile(deduped);
+}
+
+/** Add (or replace, by id) a programmatic uplink and re-fire `onChanged`. */
+export async function addProgrammaticUplink(
+    id: string,
+    source: string,
+    label?: string,
+): Promise<void> {
+    if (!id) throw new Error("uplink id is required");
+    if (!/^\d+\.\d+\.\d+\.\d+$/.test(source))
+        throw new Error(`uplink source ${JSON.stringify(source)} is not IPv4`);
+    extraUplinks.set(id, { source, label });
+    await rewriteUplinksWithExtras();
+    await fireUplinksChanged();
+}
+
+/** Remove a programmatic uplink by id; no-op when the id is unknown. */
+export async function removeProgrammaticUplink(id: string): Promise<void> {
+    if (!extraUplinks.delete(id)) return;
+    await rewriteUplinksWithExtras();
+    await fireUplinksChanged();
+}
+
+/** The currently registered programmatic uplinks (stable order by insertion). */
+export function listProgrammaticUplinks(): Array<{
+    id: string;
+    source: string;
+    label?: string;
+}> {
+    return [...extraUplinks.entries()].map(([id, e]) => ({
+        id,
+        source: e.source,
+        label: e.label,
+    }));
+}
+
+// ----------------------------------------------------------------------
+// Interface enumeration (the `network.interfaces` capability)
+// ----------------------------------------------------------------------
+/** A machine interface with its IPv4 addresses (loopback excluded). */
+export interface NetworkInterfaceInfo {
+    name: string;
+    addresses: string[];
+}
+
+let lastInterfaceSignature = "";
+const interfaceChangedHandlers = new Set<() => void>();
+
+/** List the machine's IPv4 interfaces (loopback is filtered: it never carries relay traffic). */
+export function listNetworkInterfaces(): NetworkInterfaceInfo[] {
+    const out: NetworkInterfaceInfo[] = [];
+    for (const [name, addrs] of Object.entries(networkInterfaces() ?? {})) {
+        const ipv4 = (addrs ?? [])
+            .filter((a) => a.family === "IPv4" && !a.internal)
+            .map((a) => a.address);
+        if (ipv4.length > 0) out.push({ name, addresses: ipv4 });
+    }
+    return out;
+}
+
+/** Register an interface-set change handler (`network.interfaces.onChanged`); returns the unsubscribe. */
+export function onInterfaceChange(handler: () => void): () => void {
+    interfaceChangedHandlers.add(handler);
+    return () => interfaceChangedHandlers.delete(handler);
+}
+
+/**
+ * Compare the current interface signature against the last observed one and
+ * fire `onInterfaceChange` handlers when it differs. Called from the monitor
+ * after a reconfigure (and once at start) so per-interface consumers
+ * (moblink-relay) can recreate the relays attached to changed interfaces.
+ */
+export function fireInterfaceChangeIfChanged(): void {
+    const signature = [
+        ...listNetworkInterfaces()
+            .map((i) => `${i.name}:${i.addresses.join(",")}`)
+            .sort(),
+    ].join("|");
+    if (signature === lastInterfaceSignature) return;
+    lastInterfaceSignature = signature;
+    for (const handler of [...interfaceChangedHandlers]) handler();
 }
 
 export const isMonitorRunning = (): boolean => monitorProc !== null;
@@ -736,6 +902,10 @@ async function runReconcile(reason: string): Promise<void> {
         } else {
             console.log(`[monitor] ${reason}: uplinks unchanged — no reload`);
         }
+        // The interface set (any interface, not only bonded ones) may have
+        // changed without the uplinks file changing — notify the
+        // per-interface consumers (moblink-relay).
+        fireInterfaceChangeIfChanged();
     } catch (err: unknown) {
         console.error("[monitor] error:", errorMessage(err));
     } finally {

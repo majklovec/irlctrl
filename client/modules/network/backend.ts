@@ -25,13 +25,18 @@ import {
 import type { ModuleCore } from "../../backend/module_core";
 import log from "./log";
 import {
+    addProgrammaticUplink,
     bindRouting,
     defaultRouteDetails,
     detectInterfaces,
     ensureUplinksFile,
     isMonitorRunning,
+    listNetworkInterfaces,
+    listProgrammaticUplinks,
+    onInterfaceChange,
     onUplinksChanged,
     reconfigure,
+    removeProgrammaticUplink,
     resolveSelection,
     selection,
     setSelection,
@@ -41,11 +46,22 @@ import {
     stopInterfaceMonitor,
     UPLINKS_FILE,
 } from "./routing";
+import type {
+    MoblinkDiscoveredRelay,
+    UplinkEntry,
+} from "../../../shared/contracts/module_capabilities";
 import type { Iface, Modem, ModemConfig, ModemSource } from "./types";
 
 /** Core bag, bound at discovery and re-filled at start (a module never imports the core). */
 let core: ModuleCore;
 let modemSource: ModemSource;
+
+/**
+ * The Moblink relays this device (encoder) has learned about, keyed by host.
+ * Written by the `moblink_streamer` module as it discovers/configures relays;
+ * surfaced on the network card grouped per-relay. In-memory (TTL'd upstream).
+ */
+const moblinkRelays = new Map<string, MoblinkDiscoveredRelay>();
 
 /** The interfaces chosen for the bond, enriched with the modem details from the modems module. */
 async function modemStatus(): Promise<{
@@ -95,6 +111,15 @@ async function toggleModem(p: Params) {
         throw new ApiError(`Unknown interface: ${name}`, 404);
     const names = new Set(resolveSelection(all).map((iface) => iface.iface));
     if (!names.delete(name)) names.add(name);
+    // A MobLink TUN leaving the bond drops its auto-registered programmatic
+    // uplink (moblink_streamer, id `moblink:<tun>`) too — otherwise
+    // srtla_send would keep using the path the user just excluded.
+    const uplinkId = `moblink:${name}`;
+    if (
+        !names.has(name) &&
+        listProgrammaticUplinks().some((e) => e.id === uplinkId)
+    )
+        await removeProgrammaticUplink(uplinkId);
     return applySelection({ modems: [...names] });
 }
 
@@ -178,6 +203,7 @@ const registration: BackendModule<ModuleCore> = {
         return {
             ...modem,
             selection: selection(),
+            registeredRelays: [...moblinkRelays.values()],
             defaultRouteInterface: defaultRoute?.iface ?? null,
             defaultRouteSourceIp: defaultRoute?.ip ?? null,
             uplinksFile: UPLINKS_FILE,
@@ -191,6 +217,26 @@ const registration: BackendModule<ModuleCore> = {
                 file: () => UPLINKS_FILE,
                 ensure: ensureUplinksFile,
                 onChanged: onUplinksChanged,
+                add: (entry: UplinkEntry) =>
+                    addProgrammaticUplink(entry.id, entry.source, entry.label),
+                remove: (id: string) => removeProgrammaticUplink(id),
+                list: listProgrammaticUplinks,
+            },
+            "network.interfaces": {
+                list: listNetworkInterfaces,
+                onChanged: onInterfaceChange,
+                ensureMonitoring: async () => {
+                    startInterfaceMonitor();
+                },
+            },
+            "network.moblink": {
+                upsertRelay: (r: MoblinkDiscoveredRelay) => {
+                    moblinkRelays.set(r.host, r);
+                },
+                dropRelay: (host: string) => {
+                    moblinkRelays.delete(host);
+                },
+                listRelays: () => [...moblinkRelays.values()],
             },
         },
     },

@@ -9,7 +9,8 @@
         "jsxFragmentFactory": "m.Fragment",
         "module": "preserve",
         "paths": {
-            "@ui/*": ["./shared/ui/*"]
+            "@ui/*": ["./shared/ui/*"],
+            "@irlctrl/udp-relay": ["./shared/lib/udp_relay/src/index.ts"]
         }
     }
 }

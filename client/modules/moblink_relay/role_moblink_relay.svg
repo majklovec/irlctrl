@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="220" font-family="Inter,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="c" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#3aa06a"/>
+      <stop offset=".45" stop-color="#2a8452"/>
+      <stop offset="1" stop-color="#1c6039"/>
+    </linearGradient>
+    <linearGradient id="a" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset="1" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <marker id="e" markerHeight="6" markerWidth="6" orient="auto-start-reverse" refX="9" refY="5" viewBox="0 0 10 10">
+      <path fill="#7c8ba1" d="m0 0 10 5-10 5Z"/>
+    </marker>
+    <marker id="b" markerHeight="6" markerWidth="6" orient="auto-start-reverse" refX="9" refY="5" viewBox="0 0 10 10">
+      <path fill="#2563eb" d="m0 0 10 5-10 5Z"/>
+    </marker>
+    <radialGradient id="d" cx=".3" cy=".3" r="1">
+      <stop offset="0" stop-color="#6a6a6a"/>
+      <stop offset=".4" stop-color="#3a3a3a"/>
+      <stop offset="1" stop-color="#0f0f0f"/>
+    </radialGradient>
+  </defs>
+  <g transform="translate(20 30)">
+    <rect width="150" height="140" x="3" y="4" opacity=".1" rx="9"/>
+    <rect width="150" height="140" fill="url(#a)" stroke="#94a3b8" stroke-width="1.5" rx="9"/>
+    <text x="14" y="26" fill="#334155" font-size="11" font-weight="700" letter-spacing=".4">ENCODER</text>
+    <text x="14" y="40" fill="#64748b" font-size="7.5" font-weight="600">TUN virtual interfaces</text>
+    <rect width="30" height="16" x="120" y="32" fill="#1e293b" rx="3"/>
+    <text x="135" y="43.5" fill="#e2e8f0" font-size="8" font-weight="700" text-anchor="middle">TUN0</text>
+    <rect width="30" height="16" x="120" y="62" fill="#1e293b" rx="3"/>
+    <text x="135" y="73.5" fill="#e2e8f0" font-size="8" font-weight="700" text-anchor="middle">TUN1</text>
+    <rect width="30" height="16" x="120" y="92" fill="#1e293b" rx="3"/>
+    <text x="135" y="103.5" fill="#e2e8f0" font-size="8" font-weight="700" text-anchor="middle">TUN2</text>
+  </g>
+  <path fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#b)" d="M170 70h170"/>
+  <text x="255" y="63" fill="#2563eb" font-size="9" font-weight="700" text-anchor="middle">UDP :5000</text>
+  <path fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#b)" d="M170 100h170"/>
+  <text x="255" y="93" fill="#2563eb" font-size="9" font-weight="700" text-anchor="middle">UDP :5001</text>
+  <path fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#b)" d="M170 130h170"/>
+  <text x="255" y="123" fill="#2563eb" font-size="9" font-weight="700" text-anchor="middle">UDP :5002</text>
+  <g transform="translate(340 30)">
+    <rect width="200" height="140" x="3" y="4" opacity=".16" rx="7"/>
+    <rect width="200" height="140" fill="url(#c)" rx="7"/>
+    <rect width="199" height="139" x=".5" y=".5" fill="none" stroke="#12492a" rx="6.5"/>
+    <g fill="none" stroke="#4cb47e" stroke-width=".7" opacity=".3">
+      <path d="M16 20h39M16 24h32M16 28h36M16 118h84M16 122h79M16 126h89"/>
+    </g>
+    <circle cx="9" cy="9" r="3.6" fill="#1a5c34" stroke="#0d3520" stroke-width=".8"/>
+    <circle cx="191" cy="9" r="3.6" fill="#1a5c34" stroke="#0d3520" stroke-width=".8"/>
+    <circle cx="9" cy="131" r="3.6" fill="#1a5c34" stroke="#0d3520" stroke-width=".8"/>
+    <circle cx="191" cy="131" r="3.6" fill="#1a5c34" stroke="#0d3520" stroke-width=".8"/>
+    <rect width="74" height="70" x="82" y="34" fill="url(#d)" rx="3"/>
+    <g stroke="#7a7a7a" stroke-width=".6" opacity=".8">
+      <path d="M94 40v58M106 40v58M118 40v58M130 40v58M142 40v58M154 40v58"/>
+    </g>
+    <rect width="74" height="70" x="82" y="34" fill="none" stroke="#000" stroke-width=".8" rx="3"/>
+    <circle cx="46" cy="50" r="3" fill="#22c55e"/>
+    <circle cx="46" cy="64" r="3" fill="#22c55e"/>
+    <circle cx="46" cy="78" r="3" fill="#f59e0b"/>
+    <rect width="13" height="14" y="33" fill="#93c5fd" stroke="#2563eb" stroke-width=".8" rx="1"/>
+    <path fill="#1e3a8a" d="M1 35h7v10H1z"/>
+    <rect width="13" height="14" y="63" fill="#93c5fd" stroke="#2563eb" stroke-width=".8" rx="1"/>
+    <path fill="#1e3a8a" d="M1 65h7v10H1z"/>
+    <rect width="13" height="14" y="93" fill="#93c5fd" stroke="#2563eb" stroke-width=".8" rx="1"/>
+    <path fill="#1e3a8a" d="M1 95h7v10H1z"/>
+    <rect width="13" height="14" x="187" y="33" fill="#c8c8c8" stroke="#8a8a8a" stroke-width=".6" rx="1"/>
+    <path fill="#1c1c1c" d="M188 35h7v10h-7z"/>
+    <rect width="13" height="14" x="187" y="63" fill="#c8c8c8" stroke="#8a8a8a" stroke-width=".6" rx="1"/>
+    <path fill="#1c1c1c" d="M188 65h7v10h-7z"/>
+    <rect width="13" height="14" x="187" y="93" fill="#c8c8c8" stroke="#8a8a8a" stroke-width=".6" rx="1"/>
+    <path fill="#1c1c1c" d="M188 95h7v10h-7z"/>
+    <text x="18" y="135" fill="#d8f0e2" font-size="6.5" font-weight="700" letter-spacing=".6" opacity=".9">RELAY BOX</text>
+    <text x="140" y="122" fill="#d8f0e2" font-size="7" font-weight="600" opacity=".85" text-anchor="middle">per-interface UDP relay</text>
+  </g>
+  <path stroke="#1e293b" stroke-linecap="round" stroke-width="3.5" d="M540 70h20"/>
+  <path fill="none" stroke="#7c8ba1" stroke-width="2" marker-end="url(#e)" d="M560 70c50 0 60 18 118 22"/>
+  <text x="600" y="63" fill="#64748b" font-size="9" font-weight="600" text-anchor="middle">eth0</text>
+  <path stroke="#1e293b" stroke-linecap="round" stroke-width="3.5" d="M540 100h20"/>
+  <path fill="none" stroke="#7c8ba1" stroke-width="2" marker-end="url(#e)" d="M560 100h118"/>
+  <text x="600" y="93" fill="#64748b" font-size="9" font-weight="600" text-anchor="middle">usb0</text>
+  <path stroke="#1e293b" stroke-linecap="round" stroke-width="3.5" d="M540 130h20"/>
+  <path fill="none" stroke="#7c8ba1" stroke-width="2" marker-end="url(#e)" d="M560 130c50 0 60-18 118-22"/>
+  <text x="600" y="146" fill="#64748b" font-size="9" font-weight="600" text-anchor="middle">usb1</text>
+  <rect width="190" height="100" x="680" y="50" fill="#f8fafc" stroke="#94a3b8" stroke-dasharray="6 4" stroke-width="1.5" rx="10"/>
+  <text x="775" y="92" fill="#334155" font-size="13" font-weight="700" text-anchor="middle">srtla_rec</text>
+  <text x="775" y="112" fill="#64748b" font-size="11" text-anchor="middle">public IP :5000</text>
+</svg>

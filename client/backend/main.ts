@@ -30,13 +30,31 @@ async function main(): Promise<void> {
 	await i18nReady;
 	console.log(`=== irlctrl device (Bun) — role: ${ROLE} ===\n`);
 
+	let shuttingDown = false;
 	const shutdown = async (signal: string) => {
+		// A repeated signal (teardown is stuck, user is impatient) force-exits
+		// immediately instead of re-entering the graceful path.
+		if (shuttingDown) {
+			process.exit(1);
+		}
+		shuttingDown = true;
 		console.log(`\nReceived ${signal}, shutting down...`);
 		// Before stopRemote so the control server still receives it
 		logEvent("info", "Service", t("log.stopped_signal", { signal }));
 		stopRemote();
-		await stopModules();
-		await flushLog();
+		// Force-exit if graceful teardown hangs (e.g. a stuck TUN/VIF stop),
+		// so Ctrl+C can always stop the process.
+		const forceExit = setTimeout(() => {
+			console.log("Shut down timed out — forcing exit");
+			process.exit(1);
+		}, 8000);
+		forceExit.unref?.();
+		try {
+			await stopModules();
+			await flushLog();
+		} finally {
+			clearTimeout(forceExit);
+		}
 		process.exit(0);
 	};
 

@@ -73,6 +73,11 @@ export interface NetworkStatus {
 	selected: Iface[];
 	selection?: ModemConfig;
 	modems?: import("../../../shared/contracts/module_capabilities").Modem[];
+	/** MobLink relays this encoder has learned about (via UDP announce /
+	 * manual config), each with the tunnel interfaces the relay offers. The
+	 * interface list renders these as a grouped section per relay after the
+	 * device's own interfaces (encoder role only). */
+	registeredRelays?: import("../../../shared/contracts/module_capabilities").MoblinkDiscoveredRelay[];
 	uplinksFile?: string;
 	defaultRouteInterface?: string | null;
 	defaultRouteSourceIp?: string | null;

@@ -15,6 +15,10 @@ import type {
 	DeviceDashboardWidget,
 	FrontendModule,
 } from "../../../shared/contracts/frontend_module";
+import type {
+	MoblinkStreamerTunnelStatus,
+	MoblinkStreamerView,
+} from "../moblink_streamer/types";
 import log from "./log";
 import { defaultRouteRowIndex } from "./route_view";
 import type { Iface, NetworkStatus, SrtlaLinkStats } from "./types";
@@ -40,8 +44,7 @@ function statsFrame(
 		const data = entry.data as
 			| { stats?: { links?: SrtlaLinkStats[] } | null }
 			| undefined;
-		if (!data || (data.stats && !Array.isArray(data.stats.links)))
-			continue;
+		if (!data || (data.stats && !Array.isArray(data.stats.links))) continue;
 		if (!frame || entry.at > frame.at)
 			frame = { at: entry.at, data: { stats: data.stats ?? null } };
 	}
@@ -156,6 +159,55 @@ function linkHeader(): m.Vnode {
 	);
 }
 
+/**
+ * One MobLink TUN (an encoder tunnel to a shared relay interface) as a row in
+ * the same 11-column design as the device's own interfaces. Like the own
+ * interfaces it is bondable (`modems.toggle` by TUN name — the TUN is a
+ * regular interface to the routing layer); the SRTLA link columns resolve
+ * from the tunnel IP (the TUN IP is registered as an uplink, so `links`
+ * holds its stats).
+ */
+function tunnelRow(
+	host: DeviceCard,
+	selected: Set<string>,
+	tun: MoblinkStreamerTunnelStatus,
+	links: Map<string, SrtlaLinkStats>,
+	total: number,
+): m.Vnode {
+	const busyKey = `iface:${tun.interfaceName}`;
+	return (
+		<tr key={`mstun:${tun.interfaceName}:${tun.interfaceAddress}`}>
+			<td>
+				<input
+					type="checkbox"
+					checked={selected.has(tun.interfaceName)}
+					disabled={host.busy.has(busyKey)}
+					title={t("dev.include_in_bond")}
+					onchange={() =>
+						void host.act(busyKey, "modems.toggle", {
+							iface: tun.interfaceName,
+						})
+					}
+				/>
+			</td>
+			<td class="is-iface">
+				{tun.interfaceName}
+				<span class="iface-sub muted">
+					{tun.interfaceAddress ? `${tun.interfaceAddress}/24` : null}
+					{" → "}
+					{tun.relayHost}:{tun.relayPort}
+				</span>
+			</td>
+			<td class="is-signal">—</td>
+			<td class="is-network">—</td>
+			{linkCells(links.get(tun.interfaceAddress), total)}
+		</tr>
+	);
+}
+
+/** The interfaces + per-relay MobLink TUN table. The streamer runs
+ * permanently on encoders (no start/stop controls): the TUN rows reflect its
+ * live state and reconcile automatically as relays announce. */
 function interfacesCard(host: DeviceCard, status: NetworkStatus): m.Vnode {
 	const selected = new Set((status.selected ?? []).map((i: Iface) => i.iface));
 	const frame = statsFrame(host);
@@ -171,7 +223,20 @@ function interfacesCard(host: DeviceCard, status: NetworkStatus): m.Vnode {
 		status.defaultRouteInterface,
 		status.defaultRouteSourceIp,
 	);
-	const rows = status.interfaces.map((i, index) => {
+	// The encoder's MobLink TUNs publish their live view on
+	// `status.state.moblinkStreamer` (the streamer backend's `status()`), which
+	// is merged into every card's live status. Their TUN interfaces (moblinkN)
+	// also appear in the OS `status.interfaces` list — we list each one under
+	// its relay group (below) and hide it from "Own interfaces" to avoid
+	// showing it twice.
+	const streamer = host.st.status?.state?.moblinkStreamer as
+		| MoblinkStreamerView
+		| undefined;
+	const tunnelIfaceNames = new Set(
+		(streamer?.runtime?.tunnels ?? []).map((t) => t.interfaceName),
+	);
+	const rows = status.interfaces.flatMap((i, index) => {
+		if (tunnelIfaceNames.has(i.iface)) return [];
 		const isDefaultRoute = index === defaultRouteRow;
 		const sub = [
 			i.cidr,
@@ -223,6 +288,73 @@ function interfacesCard(host: DeviceCard, status: NetworkStatus): m.Vnode {
 		);
 	});
 
+	const relays = status.registeredRelays ?? [];
+
+	// Group the encoder's live TUNs by the relay they tunnel to, so each relay
+	// group shows its tunnels in the same table as the own interfaces. A TUN's
+	// `relayHost` is the specific relay *interface* it tunnels through (one of
+	// the relay's shared endpoints), not necessarily the relay's canonical
+	// `host` — e.g. a relay on 192.168.1.136 may expose endpoint 192.168.225.12
+	// (wg0) as a second tunnel. Resolve the owning relay by matching the TUN's
+	// endpoint against every relay's host + interface addresses.
+	const relayEndpointHosts = new Map<string, string>(); // endpoint addr → relay host
+	for (const r of relays) {
+		for (const addr of [r.host, ...r.interfaces.map((ep) => ep.address)]) {
+			if (addr && !relayEndpointHosts.has(addr))
+				relayEndpointHosts.set(addr, r.host);
+		}
+	}
+	const tunnelsByRelay = new Map<string, MoblinkStreamerTunnelStatus[]>();
+	for (const tun of streamer?.runtime?.tunnels ?? []) {
+		const relayHost = relayEndpointHosts.get(tun.relayHost) ?? tun.relayHost;
+		const list = tunnelsByRelay.get(relayHost) ?? [];
+		list.push(tun);
+		tunnelsByRelay.set(relayHost, list);
+	}
+
+	// One flat, uniformly-keyed list of <tr> rows for a single table: the
+	// "Own interfaces" group header + own rows, then a group-header row per
+	// relay followed by that relay's tunnel rows. A single <tbody>{rows} keeps
+	// Mithril's fragment rule happy (one keyed-fragment child).
+	const groupHeader = (key: string, label: m.Children): m.Vnode => (
+		<tr class="iface-group-header" key={key}>
+			<th colspan={4 + LINK_COLUMNS}>{label}</th>
+		</tr>
+	);
+	const tbodyRows: m.Vnode[] = [
+		groupHeader("grp:own", t("dev.own_interfaces")),
+		...(rows.length
+			? rows
+			: [
+					<tr key="own:empty">
+						<td colspan={4 + LINK_COLUMNS} class="muted">
+							{t("dev.no_interfaces")}
+						</td>
+					</tr>,
+				]),
+		...relays.flatMap((r): m.Vnode[] => {
+			const relTuns = tunnelsByRelay.get(r.host) ?? [];
+			return [
+				groupHeader(
+					`grp:${r.host}`,
+					<>
+						{r.hostname ?? r.host}
+						{r.hostname ? <small class="muted"> · {r.host}</small> : null}
+					</>,
+				),
+				...(relTuns.length
+					? relTuns.map((tun) => tunnelRow(host, selected, tun, links, total))
+					: [
+							<tr key={`grpnone:${r.host}`}>
+								<td colspan={4 + LINK_COLUMNS} class="muted">
+									{t("dev.mstun_none")}
+								</td>
+							</tr>,
+						]),
+			];
+		}),
+	];
+
 	return (
 		<Card
 			title={t("dev.card.interfaces")}
@@ -250,15 +382,7 @@ function interfacesCard(host: DeviceCard, status: NetworkStatus): m.Vnode {
 		>
 			<table class={live ? "" : "no-stats"}>
 				{linkHeader()}
-				{rows.length ? (
-					rows
-				) : (
-					<tr>
-						<td colspan={4 + LINK_COLUMNS} class="muted">
-							{t("dev.no_interfaces")}
-						</td>
-					</tr>
-				)}
+				<tbody>{tbodyRows}</tbody>
 			</table>
 		</Card>
 	);
