@@ -1,3 +1,10 @@
+# [7.5.0](https://github.com/majklovec/irlctrl/compare/v7.4.1...v7.5.0) (2026-11-11)
+
+
+### Features
+
+* **relay:** remote relay interfaces ([266a647](https://github.com/majklovec/irlctrl/commit/266a647dc8f6dca831d9a37180f7ada261c25a01))
+
 ## [7.4.1](https://github.com/majklovec/irlctrl/compare/v7.4.0...v7.4.1) (2026-11-10)
 
 
