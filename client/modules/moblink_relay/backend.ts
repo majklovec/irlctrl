@@ -44,6 +44,7 @@ import type {
 } from "../../../shared/contracts/module_capabilities";
 import {
 	createUdpRelay,
+	resolveInterfaceAddress,
 	type IfaceRawSocket,
 	type UdpRelay,
 } from "../../../shared/lib/udp_relay";
@@ -419,10 +420,24 @@ async function startRelay(
 	addr: string,
 	listenPort: number,
 ): Promise<UdpRelay> {
+	// SNAT source = the egress NIC's *own* IP, not the (possibly overridden)
+	// vif bind address. Once a packet leaves the tether, the reply must come
+	// back to an address the egress upstream (phone / carrier NAT) can route
+	// into that NIC — which is the NIC's real IP. The vif bind address may be
+	// an encoder-reachable LAN override that the phone can't route back, in
+	// which case replies vanish (forward-only traffic). Best-effort: if the
+	// NIC IP can't be resolved (tests, fake iface), fall back to interfaceAddress.
+	let natAddress: string | undefined;
+	try {
+		natAddress = resolveInterfaceAddress(name);
+	} catch {
+		natAddress = undefined;
+	}
 	const relay = await createUdpRelay({
 		interfaceName: name,
 		listenPort,
 		interfaceAddress: addr,
+		natAddress,
 		ifaceSocket: ifaceSocketFactory?.(name),
 		// SNAT to the relay's own IP (default on) so a *remote* destination
 		// can receive the stream and reply to the relay, not the private vif

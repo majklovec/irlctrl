@@ -189,6 +189,13 @@ let announceTimer: ReturnType<typeof setInterval> | undefined;
  * port so relays learn this encoder's WebSocket endpoint (protocol.md
  * §2.1). `buildInfo` is called every tick so the announce always reflects
  * the live config (a wsPort change is picked up without a restart).
+ *
+ * The limited broadcast (255.255.255.255) reaches relays we don't know yet,
+ * but the kernel refuses it (EACCES) when the process lacks CAP_NET_ADMIN
+ * (typical unprivileged container). Every tick we therefore ALSO unicast the
+ * same payload to the registry endpoints of the relays we already know —
+ * the relay's encoder-discovery listener binds 0.0.0.0 on the discovery
+ * port, so unicast converges just as well.
  */
 export function startEncoderAnnouncing(
 	buildInfo: () => EncoderInfo | null,
@@ -204,6 +211,13 @@ export function startEncoderAnnouncing(
 		s.on("error", (e) =>
 			console.warn(`moblink_streamer: announce socket error: ${e.message}`),
 		);
+		// Warn only once when the kernel denies the limited broadcast
+		// (EACCES — no CAP_NET_ADMIN); the per-tick unicast fallback below
+		// keeps discovery working, so the rest is noise.
+		let broadcastDenied = false;
+		// Per-target throttle: a permanently-unreachable relay IP must not
+		// spam the log on every announce tick.
+		const lastUnicastWarn = new Map<string, number>();
 		const send = (): void => {
 			const info = buildInfo();
 			if (!info) return;
@@ -216,20 +230,37 @@ export function startEncoderAnnouncing(
 				token: info.token && info.token !== "" ? info.token : undefined,
 				ts: Date.now(),
 			};
+			const payload = JSON.stringify(announce);
 			try {
-				s.send(
-					JSON.stringify(announce),
-					MOBLINK_DISCOVERY_PORT,
-					MOBLINK_BROADCAST_ADDR,
-					(e) => {
-						if (e)
-							console.warn(
-								`moblink_streamer: encoder announce failed: ${e.message}`,
-							);
-					},
-				);
+				s.send(payload, MOBLINK_DISCOVERY_PORT, MOBLINK_BROADCAST_ADDR, (e) => {
+					if (e && !broadcastDenied) {
+						broadcastDenied = true;
+						console.warn(
+							`moblink_streamer: encoder announce broadcast denied (${e.code ?? e.message}); unicasting to known relays instead`,
+						);
+					}
+				});
 			} catch (e) {
 				console.warn(`moblink_streamer: encoder announce failed: ${String(e)}`);
+			}
+			// Unicast to every known relay (host + each registry interface)
+			// so relays learn this encoder even when the limited broadcast
+			// is refused.
+			const targets = new Set<string>();
+			for (const r of knownRelays()) {
+				targets.add(r.host);
+				for (const ep of r.interfaces) targets.add(ep.address);
+			}
+			targets.delete(info.ip); // our own address — no relay lives there
+			for (const ip of targets) {
+				s.send(payload, MOBLINK_DISCOVERY_PORT, ip, (e) => {
+					if (e && Date.now() - (lastUnicastWarn.get(ip) ?? 0) > 60_000) {
+						lastUnicastWarn.set(ip, Date.now());
+						console.warn(
+							`moblink_streamer: encoder announce to ${ip} failed: ${e.message}`,
+						);
+					}
+				});
 			}
 		};
 		try {

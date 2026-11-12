@@ -1,0 +1,17 @@
+videotestsrc pattern=smpte !
+video/x-raw,width=1920,height=1080,framerate=60/1 !
+videoconvert !
+textoverlay text='' valignment=top halignment=right font-desc="Monospace, 5" name=overlay ! queue !
+videoconvert ! video/x-raw,format=I420 !
+v4l2h264enc extra-controls="controls,video_bitrate=6000000,video_bitrate_mode=1,h264_i_frame_period=60,repeat_sequence_header=1" !
+video/x-h264,level=(string)4.2,profile=(string)high !
+h264parse config-interval=1 !
+mux.
+audiotestsrc wave=sine freq=440 !
+audio/x-raw,rate=48000,channels=2 !
+audioconvert !
+voaacenc bitrate=128000 !
+aacparse !
+mux.
+mpegtsmux name=mux !
+appsink name=appsink

@@ -50,6 +50,18 @@ export interface UdpRelayOptions {
     listenPort: number;
     /** Override the resolved interface IPv4 (skips os.networkInterfaces()). */
     interfaceAddress?: string;
+    /**
+     * Address to SNAT the vif source to in NAT mode (NAT mode only).
+     * Defaults to `interfaceAddress`.
+     *
+     * Decoupled on purpose: `interfaceAddress` is what the encoder dials (the
+     * vif bind) and must be reachable *from the encoder*, while the SNAT source
+     * becomes the packet's source once it leaves the egress NIC and must be
+     * return-routable *by the egress upstream* (carrier / phone NAT). When the
+     * egress is a tether, that is the phone-assigned IP of the NIC, not the
+     * relay's LAN IP. Replies come back addressed to this address.
+     */
+    natAddress?: string;
     /** Inject a raw interface socket (tests / previews). */
     ifaceSocket?: IfaceRawSocket;
     onStats?: (s: RelayStats) => void;
@@ -78,6 +90,8 @@ export interface UdpRelayOptions {
 export interface UdpRelay {
     readonly interfaceName: string;
     readonly interfaceAddress: string;
+    /** SNAT source used in NAT mode (defaults to `interfaceAddress`). */
+    readonly natAddress: string;
     readonly listenPort: number;
     start(): Promise<void>;
     stop(): Promise<void>;
@@ -165,7 +179,10 @@ export async function createUdpRelay(opts: UdpRelayOptions): Promise<UdpRelay> {
         opts.interfaceName,
         opts.interfaceAddress,
     );
-    return new RelayImpl(opts, interfaceAddress);
+    const natAddress = opts.natAddress ?? interfaceAddress;
+    if (!/^\d+\.\d+\.\d+\.\d+$/.test(natAddress))
+        throw new Error(`natAddress ${natAddress} is not IPv4`);
+    return new RelayImpl(opts, interfaceAddress, natAddress);
 }
 
 class RelayImpl implements UdpRelay {
@@ -186,6 +203,7 @@ class RelayImpl implements UdpRelay {
     constructor(
         private opts: UdpRelayOptions,
         readonly interfaceAddress: string,
+        readonly natAddress: string,
     ) {
         this._stats = newRelayStats();
     }
@@ -341,7 +359,7 @@ class RelayImpl implements UdpRelay {
         // NAT mode: replies return addressed to *this relay's* IP, so the
         // transparent "only forward packets for the vif" rule would drop them.
         // Decide with the NAT flow table instead and de-SNAT the destination.
-        const packet = this.opts.nat && this.interfaceAddress
+        const packet = this.opts.nat && this.natAddress
             ? this.decideNatReply(buf, vif)
             : (() => {
                 const d = decideIfacePacket(buf, vif);
@@ -370,7 +388,7 @@ class RelayImpl implements UdpRelay {
         const p = parseUdpPacket(buf);
         if (!p) return null;
         if (p.dstIp === vif) return buf; // already addressed to the vif.
-        if (p.dstIp !== this.interfaceAddress) return null; // not for us.
+        if (p.dstIp !== this.natAddress) return null; // not for us.
         if (!this.natMatchFlow(p.protocol, vif, p.dstPort, p.srcIp, p.srcPort)) {
             return null; // not a reply to a NATed flow — don't hijack.
         }
@@ -384,12 +402,12 @@ class RelayImpl implements UdpRelay {
      * the vif pass through untouched (the bridge's job is SRT-over-UDP).
      */
     private maybeNatOutbound(packet: Uint8Array): Uint8Array {
-        if (!this.opts.nat || !this.interfaceAddress) return packet;
+        if (!this.opts.nat || !this.natAddress) return packet;
         const p = parseUdpPacket(packet);
         if (!p) return packet; // not UDP/IP — leave for the bridge as-is.
         if (p.srcIp !== this.vifIp) return packet;
         // natPacketSource returns a new buffer (it does not mutate the input).
-        const out = natPacketSource(packet, this.interfaceAddress);
+        const out = natPacketSource(packet, this.natAddress);
         if (out) this.natRecordFlow(p.protocol, p.srcIp, p.srcPort, p.dstIp, p.dstPort);
         return out ?? packet;
     }

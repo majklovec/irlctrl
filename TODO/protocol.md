@@ -49,6 +49,7 @@ The relay discovers encoders only through:
         - encoder WebSocket port
         - protocol version and optional auth token.
     - The relay listens on a configured UDP discovery port and learns the encoder WebSocket endpoint from this message.
+    - The limited broadcast (`255.255.255.255`) is refused with `EACCES` when the encoder runs without `CAP_NET_ADMIN` (unprivileged container), so the encoder additionally unicasts the same payload every tick to the addresses of the relays it already knows — the relay's discovery listener binds `0.0.0.0` on the discovery port, so unicast converges identically.
 
 2. **Control server**
     - The relay may query the control server for available encoders.
