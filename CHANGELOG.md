@@ -1,3 +1,15 @@
+# [7.7.0](https://github.com/majklovec/irlctrl/compare/v7.6.0...v7.7.0) (2026-11-12)
+
+
+### Bug Fixes
+
+* **relay:** SNAT to NIC IP and unicast discovery ([ce74467](https://github.com/majklovec/irlctrl/commit/ce74467d0155772132fa4a0ae3915af8524c1759))
+
+
+### Features
+
+* **moblink:** add mDNS discovery path ([5f06687](https://github.com/majklovec/irlctrl/commit/5f0668773bdc156ed6a798cc4293659037fbc2c5))
+
 # [7.6.0](https://github.com/majklovec/irlctrl/compare/v7.5.0...v7.6.0) (2026-11-12)
 
 
