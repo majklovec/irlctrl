@@ -1,3 +1,10 @@
+# [7.9.0](https://github.com/majklovec/irlctrl/compare/v7.8.0...v7.9.0) (2026-11-12)
+
+
+### Features
+
+* **link:** immediate changes in ifaces ([1f6315b](https://github.com/majklovec/irlctrl/commit/1f6315bd788e9553c60db33cc097de8f1ea415f1))
+
 # [7.8.0](https://github.com/majklovec/irlctrl/compare/v7.7.1...v7.8.0) (2026-11-12)
 
 
