@@ -193,6 +193,7 @@ describe("eligibleInterfaces (allow/ignore filtering)", () => {
 	];
 	const base = {
 		enabled: true,
+		nat: false,
 		announceHost: "",
 		listenPortBase: 5000,
 		runtimeStatusFile: "/tmp/moblink-status.json",
@@ -356,8 +357,8 @@ describe("relay lifecycle (real loopback UDP)", () => {
 	});
 });
 
-describe("relay installs a vif reply-route in a dedicated table", () => {
-	test("onVifLearned → route + `to` rule in a dedicated table, never the main table", async () => {
+describe("relay installs a vif forward-route in a dedicated table", () => {
+	test("onVifLearned → source-agnostic default + `from` rule in a dedicated table, never the main table", async () => {
 		const base = 45410;
 		const vifIp = "10.90.0.1";
 		// `lo` is the first (only) eligible interface → dedicated table 200.
@@ -365,7 +366,7 @@ describe("relay installs a vif reply-route in a dedicated table", () => {
 		// A core whose `run` records each (cmd, args) so we can assert the routing.
 		const runCalls: Array<{ cmd: string; args: string[] }> = [];
 		const coreWithRun = {
-			...fakeCore({ listenPortBase: base }, false),
+			...fakeCore({ listenPortBase: base, nat: false }, false),
 			run: async (cmd: string, args: string[]) => {
 				runCalls.push({ cmd, args });
 				return "";
@@ -404,35 +405,37 @@ describe("relay installs a vif reply-route in a dedicated table", () => {
 		)
 			await Bun.sleep(10);
 
-		// The /32 lives in the dedicated table, addressed to the interface.
+		// A source-AGNOSTIC default lives in the dedicated table, out the
+		// interface: this is what makes vif-SOURCED packets routable (the host's
+		// main-table default is source-pinned `src <relayIp>` and refuses them).
 		const routeCall = runCalls.find(
 			(c) => c.cmd === "ip" && c.args[0] === "route" && c.args[1] === "replace",
 		);
 		expect(routeCall?.args).toEqual([
 			"route",
 			"replace",
-			`${vifIp}/32`,
+			"default",
 			"dev",
 			"lo",
 			"table",
 			table,
 		]);
-		// The reply path is a destination-scoped rule (`to <vif> lookup <table>`),
-		// so forwarded traffic (source = vif IP) keeps the main-table default route.
+		// The forward path is a SOURCE-scoped rule (`from <vif> lookup <table>`):
+		// only traffic the relay egresses on the vif's behalf takes the dedicated
+		// table; the relay's own traffic keeps the main-table default route.
 		const ruleAdd = runCalls.find(
 			(c) => c.cmd === "ip" && c.args[0] === "rule" && c.args[1] === "add",
 		);
 		expect(ruleAdd?.args).toEqual([
 			"rule",
 			"add",
-			"to",
+			"from",
 			vifIp,
 			"lookup",
 			table,
 		]);
-		// Nothing may land in the MAIN table: a main-table vif /32 makes the
-		// kernel treat the vif IP as a local source and silently drop the
-		// forwarded SRTLA traffic (the bug this whole fix targets).
+		// Nothing may land in the MAIN table: a main-table entry for the vif would
+		// perturb the host's local-source routing (the bug this whole fix targets).
 		for (const c of runCalls) {
 			if (c.cmd === "ip" && c.args[0] === "route")
 				expect(c.args).toContain("table");
@@ -450,6 +453,54 @@ describe("relay installs a vif reply-route in a dedicated table", () => {
 			(c) => c.cmd === "ip" && c.args[0] === "route" && c.args[1] === "flush",
 		);
 		expect(flush?.args).toEqual(["route", "flush", "table", table]);
+	});
+
+	test("NAT mode: no vif forward-route is installed (egress is the relay IP)", async () => {
+		const base = 45470;
+		const vifIp = "10.90.0.1";
+		const runCalls: Array<{ cmd: string; args: string[] }> = [];
+		const coreWithRun = {
+			...fakeCore({ listenPortBase: base, nat: true }, false),
+			run: async (cmd: string, args: string[]) => {
+				runCalls.push({ cmd, args });
+				return "";
+			},
+		} as unknown as ModuleCore;
+
+		cfg.bind?.(coreWithRun);
+		await cfg.dispatch("moblink_relay.start", {});
+
+		const frame = encodeDataFrame(
+			buildUdpIpPacket({
+				srcIp: vifIp,
+				dstIp: "203.0.113.10",
+				srcPort: 1000,
+				dstPort: 2000,
+				payload: new TextEncoder().encode("hi"),
+			}),
+			vifIp,
+		);
+		interface TestSock {
+			send(buf: Uint8Array, port: number, host: string): void;
+			close(): void;
+		}
+		const sock = (await Bun.udpSocket({
+			binaryType: "uint8array",
+		} as unknown as Parameters<typeof Bun.udpSocket>[0])) as unknown as TestSock;
+		sock.send(frame, base, "127.0.0.1");
+
+		// Give the relay a moment to learn the vif; it must NOT touch routing.
+		await Bun.sleep(200);
+
+		expect(
+			runCalls.some((c) => c.cmd === "ip" && c.args[0] === "rule"),
+		).toBe(false);
+		expect(
+			runCalls.some((c) => c.cmd === "ip" && c.args[0] === "route"),
+		).toBe(false);
+
+		sock.close();
+		await cfg.stop();
 	});
 });
 

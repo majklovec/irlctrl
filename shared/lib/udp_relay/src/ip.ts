@@ -200,3 +200,76 @@ export function buildUdpIpPacket(
     out[27] = udpCksum & 0xff;
     return out;
 }
+
+/**
+ * Rewrite one IPv4 address field of a whole IPv4 packet (source at offset 12,
+ * destination at offset 16) and recompute the IP header checksum. For UDP, the
+ * UDP checksum is recomputed too (it covers the pseudo-header, which carries
+ * both addresses). Returns a new buffer; the input is not mutated. Returns
+ * `null` for a non-IPv4/truncated header (shorter than the 20-byte fixed part)
+ * or a bad address literal.
+ */
+function natIpAddress(
+    buf: Uint8Array,
+    newAddr: string,
+    offset: 12 | 16,
+): Uint8Array | null {
+    if (buf.length < 20) return null;
+    if ((buf[0] >> 4) !== 4) return null;
+    const ihl = (buf[0] & 0x0f) * 4;
+    if (ihl < 20) return null;
+    const addr = ipToBytes(newAddr);
+
+    const out = new Uint8Array(buf);
+    out[offset] = addr[0];
+    out[offset + 1] = addr[1];
+    out[offset + 2] = addr[2];
+    out[offset + 3] = addr[3];
+
+    // Zero the checksum fields first: the copy carries the packet's *old*
+    // checksums, and the one's-complement sum must be taken over a zeroed field.
+    out[10] = 0;
+    out[11] = 0;
+    const ipCksum = internetChecksum(out.subarray(0, ihl));
+    out[10] = (ipCksum >> 8) & 0xff;
+    out[11] = ipCksum & 0xff;
+
+    if (out[9] === 17 && out.length >= ihl + 8) {
+        const udpLen = (out[ihl + 4] << 8) | out[ihl + 5];
+        const pseudo = new Uint8Array([
+            out[12], out[13], out[14], out[15],
+            out[16], out[17], out[18], out[19],
+            0x00, 17,
+            (udpLen >> 8) & 0xff, udpLen & 0xff,
+        ]);
+        out[ihl + 6] = 0;
+        out[ihl + 7] = 0;
+        const udpCk = udpChecksum(out.subarray(ihl), pseudo);
+        out[ihl + 6] = (udpCk >> 8) & 0xff;
+        out[ihl + 7] = udpCk & 0xff;
+    }
+    return out;
+}
+
+/**
+ * SNAT: rewrite the source address of a whole IPv4 packet to `newSrc` (leaving
+ * the destination untouched), recomputing the IP + UDP checksums.
+ */
+export function natPacketSource(
+    buf: Uint8Array,
+    newSrc: string,
+): Uint8Array | null {
+    return natIpAddress(buf, newSrc, 12);
+}
+
+/**
+ * Rewrite the destination address of a whole IPv4 packet to `newDst` (leaving
+ * the source untouched), recomputing the IP + UDP checksums. Used to de-SNAT a
+ * reply back to the virtual-interface address.
+ */
+export function natPacketDestination(
+    buf: Uint8Array,
+    newDst: string,
+): Uint8Array | null {
+    return natIpAddress(buf, newDst, 16);
+}

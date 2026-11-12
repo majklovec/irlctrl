@@ -6,6 +6,14 @@
 export interface MoblinkRelayConfig {
 	enabled: boolean;
 	/**
+	 * NAT (SNAT) mode for relay legs (default true). When true, outbound
+	 * packets are source-NATed to the relay's own interface IP and incoming
+	 * replies are de-SNATed back to the vif, which is what lets a *remote*
+	 * destination (not on the relay's LAN) receive the stream and reply to
+	 * the relay. When false, the relay is a plain transparent L3 bridge.
+	 */
+	nat: boolean;
+	/**
 	 * The LAN IP this relay advertises to encoders in its discovery announce.
 	 * Empty = auto-detect (the first bound relay address). A manual value wins
 	 * over the auto-detected one. Always shown (filled) in the UI.

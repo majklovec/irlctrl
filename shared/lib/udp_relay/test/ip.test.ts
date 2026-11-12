@@ -4,6 +4,8 @@ import {
     bytesToIp,
     internetChecksum,
     ipToBytes,
+    natPacketDestination,
+    natPacketSource,
     parseUdpPacket,
     udpChecksum,
 } from "../src/ip";
@@ -215,6 +217,92 @@ describe("protocol.ts — keepalive frame round-trip", () => {
         expect(decodeFrame(new Uint8Array([0x02, 1, 2, 3])).type).toBe(
             "malformed",
         );
+    });
+});
+
+describe("ip.ts — natPacketSource (SNAT)", () => {
+    const VIF = "10.0.0.2";
+    const RELAY = "203.0.113.7";
+    const DST = "8.8.8.8";
+
+    test("rewrites a UDP source address; result is byte-identical to a freshly built packet with that source", () => {
+        const pkt = buildUdpIpPacket({
+            srcIp: VIF,
+            dstIp: DST,
+            srcPort: 1030,
+            dstPort: 700,
+            payload: enc.encode("srt-data"),
+        });
+        const natd = natPacketSource(pkt, RELAY)!;
+        expect(natd).toBeTypeOf("object");
+        const expected = buildUdpIpPacket({
+            srcIp: RELAY,
+            dstIp: DST,
+            srcPort: 1030,
+            dstPort: 700,
+            payload: enc.encode("srt-data"),
+        });
+        // Byte-exact proves the IP header AND UDP checksums were both recomputed.
+        expect([...natd]).toEqual([...expected]);
+    });
+
+    test("does not mutate the input buffer", () => {
+        const pkt = buildUdpIpPacket({
+            srcIp: VIF,
+            dstIp: DST,
+            srcPort: 1,
+            dstPort: 2,
+            payload: enc.encode("x"),
+        });
+        const before = [...pkt];
+        natPacketSource(pkt, RELAY);
+        expect([...pkt]).toEqual(before);
+    });
+
+    test("leaves the source unchanged when already the relay address", () => {
+        const pkt = buildUdpIpPacket({
+            srcIp: RELAY,
+            dstIp: DST,
+            srcPort: 1,
+            dstPort: 2,
+            payload: enc.encode("y"),
+        });
+        expect([...natPacketSource(pkt, RELAY)!]).toEqual([...pkt]);
+    });
+
+    test("returns null for a non-IPv4 / truncated buffer", () => {
+        expect(natPacketSource(new Uint8Array([0]), RELAY)).toBeNull();
+        expect(natPacketSource(new Uint8Array([0x60, 0, 0, 0]), RELAY)).toBeNull();
+    });
+});
+
+describe("ip.ts — natPacketDestination (de-SNAT)", () => {
+    const VIF = "10.0.0.2";
+    const RELAY = "203.0.113.7";
+    const SRC = "8.8.8.8";
+
+    test("rewrites a UDP destination address; byte-identical to a freshly built packet", () => {
+        // A reply: src OBS → dst relay. De-SNAT rewrites dst back to the vif.
+        const pkt = buildUdpIpPacket({
+            srcIp: SRC,
+            dstIp: RELAY,
+            srcPort: 700,
+            dstPort: 1030,
+            payload: enc.encode("reply"),
+        });
+        const destNatted = natPacketDestination(pkt, VIF)!;
+        const expected = buildUdpIpPacket({
+            srcIp: SRC,
+            dstIp: VIF,
+            srcPort: 700,
+            dstPort: 1030,
+            payload: enc.encode("reply"),
+        });
+        expect([...destNatted]).toEqual([...expected]);
+    });
+
+    test("returns null for a non-IPv4 buffer", () => {
+        expect(natPacketDestination(new Uint8Array([0x60, 0, 0, 0]), VIF)).toBeNull();
     });
 });
 

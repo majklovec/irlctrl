@@ -5,6 +5,7 @@ import {
     decideEncoderFrame,
     resolveInterfaceAddress,
 } from "../src/relay";
+import { parseUdpPacket } from "../src/ip";
 import { decodeFrame, encodeDataFrame, encodeKeepaliveFrame } from "../src/protocol";
 import { buildUdpIpPacket } from "../src/ip";
 import { makeMockIfaceRawSocket } from "../src/net_linux";
@@ -168,6 +169,64 @@ describe("relay.ts — end-to-end bridge (mock iface socket)", () => {
         await relay.stop();
         encSock.close();
         expect(relay.isRunning()).toBe(false);
+    });
+});
+
+describe("relay.ts — NAT (SNAT) mode, mock iface socket", () => {
+    const RELAY_IP = "127.0.0.1";
+
+    test("outbound source → relay ip; inbound reply de-SNATed back to the vif", async () => {
+        const listenPort = 57801;
+        const iface = makeMockIfaceRawSocket();
+        const relay = await createUdpRelay({
+            interfaceName: "lo",
+            listenPort,
+            interfaceAddress: RELAY_IP,
+            ifaceSocket: iface,
+            nat: true,
+        });
+        await relay.start();
+
+        const replies: Array<{ vifIp: string; inner: ReturnType<typeof parseUdpPacket> | null }> = [];
+        const BunUdp: typeof Bun.udpSocket = Bun.udpSocket;
+        const encSock = (await BunUdp({
+            binaryType: "uint8array",
+            socket: {
+                data: (_s: any, buf: Uint8Array) => {
+                    const d = decodeFrame(buf);
+                    if (d.type === "data")
+                        replies.push({ vifIp: d.vifIp, inner: parseUdpPacket(d.payload) });
+                },
+            },
+        } as unknown as Parameters<typeof BunUdp>[0])) as any;
+        encSock.send(encodeDataFrame(
+            buildUdpIpPacket({
+                srcIp: VIF_IP, dstIp: REC_IP, srcPort: 1030, dstPort: 700, payload: enc.encode("srt"),
+            }),
+            VIF_IP,
+        ), listenPort, RELAY_IP);
+        await waitFor(() => iface.sent.length === 1);
+
+        // Outbound: source rewritten to the relay's interface address, ports kept.
+        const outParsed = parseUdpPacket(iface.sent[0].packet)!;
+        expect(outParsed.srcIp).toBe(RELAY_IP);
+        expect(outParsed.dstIp).toBe(REC_IP);
+        expect(outParsed.srcPort).toBe(1030);
+        expect(outParsed.dstPort).toBe(700);
+
+        // Inbound: the destination (OBS) answered the NATed source, i.e. the
+        // reply is addressed to the RELAY ip. The relay de-SNATs it back to the
+        // vif before handing it to the encoder.
+        iface.push(buildUdpIpPacket({
+            srcIp: REC_IP, dstIp: RELAY_IP, srcPort: 700, dstPort: 1030, payload: enc.encode("pong"),
+        }));
+        await waitFor(() => replies.length >= 1);
+        expect(replies[0].vifIp).toBe(VIF_IP);
+        expect(replies[0].inner!.dstIp).toBe(VIF_IP); // de-SNATed, not RELAY_IP
+        expect(replies[0].inner!.srcIp).toBe(REC_IP);
+
+        encSock.close();
+        await relay.stop();
     });
 });
 

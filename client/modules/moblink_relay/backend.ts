@@ -91,6 +91,7 @@ const DEFAULTS: Required<
 	portMap: Record<string, number>;
 } = {
 	enabled: false,
+	nat: true,
 	announceHost: "",
 	listenPortBase: 4000,
 	interfaceAllow: [],
@@ -155,6 +156,7 @@ function config(): ResolvedConfig {
 			portMap[name] = port;
 	return {
 		enabled: raw.enabled ?? DEFAULTS.enabled,
+		nat: raw.nat ?? DEFAULTS.nat,
 		announceHost: raw.announceHost ?? DEFAULTS.announceHost,
 		listenPortBase: raw.listenPortBase ?? DEFAULTS.listenPortBase,
 		interfaceAllow: raw.interfaceAllow ?? DEFAULTS.interfaceAllow,
@@ -422,16 +424,26 @@ async function startRelay(
 		listenPort,
 		interfaceAddress: addr,
 		ifaceSocket: ifaceSocketFactory?.(name),
+		// SNAT to the relay's own IP (default on) so a *remote* destination
+		// can receive the stream and reply to the relay, not the private vif
+		// IP the transparent bridge can't route back through.
+		nat: config().nat,
 		// When the relay learns the vif IP an encoder bridges through this
-		// interface, park a reply-path route in a DEDICATED table (never the
-		// main one): a main-table `${vifIp}/32 dev <iface>` makes the kernel
-		// treat the vif IP as a local source and silently drops the very
-		// forwarded traffic (source = vif IP) we want to egress this interface,
-		// killing the SRTLA legs. A `to <vif>` rule scopes the reply route to
-		// traffic whose DESTINATION is the vif IP only, leaving forwarded
-		// (source = vif IP) packets on the normal default route. Best-effort:
-		// a routing failure must not break the relay itself.
+		// interface, park a FORWARD-path route in a DEDICATED table (never the
+		// main one): the relay egresses whole packets with the vif IP as their
+		// SOURCE, but the host's default route is source-pinned
+		// (`... src <relayIp>`), so the kernel can't route vif-sourced traffic
+		// and emits ICMP host-unreachable (SRT handshake dies, leg 0 kbps). A
+		// `from <vif>` rule + source-agnostic `default dev <iface>` in a
+		// dedicated table gives that traffic a real egress. Best-effort: a
+		// routing failure must not break the relay itself.
+		//
+		// NAT mode: not needed — the relay SNATs the source to its own IP, so
+		// outbound traffic already routes normally through the host default
+		// route. Only the transparent bridge (nat=false) egresses vif-sourced
+		// packets, which is the case that needs this route.
 		onVifLearned: (vifIp) => {
+			if (config().nat) return;
 			void installVifRoute(name, vifIp).catch((e: unknown) =>
 				core.logEvent(
 					"warn",
@@ -462,12 +474,13 @@ async function stopRelay(name: string): Promise<void> {
 }
 
 // ----------------------------------------------------------------------
-// Vif reply-path routing (dedicated table, never the main table)
+// Vif forward-path routing (dedicated table, never the main table)
 // ----------------------------------------------------------------------
 /**
- * Assign the dedicated routing table for `name`'s vif reply path. Derived from
- * the interface's position in the current eligible list — stable for the life
- * of a relay, and cleaned up on stop, so a later interface shift is harmless.
+ * Assign the dedicated routing table for `name`'s vif forward path. Derived
+ * from the interface's position in the current eligible list — stable for the
+ * life of a relay, and cleaned up on stop, so a later interface shift is
+ * harmless.
  */
 function vifTableFor(name: string): number {
 	const ifaces = netIfaces?.list() ?? [];
@@ -477,16 +490,20 @@ function vifTableFor(name: string): number {
 }
 
 /**
- * Install the reply-path route for a learned vif IP: a `${vifIp}/32 dev <name>`
- * route in a DEDICATED table plus a `to <vifIp> lookup <table>` rule.
+ * Install the FORWARD-path route for a learned vif IP so the packets the relay
+ * egresses *on behalf of* that vif (source = vif IP) are actually routable:
+ *   - `${table}`: a source-AGNOSTIC `default dev <name>` route.
+ *   - a `from <vifIp> lookup ${table}` rule.
  *
- * Why a dedicated table (not the main one): a main-table `${vifIp}/32 dev
- * <name>` makes the kernel mark the vif IP as a local source address, and Linux
- * silently drops *outgoing* packets whose source is a main-table-local address
- * (the InDiscards path) — which is exactly the SRTLA traffic we forward
- * (source = vif IP) out this interface. The `to <vif>` rule matches only traffic
- * DESTINED to the vif IP (host-local return traffic), so forwarded packets keep
- * the normal default route and egress cleanly. Best-effort throughout.
+ * Why: the relay forwards whole IP packets out its physical interface with the
+ * ORIGINAL (vif) source address intact. The host's normal default route is
+ * source-pinned by DHCP (`... src <relayIp>`), so the kernel refuses to route
+ * packets sourced `vifIp` — "Network is unreachable" → ICMP host-unreachable,
+ * which kills the SRT handshake and leaves the leg at 0 kbps. A dedicated table
+ * with a source-agnostic default plus a `from <vifIp>` rule gives vif-sourced
+ * traffic a real egress without touching the main table. The reverse (OBS→vif)
+ * needs no route: the raw tap (SO_RCVALL) captures it straight off the
+ * interface. Best-effort throughout.
  */
 async function installVifRoute(name: string, vifIp: string): Promise<void> {
 	// Re-learn of a changed vif: tear down the previous one first.
@@ -495,23 +512,25 @@ async function installVifRoute(name: string, vifIp: string): Promise<void> {
 	const table = vifTableFor(name);
 	vifRoutes.set(name, { vifIp, table });
 	const tableStr = String(table);
+	// Source-agnostic default out this interface (on-link): works for a routed
+	// NIC (nearest-hop / proxy-ARP) and for a WireGuard tunnel (single peer).
 	await core
 		.run(
 			"ip",
-			["route", "replace", `${vifIp}/32`, "dev", name, "table", tableStr],
+			["route", "replace", "default", "dev", name, "table", tableStr],
 			true,
 		)
 		.catch(routeWarn(name, vifIp, "route"));
 	// `rule` has no `replace`: del the old one (idempotent) then add.
 	await core
-		.run("ip", ["rule", "del", "to", vifIp, "lookup", tableStr], true)
+		.run("ip", ["rule", "del", "from", vifIp, "lookup", tableStr], true)
 		.catch(routeWarn(name, vifIp, "rule-del"));
 	await core
-		.run("ip", ["rule", "add", "to", vifIp, "lookup", tableStr], true)
+		.run("ip", ["rule", "add", "from", vifIp, "lookup", tableStr], true)
 		.catch(routeWarn(name, vifIp, "rule-add"));
 }
 
-/** Tear down a vif reply-path route + rule. Best-effort, never throws. */
+/** Tear down a vif forward-path route + rule. Best-effort, never throws. */
 async function removeVifRoute(
 	name: string,
 	entry?: { vifIp: string; table: number },
@@ -521,7 +540,7 @@ async function removeVifRoute(
 	vifRoutes.delete(name);
 	const tableStr = String(e.table);
 	await core
-		.run("ip", ["rule", "del", "to", e.vifIp, "lookup", tableStr], true)
+		.run("ip", ["rule", "del", "from", e.vifIp, "lookup", tableStr], true)
 		.catch(routeWarn(name, e.vifIp, "rule-del"));
 	await core
 		.run("ip", ["route", "flush", "table", tableStr], true)
@@ -1040,6 +1059,7 @@ const registration: BackendModule<ModuleCore> = {
 			next.enabled = patch.enabled;
 			s.enabled = patch.enabled;
 		}
+		if (typeof patch.nat === "boolean") next.nat = patch.nat;
 		if (typeof patch.announceHost === "string")
 			next.announceHost = patch.announceHost.trim();
 		if (typeof patch.listenPortBase === "number")

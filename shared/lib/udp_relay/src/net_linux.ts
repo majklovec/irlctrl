@@ -31,6 +31,12 @@ const IPPROTO_RAW = 255;
 const SOL_SOCKET = 1;
 const SO_BINDTODEVICE = 25;
 const SO_RCVBUF = 8;
+// Without SO_RCVALL a SOCK_RAW socket only receives datagrams addressed to a
+// LOCAL address. The relay's tap must observe the OBS→vif REPLY traffic (whose
+// destination is the encoder's virtual-interface IP, not the relay's own), so
+// the socket is put in "receive all" mode — every IP frame on the interface
+// is delivered and filtered later by `decideIfacePacket` (vif-destined only).
+const SO_RCVALL = 40;
 
 /** Receive ring size for the raw socket (bytes). */
 const IFACE_RCVBUF = 4 * 1024 * 1024;
@@ -202,6 +208,14 @@ export function openIfaceRawSocket(
     const rcvbufBuf = new ArrayBuffer(4);
     new DataView(rcvbufBuf).setUint32(0, rcvbuf, true);
     lib.symbols.setsockopt(fd, SOL_SOCKET, SO_RCVBUF, ptr(rcvbufBuf), 4);
+
+    // Receive all IP frames on the interface (not just local-destined ones),
+    // so the OBS→vif reply traffic is visible to the tap. Best-effort: if the
+    // kernel rejects it (shouldn't happen with CAP_NET_ADMIN) the socket still
+    // opens and forwards the encoder→iface direction.
+    const rcvallBuf = new ArrayBuffer(4);
+    new DataView(rcvallBuf).setUint32(0, 1, true);
+    lib.symbols.setsockopt(fd, SOL_SOCKET, SO_RCVALL, ptr(rcvallBuf), 4);
 
     // Bind to the interface (SO_BINDTODEVICE takes a nul-terminated name).
     const nameBytes = new TextEncoder().encode(`${ifaceName}\0`);

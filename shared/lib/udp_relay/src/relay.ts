@@ -25,7 +25,13 @@
 
 import { networkInterfaces } from "node:os";
 import { decodeFrame, encodeDataFrame } from "./protocol";
-import { ipDST } from "./ip";
+import {
+    ipDST,
+    natPacketDestination,
+    natPacketSource,
+    parseUdpPacket,
+    type ParsedUdpPacket,
+} from "./ip";
 import { openIfaceRawSocket, type IfaceRawSocket } from "./net_linux";
 import type { RelayStats } from "./types";
 import { newRelayStats, noteError } from "./stats";
@@ -53,6 +59,20 @@ export interface UdpRelayOptions {
      * stays transport-only and never touches the host routing table.
      */
     onVifLearned?: (vifIp: string) => void;
+    /**
+     * NAT mode (default false = transparent L3 bridge). When true, outbound
+     * packets are source-NATed to this relay's `interfaceAddress` before
+     * egress, and inbound replies addressed to that address are de-SNATed back
+     * to the vif. This is what lets the destination be *remote* (not on the
+     * relay's LAN): the reply path no longer depends on the destination
+     * routing back to the private vif IP.
+     *
+     * Only UDP/IP packets are NATed (SRT is UDP); anything else is passed
+     * through untouched. A small per-flow table (keyed by the 5-tuple) bounds
+     * de-SNAT to packets that are genuine replies to a NATed flow, so ordinary
+     * traffic addressed to the relay's own IP is never hijacked.
+     */
+    nat?: boolean;
 }
 
 export interface UdpRelay {
@@ -158,6 +178,10 @@ class RelayImpl implements UdpRelay {
     private vifIp: string | null = null;
     private readTask: Promise<void> | null = null;
     private running = false;
+    // NAT-mode flow table: outbound 5-tuple keys of NATed packets, so the
+    // return path de-SNATs only genuine replies (not ordinary traffic to this
+    // relay's own IP). Bounded; expired entries are dropped opportunistically.
+    private natFlows = new Map<string, number>();
 
     constructor(
         private opts: UdpRelayOptions,
@@ -290,11 +314,15 @@ class RelayImpl implements UdpRelay {
             this._stats.drops++;
             return;
         }
+        // NAT mode: SNAT source (vif private IP) → this relay's own IP so a
+        // *remote* destination can reach us and reply to our address.
+        const outbound = this.maybeNatOutbound(d.packet);
         try {
-            // The raw socket routes from the packet's own destination field.
-            iface.send(d.packet, ipDST(d.packet) ?? "255.255.255.255");
+            // The raw socket routes from the packet's own destination field
+            // (the post-NAT destination, i.e. the real remote host).
+            iface.send(outbound, ipDST(outbound) ?? "255.255.255.255");
             this._stats.ifaceTxPackets++;
-            this._stats.ifaceTxBytes += d.packet.length;
+            this._stats.ifaceTxBytes += outbound.length;
         } catch (e) {
             noteError(
                 this._stats,
@@ -304,22 +332,105 @@ class RelayImpl implements UdpRelay {
         }
     }
 
-    /** Interface → encoder: forward only packets addressed to the vif IP. */
+    /** Interface → encoder: forward packets for the vif (de-SNATed in NAT mode). */
     private onIfacePacket(buf: Uint8Array): void {
         this._stats.ifaceRxPackets++;
         this._stats.ifaceRxBytes += buf.length;
-        const d = decideIfacePacket(buf, this.vifIp);
-        if (d.action === "drop") {
+        const vif = this.vifIp;
+        if (!vif) return;
+        // NAT mode: replies return addressed to *this relay's* IP, so the
+        // transparent "only forward packets for the vif" rule would drop them.
+        // Decide with the NAT flow table instead and de-SNAT the destination.
+        const packet = this.opts.nat && this.interfaceAddress
+            ? this.decideNatReply(buf, vif)
+            : (() => {
+                const d = decideIfacePacket(buf, vif);
+                return d.action === "drop" ? null : d.packet;
+            })();
+        if (!packet) {
             this._stats.drops++;
             return;
         }
         const encoder = this.encoderAddr;
         const vifSocket = this.vifSocket;
-        const vif = this.vifIp;
-        if (!encoder || !vifSocket || !vif) return;
-        const frame = encodeDataFrame(d.packet, vif);
+        if (!encoder || !vifSocket) return;
+        const frame = encodeDataFrame(packet, vif);
         vifSocket.send(frame, encoder.port, encoder.host);
         this._stats.encTxPackets++;
         this._stats.encTxBytes += frame.length;
+    }
+
+    /**
+     * NAT-mode inbound decision. Forwards (de-SNATed to the vif) a reply that
+     * is addressed to this relay's own IP and matches a NATed outbound flow;
+     * also forwards packets already addressed to the vif as-is. Returns null
+     * for anything else, so we never hijack ordinary traffic to the relay IP.
+     */
+    private decideNatReply(buf: Uint8Array, vif: string): Uint8Array | null {
+        const p = parseUdpPacket(buf);
+        if (!p) return null;
+        if (p.dstIp === vif) return buf; // already addressed to the vif.
+        if (p.dstIp !== this.interfaceAddress) return null; // not for us.
+        if (!this.natMatchFlow(p.protocol, vif, p.dstPort, p.srcIp, p.srcPort)) {
+            return null; // not a reply to a NATed flow — don't hijack.
+        }
+        return natPacketDestination(buf, vif);
+    }
+
+    /**
+     * Outbound SNAT (NAT mode only). For a UDP/IP packet with a known vif
+     * source, rewrite the source to this relay's own IP and record the flow
+     * for the return path. Non-UDP/non-IP packets and anything not matching
+     * the vif pass through untouched (the bridge's job is SRT-over-UDP).
+     */
+    private maybeNatOutbound(packet: Uint8Array): Uint8Array {
+        if (!this.opts.nat || !this.interfaceAddress) return packet;
+        const p = parseUdpPacket(packet);
+        if (!p) return packet; // not UDP/IP — leave for the bridge as-is.
+        if (p.srcIp !== this.vifIp) return packet;
+        // natPacketSource returns a new buffer (it does not mutate the input).
+        const out = natPacketSource(packet, this.interfaceAddress);
+        if (out) this.natRecordFlow(p.protocol, p.srcIp, p.srcPort, p.dstIp, p.dstPort);
+        return out ?? packet;
+    }
+
+    private natKey(
+        proto: number,
+        a: string,
+        ap: number,
+        b: string,
+        bp: number,
+    ): string {
+        return `${proto}|${a}:${ap}>${b}:${bp}`;
+    }
+
+    private natRecordFlow(
+        proto: number,
+        src: string,
+        sp: number,
+        dst: string,
+        dp: number,
+    ): void {
+        const now = Date.now();
+        // Opportunistic GC of flows idle > 30s.
+        if (this.natFlows.size > 256) {
+            for (const [k, t] of this.natFlows) {
+                if (now - t > 30_000) this.natFlows.delete(k);
+            }
+        }
+        this.natFlows.set(this.natKey(proto, src, sp, dst, dp), now);
+    }
+
+    private natMatchFlow(
+        proto: number,
+        vif: string,
+        replyDstPort: number,
+        replySrc: string,
+        replySrcPort: number,
+    ): boolean {
+        // Reverse of the outbound flow: vif:replyDstPort <--> replySrc:replySrcPort
+        return this.natFlows.has(
+            this.natKey(proto, vif, replyDstPort, replySrc, replySrcPort),
+        );
     }
 }
