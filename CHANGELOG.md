@@ -1,3 +1,10 @@
+# [7.8.0](https://github.com/majklovec/irlctrl/compare/v7.7.1...v7.8.0) (2026-11-12)
+
+
+### Features
+
+* **moblink:** show throughput and announce times ([c1d86f1](https://github.com/majklovec/irlctrl/commit/c1d86f18b2ad521251e850720be32167e7044079))
+
 ## [7.7.1](https://github.com/majklovec/irlctrl/compare/v7.7.0...v7.7.1) (2026-11-12)
 
 
