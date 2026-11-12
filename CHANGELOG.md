@@ -1,3 +1,10 @@
+# [7.10.0](https://github.com/majklovec/irlctrl/compare/v7.9.0...v7.10.0) (2026-11-12)
+
+
+### Features
+
+* **moblink:** show live WebSocket links ([7360c79](https://github.com/majklovec/irlctrl/commit/7360c793a514e02469ccb3ddbc5f7b6dff5b7bad))
+
 # [7.9.0](https://github.com/majklovec/irlctrl/compare/v7.8.0...v7.9.0) (2026-11-12)
 
 
