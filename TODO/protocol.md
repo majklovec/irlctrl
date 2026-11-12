@@ -54,15 +54,23 @@ that filters multicast — no longer flaps the link):
          - The limited broadcast (`255.255.255.255`) is refused with `EACCES` when the
            encoder runs without `CAP_NET_ADMIN` (unprivileged container); the unicast
            fallback converges identically because the listener is not broadcast-bound.
-           - Symmetric for the relay: it announces its uplink interfaces the same way,
-             AND unicasts the same payload every tick to every KNOWN encoder's IP —
-             the limited broadcast does not cross subnets (an encoder on a
-             phone-hotspot / WireGuard link never sees it), so once ANY path (same-L2
-             broadcast, mDNS, or the control server) seeds one entry, the unicast
-             keeps the pair alive across any routed path. The encoder's listener
-             learns/refreshes the relay from those messages (plus the WS control
-             channel, which remains the authoritative source for the full interface
-             list).
+           - Symmetric for the relay: it announces its uplink interfaces the same way.
+             Its announcer opens ONE SOCKET PER ATTACHED SEGMENT (bound to each
+             interface's own IP with `setBroadcast(true)`): a limited broadcast
+             (`255.255.255.255`) only egresses on the bind address's subnet, so a
+             multi-homed relay (e.g. facing an encoder on 192.168.10.x via a second
+             NIC) would be silent on every segment except the bound one with a single
+             socket. A manual `announceHost` override changes the ANNOUNCED tunnel
+             IPs, not where the discovery datagrams are sent.
+             - AND the relay unicasts the same payload every tick to every KNOWN
+               encoder's IP (from one socket — routing picks its egress): the
+               limited broadcast does not cross subnets (an encoder on a
+               phone-hotspot / WireGuard link never sees it), so once ANY path
+               (same-L2 broadcast, mDNS, or the control server) seeds one entry,
+               the unicast keeps the pair alive across any routed path. The
+               encoder's listener learns/refreshes the relay from those messages
+               (plus the WS control channel, which remains the authoritative source
+               for the full interface list).
              - Note: a Docker **bridge** network does not forward these datagrams between
                the container and the LAN — publish `10333:10333/udp` (done in
                `docker-compose.yaml`) or run the relay with `network_mode: host`.

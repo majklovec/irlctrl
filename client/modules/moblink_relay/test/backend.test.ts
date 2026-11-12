@@ -29,6 +29,8 @@ import {
 	knownEncoderIps,
 	knownEncoders,
 	noteEncoder,
+	startAnnouncing,
+	stopAnnouncing,
 	sweepEncoders,
 } from "../discovery";
 
@@ -323,6 +325,39 @@ describe("relay lifecycle (real loopback UDP)", () => {
 			}
 		).moblink;
 		expect(down.connected).toBe(false);
+	});
+
+	test("announcer falls back to an unbound socket when no segment is bindable", async () => {
+		const logs: string[] = [];
+		const origLog = console.log;
+		console.log = (...a: unknown[]) => logs.push(a.join(" "));
+		try {
+			// TEST-NET addresses are never local → every per-segment bind
+			// fails and the announcer must fall back to one unbound
+			// (default-route) socket.
+			startAnnouncing(() => ({
+				id: "r",
+				host: "192.0.2.1",
+				proto: "",
+				token: "",
+				relayPort: 4000,
+				websocketPort: 8732,
+				interfaces: [
+					{ name: "a", address: "192.0.2.1", listenPort: 4000 },
+					{ name: "b", address: "192.0.2.2", listenPort: 4001 },
+				],
+			}));
+			await new Promise((r) => setTimeout(r, 300));
+			stopAnnouncing();
+			expect(logs.some((l) => l.includes("via [default]"))).toBe(true);
+			expect(
+				logs.some((l) =>
+					l.startsWith("moblink_relay: advertising host=192.0.2.1"),
+				),
+			).toBe(true);
+		} finally {
+			console.log = origLog;
+		}
 	});
 
 	test("a failing interface is recorded, others keep running (no crash)", async () => {

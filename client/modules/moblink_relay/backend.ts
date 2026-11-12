@@ -284,6 +284,24 @@ export function carrierUp(name: string): boolean {
 	}
 }
 
+/**
+ * Negotiated link speed in Mb/s from sysfs; `undefined` when the kernel
+ * reports it unknown (-1 / EINVAL — Wi-Fi, most modems, no carrier). Mirrors
+ * the network module's `linkSpeed` so the relay card shows the same value the
+ * encoder's interfaces card shows.
+ */
+function linkSpeed(name: string): number | undefined {
+	try {
+		const mbps = parseInt(
+			readFileSync(join("/sys/class/net", name, "speed"), "utf8").trim(),
+			10,
+		);
+		return mbps > 0 && mbps < 0xffffffff ? mbps : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 // ----------------------------------------------------------------------
 // Runtime status (the status file + the `moblink_relay.status` RPC)
 // ----------------------------------------------------------------------
@@ -333,6 +351,7 @@ function buildStatus(): MoblinkRuntimeStatus {
 		// High-water-mark mapping (protocol.md §1) — never base+index.
 		listenPort: allocatePort(name),
 		state: relays.has(name) ? ("up" as const) : ("down" as const),
+		speed: linkSpeed(name),
 	}));
 	const relaysArr = [...relays.entries()].map(([name, relay]) => {
 		const st = relay.stats();
@@ -1111,7 +1130,16 @@ function stopDiscovery(): void {
  * full list comes back with the next WS hello).
  */
 function startAdvertiseAll(): void {
-	startAnnouncing(announcePayload, { dryRun: core.config.DRY_RUN });
+	// Per-segment announce sockets: bind addresses are the REAL interface
+	// addresses, not the announce payload's (a manual `announceHost`
+	// override collapses the payload to one IP — see `startAnnouncing`).
+	const segs = buildStatus()
+		.availableInterfaces.map((i) => i.address)
+		.filter((a): a is string => typeof a === "string" && a.length > 0);
+	startAnnouncing(announcePayload, {
+		dryRun: core.config.DRY_RUN,
+		binds: segs,
+	});
 	mdnsAdvertiseStop?.();
 	mdnsAdvertiseStop = startMdnsAdvertiser({
 		instance: hostname() || "irlctrl-relay",
@@ -1272,10 +1300,10 @@ const registration: BackendModule<ModuleCore> = {
 				// failed interface is surfaced in `moblink.failures`, others run.
 				const result = await syncRelays(false);
 				pushIfaceEvents(result.events);
-				if (result.started.length > 0)
-					startAnnouncing(announcePayload, {
-						dryRun: core.config.DRY_RUN,
-					});
+				// Both UDP + mDNS advertise paths (per-segment sockets), so a
+				// UI start (e.g. after an announceHost change) is consistent
+				// with the autostart path.
+				if (result.started.length > 0) startAdvertiseAll();
 				return { moblink: buildStatus(), ...result };
 			}
 			case "moblink_relay.stop":

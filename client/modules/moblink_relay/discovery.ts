@@ -17,9 +17,12 @@
  * keep each side's listener from misparsing the other.
  *
  * Uses `node:dgram` (Bun's `Bun.udp` does not expose `SO_BROADCAST` in 1.4.4):
- * the sender socket is bound, `setBroadcast(true)` is set, and the announce is
- * re-sent on an interval so remote TTL entries stay fresh. `buildPayload` is
- * called every tick so the announce always reflects the live interface set.
+ * one sender socket per attached segment is bound to that segment's IP and
+ * `setBroadcast(true)` — a limited broadcast (255.255.255.255) only egresses
+ * on the bind address's subnet, so a multi-homed relay needs one socket per
+ * segment to be heard everywhere. The announce is re-sent on an interval so
+ * remote TTL entries stay fresh. `buildPayload` is called every tick so the
+ * announce always reflects the live interface set.
  */
 import dgram from "node:dgram";
 import {
@@ -32,8 +35,17 @@ import {
 	type MoblinkDiscoveredEncoder,
 } from "../../../shared/moblink_discovery";
 
-/** The bound UDP socket used to broadcast announce datagrams. */
-let socket: dgram.Socket | undefined;
+/** One announce socket PER attached segment: a `255.255.255.255` datagram
+ * only egresses on the subnet of the socket's BIND address, so one
+ * (announce-host) socket would broadcast on a single segment while every
+ * other directly-connected subnet (e.g. an rpi4 on 192.168.10.x behind a
+ * multi-homed relay) never hears the relay. */
+interface AnnounceSocket {
+	s: dgram.Socket;
+	/** The IP the socket is bound to ("" = unbound, default-route segment). */
+	bind: string;
+}
+let announceSockets: AnnounceSocket[] = [];
 /** The re-broadcast timer. */
 let timer: ReturnType<typeof setInterval> | undefined;
 
@@ -46,105 +58,176 @@ function endpointSummary(eps: MoblinkAnnounce["interfaces"]): string {
  * the log on every announce tick (60 s). */
 const lastUnicastWarn = new Map<string, number>();
 
-function sendOnce(s: dgram.Socket, announce: MoblinkAnnounce): void {
-	const payload = JSON.stringify(announce);
-	console.log(
-		`moblink_relay: advertising host=${announce.host} ifaces=[${endpointSummary(announce.interfaces)}] → ${MOBLINK_BROADCAST_ADDR}:${MOBLINK_DISCOVERY_PORT}`,
-	);
-	try {
-		s.send(payload, MOBLINK_DISCOVERY_PORT, MOBLINK_BROADCAST_ADDR, (e) => {
-			if (e)
-				console.warn(`moblink_relay: discovery announce failed: ${e.message}`);
+/** Open one announce socket bound to `bindIp` ("" = unbound). Resolves to
+ * null when the bind fails (segment vanished / busy) — the other segments
+ * keep advertising. */
+function openAnnounceSocket(bindIp: string): Promise<AnnounceSocket | null> {
+	return new Promise((resolve) => {
+		const s = dgram.createSocket({ type: "udp4", reuseAddr: true });
+		let settled = false;
+		const finish = (err?: Error): void => {
+			if (settled) return;
+			settled = true;
+			if (err) {
+				try {
+					s.close();
+				} catch {
+					/* already closed */
+				}
+				resolve(null);
+				return;
+			}
+			try {
+				s.setBroadcast(true);
+			} catch {
+				/* best-effort — the unicast path below covers encoders */
+			}
+			resolve({ s, bind: bindIp });
+		};
+		s.on("error", (e) => {
+			if (!settled) {
+				finish(e);
+				return;
+			}
+			console.warn(
+				`moblink_relay: discovery socket ${bindIp || "(unbound)"} error: ${e.message}`,
+			);
 		});
-	} catch (e) {
-		console.warn(`moblink_relay: discovery announce failed: ${String(e)}`);
-	}
-	// Unicast to every KNOWN encoder as well: the limited broadcast does not
-	// cross subnets (an encoder on a phone-hotspot / WireGuard link never
-	// sees it) and mDNS is L2-only. Once the control server — or a same-L2
-	// broadcast — seeds one entry, this keeps the pair alive across any
-	// routed path. Symmetric mirror of the encoder's unicast fallback.
-	for (const ip of knownEncoderIps()) {
+		if (bindIp) s.bind(0, bindIp, finish);
+		else s.bind(0, finish);
+	});
+}
+
+/** Drop a socket whose send failed (segment vanished). Best-effort —
+ * `stopAnnouncing` closes leftovers either way. */
+function dropDeadSocket(s: dgram.Socket): void {
+	announceSockets = announceSockets.filter((a) => a.s !== s);
+}
+
+/** One announce tick: broadcast on every segment socket, unicast the known
+ * encoders from the first socket (its routing table picks the egress, so
+ * one egress suffices and a single `announceHost` override does not stop
+ * the unicast from reaching encoders on other subnets). Sockets whose send
+ * fails (segment vanished) are dropped via `dropDeadSocket`. */
+function tickAnnounce(buildPayload: () => MoblinkAnnounce | null): void {
+	if (announceSockets.length === 0) return;
+	const announce = buildPayload();
+	if (!announce) return;
+	const payload = JSON.stringify(announce);
+	const via = announceSockets.map((a) => a.bind || "default").join(", ");
+	console.log(
+		`moblink_relay: advertising host=${announce.host} ifaces=[${endpointSummary(announce.interfaces)}] → ${MOBLINK_BROADCAST_ADDR}:${MOBLINK_DISCOVERY_PORT} via [${via}]`,
+	);
+	announceSockets.forEach((a, i) => {
 		try {
-			s.send(payload, MOBLINK_DISCOVERY_PORT, ip, (e) => {
+			a.s.send(payload, MOBLINK_DISCOVERY_PORT, MOBLINK_BROADCAST_ADDR, (e) => {
 				if (!e) return;
-				const now = Date.now();
-				if (now - (lastUnicastWarn.get(ip) ?? 0) < 60_000) return;
-				lastUnicastWarn.set(ip, now);
+				// The segment's socket is dead (interface vanished): drop it
+				// — the other segments keep advertising.
+				dropDeadSocket(a.s);
 				console.warn(
-					`moblink_relay: encoder announce to ${ip} failed: ${e.message}`,
+					`moblink_relay: discovery announce (${a.bind || "default"}) failed: ${e.message}`,
 				);
 			});
 		} catch (e) {
-			console.warn(
-				`moblink_relay: encoder unicast announce failed: ${String(e)}`,
-			);
+			dropDeadSocket(a.s);
+			console.warn(`moblink_relay: discovery announce failed: ${String(e)}`);
 		}
-	}
+		if (i !== 0) return;
+		// Unicast to every KNOWN encoder: the limited broadcast does not
+		// cross subnets and mDNS is L2-only — once any path (same-L2
+		// broadcast, mDNS, control server) seeds an entry, this keeps the
+		// pair alive across routed links. Symmetric mirror of the
+		// encoder's unicast fallback.
+		for (const ip of knownEncoderIps()) {
+			try {
+				a.s.send(payload, MOBLINK_DISCOVERY_PORT, ip, (e) => {
+					if (!e) return;
+					const now = Date.now();
+					if (now - (lastUnicastWarn.get(ip) ?? 0) < 60_000) return;
+					lastUnicastWarn.set(ip, now);
+					console.warn(
+						`moblink_relay: encoder announce to ${ip} failed: ${e.message}`,
+					);
+				});
+			} catch (e) {
+				console.warn(
+					`moblink_relay: encoder unicast announce failed: ${String(e)}`,
+				);
+			}
+		}
+	});
 }
 
-/** Start broadcasting `buildPayload()` announcements until `stopAnnouncing`. */
+/**
+ * Start advertising `buildPayload()` on EVERY attached segment until
+ * `stopAnnouncing`: one socket bound to each unique segment address. A
+ * single bind would only cover its own segment; per-segment sockets make
+ * the limited broadcast reach each directly-connected subnet.
+ *
+ * `opts.binds` should be the host's REAL interface addresses — the announce
+ * payload's addresses are NOT a reliable source: a manual `announceHost`
+ * override collapses every announced interface to one IP, which would
+ * silently put every socket back on a single segment.
+ */
 export function startAnnouncing(
 	buildPayload: () => MoblinkAnnounce | null,
-	opts: { dryRun?: boolean } = {},
+	opts: { dryRun?: boolean; binds?: string[] } = {},
 ): void {
 	stopAnnouncing();
 	if (opts.dryRun) {
 		console.log("moblink_relay: discovery advertise skipped (dry-run)");
 		return;
 	}
-	try {
-		const s = dgram.createSocket({ type: "udp4", reuseAddr: true });
-		s.on("error", (e) =>
-			console.warn(`moblink_relay: discovery socket error: ${e.message}`),
-		);
-		const begin = (): void => {
-			try {
-				s.setBroadcast(true);
-			} catch {
-				/* best-effort — unicast encoders on the same host still work */
+	void (async (): Promise<void> => {
+		const binds = new Set<string>();
+		for (const b of opts.binds ?? []) if (b) binds.add(b);
+		if (binds.size === 0) {
+			const payload = buildPayload();
+			if (payload) {
+				for (const i of payload.interfaces) if (i.address) binds.add(i.address);
+				if (payload.host) binds.add(payload.host);
 			}
-			console.log(
-				`moblink_relay: discovery advertise started → ${MOBLINK_BROADCAST_ADDR}:${MOBLINK_DISCOVERY_PORT} every ${MOBLINK_ANNOUNCE_INTERVAL_MS}ms`,
-			);
-			const tick = (): void => {
-				const announce = buildPayload();
-				if (announce) sendOnce(s, announce);
-			};
-			tick();
-			timer = setInterval(tick, MOBLINK_ANNOUNCE_INTERVAL_MS);
-			timer.unref?.();
-		};
-		// Bind the socket to the announce host so the limited-broadcast
-		// (255.255.255.255) egresses on the interface facing the encoders.
-		// An unbound socket routes the broadcast out the default-route
-		// interface, which may be a different subnet than the one encoders
-		// actually reach the relay tunnels on (e.g. interconnect-only NIC).
-		const bindHost = buildPayload()?.host ?? "";
-		if (bindHost) s.bind(0, bindHost, begin);
-		else s.bind(0, begin);
-		socket = s;
-	} catch (e) {
-		console.warn(
-			`moblink_relay: discovery announce failed to start: ${String(e)}`,
+		}
+		const opened = await Promise.all([...binds].map(openAnnounceSocket));
+		announceSockets = opened.filter((s): s is AnnounceSocket => s !== null);
+		if (announceSockets.length === 0) {
+			// No segment bindable (all down at startup): fall back to one
+			// unbound socket (default-route segment); `ip monitor`-triggered
+			// restarts pick up segments when they appear.
+			const fb = await openAnnounceSocket("");
+			if (fb) announceSockets = [fb];
+		}
+		if (announceSockets.length === 0) {
+			console.warn("moblink_relay: discovery advertise failed to start");
+			return;
+		}
+		const via = announceSockets.map((a) => a.bind || "default").join(", ");
+		console.log(
+			`moblink_relay: discovery advertise started → ${MOBLINK_BROADCAST_ADDR}:${MOBLINK_DISCOVERY_PORT} every ${MOBLINK_ANNOUNCE_INTERVAL_MS}ms via [${via}]`,
 		);
-		stopAnnouncing();
-	}
+		tickAnnounce(buildPayload);
+		timer = setInterval(
+			() => tickAnnounce(buildPayload),
+			MOBLINK_ANNOUNCE_INTERVAL_MS,
+		);
+		timer.unref?.();
+	})();
 }
 
 /** Stop broadcasting; best-effort (never throws). */
 export function stopAnnouncing(): void {
-	const had = timer !== undefined || socket !== undefined;
+	const had = timer !== undefined || announceSockets.length > 0;
 	if (timer) {
 		clearInterval(timer);
 		timer = undefined;
 	}
-	const s = socket;
-	socket = undefined;
+	const socks = announceSockets;
+	announceSockets = [];
 	if (had) console.log("moblink_relay: discovery advertise stopped");
-	if (s) {
+	for (const a of socks) {
 		try {
-			s.close();
+			a.s.close();
 		} catch {
 			/* already closed */
 		}
