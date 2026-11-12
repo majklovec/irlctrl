@@ -283,6 +283,49 @@ describe("relay WS control channel (protocol.md §3–§5)", () => {
 		await up().stop();
 	});
 
+	test("a hello with a peer IP keys the registry by IP (no UDP announce yet)", async () => {
+		await setup();
+		mod.onRelayWsMessage(
+			"bigcml",
+			{
+				type: "hello",
+				relay_id: "bigcml",
+				proto: 1,
+				interfaces: [iface("eno2", "192.0.2.10", 4000)],
+			},
+			"192.0.2.10",
+		);
+		await Bun.sleep(10);
+		const v = await view();
+		// The registry key is the routable peer IP, not the hostname (dgram
+		// performs no hostname resolution — an ENOTFOUND dial target).
+		expect(v.discoveredRelays.map((r) => r.host)).toEqual(["192.0.2.10"]);
+		expect(v.discoveredRelays[0].hostname).toBe("bigcml");
+		await up().stop();
+	});
+
+	test("a later hello with a peer IP migrates the hostname-keyed registry entry", async () => {
+		await setup();
+		const hello = {
+			type: "hello" as const,
+			relay_id: "bigcml",
+			proto: 1,
+			interfaces: [iface("eno2", "192.0.2.10", 4000)],
+		};
+		mod.onRelayWsMessage("bigcml", hello);
+		await Bun.sleep(10);
+		expect((await view()).discoveredRelays.map((r) => r.host)).toEqual([
+			"bigcml",
+		]);
+		mod.onRelayWsMessage("bigcml", hello, "192.0.2.10");
+		await Bun.sleep(10);
+		const v = await view();
+		// One entry, re-keyed from the hostname to the peer IP.
+		expect(v.discoveredRelays.map((r) => r.host)).toEqual(["192.0.2.10"]);
+		expect(v.discoveredRelays[0].hostname).toBe("bigcml");
+		await up().stop();
+	});
+
 	test("interface_down stops the TUN; interface_up reuses the same slot (protocol.md §1)", async () => {
 		const { uplinks } = await setup();
 		mod.onRelayWsMessage("wan-relay", {

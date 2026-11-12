@@ -44,12 +44,13 @@ import type {
 } from "../../../shared/contracts/module_capabilities";
 import {
 	createUdpRelay,
-	resolveInterfaceAddress,
 	type IfaceRawSocket,
+	resolveInterfaceAddress,
 	type UdpRelay,
 } from "../../../shared/lib/udp_relay";
 import {
 	MOBLINK_ANNOUNCE_INTERVAL_MS,
+	MOBLINK_DISCOVERY_PORT,
 	MOBLINK_RELAY_WS_PROTOCOL,
 	type MoblinkAnnounce,
 	type MoblinkDiscoveredEncoder,
@@ -57,6 +58,13 @@ import {
 	type MoblinkRelayIfaceEventType,
 	type MoblinkRelayWsMessage,
 } from "../../../shared/moblink_discovery";
+import {
+	MDNS_ENCODER_SERVICE,
+	MDNS_RELAY_SERVICE,
+	type MdnsFound,
+	startMdnsAdvertiser,
+	startMdnsBrowser,
+} from "../../../shared/moblink_mdns";
 import {
 	ApiError,
 	optionalStringList,
@@ -111,6 +119,9 @@ let netUnsub: (() => void) | undefined;
 let encoderSweep: ReturnType<typeof setInterval> | undefined;
 /** Timestamp of the last control-server encoder lookup. */
 let lastControlServerCheck = 0;
+/** mDNS advertiser (relay service) / browser (encoder service) stop handles. */
+let mdnsBrowseStop: (() => void) | undefined;
+let mdnsAdvertiseStop: (() => void) | undefined;
 
 /** The running per-interface relays, keyed by interface name. */
 const relays = new Map<string, UdpRelay>();
@@ -861,8 +872,20 @@ function stopEncoderChannel(key: string): void {
  */
 function startEncoderChannel(e: MoblinkDiscoveredEncoder): void {
 	if (pendingConnects.has(e.encoderId)) return;
+	// An open (or connecting) channel already exists: do NOT dial again. The
+	// reconcile runs every announce tick, and a re-dial leaks the previous
+	// socket (the relay never closes it), so the encoder sees a fresh
+	// "relay WS connected" every 5 s — the flapping pattern. A failed connect
+	// removes the entry via `fail()`, which owns the re-dial.
+	const existing = encoderChannels.get(e.encoderId);
+	if (
+		existing &&
+		(existing.ws.readyState === WebSocket.OPEN ||
+			existing.ws.readyState === WebSocket.CONNECTING)
+	)
+		return;
 	pendingConnects.add(e.encoderId);
-	const gen = (encoderChannels.get(e.encoderId)?.gen ?? 0) + 1;
+	const gen = (existing?.gen ?? 0) + 1;
 	const url = `ws://${e.ip}:${e.wsPort}/moblink${
 		e.token ? `?token=${encodeURIComponent(e.token)}` : ""
 	}`;
@@ -988,13 +1011,40 @@ export function stopEncoderChannels(): void {
 	pendingConnects.clear();
 }
 
+/** mDNS browse callback (protocol.md §2/§3): encoder TXT is flat
+ * (id/ip/port/proto/tok). */
+function onMdnsEncoder(f: MdnsFound): void {
+	const encoderId = f.fields.get("id");
+	const ip = f.fields.get("ip");
+	const wsPort = Number(f.fields.get("port") ?? "");
+	if (!encoderId || !ip || !Number.isInteger(wsPort) || wsPort <= 0) return;
+	const enc: MoblinkDiscoveredEncoder = {
+		encoderId,
+		ip,
+		wsPort,
+		proto: Number(f.fields.get("proto") ?? "1") || 1,
+		token: f.fields.get("tok") ?? undefined,
+		lastSeen: Date.now(),
+	};
+	noteEncoder(enc);
+	onEncoderAnnounced(enc);
+}
+
 /**
- * Start encoder discovery (protocol.md §2): the UDP-announce listener on the
- * well-known port + the TTL sweep / control-server reconciler. Idempotent.
+ * Start encoder discovery (protocol.md §2/§3): the UDP-announce listener on
+ * the well-known port, the mDNS encoder-service browser, and the TTL sweep /
+ * control-server reconciler. Idempotent.
  */
 function startDiscovery(): void {
 	startListeningForEncoders(onEncoderAnnounced, {
 		dryRun: core.config.DRY_RUN,
+	});
+	// mDNS path: encoders advertise `_irlctrl-encoder._udp.local`.
+	mdnsBrowseStop?.();
+	mdnsBrowseStop = startMdnsBrowser({
+		service: MDNS_ENCODER_SERVICE,
+		dryRun: core.config.DRY_RUN,
+		onFound: onMdnsEncoder,
 	});
 	if (!encoderSweep) {
 		encoderSweep = setInterval(() => {
@@ -1009,11 +1059,48 @@ function startDiscovery(): void {
 /** Stop encoder discovery and tear down every relay → encoder channel. */
 function stopDiscovery(): void {
 	stopListeningForEncoders();
+	mdnsBrowseStop?.();
+	mdnsBrowseStop = undefined;
 	if (encoderSweep) {
 		clearInterval(encoderSweep);
 		encoderSweep = undefined;
 	}
 	stopEncoderChannels();
+}
+
+/**
+ * Advertise this relay to encoders via BOTH paths (protocol.md §3): UDP
+ * broadcasts on 10333 AND the mDNS `_irlctrl-relay._udp.local` service. mDNS
+ * TXT is compact (`h`; `ip`; `i=name=addr:port;...`), so the endpoint list is
+ * truncated at 255 B — the encoder keeps the longer set across sources (the
+ * full list comes back with the next WS hello).
+ */
+function startAdvertiseAll(): void {
+	startAnnouncing(announcePayload, { dryRun: core.config.DRY_RUN });
+	mdnsAdvertiseStop?.();
+	mdnsAdvertiseStop = startMdnsAdvertiser({
+		instance: hostname() || "irlctrl-relay",
+		service: MDNS_RELAY_SERVICE,
+		servicePort: MOBLINK_DISCOVERY_PORT,
+		dryRun: core.config.DRY_RUN,
+		buildTxt: (): string[] | null => {
+			const p = announcePayload();
+			if (!p) return null;
+			const fields = [`h=${p.hostname ?? p.host}`, `ip=${p.host}`];
+			const i = p.interfaces
+				.map((e) => `${e.name}=${e.address}:${e.listenPort}`)
+				.join(";");
+			if (i) fields.push(`i=${i}`);
+			return fields;
+		},
+	});
+}
+
+/** Stop both relay-advertise paths (UDP + mDNS). */
+function stopAdvertiseAll(): void {
+	stopAnnouncing();
+	mdnsAdvertiseStop?.();
+	mdnsAdvertiseStop = undefined;
 }
 
 // ----------------------------------------------------------------------
@@ -1112,17 +1199,14 @@ const registration: BackendModule<ModuleCore> = {
 		if (config().enabled) {
 			const res = await syncRelays(false);
 			pushIfaceEvents(res.events);
-			if (res.started.length > 0)
-				startAnnouncing(announcePayload, {
-					dryRun: core.config.DRY_RUN,
-				});
+			if (res.started.length > 0) startAdvertiseAll();
 			void ensureControlServerEncoders();
 		}
 	},
 	async stop() {
 		netUnsub?.();
 		netUnsub = undefined;
-		stopAnnouncing();
+		stopAdvertiseAll();
 		stopDiscovery();
 		await stopAll();
 	},

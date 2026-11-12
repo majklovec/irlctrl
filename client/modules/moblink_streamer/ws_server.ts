@@ -25,6 +25,9 @@ export interface RelayWsConn {
 	relayId?: string;
 	/** The relay's protocol version (from the `hello`), once known. */
 	proto?: number;
+	/** The relay's source IP as seen by the encoder (WS peer address) —
+	 * routable, unlike the `relay_id` hostname. */
+	remoteAddress?: string;
 }
 
 interface Options {
@@ -63,7 +66,9 @@ export function startRelayWsServer(
 						return new Response("unauthorized", { status: 401 });
 					}
 				}
-				const conn: RelayWsConn = {};
+				const conn: RelayWsConn = {
+					remoteAddress: req.socket?.remoteAddress,
+				};
 				if (!srv.upgrade(req, { data: conn }))
 					return new Response("websocket only", { status: 400 });
 				opts.onOpen?.(conn);

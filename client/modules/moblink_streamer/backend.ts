@@ -50,6 +50,13 @@ import {
 	type MoblinkSharedEndpoint,
 } from "../../../shared/moblink_discovery";
 import {
+	MDNS_ENCODER_SERVICE,
+	MDNS_RELAY_SERVICE,
+	type MdnsFound,
+	startMdnsAdvertiser,
+	startMdnsBrowser,
+} from "../../../shared/moblink_mdns";
+import {
 	ApiError,
 	oneOf,
 	optionalInt,
@@ -61,7 +68,10 @@ import { errorMessage } from "../../../shared/util";
 import type { ModuleCore } from "../../backend/module_core";
 import {
 	type EncoderInfo,
+	forgetRelay,
+	isIpv4Literal,
 	knownRelays,
+	noteMdnsRelay,
 	noteRelay,
 	startDiscovering,
 	startEncoderAnnouncing,
@@ -488,12 +498,39 @@ async function onDiscoveredRelays(
 	});
 }
 
+let mdnsBrowseStop: (() => void) | undefined;
+let mdnsAdvertiseStop: (() => void) | undefined;
+
 function ensureDiscovery(): void {
 	// Always wire the change callback: it also serves as the registration
 	// path for relays handed over via the control server (`noteRelay`). In
 	// dry-run the UDP socket is skipped, but relaying still converges.
 	startDiscovering((rels) => void onDiscoveredRelays(rels), {
 		dryRun: core.config.DRY_RUN,
+	});
+	// mDNS path (protocol.md §3): browse for relay services. TXT is compact
+	// (≤255 B) and may truncate the endpoint list, so `noteMdnsRelay` keeps
+	// the longer of the known / seen endpoint sets (the WS hello stays
+	// authoritative).
+	mdnsBrowseStop?.();
+	mdnsBrowseStop = startMdnsBrowser({
+		service: MDNS_RELAY_SERVICE,
+		dryRun: core.config.DRY_RUN,
+		onFound: (f: MdnsFound): void => {
+			const host = f.fields.get("ip");
+			if (!host || !isIpv4Literal(host)) return;
+			const endpoints: MoblinkSharedEndpoint[] = [];
+			for (const part of (f.fields.get("i") ?? "").split(";")) {
+				const m = /^(.+)=([0-9.]+):(\d+)$/u.exec(part.trim());
+				if (m && isIpv4Literal(m[2]))
+					endpoints.push({
+						name: m[1],
+						address: m[2],
+						listenPort: Number(m[3]),
+					});
+			}
+			noteMdnsRelay(host, f.fields.get("h") ?? undefined, endpoints);
+		},
 	});
 }
 
@@ -539,13 +576,33 @@ function ensureControlPlane(): void {
 		port: c.wsPort,
 		token: c.announceToken,
 		onMessage: (conn, msg: MoblinkRelayWsMessage) => {
-			onRelayWsMessage(conn.relayId, msg);
+			onRelayWsMessage(conn.relayId, msg, conn.remoteAddress);
 		},
 		onClose: (conn) => {
 			if (conn.relayId) wsRelayHosts.delete(conn.relayId);
 		},
 	});
 	startEncoderAnnouncing(() => encoderInfo(), { dryRun: core.config.DRY_RUN });
+	// mDNS advertise (protocol.md §3): relays browse for us.
+	mdnsAdvertiseStop?.();
+	mdnsAdvertiseStop = startMdnsAdvertiser({
+		instance: hostname() || "irlctrl-encoder",
+		service: MDNS_ENCODER_SERVICE,
+		servicePort: c.wsPort,
+		dryRun: core.config.DRY_RUN,
+		buildTxt: (): string[] | null => {
+			const info = encoderInfo();
+			if (!info) return null;
+			const fields = [
+				`id=${info.encoderId}`,
+				`ip=${info.ip}`,
+				`port=${info.wsPort}`,
+				`proto=${info.proto}`,
+			];
+			if (info.token) fields.push(`tok=${info.token}`);
+			return fields;
+		},
+	});
 }
 
 /** Relay WS identity (`relay_id`) → discovered-relay registry host. */
@@ -561,16 +618,27 @@ const wsRelayHosts = new Map<string, string>();
 export function onRelayWsMessage(
 	relayId: string | undefined,
 	msg: MoblinkRelayWsMessage,
+	/** The relay's WS peer address (encoder-side source IP), if known. */
+	remoteAddress?: string,
 ): void {
 	if (!relayId) return; // before the (required) hello — nothing to match
 	if (msg.type === "hello") {
 		// The announce `host` (IP) and the WS `relay_id` (hostname) describe
 		// the SAME relay; the WS channel is the authoritative, newer source,
 		// so it owns the registry entry (key = the announce IP if known).
+		// When no UDP announce ever arrived, the key would be the `relay_id`
+		// hostname — prefer the routable peer IP instead (the hostname is
+		// unusable for UDP dials; dgram performs no resolution).
 		const known = knownRelays().find(
 			(r) => r.hostname === relayId || r.host === relayId,
 		);
-		const host = known?.host ?? relayId;
+		const host =
+			known && isIpv4Literal(known.host)
+				? known.host
+				: remoteAddress && isIpv4Literal(remoteAddress)
+					? remoteAddress
+					: relayId;
+		if (known && known.host !== host) forgetRelay(known.host); // key migration (hostname → peer IP)
 		wsRelayHosts.set(relayId, host);
 		noteRelay({
 			host,
@@ -707,6 +775,10 @@ const registration: BackendModule<ModuleCore> = {
 	async stop() {
 		stopDiscovering();
 		stopEncoderAnnouncing();
+		mdnsBrowseStop?.();
+		mdnsBrowseStop = undefined;
+		mdnsAdvertiseStop?.();
+		mdnsAdvertiseStop = undefined;
 		wsServer?.stop(true);
 		wsServer = null;
 		await stopAllTunnels();

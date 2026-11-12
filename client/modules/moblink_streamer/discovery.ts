@@ -154,9 +154,48 @@ export function noteRelay(relay: MoblinkDiscoveredRelay): void {
 	emitIfChanged();
 }
 
+/** True for a plain dotted-quad IPv4 literal (no hostname resolution). */
+export function isIpv4Literal(x: string): boolean {
+	return /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/u.test(x);
+}
+
 /** A registry entry for host (if known); null otherwise. */
 export function getKnownRelay(host: string): MoblinkDiscoveredRelay | null {
 	return relays.get(host) ?? null;
+}
+
+/** Drop a registry entry (e.g. a hostname-keyed duplicate whose relay moved
+ * to a peer-IP key). Fires the change callback when the shape changed. */
+export function forgetRelay(host: string): void {
+	if (relays.delete(host)) emitIfChanged();
+}
+
+/**
+ * Register/refresh a relay learned via mDNS (protocol.md §3). The mDNS TXT
+ * endpoint list is compact (255 B) and may be TRUNCATED relative to the full
+ * WS `hello` snapshot, so the endpoint set only ever grows: a shorter mDNS
+ * list never shrinks a known relay's endpoint set (the full list comes back
+ * with the next hello).
+ */
+export function noteMdnsRelay(
+	host: string,
+	hostname: string | undefined,
+	endpoints: MoblinkSharedEndpoint[],
+): void {
+	const known = relays.get(host);
+	const interfaces =
+		endpoints.length > (known?.interfaces.length ?? 0)
+			? endpoints
+			: (known?.interfaces ?? endpoints);
+	// An endpoint whose UDP address is down must not keep a downed relay
+	// alive via a stale mDNS record: only refresh if we have usable info.
+	relays.set(host, {
+		host,
+		hostname: hostname ?? known?.hostname,
+		interfaces,
+		lastSeen: Date.now(),
+	});
+	emitIfChanged();
 }
 
 /** The currently-known relays (empty when none heard). */
@@ -245,11 +284,14 @@ export function startEncoderAnnouncing(
 			}
 			// Unicast to every known relay (host + each registry interface)
 			// so relays learn this encoder even when the limited broadcast
-			// is refused.
+			// is refused. Only routable IPv4 literals — a registry host may be
+			// a hostname (WS hello carries `relay_id` = hostname), and dgram
+			// would try to resolve it (ENOTFOUND).
 			const targets = new Set<string>();
 			for (const r of knownRelays()) {
-				targets.add(r.host);
-				for (const ep of r.interfaces) targets.add(ep.address);
+				if (isIpv4Literal(r.host)) targets.add(r.host);
+				for (const ep of r.interfaces)
+					if (isIpv4Literal(ep.address)) targets.add(ep.address);
 			}
 			targets.delete(info.ip); // our own address — no relay lives there
 			for (const ip of targets) {

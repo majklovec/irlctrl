@@ -393,7 +393,9 @@ describe("relay installs a vif forward-route in a dedicated table", () => {
 		}
 		const sock = (await Bun.udpSocket({
 			binaryType: "uint8array",
-		} as unknown as Parameters<typeof Bun.udpSocket>[0])) as unknown as TestSock;
+		} as unknown as Parameters<
+			typeof Bun.udpSocket
+		>[0])) as unknown as TestSock;
 		sock.send(frame, base, "127.0.0.1");
 
 		const deadline = Date.now() + 2000;
@@ -486,18 +488,20 @@ describe("relay installs a vif forward-route in a dedicated table", () => {
 		}
 		const sock = (await Bun.udpSocket({
 			binaryType: "uint8array",
-		} as unknown as Parameters<typeof Bun.udpSocket>[0])) as unknown as TestSock;
+		} as unknown as Parameters<
+			typeof Bun.udpSocket
+		>[0])) as unknown as TestSock;
 		sock.send(frame, base, "127.0.0.1");
 
 		// Give the relay a moment to learn the vif; it must NOT touch routing.
 		await Bun.sleep(200);
 
-		expect(
-			runCalls.some((c) => c.cmd === "ip" && c.args[0] === "rule"),
-		).toBe(false);
-		expect(
-			runCalls.some((c) => c.cmd === "ip" && c.args[0] === "route"),
-		).toBe(false);
+		expect(runCalls.some((c) => c.cmd === "ip" && c.args[0] === "rule")).toBe(
+			false,
+		);
+		expect(runCalls.some((c) => c.cmd === "ip" && c.args[0] === "route")).toBe(
+			false,
+		);
 
 		sock.close();
 		await cfg.stop();
