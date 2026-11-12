@@ -39,7 +39,12 @@ This is the complete, consolidated specification of the relay–encoder behavior
 
 Both sides discover each other through **three redundant paths** (any one of them
 keeps the registry's TTL fresh, so a single blocked path — e.g. a Docker bridge
-that filters multicast — no longer flaps the link):
+that filters multicast — no longer flaps the link). The discovered-relay
+registry is keyed by the relay's STABLE identity (`relay_id`/hostname, falling
+back to the announced IP when none is known), so one physical relay occupies
+exactly ONE entry no matter how many paths learn it (and a later path for the
+same identity merges into the existing entry instead of duplicating it);
+registration is logged once per relay, not on every refresh:
 1. **UDP broadcast + unicast** (discovery port `10333`)
    - The encoder periodically broadcasts its information on the network, and
      additionally unicasts the same payload every tick to the addresses of the

@@ -14,7 +14,12 @@ import type {
 	MoblinkSharedEndpoint,
 } from "../../../../shared/moblink_discovery";
 import * as mod from "../backend";
-import { knownRelays, noteRelay, sweepStaleRelays } from "../discovery";
+import {
+	knownRelays,
+	noteMdnsRelay,
+	noteRelay,
+	sweepStaleRelays,
+} from "../discovery";
 import type { MoblinkStreamerView } from "../types";
 
 /** A fake uplinks capability that records add/remove and a live list. */
@@ -437,7 +442,9 @@ describe("TTL sweep + WS keepalive (protocol.md §3 self-sustaining channel)", (
 			lastSeen: Date.now() - 20_000, // beyond the 15 s TTL
 		};
 		noteRelay(backdated as MoblinkDiscoveredRelay);
-		expect(sweepStaleRelays()).toEqual(["192.0.2.10"]);
+		// The registry is keyed by the relay's identity (hostname), so the
+		// swept key is "bigcml", not the IP.
+		expect(sweepStaleRelays()).toEqual(["bigcml"]);
 		// Re-seed the SAME relay, now with a live WS → protected from the sweep.
 		noteRelay(backdated as MoblinkDiscoveredRelay);
 		expect(sweepStaleRelays(() => new Set(["192.0.2.10"]))).toEqual([]);
@@ -477,6 +484,73 @@ describe("TTL sweep + WS keepalive (protocol.md §3 self-sustaining channel)", (
 		// Unprotected sweep: the ping refreshed lastSeen → relay survives.
 		expect(sweepStaleRelays()).toEqual([]);
 		expect(knownRelays().some((r) => r.host === "192.0.2.10")).toBe(true);
+		await up().stop();
+	});
+});
+
+describe("registry dedupe (one entry per relay)", () => {
+	test("the same relay learned via UDP, mDNS and WS stays a single entry", async () => {
+		await setup();
+		// 1) UDP broadcast announce (identity = hostname "bigcml").
+		noteRelay({
+			host: "192.0.2.10",
+			hostname: "bigcml",
+			interfaces: [{ name: "eno2", address: "192.0.2.10", listenPort: 4000 }],
+			lastSeen: Date.now(),
+		} as MoblinkDiscoveredRelay);
+		expect(knownRelays()).toHaveLength(1);
+		// 2) mDNS for the SAME relay → merged into the existing entry, and
+		// the longer endpoint set wins (mDNS may carry more endpoints).
+		noteMdnsRelay("192.0.2.10", "bigcml", [
+			{ name: "eno2", address: "192.0.2.10", listenPort: 4000 },
+			{ name: "wg0", address: "192.0.2.11", listenPort: 4002 },
+		]);
+		expect(knownRelays()).toHaveLength(1);
+		expect(knownRelays()[0].interfaces).toHaveLength(2);
+		// 3) WS hello from the same relay → no new entry; the hello snapshot
+		// replaces the interface set wholesale (protocol.md §4).
+		mod.onRelayWsMessage(
+			"bigcml",
+			{
+				type: "hello",
+				relay_id: "bigcml",
+				proto: 1,
+				interfaces: [
+					{
+						iface_name: "eno2",
+						ip: "192.0.2.10",
+						udp_port: 4000,
+						state: "up",
+						uplink: true,
+					},
+				],
+			},
+			"192.0.2.10",
+		);
+		expect(knownRelays()).toHaveLength(1);
+		expect(knownRelays()[0].host).toBe("192.0.2.10");
+		expect(knownRelays()[0].hostname).toBe("bigcml");
+		expect(knownRelays()[0].interfaces).toHaveLength(1);
+		await up().stop();
+	});
+
+	test("a hostname-less relay stays one entry when its announce IP is stable", async () => {
+		await setup();
+		noteRelay({
+			host: "192.0.2.20",
+			interfaces: [{ name: "eno2", address: "192.0.2.20", listenPort: 4000 }],
+			lastSeen: Date.now(),
+		} as MoblinkDiscoveredRelay);
+		noteMdnsRelay("192.0.2.20", undefined, [
+			{ name: "eno2", address: "192.0.2.20", listenPort: 4000 },
+		]);
+		noteRelay({
+			host: "192.0.2.20",
+			interfaces: [{ name: "eno2", address: "192.0.2.20", listenPort: 4000 }],
+			lastSeen: Date.now(),
+		} as MoblinkDiscoveredRelay);
+		expect(knownRelays()).toHaveLength(1);
+		expect(knownRelays()[0].host).toBe("192.0.2.20");
 		await up().stop();
 	});
 });

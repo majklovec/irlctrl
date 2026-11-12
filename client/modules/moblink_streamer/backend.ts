@@ -650,7 +650,11 @@ export function onRelayWsMessage(
 				: remoteAddress && isIpv4Literal(remoteAddress)
 					? remoteAddress
 					: relayId;
-		if (known && known.host !== host) forgetRelay(known.host); // key migration (hostname → peer IP)
+		// Identity keying: `noteRelay` merges any old IP-keyed duplicate for
+		// this relay; this explicit drop covers a STALE entry whose host and
+		// hostname both differ from the live channel (relay moved subnets).
+		if (known && known.host !== host && known.hostname !== relayId)
+			forgetRelay(known.host);
 		wsRelayHosts.set(relayId, host);
 		noteRelay({
 			host,
@@ -666,12 +670,12 @@ export function onRelayWsMessage(
 		return;
 	}
 	// Keepalive frame (protocol.md §3): proof the channel is live → refresh
-	// the TTL quietly (every 5 s; logging would spam).
+	// the TTL (every 5 s; the registry logs once per relay, never per frame).
 	if (msg.type === "ping" || msg.type === "pong") {
 		const host = wsRelayHosts.get(relayId);
 		if (!host) return;
 		const relay = knownRelays().find((r) => r.host === host);
-		if (relay) noteRelay({ ...relay, lastSeen: Date.now() }, { quiet: true });
+		if (relay) noteRelay({ ...relay, lastSeen: Date.now() });
 		return;
 	}
 	// A single-interface event: patch the owning relay's endpoint set

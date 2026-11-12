@@ -24,21 +24,38 @@ import {
 
 let socket: dgram.Socket | undefined;
 let sweeper: ReturnType<typeof setInterval> | undefined;
+/** Keyed by the relay's STABLE identity (see `relayKey`), not by the
+ * announced IP — the same relay must occupy exactly one entry no matter
+ * which discovery path learned it (UDP / mDNS / WS / control server) or
+ * which (override) IP it announced under. */
 let relays = new Map<string, MoblinkDiscoveredRelay>();
 let lastSig = "";
+/** Keys already announced in the "registered relay" log (once per relay). */
+let loggedKeys = new Set<string>();
 let onChange: ((relays: MoblinkDiscoveredRelay[]) => void) | undefined;
+
+/**
+ * The registry key for a relay: its identity (hostname, which the relay
+ * carries in the WS `relay_id` and the mDNS `h=` field) when known, else
+ * the announced IP. Keying by IP alone let one physical relay accumulate
+ * several entries (e.g. an announced-override IP from UDP plus a WS peer
+ * IP from the hello path) — each identity now maps to exactly one entry.
+ */
+export function relayKey(r: { host: string; hostname?: string }): string {
+	return r.hostname && r.hostname.trim() !== "" ? r.hostname : r.host;
+}
 
 function signature(): string {
 	const out: string[] = [];
-	for (const [host, r] of [...relays].sort((a, b) =>
-		a[0].localeCompare(b[0]),
+	for (const r of [...relays.values()].sort((a, b) =>
+		relayKey(a).localeCompare(relayKey(b)),
 	)) {
 		// `state` is part of the signature: an `interface_down` /
 		// `interface_up` with no other shape change must still fire the
 		// change callback (protocol.md §4–§5) so reconcile stops/starts the
 		// TUN.
 		out.push(
-			`${host}|${r.interfaces
+			`${relayKey(r)}|${r.interfaces
 				.map((i) => `${i.name}:${i.address}:${i.listenPort}:${i.state ?? "up"}`)
 				.join(",")}`,
 		);
@@ -103,16 +120,15 @@ export function startDiscovering(
 				return; // not JSON — ignore
 			}
 			if (!isMoblinkAnnounce(parsed)) return;
-			relays.set(parsed.host, {
-				host: parsed.host,
-				hostname: parsed.hostname,
-				interfaces: parsed.interfaces,
-				lastSeen: Date.now(),
-			});
-			console.log(
-				`moblink_streamer: registered relay ${parsed.host}${parsed.hostname ? ` (${parsed.hostname})` : ""} ifaces=[${endpointSummary(parsed.interfaces)}]`,
+			registerRelay(
+				{
+					host: parsed.host,
+					hostname: parsed.hostname,
+					interfaces: parsed.interfaces,
+					lastSeen: Date.now(),
+				},
+				"broadcast",
 			);
-			emitIfChanged();
 		});
 		s.bind(MOBLINK_DISCOVERY_PORT, "0.0.0.0");
 		socket = s;
@@ -135,19 +151,56 @@ export function startDiscovering(
 }
 
 /**
- * Drop every relay not (re)announced within TTL, EXCEPT any host in
+ * The single entry point for the registry. Keyed by the relay's stable
+ * identity (hostname, else IP — see `relayKey`), so the same physical relay
+ * always occupies EXACTLY ONE entry no matter which path learned it (UDP
+ * broadcast, mDNS, WS hello, control server). Before inserting, any stale
+ * duplicate key for the same relay (learned earlier under a different key)
+ * is merged away. Logs once per relay, not on every refresh.
+ */
+function registerRelay(relay: MoblinkDiscoveredRelay): void {
+	const key = relayKey(relay);
+	// Merge away a duplicate key for the SAME relay: an entry that shares the
+	// identity (hostname) or that is the old IP-keyed entry for this very IP.
+	for (const [k, e] of relays) {
+		if (k === key) continue;
+		const sameIdentity =
+			(relay.hostname && e.hostname === relay.hostname) ||
+			(!e.hostname && k === relay.host);
+		if (sameIdentity) {
+			relays.delete(k);
+			loggedKeys.delete(k);
+		}
+	}
+	// Honor a caller-supplied lastSeen (production callers stamp `now`); this
+	// also lets tests backdate an entry to exercise the TTL sweep.
+	relays.set(key, { ...relay, lastSeen: relay.lastSeen ?? Date.now() });
+	if (!loggedKeys.has(key)) {
+		loggedKeys.add(key);
+		console.log(
+			`moblink_streamer: registered relay ${relay.host}${relay.hostname ? ` (${relay.hostname})` : ""} ifaces=[${endpointSummary(relay.interfaces)}]`,
+		);
+	}
+	emitIfChanged();
+}
+
+/**
+ * Drop every relay not (re)announced within TTL, EXCEPT relays protected in
  * `protectedHosts` (relays with a live WebSocket — the channel keeps itself
- * fresh via keepalive, so UDP silence must not reap a connected relay).
- * Returns the swept hosts.
+ * fresh via keepalive, so UDP silence must not reap a connected relay). A
+ * relay is protected when its key OR its dial host is in the set. Returns
+ * the swept keys.
  */
 export function sweepStaleRelays(protectedHosts?: () => Set<string>): string[] {
 	const now = Date.now();
 	const protectedNow = protectedHosts?.() ?? new Set<string>();
 	const swept: string[] = [];
-	for (const [host, r] of relays) {
-		if (now - r.lastSeen > MOBLINK_ANNOUNCE_TTL_MS && !protectedNow.has(host)) {
-			relays.delete(host);
-			swept.push(host);
+	for (const [key, r] of relays) {
+		const protectedEntry = protectedNow.has(key) || protectedNow.has(r.host);
+		if (now - r.lastSeen > MOBLINK_ANNOUNCE_TTL_MS && !protectedEntry) {
+			relays.delete(key);
+			loggedKeys.delete(key);
+			swept.push(key);
 		}
 	}
 	if (swept.length > 0) {
@@ -159,23 +212,13 @@ export function sweepStaleRelays(protectedHosts?: () => Set<string>): string[] {
 
 /**
  * Register a relay as if its announce had just been received. This is the
- * control-server registration path (a relay can hand the encoder its IP
- * through the control plane instead of UDP) and is also what tests use to
- * seed a discovered relay. Fires the change callback on a shape change.
- * `quiet` skips the registration log (keepalive refreshes run every 5 s).
+ * WS `hello` / control-server registration path (a relay can hand the
+ * encoder its IP through the control plane instead of UDP) and is also what
+ * tests use to seed a discovered relay. Fires the change callback on a
+ * shape change; logs once per relay (subsequent refreshes are silent).
  */
-export function noteRelay(
-	relay: MoblinkDiscoveredRelay,
-	opts: { quiet?: boolean } = {},
-): void {
-	if (!opts.quiet)
-		console.log(
-			`moblink_streamer: registered relay (control-server) ${relay.host}${relay.hostname ? ` (${relay.hostname})` : ""} ifaces=[${endpointSummary(relay.interfaces)}]`,
-		);
-	// Honor a caller-supplied lastSeen (production callers stamp `now`); this
-	// also lets tests backdate an entry to exercise the TTL sweep.
-	relays.set(relay.host, { ...relay, lastSeen: relay.lastSeen ?? Date.now() });
-	emitIfChanged();
+export function noteRelay(relay: MoblinkDiscoveredRelay): void {
+	registerRelay(relay);
 }
 
 /** True for a plain dotted-quad IPv4 literal (no hostname resolution). */
@@ -183,15 +226,37 @@ export function isIpv4Literal(x: string): boolean {
 	return /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/u.test(x);
 }
 
-/** A registry entry for host (if known); null otherwise. */
-export function getKnownRelay(host: string): MoblinkDiscoveredRelay | null {
-	return relays.get(host) ?? null;
+/** A registry entry keyed by (or hosted at) `keyOrHost`, if known. */
+export function getKnownRelay(
+	keyOrHost: string,
+): MoblinkDiscoveredRelay | null {
+	return (
+		relays.get(keyOrHost) ??
+		[...relays.values()].find(
+			(r) => r.host === keyOrHost || r.hostname === keyOrHost,
+		) ??
+		null
+	);
 }
 
-/** Drop a registry entry (e.g. a hostname-keyed duplicate whose relay moved
- * to a peer-IP key). Fires the change callback when the shape changed. */
-export function forgetRelay(host: string): void {
-	if (relays.delete(host)) emitIfChanged();
+/** Drop a registry entry matched by key, host, or hostname. Fires the
+ * change callback when the shape changed. */
+export function forgetRelay(keyOrHost: string): void {
+	const direct = relays.get(keyOrHost);
+	if (direct) {
+		relays.delete(keyOrHost);
+		loggedKeys.delete(keyOrHost);
+		emitIfChanged();
+		return;
+	}
+	const match = [...relays.entries()].find(
+		([, r]) => r.host === keyOrHost || r.hostname === keyOrHost,
+	);
+	if (match) {
+		relays.delete(match[0]);
+		loggedKeys.delete(match[0]);
+		emitIfChanged();
+	}
 }
 
 /**
@@ -206,20 +271,17 @@ export function noteMdnsRelay(
 	hostname: string | undefined,
 	endpoints: MoblinkSharedEndpoint[],
 ): void {
-	const known = relays.get(host);
+	const known = getKnownRelay(hostname ?? host) ?? getKnownRelay(host);
 	const interfaces =
 		endpoints.length > (known?.interfaces.length ?? 0)
 			? endpoints
 			: (known?.interfaces ?? endpoints);
-	// An endpoint whose UDP address is down must not keep a downed relay
-	// alive via a stale mDNS record: only refresh if we have usable info.
-	relays.set(host, {
+	registerRelay({
 		host,
 		hostname: hostname ?? known?.hostname,
 		interfaces,
 		lastSeen: Date.now(),
 	});
-	emitIfChanged();
 }
 
 /** The currently-known relays (empty when none heard). */
@@ -394,5 +456,6 @@ export function stopDiscovering(): void {
 		}
 	}
 	relays = new Map();
+	loggedKeys = new Set();
 	lastSig = "";
 }
