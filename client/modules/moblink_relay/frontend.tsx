@@ -6,19 +6,11 @@
  * device page composes it with the network module's interfaces card.
  */
 import "./styles.css";
-import {
-	Actions,
-	Badge,
-	Button,
-	Card,
-	Field,
-	Form,
-	Input,
-	Table,
-} from "@ui/components/";
+import { Actions, Badge, Button, Card, Form, Table } from "@ui/components/";
 import { OutlineIcon } from "@ui/components/icons";
 import { card, type DeviceCard } from "@ui/device/store";
 import { t } from "@ui/i18n";
+import { formatBitrate, since } from "@ui/util";
 import m from "mithril";
 import type {
 	DeviceDashboardWidget,
@@ -65,40 +57,10 @@ const uplinkIcon = (state: "up" | "down") => (
 	</OutlineIcon>
 );
 
-interface RelayCardState {
-	announceHost: string;
-}
-
-const relayStates = new WeakMap<DeviceCard, RelayCardState>();
-const relayState = (host: DeviceCard): RelayCardState => {
-	let state = relayStates.get(host);
-	if (!state) {
-		state = { announceHost: "" };
-		relayStates.set(host, state);
-	}
-	return state;
-};
-
-/**
- * Prefill only once, and never clobber the operator's focused field. The
- * "advertise IP" is always prefilled with the relay's effective IP (auto or
- * manual) so the operator sees what will be announced and can override it.
- */
-function prefill(host: DeviceCard, status: MoblinkRuntimeStatus): void {
-	const s = relayState(host);
-	if (
-		status.announceHost &&
-		(document.activeElement as HTMLInputElement | null)?.name !==
-			"moblink-announce-host"
-	)
-		s.announceHost = status.announceHost;
-}
-
 function moblinkStart(host: DeviceCard): void {
-	const s = relayState(host);
-	host.press("moblink-start", "moblink_relay.start", {
-		announceHost: s.announceHost.trim(),
-	});
+	// The advertised IP is auto-detected by the relay (effectiveAnnounceHost);
+	// the card only shows it, so no override is sent on start.
+	host.press("moblink-start", "moblink_relay.start");
 }
 
 const moblinkDashboardWidgets: DeviceDashboardWidget[] = [
@@ -129,21 +91,22 @@ const moblinkRelayModule: FrontendModule = {
 	defaultSize: { w: 4, h: 4 },
 	minSize: { w: 3, h: 3 },
 	component: () => <Card>{moblinkCardBody(card)}</Card>,
-	handleEvent(event, _data, host) {
-		if (event === "status" && host && host.st.status)
-			prefill(host, moblinkRuntime(host));
-	},
 };
 
 function moblinkCardBody(host: DeviceCard): m.Children {
 	const s = moblinkRuntime(host);
-	const form = relayState(host);
-	// One row per shared interface: name, its IP, UDP port, and the
-	// uplink mark (protocol.md §1), colored by up/down state.
+	// One row per shared interface: name, its IP, UDP port, its negotiated
+	// link speed (same as the encoder's interfaces card), and the uplink mark
+	// (protocol.md §1), colored by up/down state.
 	const columns = [
 		{ key: "iface", header: t("dev.moblink.col_iface") },
 		{ key: "ip", header: t("dev.moblink.col_ip") },
 		{ key: "port", header: t("dev.moblink.col_port") },
+		{
+			key: "speed",
+			header: t("dev.moblink.col_speed"),
+			title: t("dev.moblink.speed_note"),
+		},
 		{ key: "uplink", header: t("dev.moblink.uplink") },
 	];
 	return (
@@ -163,6 +126,25 @@ function moblinkCardBody(host: DeviceCard): m.Children {
 						<td>{i.name}</td>
 						<td>{i.address || "—"}</td>
 						<td>{i.listenPort}</td>
+						<td className="num">
+							{i.rxBytesPerSec !== undefined ||
+							i.txBytesPerSec !== undefined ? (
+								<span
+									title={`↑ ${formatBitrate(
+										i.txBytesPerSec ?? 0,
+									)} · ↓ ${formatBitrate(
+										i.rxBytesPerSec ?? 0,
+									)}`}
+								>
+									{formatBitrate(
+										(i.rxBytesPerSec ?? 0) +
+											(i.txBytesPerSec ?? 0),
+									)}
+								</span>
+							) : (
+								"—"
+							)}
+						</td>
 						<td>{uplinkIcon(i.state)}</td>
 					</tr>
 				))}
@@ -179,18 +161,30 @@ function moblinkCardBody(host: DeviceCard): m.Children {
 				</p>
 			))}
 			<p class="muted">{t("dev.moblink.help_hosts")}</p>
+			{/* The advertised IP is auto-detected by the relay — show it,
+			 * don't let the operator type into it (settings page still
+			 * overrides it for NATted / multi-homed relays). */}
+			<p class="announce-host">
+				<span class="muted">{t("dev.moblink.announce_host")}</span>{" "}
+				<strong>{s.announceHost || "—"}</strong>
+			</p>
+			{/* How recently we announced ourselves on each path (mDNS / UDP /
+			 * WS control channel). A live path keeps a fresh timestamp. */}
+			<p class="muted announce-times">
+				{t("dev.moblink.last_self_announce")}:{" "}
+				<span title={t("dev.moblink.last_mdns")}>
+					{t("dev.moblink.last_mdns")} {since(s.lastMdnsAnnounceAt)}
+				</span>
+				{" · "}
+				<span title={t("dev.moblink.last_udp")}>
+					{t("dev.moblink.last_udp")} {since(s.lastUdpAnnounceAt)}
+				</span>
+				{" · "}
+				<span title={t("dev.moblink.last_ws")}>
+					{t("dev.moblink.last_ws")} {since(s.lastWsAdvertiseAt)}
+				</span>
+			</p>
 			<Form onSubmit={() => moblinkStart(host)}>
-				<Field
-					label={t("dev.moblink.announce_host")}
-					control={
-						<Input
-							target={form}
-							prop="announceHost"
-							name="moblink-announce-host"
-							placeholder={form.announceHost || "auto (detected)"}
-						/>
-					}
-				/>
 				<Actions>
 					<Button
 						type="submit"

@@ -13,6 +13,8 @@
     "dev.link_weak": "较弱",
     "dev.monitor_watching": "监视中",
     "dev.mstun_none": "无活动隧道",
+    "dev.net_last_seen": "上次收到",
+    "dev.net_self_announce": "自我宣告",
     "dev.no_interfaces": "未检测到接口",
     "dev.own_interfaces": "Own interfaces",
     "dev.stale": "过期，{{time}}",

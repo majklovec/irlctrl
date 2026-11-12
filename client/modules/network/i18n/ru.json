@@ -13,6 +13,8 @@
     "dev.link_weak": "слабый",
     "dev.monitor_watching": "наблюдение",
     "dev.mstun_none": "No active tunnels",
+    "dev.net_last_seen": "Последнее получение",
+    "dev.net_self_announce": "Самоанонсация",
     "dev.no_interfaces": "Интерфейсы не обнаружены",
     "dev.own_interfaces": "Own interfaces",
     "dev.stale": "устарело, {{time}}",

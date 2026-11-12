@@ -199,6 +199,10 @@ export interface MdnsAdvertiserOptions {
 	/** Multicast UDP port (tests use a scratch port). Default 5353. */
 	udpPort?: number;
 	dryRun?: boolean;
+	/** Fired (with the epoch-ms timestamp) after every re-advertise tick that
+	 * actually sent a record, so the caller can surface "last mDNS
+	 * advertise" in the UI. */
+	onAdvertise?: (ts: number) => void;
 }
 
 /**
@@ -275,10 +279,12 @@ export function startMdnsAdvertiser(opts: MdnsAdvertiserOptions): () => void {
 			const tick = (): void => {
 				const pkt = buildResponse();
 				if (!pkt) return;
+				const ts = Date.now();
 				s.send(pkt, udpPort, MDNS_ADDR, (e) => {
 					if (e && !stopped)
 						console.warn(`moblink_mdns: advertise send failed: ${e.message}`);
 				});
+				opts.onAdvertise?.(ts);
 			};
 			tick();
 			timer = setInterval(tick, MDNS_REFRESH_MS);

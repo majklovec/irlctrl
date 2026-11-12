@@ -48,6 +48,14 @@ interface AnnounceSocket {
 let announceSockets: AnnounceSocket[] = [];
 /** The re-broadcast timer. */
 let timer: ReturnType<typeof setInterval> | undefined;
+/** Epoch ms of the last UDP discovery broadcast (surfaced on the card).
+ * `undefined` until the first send; cleared on stop. */
+let udpAnnounceAt: number | undefined;
+
+/** The relay's last UDP discovery broadcast timestamp, if any. */
+export function lastUdpAnnounceAt(): number | undefined {
+	return udpAnnounceAt;
+}
 
 /** Compact one-line summary of an announce's shared interfaces (debug logs). */
 function endpointSummary(eps: MoblinkAnnounce["interfaces"]): string {
@@ -114,6 +122,7 @@ function tickAnnounce(buildPayload: () => MoblinkAnnounce | null): void {
 	const announce = buildPayload();
 	if (!announce) return;
 	const payload = JSON.stringify(announce);
+	udpAnnounceAt = Date.now();
 	const via = announceSockets.map((a) => a.bind || "default").join(", ");
 	console.log(
 		`moblink_relay: advertising host=${announce.host} ifaces=[${endpointSummary(announce.interfaces)}] → ${MOBLINK_BROADCAST_ADDR}:${MOBLINK_DISCOVERY_PORT} via [${via}]`,
@@ -222,6 +231,7 @@ export function stopAnnouncing(): void {
 		clearInterval(timer);
 		timer = undefined;
 	}
+	udpAnnounceAt = undefined;
 	const socks = announceSockets;
 	announceSockets = [];
 	if (had) console.log("moblink_relay: discovery advertise stopped");

@@ -308,6 +308,14 @@ export interface EncoderInfo {
 
 let announceSocket: dgram.Socket | undefined;
 let announceTimer: ReturnType<typeof setInterval> | undefined;
+/** Epoch ms of the encoder's last UDP self-announce (so relays find it).
+ * `undefined` until the first send; cleared on stop. Surfaced on the card. */
+let encoderUdpAnnounceAt: number | undefined;
+
+/** The encoder's last UDP self-announce timestamp, if any. */
+export function lastEncoderUdpAnnounceAt(): number | undefined {
+	return encoderUdpAnnounceAt;
+}
 
 /**
  * Broadcast `MoblinkEncoderAnnounce` datagrams on the well-known discovery
@@ -356,6 +364,7 @@ export function startEncoderAnnouncing(
 				ts: Date.now(),
 			};
 			const payload = JSON.stringify(announce);
+			encoderUdpAnnounceAt = Date.now();
 			try {
 				s.send(payload, MOBLINK_DISCOVERY_PORT, MOBLINK_BROADCAST_ADDR, (e) => {
 					if (e && !broadcastDenied) {
@@ -419,6 +428,7 @@ export function stopEncoderAnnouncing(): void {
 		clearInterval(announceTimer);
 		announceTimer = undefined;
 	}
+	encoderUdpAnnounceAt = undefined;
 	const s = announceSocket;
 	announceSocket = undefined;
 	if (s) {

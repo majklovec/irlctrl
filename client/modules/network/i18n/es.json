@@ -13,6 +13,8 @@
     "dev.link_weak": "débil",
     "dev.monitor_watching": "monitorizando",
     "dev.mstun_none": "No active tunnels",
+    "dev.net_last_seen": "Última vez oído",
+    "dev.net_self_announce": "Auto-anuncio",
     "dev.no_interfaces": "No se detectaron interfaces",
     "dev.own_interfaces": "Own interfaces",
     "dev.stale": "obsoleto, {{time}}",

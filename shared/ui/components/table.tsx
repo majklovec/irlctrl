@@ -7,6 +7,8 @@ import type { MithrilJSXComponent } from "../jsx";
 export interface TableColumn {
 	key: string;
 	header: m.Children;
+	/** Optional tooltip shown on the column-header cell. */
+	title?: string;
 }
 
 export const Table = {
@@ -15,7 +17,9 @@ export const Table = {
 			<thead>
 				<tr>
 					{columns.map((c) => (
-						<th key={c.key}>{c.header}</th>
+						<th key={c.key} title={c.title ?? null}>
+							{c.header}
+						</th>
 					))}
 					{actions ? <th /> : null}
 				</tr>

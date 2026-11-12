@@ -321,7 +321,20 @@ function interfacesCard(host: DeviceCard, status: NetworkStatus): m.Vnode {
 			<th colspan={4 + LINK_COLUMNS}>{label}</th>
 		</tr>
 	);
+	// The encoder's own self-announce freshness (how recently it told the
+	// relays it's here) — encoder role only; mirrors the relay card.
+	const selfAnnounceRow = streamer?.runtime ? (
+		groupHeader(
+			"grp:self",
+			<>
+				<span class="muted">{t("dev.net_self_announce")}</span>{" "}
+				mDNS {since(streamer.runtime.lastMdnsAnnounceAt)} · UDP{" "}
+				{since(streamer.runtime.lastUdpAnnounceAt)}
+			</>,
+		)
+	) : null;
 	const tbodyRows: m.Vnode[] = [
+		...(selfAnnounceRow ? [selfAnnounceRow] : []),
 		groupHeader("grp:own", t("dev.own_interfaces")),
 		...(rows.length
 			? rows
@@ -340,6 +353,11 @@ function interfacesCard(host: DeviceCard, status: NetworkStatus): m.Vnode {
 					<>
 						{r.hostname ?? r.host}
 						{r.hostname ? <small class="muted"> · {r.host}</small> : null}
+						{r.lastSeen ? (
+							<small class="muted" title={t("dev.net_last_seen")}>
+								{" "}· {since(r.lastSeen)}
+							</small>
+						) : null}
 					</>,
 				),
 				...(relTuns.length

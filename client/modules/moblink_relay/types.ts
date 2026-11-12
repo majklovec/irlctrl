@@ -56,6 +56,17 @@ export interface MoblinkAvailableInterface {
 	/** `up` = a relay is running on it; `down` = path lost/failed (the port
 	 * mapping is KEPT, protocol.md §1). */
 	state: "up" | "down";
+	/** Negotiated link speed in Mb/s (sysfs); undefined when the kernel
+	 * reports it unknown (Wi-Fi, most modems, no carrier). */
+	speed?: number;
+	/**
+	 * The REAL relayed throughput in bytes/sec (live 1s sample of the UDP
+	 * frames this relay forwards) — what the card's Speed column shows, in
+	 * contrast to the negotiated `speed` above. `undefined` until the first
+	 * sample completes.
+	 */
+	rxBytesPerSec?: number;
+	txBytesPerSec?: number;
 }
 
 /** One relay entry in the runtime status (§9.1, relay-box side). */
@@ -96,6 +107,16 @@ export interface MoblinkRuntimeStatus {
 	 * `state: "down"`.
 	 */
 	downInterfaces: string[];
+	/**
+	 * Epoch-ms of this relay's last SELF-ADVERTISE on each path, so the card
+	 * can show "how recently did we announce ourselves". `undefined` = not
+	 * running on that path yet (stopped or not started). Surfaced as a
+	 * relative time on the relay card.
+	 */
+	lastMdnsAnnounceAt?: number;
+	lastUdpAnnounceAt?: number;
+	/** Last control-channel snapshot (WS "hello") sent to an encoder. */
+	lastWsAdvertiseAt?: number;
 }
 
 /** The status fragment the module contributes under `state.moblink`. */

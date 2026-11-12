@@ -71,6 +71,7 @@ import {
 	forgetRelay,
 	isIpv4Literal,
 	knownRelays,
+	lastEncoderUdpAnnounceAt,
 	noteMdnsRelay,
 	noteRelay,
 	startDiscovering,
@@ -271,6 +272,9 @@ function runtimeStatus(): MoblinkStreamerRuntimeStatus {
 		txBytes: bytes.txBytes,
 		rxBytes: bytes.rxBytes,
 		lastError: statuses.find((s) => s.lastError)?.lastError,
+		// How recently this encoder announced itself so relays stay in touch.
+		lastMdnsAnnounceAt,
+		lastUdpAnnounceAt: lastEncoderUdpAnnounceAt(),
 	};
 }
 
@@ -463,6 +467,7 @@ function syncRegistry(relays: MoblinkDiscoveredRelay[]): void {
 				host: r.host,
 				hostname: r.hostname,
 				interfaces: r.interfaces,
+				lastSeen: r.lastSeen,
 			});
 		}
 	} catch (e) {
@@ -500,6 +505,10 @@ async function onDiscoveredRelays(
 
 let mdnsBrowseStop: (() => void) | undefined;
 let mdnsAdvertiseStop: (() => void) | undefined;
+/** Epoch ms of the encoder's last mDNS self-advertise (so relays find it).
+ * The UDP one lives in `discovery.lastEncoderUdpAnnounceAt()`. Both surface
+ * on the Network card (encoder role). */
+let lastMdnsAnnounceAt: number | undefined;
 
 function ensureDiscovery(): void {
 	// Always wire the change callback: it also serves as the registration
@@ -598,6 +607,9 @@ function ensureControlPlane(): void {
 		service: MDNS_ENCODER_SERVICE,
 		servicePort: c.wsPort,
 		dryRun: core.config.DRY_RUN,
+		onAdvertise: (ts) => {
+			lastMdnsAnnounceAt = ts;
+		},
 		buildTxt: (): string[] | null => {
 			const info = encoderInfo();
 			if (!info) return null;

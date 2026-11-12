@@ -66,6 +66,11 @@ export interface MoblinkStreamerRuntimeStatus {
 	txBytes: number;
 	rxBytes: number;
 	lastError?: string;
+	/** How recently this encoder announced ITSELF so relays keep finding it
+	 * (epoch ms; `undefined` when that path isn't running). Shown on the
+	 * Network card, mirroring the relay card's self-announce line. */
+	lastMdnsAnnounceAt?: number;
+	lastUdpAnnounceAt?: number;
 }
 
 /** The device `status` view contribution for `modules["moblink_streamer"]`. */

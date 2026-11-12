@@ -13,6 +13,8 @@
     "dev.link_weak": "slabé",
     "dev.monitor_watching": "sleduje",
     "dev.mstun_none": "No active tunnels",
+    "dev.net_last_seen": "Naposledy počuté",
+    "dev.net_self_announce": "Vlastné ohlasovanie",
     "dev.no_interfaces": "Neboli zistené žiadne rozhrania",
     "dev.own_interfaces": "Own interfaces",
     "dev.stale": "zastarané, {{time}}",

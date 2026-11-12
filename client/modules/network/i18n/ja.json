@@ -13,6 +13,8 @@
     "dev.link_weak": "弱い",
     "dev.monitor_watching": "監視中",
     "dev.mstun_none": "No active tunnels",
+    "dev.net_last_seen": "最終受信",
+    "dev.net_self_announce": "自己広告",
     "dev.no_interfaces": "インターフェースが検出されていません",
     "dev.own_interfaces": "Own interfaces",
     "dev.stale": "古い、{{time}}",

@@ -75,6 +75,7 @@ import { errorMessage } from "../../../shared/util";
 import type { ModuleCore } from "../../backend/module_core";
 import {
 	knownEncoders,
+	lastUdpAnnounceAt,
 	noteEncoder,
 	startAnnouncing,
 	startListeningForEncoders,
@@ -122,9 +123,76 @@ let lastControlServerCheck = 0;
 /** mDNS advertiser (relay service) / browser (encoder service) stop handles. */
 let mdnsBrowseStop: (() => void) | undefined;
 let mdnsAdvertiseStop: (() => void) | undefined;
+/** Epoch ms of the last mDNS re-advertise (this relay's own record). The
+ * UDP one lives in `discovery.lastUdpAnnounceAt()`; the WS one is the last
+ * control-channel snapshot (hello) sent. All three surface on the card. */
+let lastMdnsAnnounceAt: number | undefined;
+let lastWsAdvertiseAt: number | undefined;
 
 /** The running per-interface relays, keyed by interface name. */
 const relays = new Map<string, UdpRelay>();
+
+/**
+ * Live per-interface RELAYED throughput (the real bytes/sec this relay is
+ * forwarding, not the negotiated PHY link speed). Sampled on an interval from
+ * the `encRxBytes` / `encTxBytes` counters each `createUdpRelay()` accumulates.
+ * `lastSample` holds the previous reading; `liveRates` the derived rate.
+ */
+const RATE_SAMPLE_MS = 1_000;
+const lastSample = new Map<string, { rx: number; tx: number; at: number }>();
+const liveRates = new Map<
+	string,
+	{ rxBytesPerSec: number; txBytesPerSec: number }
+>();
+let rateTimer: ReturnType<typeof setInterval> | undefined;
+
+/** One throughput sample: rate vs the previous reading, per live relay. */
+function sampleRates(): void {
+	const now = Date.now();
+	for (const [name, relay] of relays) {
+		const st = relay.stats();
+		const prev = lastSample.get(name);
+		if (prev) {
+			const dt = (now - prev.at) / 1000;
+			if (dt > 0) {
+				liveRates.set(name, {
+					// Counters are monotonic; clamp against a mid-sample
+					// restart (a fresh relay's counters start at 0).
+					rxBytesPerSec: Math.max(0, (st.encRxBytes - prev.rx) / dt),
+					txBytesPerSec: Math.max(0, (st.encTxBytes - prev.tx) / dt),
+				});
+			}
+		}
+		lastSample.set(name, {
+			rx: st.encRxBytes,
+			tx: st.encTxBytes,
+			at: now,
+		});
+	}
+	for (const name of [...lastSample.keys()])
+		if (!relays.has(name)) {
+			lastSample.delete(name);
+			liveRates.delete(name);
+		}
+}
+
+/** Start the sampler (idempotent); run it for the module's lifetime. */
+function startRateSampler(): void {
+	if (rateTimer) return;
+	rateTimer = setInterval(sampleRates, RATE_SAMPLE_MS);
+	rateTimer.unref?.();
+}
+
+/** Stop the sampler and drop all samples/rates. */
+function stopRateSampler(): void {
+	if (rateTimer) {
+		clearInterval(rateTimer);
+		rateTimer = undefined;
+	}
+	lastSample.clear();
+	liveRates.clear();
+}
+
 /**
  * Interfaces marked DOWN (present in the mapping, no live relay): their port
  * mapping is kept (protocol.md §1) and the encoder is told `interface_down`.
@@ -345,14 +413,21 @@ export function relayIfaceList(): MoblinkRelayIface[] {
 function buildStatus(): MoblinkRuntimeStatus {
 	const cfg = config();
 	const ifaces = netIfaces?.list() ?? [];
-	const availableInterfaces = eligibleInterfaces(ifaces, cfg).map((name) => ({
-		name,
-		address: ifaceAddress(name, ifaces, cfg) ?? "",
-		// High-water-mark mapping (protocol.md §1) — never base+index.
-		listenPort: allocatePort(name),
-		state: relays.has(name) ? ("up" as const) : ("down" as const),
-		speed: linkSpeed(name),
-	}));
+	const availableInterfaces = eligibleInterfaces(ifaces, cfg).map((name) => {
+		const rate = liveRates.get(name);
+		return {
+			name,
+			address: ifaceAddress(name, ifaces, cfg) ?? "",
+			// High-water-mark mapping (protocol.md §1) — never base+index.
+			listenPort: allocatePort(name),
+			state: relays.has(name) ? ("up" as const) : ("down" as const),
+			speed: linkSpeed(name),
+			// The REAL relayed throughput (bytes/sec), sampled live — this is
+			// what the card shows, not the negotiated `speed` above.
+			rxBytesPerSec: rate?.rxBytesPerSec,
+			txBytesPerSec: rate?.txBytesPerSec,
+		};
+	});
 	const relaysArr = [...relays.entries()].map(([name, relay]) => {
 		const st = relay.stats();
 		return {
@@ -378,6 +453,9 @@ function buildStatus(): MoblinkRuntimeStatus {
 			interfaceName,
 			reason,
 		})),
+		lastMdnsAnnounceAt,
+		lastUdpAnnounceAt: lastUdpAnnounceAt(),
+		lastWsAdvertiseAt,
 	};
 }
 
@@ -512,6 +590,7 @@ async function stopRelay(name: string): Promise<void> {
 	if (!relay) return;
 	await relay.stop();
 	relays.delete(name);
+	liveRates.delete(name);
 	lastIfaceAddr.delete(name);
 	failures.delete(name);
 	downIfaces.delete(name);
@@ -927,6 +1006,7 @@ function startEncoderChannel(e: MoblinkDiscoveredEncoder): void {
 		noteEncoder(e);
 		// Full snapshot on (re)connect — the encoder has a consistent view.
 		st.ws.send(JSON.stringify(helloMessage()));
+		lastWsAdvertiseAt = Date.now();
 		// Keepalive: the encoder replies `pong`; every frame in both
 		// directions refreshes the registry TTL (protocol.md §3).
 		st.hbeat = setInterval(() => {
@@ -1062,6 +1142,7 @@ export function onEncoderAnnounced(e: MoblinkDiscoveredEncoder): void {
 /** Stop all relay → encoder channels (module stop). */
 export function stopEncoderChannels(): void {
 	for (const key of [...encoderChannels.keys()]) stopEncoderChannel(key);
+	lastWsAdvertiseAt = undefined;
 	pendingConnects.clear();
 }
 
@@ -1146,6 +1227,9 @@ function startAdvertiseAll(): void {
 		service: MDNS_RELAY_SERVICE,
 		servicePort: MOBLINK_DISCOVERY_PORT,
 		dryRun: core.config.DRY_RUN,
+		onAdvertise: (ts) => {
+			lastMdnsAnnounceAt = ts;
+		},
 		buildTxt: (): string[] | null => {
 			const p = announcePayload();
 			if (!p) return null;
@@ -1164,6 +1248,7 @@ function stopAdvertiseAll(): void {
 	stopAnnouncing();
 	mdnsAdvertiseStop?.();
 	mdnsAdvertiseStop = undefined;
+	lastMdnsAnnounceAt = undefined;
 }
 
 // ----------------------------------------------------------------------
@@ -1247,6 +1332,9 @@ const registration: BackendModule<ModuleCore> = {
 		// network module's slice is disabled on this role).
 		await netIfaces.ensureMonitoring();
 		netUnsub = netIfaces.onChanged(() => void onNetworkChange());
+		// Sample each relay's live forwarded throughput (bytes/sec) for the
+		// card's "real speed" — the negotiated link speed is not what matters.
+		startRateSampler();
 		// Interface history: an interface that got a port mapping before this
 		// process started must not be re-announced as `interface_added` — it
 		// goes out in the WS snapshot (protocol.md §4).
@@ -1269,6 +1357,7 @@ const registration: BackendModule<ModuleCore> = {
 	async stop() {
 		netUnsub?.();
 		netUnsub = undefined;
+		stopRateSampler();
 		stopAdvertiseAll();
 		stopDiscovery();
 		await stopAll();

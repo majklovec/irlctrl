@@ -26,3 +26,7 @@
 .uplink-mark-down {
 	stroke: var(--muted, #888);
 }
+/* Read-only advertise-IP line (was an input; the relay auto-detects it). */
+.moblink-relay .announce-host {
+	margin: 0.25rem 0 0.5rem;
+}

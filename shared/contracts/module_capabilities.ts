@@ -66,6 +66,8 @@ export interface MoblinkDiscoveredRelay {
 	host: string;
 	hostname?: string;
 	interfaces: MoblinkSharedEndpoint[];
+	/** Epoch ms we last heard from this relay (shown as "last discovered"). */
+	lastSeen?: number;
 }
 
 /** The `network.moblink` capability (network module): the small registry of
