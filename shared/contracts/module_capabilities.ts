@@ -68,6 +68,13 @@ export interface MoblinkDiscoveredRelay {
 	interfaces: MoblinkSharedEndpoint[];
 	/** Epoch ms we last heard from this relay (shown as "last discovered"). */
 	lastSeen?: number;
+	/**
+	 * `true` while the relay's control-channel WebSocket is open (protocol.md
+	 * §3: the relay dials the encoder's WS server). The network card renders a
+	 * green dot next to the relay name when this is set — a live WS is a
+	 * stronger "reachable" signal than a TTL'd UDP announce.
+	 */
+	wsConnected?: boolean;
 }
 
 /** The `network.moblink` capability (network module): the small registry of

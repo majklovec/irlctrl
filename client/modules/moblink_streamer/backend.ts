@@ -454,10 +454,14 @@ async function stopAllTunnels(): Promise<void> {
 // ----------------------------------------------------------------------
 // Discovery wiring
 // ----------------------------------------------------------------------
-/** Mirror the discovered relays to the network card's per-relay grouping. */
+/** Mirror the discovered relays to the network card's per-relay grouping.
+ * `wsConnected` marks the relays with a live control-channel WebSocket so the
+ * card can show a green "connected" dot (protocol.md §3). */
 function syncRegistry(relays: MoblinkDiscoveredRelay[]): void {
 	try {
 		const seen = new Set(relays.map((r) => r.host));
+		// Registry keys inside the hello→close WS window (protocol.md §3).
+		const wsConnectedHosts = new Set(wsRelayHosts.values());
 		// Drop stale registry entries no longer present.
 		for (const r of moblinkReg.listRelays()) {
 			if (!seen.has(r.host)) moblinkReg.dropRelay(r.host);
@@ -468,11 +472,24 @@ function syncRegistry(relays: MoblinkDiscoveredRelay[]): void {
 				hostname: r.hostname,
 				interfaces: r.interfaces,
 				lastSeen: r.lastSeen,
+				wsConnected: wsConnectedHosts.has(r.host),
 			});
 		}
 	} catch (e) {
 		console.warn(`moblink_streamer: registry sync failed: ${errorMessage(e)}`);
 	}
+}
+
+/**
+ * Re-publish the network-card relay registry with fresh `wsConnected` flags.
+ * Called when a control-channel WebSocket CLOSES: the relay entry stays in the
+ * registry until its TTL sweeps it, but the green "connected" dot must go away
+ * immediately. (The OPEN path needs no extra call — the relay's `hello`
+ * re-registers it, which re-syncs with the flag already set.)
+ */
+function pushWsStatus(): void {
+	syncRegistry(knownRelays());
+	core.notifyStateChange();
 }
 
 /** A discovery shape change: re-sync the registry + reconcile the TUNs.
@@ -581,8 +598,10 @@ function ensureControlPlane(): void {
 	const c = config();
 	wsServer?.stop(true);
 	wsServer = null;
-	// A stopped server has no peers — never sweep-protect a stale IP.
+	// A stopped server has no peers — never sweep-protect a stale IP, and no
+	// relay is WS-connected across the restart (its channel is gone).
 	wsLivePeers.clear();
+	wsRelayHosts.clear();
 	if (core.config.DRY_RUN) return;
 	wsServer = startRelayWsServer({
 		port: c.wsPort,
@@ -597,6 +616,9 @@ function ensureControlPlane(): void {
 		onClose: (conn) => {
 			if (conn.relayId) wsRelayHosts.delete(conn.relayId);
 			if (conn.remoteAddress) wsLivePeers.delete(conn.remoteAddress);
+			// Drop the green "connected" dot now, before the TTL sweep reaps
+			// the registry entry (protocol.md §3).
+			pushWsStatus();
 		},
 	});
 	startEncoderAnnouncing(() => encoderInfo(), { dryRun: core.config.DRY_RUN });
@@ -679,6 +701,10 @@ export function onRelayWsMessage(
 			})),
 			lastSeen: Date.now(),
 		});
+		// Publish the green "connected" dot now. A relay re-announcing the
+		// SAME interface set over WS leaves the registry shape unchanged, so
+		// `noteRelay` alone would not re-sync the network card's flag.
+		pushWsStatus();
 		return;
 	}
 	// Keepalive frame (protocol.md §3): proof the channel is live → refresh

@@ -117,6 +117,22 @@ export interface MoblinkRuntimeStatus {
 	lastUdpAnnounceAt?: number;
 	/** Last control-channel snapshot (WS "hello") sent to an encoder. */
 	lastWsAdvertiseAt?: number;
+	/**
+	 * The encoders this relay has discovered, each with whether its
+	 * control-channel WebSocket (protocol.md §3) is currently open. Shown on
+	 * the relay card so the operator sees the relay→encoder links live.
+	 */
+	encoders: MoblinkRelayEncoderStatus[];
+}
+
+/** One discovered encoder and the state of the relay's WS link to it. */
+export interface MoblinkRelayEncoderStatus {
+	/** Stable encoder identity (the `encoder_id` from its announce). */
+	id: string;
+	/** `true` while the relay's WebSocket to this encoder is open. */
+	connected: boolean;
+	/** Epoch ms the relay last heard from this encoder (announce / WS frame). */
+	lastSeen?: number;
 }
 
 /** The status fragment the module contributes under `state.moblink`. */

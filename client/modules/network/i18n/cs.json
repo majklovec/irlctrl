@@ -15,6 +15,8 @@
     "dev.mstun_none": "No active tunnels",
     "dev.net_last_seen": "Naposlední slyšeno",
     "dev.net_self_announce": "Vlastní ohlášení",
+    "dev.net_ws_connected": "Připojeno přes WebSocket",
+    "dev.net_ws_offline": "Žádný živý WebSocket — slyšeno jen přes ohlášení",
     "dev.no_interfaces": "Nebyly detekována žádná rozhraní",
     "dev.own_interfaces": "Lokální rozhraní",
     "dev.stale": "zastaralá, {{time}}",

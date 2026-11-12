@@ -355,6 +355,14 @@ function interfacesCard(host: DeviceCard, status: NetworkStatus): m.Vnode {
 				groupHeader(
 					`grp:${r.host}`,
 					<>
+						<span
+							class={`ws-dot${r.wsConnected ? " is-on" : ""}`}
+							title={
+								r.wsConnected
+									? t("dev.net_ws_connected")
+									: t("dev.net_ws_offline")
+							}
+						/>
 						{r.hostname ?? r.host}
 						{r.hostname ? <small class="muted"> · {r.host}</small> : null}
 						{r.lastSeen ? (

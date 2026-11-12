@@ -309,6 +309,27 @@ describe("relay WS control channel (protocol.md §3–§5)", () => {
 		await up().stop();
 	});
 
+	test("a live WS marks the relay wsConnected on the network-card registry", async () => {
+		const { moblink } = await setup();
+		mod.onRelayWsMessage(
+			"bigcml",
+			{
+				type: "hello",
+				relay_id: "bigcml",
+				proto: 1,
+				interfaces: [iface("eno2", "192.0.2.10", 4000)],
+			},
+			"192.0.2.10",
+		);
+		await Bun.sleep(10);
+		// The relay lands in the network-card registry flagged as WS-connected
+		// (protocol.md §3) — the card renders the green dot from this flag.
+		const entry = moblink.relays.get("192.0.2.10");
+		expect(entry).toBeDefined();
+		expect(entry?.wsConnected).toBe(true);
+		await up().stop();
+	});
+
 	test("a later hello with a peer IP migrates the hostname-keyed registry entry", async () => {
 		await setup();
 		const hello = {

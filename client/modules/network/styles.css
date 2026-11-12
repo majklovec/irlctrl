@@ -95,3 +95,20 @@ tr.iface-group-header th .muted {
     text-transform: none;
     letter-spacing: 0;
 }
+
+/* Live-connection dot next to a relay name in the group header (protocol.md
+ * §3): green while the relay's control-channel WebSocket is open, muted gray
+ * when it was last heard only by UDP announce. */
+.ws-dot {
+    display: inline-block;
+    width: 0.6em;
+    height: 0.6em;
+    margin-right: 0.4rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--muted, #888) 55%, transparent);
+    vertical-align: 0.02em;
+}
+.ws-dot.is-on {
+    background: var(--ok);
+    box-shadow: 0 0 0 0.28em color-mix(in srgb, var(--ok) 22%, transparent);
+}

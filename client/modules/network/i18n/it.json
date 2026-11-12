@@ -15,6 +15,8 @@
     "dev.mstun_none": "No active tunnels",
     "dev.net_last_seen": "Ultima volta sentito",
     "dev.net_self_announce": "Auto-annuncia",
+    "dev.net_ws_connected": "Connected over WebSocket",
+    "dev.net_ws_offline": "No live WebSocket — heard by announce only",
     "dev.no_interfaces": "Nessuna interfaccia rilevata",
     "dev.own_interfaces": "Own interfaces",
     "dev.stale": "obsoleto, {{time}}",

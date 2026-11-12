@@ -30,3 +30,41 @@
 .moblink-relay .announce-host {
 	margin: 0.25rem 0 0.5rem;
 }
+/* Encoder links (protocol.md §3): one chip per discovered encoder. The dot
+ * is green while the relay's control-channel WebSocket to it is open, muted
+ * gray when the link is down (discovered but not connected). */
+.moblink-relay .encoder-links {
+	margin: 0.5rem 0;
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	flex-wrap: wrap;
+}
+.moblink-relay .encoder-links-list {
+	display: inline-flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+.moblink-relay .encoder-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	padding: 0.15rem 0.55rem;
+	border-radius: 999px;
+	font-size: 0.85em;
+	background: color-mix(in srgb, var(--fg) 6%, transparent);
+	border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
+}
+.moblink-relay .encoder-link.is-on {
+	border-color: color-mix(in srgb, var(--ok) 45%, transparent);
+}
+.moblink-relay .encoder-link .ws-dot {
+	width: 0.6em;
+	height: 0.6em;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--muted, #888) 55%, transparent);
+}
+.moblink-relay .encoder-link.is-on .ws-dot {
+	background: var(--ok);
+	box-shadow: 0 0 0 0.28em color-mix(in srgb, var(--ok) 22%, transparent);
+}

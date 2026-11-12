@@ -29,6 +29,7 @@ const moblinkRuntime = (host: DeviceCard): MoblinkRuntimeStatus =>
 		relays: [],
 		failures: [],
 		downInterfaces: [],
+		encoders: [],
 	};
 
 /** The role pictogram (bridging a hub to the shared interfaces). */
@@ -184,6 +185,37 @@ function moblinkCardBody(host: DeviceCard): m.Children {
 					{t("dev.moblink.last_ws")} {since(s.lastWsAdvertiseAt)}
 				</span>
 			</p>
+			{/* The encoders this relay reached (discovery + live WS state). A
+			 * green dot = the control-channel WebSocket to that encoder is
+			 * open (protocol.md §3) — the relay is talking to the encoder. */}
+			{(() => {
+				const encs = s.encoders ?? [];
+				if (encs.length === 0) return null;
+				return (
+					<p class="encoder-links">
+						<span class="muted">{t("dev.moblink.encoders")}</span>
+						<span class="encoder-links-list">
+							{encs.map((enc) => (
+								<span
+									class={`encoder-link${enc.connected ? " is-on" : ""}`}
+									key={`enc:${enc.id}`}
+									title={
+										enc.connected
+											? t("dev.moblink.encoder_connected")
+											: t("dev.moblink.encoder_offline")
+									}
+								>
+									<span class="ws-dot" aria-hidden="true" />
+									{enc.id}
+									{enc.lastSeen ? (
+										<small class="muted"> · {since(enc.lastSeen)}</small>
+									) : null}
+								</span>
+							))}
+						</span>
+					</p>
+				);
+			})()}
 			<Form onSubmit={() => moblinkStart(host)}>
 				<Actions>
 					<Button

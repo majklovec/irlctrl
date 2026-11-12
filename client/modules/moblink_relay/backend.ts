@@ -451,6 +451,16 @@ function buildStatus(): MoblinkRuntimeStatus {
 	const downList = [...downIfaces.keys()].filter((name) =>
 		availableInterfaces.some((i) => i.name === name),
 	);
+	// The encoders this relay learned about, each with the live state of the
+	// control-channel WebSocket to it (the card shows the relay→encoder links).
+	const encoders = knownEncoders().map((e) => {
+		const ch = encoderChannels.get(e.encoderId);
+		return {
+			id: e.encoderId,
+			connected: !!ch && ch.ws.readyState === WebSocket.OPEN,
+			lastSeen: e.lastSeen,
+		};
+	});
 	return {
 		connected: relays.size > 0,
 		announceHost: effectiveAnnounceHost(),
@@ -464,6 +474,7 @@ function buildStatus(): MoblinkRuntimeStatus {
 		lastMdnsAnnounceAt,
 		lastUdpAnnounceAt: lastUdpAnnounceAt(),
 		lastWsAdvertiseAt,
+		encoders,
 	};
 }
 
@@ -1049,6 +1060,10 @@ function startEncoderChannel(e: MoblinkDiscoveredEncoder): void {
 		console.log(
 			`moblink_relay: WS connected to encoder ${e.encoderId} — snapshot sent (${relayIfaceList().length} iface(s))`,
 		);
+		// The link state surfaced on the card changed — refresh it now
+		// (don't wait for the next announce tick).
+		core.notifyStateChange();
+		void writeStatusFile();
 	};
 	ws.onmessage = (): void => {
 		// Any frame from the encoder (pong / events) proves the channel is
@@ -1059,6 +1074,9 @@ function startEncoderChannel(e: MoblinkDiscoveredEncoder): void {
 	const fail = (why: string): void => {
 		if (encoderChannels.get(e.encoderId) !== st) return; // replaced
 		closeEncoderChannel(e.encoderId, st.gen);
+		// The link state surfaced on the card changed — refresh it now.
+		core.notifyStateChange();
+		void writeStatusFile();
 		if (knownEncoders().some((x) => x.encoderId === e.encoderId)) {
 			console.warn(
 				`moblink_relay: WS to encoder ${e.encoderId} lost (${why}) — retrying in ${ENCODER_WS_RECONNECT_MS / 1000}s`,
