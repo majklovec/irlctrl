@@ -106,6 +106,16 @@ export function startRelayWsServer(
 						conn.relayId = parsed.relay_id;
 						conn.proto = parsed.proto;
 					}
+					// Keepalive (protocol.md §3): answer the relay's ping so
+					// both directions carry frames that refresh the registry
+					// TTL. The backend still sees the message (onMessage).
+					if (parsed.type === "ping") {
+						try {
+							ws.send(JSON.stringify({ type: "pong" }));
+						} catch {
+							/* closing */
+						}
+					}
 					opts.onMessage(conn, parsed);
 				},
 				close(ws) {

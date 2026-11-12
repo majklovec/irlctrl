@@ -684,4 +684,24 @@ describe("encoder discovery + WS channels (protocol.md §2–§5)", () => {
 			false,
 		);
 	});
+
+	test("a live WS channel refreshes the TTL and survives the sweep (protocol.md §3 keepalive)", () => {
+		noteEncoder({
+			encoderId: "enc-live",
+			ip: "10.0.0.8",
+			wsPort: 8199,
+			proto: 1,
+			lastSeen: Date.now() - 60_000, // older than the TTL
+		});
+		// The channel's onopen/onmessage refresh (as startEncoderChannel does).
+		noteEncoder({
+			encoderId: "enc-live",
+			ip: "10.0.0.8",
+			wsPort: 8199,
+			proto: 1,
+			lastSeen: Date.now(),
+		});
+		expect(sweepEncoders()).toEqual([]);
+		expect(knownEncoders().some((e) => e.encoderId === "enc-live")).toBe(true);
+	});
 });

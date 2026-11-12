@@ -195,12 +195,19 @@ export type MoblinkRelayWsMessage =
 	| { type: "interface_added"; iface: MoblinkRelayIface }
 	| { type: "interface_removed"; iface: MoblinkRelayIface }
 	| { type: "interface_up"; iface: MoblinkRelayIface }
-	| { type: "interface_down"; iface: MoblinkRelayIface };
+	| { type: "interface_down"; iface: MoblinkRelayIface }
+	/** WS keepalive (protocol.md §3): relay → encoder every 5 s while the
+	 * channel is open; the encoder replies `pong`. Every message in both
+	 * directions refreshes the peer's discovery-registry TTL, so a live
+	 * channel is self-sustaining and discovery is only needed for the
+	 * initial dial. */
+	| { type: "ping" }
+	| { type: "pong" };
 
-/** The event types that apply to a single interface (everything but `hello`). */
+/** The event types that apply to a single interface (no hello/keepalive). */
 export type MoblinkRelayIfaceEventType = Exclude<
 	MoblinkRelayWsMessage["type"],
-	"hello"
+	"hello" | "ping" | "pong"
 >;
 
 /** Type-guard for a parsed relay → encoder control-channel message. */
@@ -235,6 +242,9 @@ export function isMoblinkRelayWsMessage(
 		case "interface_up":
 		case "interface_down":
 			return okIface(o.iface);
+		case "ping":
+		case "pong":
+			return true;
 		default:
 			return false;
 	}

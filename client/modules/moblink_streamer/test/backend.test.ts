@@ -14,7 +14,7 @@ import type {
 	MoblinkSharedEndpoint,
 } from "../../../../shared/moblink_discovery";
 import * as mod from "../backend";
-import { noteRelay } from "../discovery";
+import { knownRelays, noteRelay, sweepStaleRelays } from "../discovery";
 import type { MoblinkStreamerView } from "../types";
 
 /** A fake uplinks capability that records add/remove and a live list. */
@@ -423,6 +423,60 @@ describe("relay WS control channel (protocol.md §3–§5)", () => {
 		});
 		await Bun.sleep(10);
 		expect(uplinks.list()).toEqual([]);
+		await up().stop();
+	});
+});
+
+describe("TTL sweep + WS keepalive (protocol.md §3 self-sustaining channel)", () => {
+	test("sweepStaleRelays drops silent relays but spares live-WS peers", async () => {
+		await setup();
+		const backdated = {
+			host: "192.0.2.10",
+			hostname: "bigcml",
+			interfaces: [{ name: "eno2", address: "192.0.2.10", listenPort: 4000 }],
+			lastSeen: Date.now() - 20_000, // beyond the 15 s TTL
+		};
+		noteRelay(backdated as MoblinkDiscoveredRelay);
+		expect(sweepStaleRelays()).toEqual(["192.0.2.10"]);
+		// Re-seed the SAME relay, now with a live WS → protected from the sweep.
+		noteRelay(backdated as MoblinkDiscoveredRelay);
+		expect(sweepStaleRelays(() => new Set(["192.0.2.10"]))).toEqual([]);
+		expect(knownRelays().some((r) => r.host === "192.0.2.10")).toBe(true);
+		await up().stop();
+	});
+
+	test("a ping frame refreshes the registry TTL (no log spam, quiet path)", async () => {
+		await setup();
+		mod.onRelayWsMessage(
+			"bigcml",
+			{
+				type: "hello",
+				relay_id: "bigcml",
+				proto: 1,
+				interfaces: [
+					{
+						iface_name: "eno2",
+						ip: "192.0.2.10",
+						udp_port: 4000,
+						state: "up",
+						uplink: true,
+					},
+				],
+			},
+			"192.0.2.10",
+		);
+		await Bun.sleep(10);
+		// Age the entry past the TTL, then let a keepalive frame refresh it.
+		noteRelay({
+			host: "192.0.2.10",
+			hostname: "bigcml",
+			interfaces: [{ name: "eno2", address: "192.0.2.10", listenPort: 4000 }],
+			lastSeen: Date.now() - 20_000,
+		} as MoblinkDiscoveredRelay);
+		mod.onRelayWsMessage("bigcml", { type: "ping" }, "192.0.2.10");
+		// Unprotected sweep: the ping refreshed lastSeen → relay survives.
+		expect(sweepStaleRelays()).toEqual([]);
+		expect(knownRelays().some((r) => r.host === "192.0.2.10")).toBe(true);
 		await up().stop();
 	});
 });

@@ -830,6 +830,8 @@ interface EncoderChannel {
 	ws: WebSocket;
 	gen: number;
 	timer?: ReturnType<typeof setTimeout>;
+	/** Keepalive ping timer (cleared when the channel closes). */
+	hbeat?: ReturnType<typeof setInterval>;
 }
 /** The live relay → encoder channels, keyed by `encoder_id` (announces are
  * re-sent periodically, so the key is stable). */
@@ -851,6 +853,7 @@ function closeEncoderChannel(key: string, gen: number): void {
 	const st = encoderChannels.get(key);
 	if (!st || st.gen !== gen) return; // already replaced / stopped
 	if (st.timer) clearTimeout(st.timer);
+	if (st.hbeat) clearInterval(st.hbeat);
 	encoderChannels.delete(key);
 	try {
 		st.ws.close();
@@ -900,11 +903,31 @@ function startEncoderChannel(e: MoblinkDiscoveredEncoder): void {
 	encoderChannels.set(e.encoderId, st);
 	ws.onopen = (): void => {
 		pendingConnects.delete(e.encoderId);
+		// The channel is live: keep the encoder's TTL fresh (a live channel
+		// is self-sustaining; discovery only matters for the dial).
+		noteEncoder(e);
 		// Full snapshot on (re)connect — the encoder has a consistent view.
 		st.ws.send(JSON.stringify(helloMessage()));
+		// Keepalive: the encoder replies `pong`; every frame in both
+		// directions refreshes the registry TTL (protocol.md §3).
+		st.hbeat = setInterval(() => {
+			if (st.ws.readyState !== WebSocket.OPEN) return;
+			try {
+				st.ws.send(JSON.stringify({ type: "ping" }));
+			} catch {
+				/* close handler owns the re-dial */
+			}
+		}, MOBLINK_ANNOUNCE_INTERVAL_MS);
+		st.hbeat.unref?.();
 		console.log(
 			`moblink_relay: WS connected to encoder ${e.encoderId} — snapshot sent (${relayIfaceList().length} iface(s))`,
 		);
+	};
+	ws.onmessage = (): void => {
+		// Any frame from the encoder (pong / events) proves the channel is
+		// alive → refresh the registry TTL so the sweep never reaps a live
+		// channel.
+		noteEncoder(e);
 	};
 	const fail = (why: string): void => {
 		if (encoderChannels.get(e.encoderId) !== st) return; // replaced
@@ -926,12 +949,19 @@ function startEncoderChannel(e: MoblinkDiscoveredEncoder): void {
 
 /**
  * Reconcile the channel set to the known encoders: start missing, stop the
- * ones we stopped hearing (or that left the registry).
+ * ones we stopped hearing (or that left the registry). An OPEN/CONNECTING
+ * channel is never stopped here: it refreshes its own TTL (keepalive), so an
+ * "unknown" encoder behind a live socket is a registry artifact, and a truly
+ * dead peer closes itself (the `fail` handler then owns the cleanup).
  */
 function reconcileEncoderChannels(): void {
 	for (const enc of knownEncoders()) startEncoderChannel(enc);
-	for (const key of [...encoderChannels.keys()]) {
-		if (!knownEncoders().some((e) => e.encoderId === key))
+	for (const [key, st] of [...encoderChannels]) {
+		if (
+			!knownEncoders().some((e) => e.encoderId === key) &&
+			st.ws.readyState !== WebSocket.OPEN &&
+			st.ws.readyState !== WebSocket.CONNECTING
+		)
 			stopEncoderChannel(key);
 	}
 }
@@ -942,7 +972,12 @@ function reconcileEncoderChannels(): void {
  * a down / unreachable control server must never block UDP discovery.
  * Throttled to one poll per 30 s.
  */
-const CONTROL_SERVER_INTERVAL_MS = 30_000;
+/**
+ * MUST stay well under the encoder registry TTL (15 s) — a control-server-
+ * only link (both boxes reachable, no LAN discovery) must be able to keep
+ * the entry fresh on its own.
+ */
+const CONTROL_SERVER_INTERVAL_MS = 10_000;
 /** Reset the control-server poll throttle (tests — the timestamp persists across cases). */
 export function resetControlServerCheck(): void {
 	lastControlServerCheck = 0;

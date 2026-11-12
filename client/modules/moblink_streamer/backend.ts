@@ -507,6 +507,7 @@ function ensureDiscovery(): void {
 	// dry-run the UDP socket is skipped, but relaying still converges.
 	startDiscovering((rels) => void onDiscoveredRelays(rels), {
 		dryRun: core.config.DRY_RUN,
+		protectedHosts: () => wsLivePeers,
 	});
 	// mDNS path (protocol.md §3): browse for relay services. TXT is compact
 	// (≤255 B) and may truncate the endpoint list, so `noteMdnsRelay` keeps
@@ -571,6 +572,8 @@ function ensureControlPlane(): void {
 	const c = config();
 	wsServer?.stop(true);
 	wsServer = null;
+	// A stopped server has no peers — never sweep-protect a stale IP.
+	wsLivePeers.clear();
 	if (core.config.DRY_RUN) return;
 	wsServer = startRelayWsServer({
 		port: c.wsPort,
@@ -578,8 +581,13 @@ function ensureControlPlane(): void {
 		onMessage: (conn, msg: MoblinkRelayWsMessage) => {
 			onRelayWsMessage(conn.relayId, msg, conn.remoteAddress);
 		},
+		onOpen: (conn) => {
+			if (conn.remoteAddress && isIpv4Literal(conn.remoteAddress))
+				wsLivePeers.add(conn.remoteAddress);
+		},
 		onClose: (conn) => {
 			if (conn.relayId) wsRelayHosts.delete(conn.relayId);
+			if (conn.remoteAddress) wsLivePeers.delete(conn.remoteAddress);
 		},
 	});
 	startEncoderAnnouncing(() => encoderInfo(), { dryRun: core.config.DRY_RUN });
@@ -607,6 +615,10 @@ function ensureControlPlane(): void {
 
 /** Relay WS identity (`relay_id`) → discovered-relay registry host. */
 const wsRelayHosts = new Map<string, string>();
+/** Registry hosts with a LIVE relay WS (peer IP). The TTL sweep must not
+ * reap these: the live channel keeps itself fresh via keepalive, and reaping
+ * a connected relay is what caused the sweep→reconnect churn. */
+const wsLivePeers = new Set<string>();
 
 /**
  * A validated relay → encoder control-channel message (protocol.md §4).
@@ -651,6 +663,15 @@ export function onRelayWsMessage(
 			})),
 			lastSeen: Date.now(),
 		});
+		return;
+	}
+	// Keepalive frame (protocol.md §3): proof the channel is live → refresh
+	// the TTL quietly (every 5 s; logging would spam).
+	if (msg.type === "ping" || msg.type === "pong") {
+		const host = wsRelayHosts.get(relayId);
+		if (!host) return;
+		const relay = knownRelays().find((r) => r.host === host);
+		if (relay) noteRelay({ ...relay, lastSeen: Date.now() }, { quiet: true });
 		return;
 	}
 	// A single-interface event: patch the owning relay's endpoint set

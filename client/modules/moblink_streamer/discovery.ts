@@ -77,7 +77,12 @@ function emitIfChanged(): void {
  */
 export function startDiscovering(
 	onChangeCb: (relays: MoblinkDiscoveredRelay[]) => void,
-	opts: { dryRun?: boolean } = {},
+	opts: {
+		dryRun?: boolean;
+		/** Registry hosts protected from the TTL sweep (relays with a live
+		 * WS channel — the channel keeps itself fresh via keepalive). */
+		protectedHosts?: () => Set<string>;
+	} = {},
 ): MoblinkDiscoveredRelay[] {
 	stopDiscovering();
 	onChange = onChangeCb;
@@ -117,23 +122,12 @@ export function startDiscovering(
 	} catch (e) {
 		console.warn(`moblink_streamer: discovery listen failed: ${String(e)}`);
 	}
-	// Periodic TTL sweep: drop relays we stopped hearing.
-	const sweep = setInterval(() => {
-		const now = Date.now();
-		const swept: string[] = [];
-		for (const [host, r] of relays) {
-			if (now - r.lastSeen > MOBLINK_ANNOUNCE_TTL_MS) {
-				relays.delete(host);
-				swept.push(host);
-			}
-		}
-		if (swept.length > 0) {
-			console.log(
-				`moblink_streamer: swept stale relay(s): ${swept.join(", ")}`,
-			);
-			emitIfChanged();
-		}
-	}, MOBLINK_ANNOUNCE_TTL_MS / 3);
+	// Periodic TTL sweep: drop relays we stopped hearing (relays with a live
+	// WS are protected — a connected relay must not be reaped on UDP silence).
+	const sweep = setInterval(
+		() => sweepStaleRelays(opts.protectedHosts),
+		MOBLINK_ANNOUNCE_TTL_MS / 3,
+	);
 	// Don't keep the process alive solely for discovery.
 	sweep.unref?.();
 	sweeper = sweep;
@@ -141,16 +135,46 @@ export function startDiscovering(
 }
 
 /**
+ * Drop every relay not (re)announced within TTL, EXCEPT any host in
+ * `protectedHosts` (relays with a live WebSocket — the channel keeps itself
+ * fresh via keepalive, so UDP silence must not reap a connected relay).
+ * Returns the swept hosts.
+ */
+export function sweepStaleRelays(protectedHosts?: () => Set<string>): string[] {
+	const now = Date.now();
+	const protectedNow = protectedHosts?.() ?? new Set<string>();
+	const swept: string[] = [];
+	for (const [host, r] of relays) {
+		if (now - r.lastSeen > MOBLINK_ANNOUNCE_TTL_MS && !protectedNow.has(host)) {
+			relays.delete(host);
+			swept.push(host);
+		}
+	}
+	if (swept.length > 0) {
+		console.log(`moblink_streamer: swept stale relay(s): ${swept.join(", ")}`);
+		emitIfChanged();
+	}
+	return swept;
+}
+
+/**
  * Register a relay as if its announce had just been received. This is the
  * control-server registration path (a relay can hand the encoder its IP
  * through the control plane instead of UDP) and is also what tests use to
  * seed a discovered relay. Fires the change callback on a shape change.
+ * `quiet` skips the registration log (keepalive refreshes run every 5 s).
  */
-export function noteRelay(relay: MoblinkDiscoveredRelay): void {
-	console.log(
-		`moblink_streamer: registered relay (control-server) ${relay.host}${relay.hostname ? ` (${relay.hostname})` : ""} ifaces=[${endpointSummary(relay.interfaces)}]`,
-	);
-	relays.set(relay.host, { ...relay, lastSeen: Date.now() });
+export function noteRelay(
+	relay: MoblinkDiscoveredRelay,
+	opts: { quiet?: boolean } = {},
+): void {
+	if (!opts.quiet)
+		console.log(
+			`moblink_streamer: registered relay (control-server) ${relay.host}${relay.hostname ? ` (${relay.hostname})` : ""} ifaces=[${endpointSummary(relay.interfaces)}]`,
+		);
+	// Honor a caller-supplied lastSeen (production callers stamp `now`); this
+	// also lets tests backdate an entry to exercise the TTL sweep.
+	relays.set(relay.host, { ...relay, lastSeen: relay.lastSeen ?? Date.now() });
 	emitIfChanged();
 }
 

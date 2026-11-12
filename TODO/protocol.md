@@ -116,6 +116,16 @@ Each event contains at least:
 
 After any WebSocket reconnect, the relay always sends a **full snapshot of all interfaces** so the encoder has a consistent view.
 
+**Keepalive (self-sustaining channel):** the relay sends `{type:"ping"}` every
+5 s while the channel is open; the encoder replies `{type:"pong"}`. Every
+frame in both directions refreshes the peer's discovery-registry TTL, so a
+live WebSocket is self-sustaining — discovery (UDP/mDNS/control server) is
+only needed for the initial dial. Additionally:
+
+- the relay never stops an OPEN/CONNECTING channel during reconcile (a dead
+  peer closes itself; the close handler owns the re-dial/cleanup);
+- the encoder's TTL sweep never reaps a relay with a live WebSocket.
+
 ---
 
 ### 5. Data Flow (with TUN Interface on Encoder)
