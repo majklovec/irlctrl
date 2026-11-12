@@ -15,6 +15,7 @@ import { networkInterfaces, tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
 import { argEnv, intArgEnv } from "../../../shared/args";
+import { isMoblinkTun } from "../../../shared/moblink_discovery";
 import { errorMessage, readLines } from "../../../shared/util";
 import type { ModuleCore } from "../../backend/module_core";
 import type {
@@ -832,20 +833,15 @@ export interface NetworkInterfaceInfo {
 let lastInterfaceSignature = "";
 const interfaceChangedHandlers = new Set<() => void>();
 
-/** Name of a MobLink encoder tunnel TUN (moblink_streamer:
- * `relay${slot}_${relayIface}`, e.g. `relay0_wg0`). These are TUNNELS to a
- * relay's shared uplinks — they are not the machine's own interfaces, so
- * they must not appear in the interface list (bond selection / relay
- * eligibility): selecting one would loop traffic back through the relay. */
-const MOBLINK_TUN_RE = /^relay\d+_[a-z0-9]+$/u;
-
 /** List the machine's own IPv4 interfaces. Filtered:
  * - loopback (never carries relay traffic)
- * - MobLink tunnel TUNs (relay-shared paths, not own interfaces). */
+ * - MobLink tunnel TUNs (`relay${slot}_${iface}`, e.g. `relay0_wg0`) —
+ *   tunnels to a relay's shared uplinks, not own interfaces: selecting one
+ *   would loop traffic back through the relay (see `isMoblinkTun`). */
 export function listNetworkInterfaces(): NetworkInterfaceInfo[] {
     const out: NetworkInterfaceInfo[] = [];
     for (const [name, addrs] of Object.entries(networkInterfaces() ?? {})) {
-        if (MOBLINK_TUN_RE.test(name)) continue;
+        if (isMoblinkTun(name)) continue;
         const ipv4 = (addrs ?? [])
             .filter((a) => a.family === "IPv4" && !a.internal)
             .map((a) => a.address);

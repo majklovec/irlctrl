@@ -15,6 +15,7 @@ import type {
 	DeviceDashboardWidget,
 	FrontendModule,
 } from "../../../shared/contracts/frontend_module";
+import { isMoblinkTun } from "../../../shared/moblink_discovery";
 import type {
 	MoblinkStreamerTunnelStatus,
 	MoblinkStreamerView,
@@ -225,10 +226,13 @@ function interfacesCard(host: DeviceCard, status: NetworkStatus): m.Vnode {
 	);
 	// The encoder's MobLink TUNs publish their live view on
 	// `status.state.moblinkStreamer` (the streamer backend's `status()`), which
-	// is merged into every card's live status. Their TUN interfaces (moblinkN)
-	// also appear in the OS `status.interfaces` list — we list each one under
-	// its relay group (below) and hide it from "Own interfaces" to avoid
-	// showing it twice.
+	// is merged into every card's live status. Their TUN interfaces (e.g.
+	// `relay0_wg0`) are tunnels to a relay's shared uplink, not the machine's
+	// own interfaces — they also appear in the OS `status.interfaces` list, so
+	// we list each one under its relay group (below) and hide it from "Own
+	// interfaces". The name rule (`isMoblinkTun`) catches them even when the
+	// streamer isn't reporting them live yet; `tunnelIfaceNames` additionally
+	// hides whatever the streamer currently reports, by exact name.
 	const streamer = host.st.status?.state?.moblinkStreamer as
 		| MoblinkStreamerView
 		| undefined;
@@ -236,7 +240,7 @@ function interfacesCard(host: DeviceCard, status: NetworkStatus): m.Vnode {
 		(streamer?.runtime?.tunnels ?? []).map((t) => t.interfaceName),
 	);
 	const rows = status.interfaces.flatMap((i, index) => {
-		if (tunnelIfaceNames.has(i.iface)) return [];
+		if (isMoblinkTun(i.iface) || tunnelIfaceNames.has(i.iface)) return [];
 		const isDefaultRoute = index === defaultRouteRow;
 		const sub = [
 			i.cidr,
