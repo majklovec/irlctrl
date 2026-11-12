@@ -1,20 +1,20 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import type { ModuleCore } from "../../../../client/backend/module_core";
 import {
 	clearCapabilities,
 	provideCapability,
 } from "../../../../shared/capabilities";
 import type {
 	MoblinkRegistry,
-	Uplinks,
 	UplinkEntry,
+	Uplinks,
 } from "../../../../shared/contracts/module_capabilities";
-import type { ModuleCore } from "../../../../client/backend/module_core";
-import * as mod from "../backend";
-import { noteRelay } from "../discovery";
 import type {
 	MoblinkDiscoveredRelay,
 	MoblinkSharedEndpoint,
 } from "../../../../shared/moblink_discovery";
+import * as mod from "../backend";
+import { noteRelay } from "../discovery";
 import type { MoblinkStreamerView } from "../types";
 
 /** A fake uplinks capability that records add/remove and a live list. */
@@ -74,18 +74,20 @@ function fakeCore(section: Record<string, unknown> | null = null): ModuleCore {
 	} as unknown as ModuleCore;
 }
 
-const up = () => mod.default!;
+const up = () => mod.default as NonNullable<typeof mod.default>;
 
 /** Build a discovered relay (as a relay would announce it / control server). */
 function relay(
 	host: string,
 	ifaces: Array<[name: string, address: string, port: number]>,
 ): MoblinkDiscoveredRelay {
-	const interfaces: MoblinkSharedEndpoint[] = ifaces.map(([name, address, listenPort]) => ({
-		name,
-		address,
-		listenPort,
-	}));
+	const interfaces: MoblinkSharedEndpoint[] = ifaces.map(
+		([name, address, listenPort]) => ({
+			name,
+			address,
+			listenPort,
+		}),
+	);
 	return { host, hostname: host, interfaces, lastSeen: Date.now() };
 }
 
@@ -121,7 +123,11 @@ describe("moblink_streamer", () => {
 		const { uplinks } = await setup();
 		await announce(relay("203.0.113.10", [["eth0", "203.0.113.10", 4000]]));
 		expect(uplinks.added).toEqual([
-			{ id: "moblink:relay0_eth0", source: "10.90.0.1", label: "Moblink (relay0_eth0)" },
+			{
+				id: "moblink:relay0_eth0",
+				source: "10.90.0.1",
+				label: "Moblink (relay0_eth0)",
+			},
 		]);
 		const v = await view();
 		expect(v.runtime.running).toBe(true);
@@ -152,10 +158,12 @@ describe("moblink_streamer", () => {
 			"10.90.1.1",
 		]);
 		expect(v.runtime.tunnels.map((t) => t.relayPort)).toEqual([4000, 4001]);
-		expect(uplinks.list().map((e) => e.id).sort()).toEqual([
-			"moblink:relay0_eth0",
-			"moblink:relay0_eth1",
-		]);
+		expect(
+			uplinks
+				.list()
+				.map((e) => e.id)
+				.sort(),
+		).toEqual(["moblink:relay0_eth0", "moblink:relay0_eth1"]);
 		await up().stop();
 	});
 
@@ -174,13 +182,15 @@ describe("moblink_streamer", () => {
 
 		await announce(relay("198.51.100.7", [["eth0", "198.51.100.7", 4000]]));
 		const v = await view();
-		expect(uplinks.list().map((e) => e.id).sort()).toEqual([
-			"moblink:relay0_eth0",
-			"moblink:relay1_eth0",
-		]);
 		expect(
-			v.runtime.tunnels.some((t) => t.relayHost === "198.51.100.7"),
-		).toBe(true);
+			uplinks
+				.list()
+				.map((e) => e.id)
+				.sort(),
+		).toEqual(["moblink:relay0_eth0", "moblink:relay1_eth0"]);
+		expect(v.runtime.tunnels.some((t) => t.relayHost === "198.51.100.7")).toBe(
+			true,
+		);
 		await up().stop();
 	});
 
@@ -211,6 +221,184 @@ describe("moblink_streamer", () => {
 		const v = await view();
 		expect(v.discoveredRelays.map((r) => r.host)).toEqual(["203.0.113.10"]);
 		expect(moblink.relays.get("203.0.113.10")?.interfaces).toHaveLength(1);
+		await up().stop();
+	});
+
+	test("an interface_down in the ANNOUNCE is not tunnelled (protocol.md §5)", async () => {
+		const { uplinks } = await setup();
+		await announce({
+			host: "203.0.113.20",
+			hostname: "203.0.113.20",
+			interfaces: [
+				{
+					name: "eth0",
+					address: "203.0.113.20",
+					listenPort: 4000,
+					state: "down",
+				},
+			],
+			lastSeen: Date.now(),
+		});
+		expect(uplinks.list()).toEqual([]);
+		const v = await view();
+		expect(v.runtime.tunnels).toEqual([]);
+		// The endpoint is still tracked (the port mapping must survive).
+		expect(v.discoveredRelays[0]?.interfaces[0]?.state).toBe("down");
+		await up().stop();
+	});
+});
+
+describe("relay WS control channel (protocol.md §3–§5)", () => {
+	const iface = (
+		name: string,
+		ip: string,
+		port: number,
+		state: "up" | "down" = "up",
+	) => ({
+		iface_name: name,
+		ip,
+		udp_port: port,
+		state,
+		uplink: true as const,
+	});
+
+	test("a hello snapshot registers the relay and starts its TUNs", async () => {
+		const { uplinks } = await setup();
+		mod.onRelayWsMessage("wan-relay", {
+			type: "hello",
+			relay_id: "wan-relay",
+			proto: 1,
+			interfaces: [iface("eth0", "198.51.100.9", 4000)],
+		});
+		await Bun.sleep(10);
+		const v = await view();
+		expect(v.discoveredRelays.map((r) => r.host)).toContain("wan-relay");
+		expect(uplinks.list().map((e) => e.id)).toEqual(["moblink:relay0_eth0"]);
+		// The TUN dials the INTERFACE address the relay advertised, not its id.
+		expect(v.runtime.tunnels[0]).toMatchObject({
+			interfaceName: "relay0_eth0",
+			relayHost: "198.51.100.9",
+			relayPort: 4000,
+		});
+		await up().stop();
+	});
+
+	test("interface_down stops the TUN; interface_up reuses the same slot (protocol.md §1)", async () => {
+		const { uplinks } = await setup();
+		mod.onRelayWsMessage("wan-relay", {
+			type: "hello",
+			relay_id: "wan-relay",
+			proto: 1,
+			interfaces: [iface("eth0", "198.51.100.9", 4000)],
+		});
+		await Bun.sleep(10);
+		const before = (await view()).runtime.tunnels[0];
+		expect(before).toMatchObject({
+			interfaceName: "relay0_eth0",
+			interfaceAddress: "10.90.0.1",
+		});
+
+		mod.onRelayWsMessage("wan-relay", {
+			type: "interface_down",
+			iface: iface("eth0", "198.51.100.9", 4000, "down"),
+		});
+		await Bun.sleep(10);
+		expect((await view()).runtime.tunnels).toEqual([]);
+		expect(uplinks.list()).toEqual([]);
+		// The (down) endpoint stays in the registry → the port mapping keeps.
+		expect(
+			(await view()).discoveredRelays.find((r) => r.host === "wan-relay")
+				?.interfaces,
+		).toEqual([
+			expect.objectContaining({
+				name: "eth0",
+				listenPort: 4000,
+				state: "down",
+			}),
+		]);
+
+		mod.onRelayWsMessage("wan-relay", {
+			type: "interface_up",
+			iface: iface("eth0", "198.51.100.9", 4000),
+		});
+		await Bun.sleep(10);
+		const after = (await view()).runtime.tunnels[0];
+		expect(after).toMatchObject({
+			interfaceName: "relay0_eth0",
+			interfaceAddress: "10.90.0.1",
+		});
+		expect(after).toEqual(before);
+		await up().stop();
+	});
+
+	test("interface_added opens a new TUN; interface_removed stops it (protocol.md §4.2)", async () => {
+		const { uplinks } = await setup();
+		mod.onRelayWsMessage("wan-relay", {
+			type: "hello",
+			relay_id: "wan-relay",
+			proto: 1,
+			interfaces: [iface("eth0", "198.51.100.9", 4000)],
+		});
+		await Bun.sleep(10);
+		expect(uplinks.list().map((e) => e.id)).toEqual(["moblink:relay0_eth0"]);
+
+		mod.onRelayWsMessage("wan-relay", {
+			type: "interface_added",
+			iface: iface("eth1", "198.51.100.9", 4001),
+		});
+		await Bun.sleep(10);
+		expect(
+			uplinks
+				.list()
+				.map((e) => e.id)
+				.sort(),
+		).toEqual(["moblink:relay0_eth0", "moblink:relay0_eth1"]);
+		expect(
+			(await view()).runtime.tunnels.map((t) => t.interfaceAddress),
+		).toEqual(["10.90.0.1", "10.90.1.1"]);
+
+		mod.onRelayWsMessage("wan-relay", {
+			type: "interface_removed",
+			iface: iface("eth1", "198.51.100.9", 4001),
+		});
+		await Bun.sleep(10);
+		expect(uplinks.list().map((e) => e.id)).toEqual(["moblink:relay0_eth0"]);
+		expect(
+			(await view()).discoveredRelays
+				.find((r) => r.host === "wan-relay")
+				?.interfaces.map((e) => e.name),
+		).toEqual(["eth0"]);
+		await up().stop();
+	});
+
+	test("a hello for an UNKNOWN relay is ignored until its identity is known", async () => {
+		const { uplinks } = await setup();
+		// No hello → no wsRelayHosts entry → single-interface events drop.
+		mod.onRelayWsMessage("ghost-relay", {
+			type: "interface_up",
+			iface: iface("eth0", "198.51.100.9", 4000),
+		});
+		await Bun.sleep(10);
+		expect(uplinks.list()).toEqual([]);
+		await up().stop();
+	});
+});
+
+describe("encoderInfo (protocol.md §2 relay lookup)", () => {
+	test("reports id / IP / WS port / protocol version", async () => {
+		await setup();
+		const info = (await up().dispatch("moblink_streamer.encoderInfo", {})) as {
+			encoderId: string;
+			ip: string;
+			wsPort: number;
+			proto: number;
+		} | null;
+		// `defaultSourceIp` shells out to `ip route get`; on test hosts it may
+		// resolve a real LAN IP — assert the shape, not the address.
+		expect(info).not.toBeNull();
+		expect(info?.encoderId.length).toBeGreaterThan(0);
+		expect(info?.wsPort).toBe(8190);
+		expect(info?.proto).toBe(1);
 		await up().stop();
 	});
 });

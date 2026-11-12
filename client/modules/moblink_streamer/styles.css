@@ -1,26 +1,26 @@
 /* MobLink streamer card (encoder side) */
 .moblink-streamer .status {
-    margin: 0.25rem 0 0.5rem;
+	margin: 0.25rem 0 0.5rem;
 }
 .moblink-streamer .status[data-state="running"] {
-    color: var(--ok);
+	color: var(--ok);
 }
 .moblink-streamer .status[data-state="starting"] {
-    color: var(--warn);
+	color: var(--warn);
 }
 .moblink-streamer .status[data-state="error"] {
-    color: var(--bad);
+	color: var(--bad);
 }
 .moblink-streamer .status[data-state="idle"] {
-    color: var(--muted);
+	color: var(--muted);
 }
 
 /* One section per registered relay, holding its shared-interface → tunnel table */
 .moblink-streamer .mstream-relay {
-    margin-top: 0.75rem;
+	margin-top: 0.75rem;
 }
 .moblink-streamer .mstream-relay h4 {
-    margin: 0 0 0.25rem;
-    color: var(--muted);
-    font-size: 0.85rem;
+	margin: 0 0 0.25rem;
+	color: var(--muted);
+	font-size: 0.85rem;
 }

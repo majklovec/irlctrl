@@ -1,14 +1,28 @@
 /* MobLink LAN relay card */
 .moblink-relay .status {
-    margin: 0.25rem 0 0.5rem;
+	margin: 0.25rem 0 0.5rem;
 }
 .moblink-relay .status[data-state="online"] {
-    color: var(--ok);
+	color: var(--ok);
 }
 .moblink-relay .status[data-state="offline"] {
-    color: var(--muted);
+	color: var(--muted);
 }
 /* Settings: input rows */
 .moblink-relay-settings .field + .field {
-    margin-top: 0.75rem;
+	margin-top: 0.75rem;
+}
+/* Uplink mark (protocol.md §1): inline, 1em, colored by up/down state */
+.uplink-mark {
+	height: 1em;
+	width: 1em;
+	vertical-align: -0.2em;
+	fill: none;
+	stroke: var(--ok, #4caf50);
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+.uplink-mark-down {
+	stroke: var(--muted, #888);
 }

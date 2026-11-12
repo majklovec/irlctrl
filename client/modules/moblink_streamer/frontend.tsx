@@ -13,17 +13,17 @@ import type { FrontendModule } from "../../../shared/contracts/frontend_module";
 import log from "./log";
 
 const moblinkStreamerModule: FrontendModule = {
-    id: "moblink_streamer",
-    kind: "device-card",
-    title: "Relay tunnels",
-    order: 52,
-    log,
-    available: (status) => status.role === "encoder",
-    // No card of its own — everything it used to show now lives in the
-    // Network card's tunnel rows.
-    component: () => m(""),
-    defaultSize: { w: 4, h: 4 },
-    minSize: { w: 3, h: 3 },
+	id: "moblink_streamer",
+	kind: "device-card",
+	title: "Relay tunnels",
+	order: 52,
+	log,
+	available: (status) => status.role === "encoder",
+	// No card of its own — everything it used to show now lives in the
+	// Network card's tunnel rows.
+	component: () => m(""),
+	defaultSize: { w: 4, h: 4 },
+	minSize: { w: 3, h: 3 },
 };
 
 export default moblinkStreamerModule;

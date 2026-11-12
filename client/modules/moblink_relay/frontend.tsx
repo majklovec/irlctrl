@@ -36,6 +36,7 @@ const moblinkRuntime = (host: DeviceCard): MoblinkRuntimeStatus =>
 		availableInterfaces: [],
 		relays: [],
 		failures: [],
+		downInterfaces: [],
 	};
 
 /** The role pictogram (bridging a hub to the shared interfaces). */
@@ -47,6 +48,20 @@ const moblinkRelayIcon = () => (
 		<circle cx="4.5" cy="19" r="2" />
 		<circle cx="19.5" cy="19" r="2" />
 		<path d="m9.9 10.1-3.4-3.2M14.1 10.1l3.4-3.2M9.9 13.9l-3.4 3.2M14.1 13.9l3.4 3.2" />
+	</OutlineIcon>
+);
+
+/**
+ * The uplink mark (protocol.md §1: every relayed interface is an uplink,
+ * marked in the UI). Colored by state — up = available path, down = path
+ * lost (the port mapping is kept).
+ */
+const uplinkIcon = (state: "up" | "down") => (
+	<OutlineIcon
+		class={`uplink-mark${state === "down" ? " uplink-mark-down" : ""}`}
+	>
+		<path d="M12 19V5M6 11l6-6 6 6" />
+		<path d="M5 21h14" />
 	</OutlineIcon>
 );
 
@@ -123,19 +138,22 @@ const moblinkRelayModule: FrontendModule = {
 function moblinkCardBody(host: DeviceCard): m.Children {
 	const s = moblinkRuntime(host);
 	const form = relayState(host);
-	// One row per shared interface: name, its IP, and the UDP relay port.
+	// One row per shared interface: name, its IP, UDP port, and the
+	// uplink mark (protocol.md §1), colored by up/down state.
 	const columns = [
 		{ key: "iface", header: t("dev.moblink.col_iface") },
 		{ key: "ip", header: t("dev.moblink.col_ip") },
 		{ key: "port", header: t("dev.moblink.col_port") },
+		{ key: "uplink", header: t("dev.moblink.uplink") },
 	];
 	return (
 		<div class="moblink-relay">
 			<p class="status" data-state={s.connected ? "online" : "offline"}>
 				{s.connected
 					? t("dev.moblink.status_running", {
-							up: s.availableInterfaces.length - s.failures.length,
-							down: s.failures.length,
+							up: s.availableInterfaces.filter((i) => i.state === "up").length,
+							down: s.availableInterfaces.filter((i) => i.state === "down")
+								.length,
 						})
 					: t("dev.moblink.status_idle")}
 			</p>
@@ -145,6 +163,7 @@ function moblinkCardBody(host: DeviceCard): m.Children {
 						<td>{i.name}</td>
 						<td>{i.address || "—"}</td>
 						<td>{i.listenPort}</td>
+						<td>{uplinkIcon(i.state)}</td>
 					</tr>
 				))}
 			</Table>

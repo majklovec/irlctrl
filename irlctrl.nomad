@@ -51,9 +51,12 @@ job "[[.DOMAIN]]" {
         TURN_SECRET = "[[.TURN_SECRET]]"
       }
 
+      # The server generates module manifests and bundles the web UI before
+      # it starts listening, so boot is CPU- and RAM-hungry: 200 MHz / 256 MB
+      # starved it mid-boot and the health check restarted it in a loop.
       resources {
-        cpu    = 200
-        memory = 256
+        cpu    = 1000
+        memory = 512
       }
 
       service {
@@ -72,9 +75,11 @@ job "[[.DOMAIN]]" {
           interval = "15s"
           timeout  = "5s"
 
+          # Fresh boots take well over 30s to reach app.listen(): allow a
+          # longer unhealthy window before a failed check kills the task.
           check_restart {
             limit = 5
-            grace = "30s"
+            grace = "2m"
           }
         }
       }

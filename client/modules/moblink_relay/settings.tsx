@@ -68,6 +68,7 @@ const def: ModuleDef = {
 	log,
 	visible: (ctx) => ctx.role === "moblink_relay",
 	refresh: (ctx) => {
+		// biome-ignore lint/complexity/useLiteralKeys: dynamic module-id key
 		const v = ctx.modules["moblink_relay"] as unknown as
 			| MoblinkRelayView
 			| undefined;
