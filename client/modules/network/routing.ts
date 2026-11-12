@@ -9,6 +9,7 @@
  */
 
 import { resolve4 } from "node:dns/promises";
+import { readFileSync } from "node:fs";
 import { exists, readFile } from "node:fs/promises";
 import { createConnection } from "node:net";
 import { networkInterfaces, tmpdir } from "node:os";
@@ -833,6 +834,33 @@ export interface NetworkInterfaceInfo {
 let lastInterfaceSignature = "";
 const interfaceChangedHandlers = new Set<() => void>();
 
+/** Root of the per-interface sysfs dir (test seam: point at a fixture). */
+let sysfsNetDir = "/sys/class/net";
+
+/** Test seam: point the operstate read at a fixture directory (null restores the default). */
+export function setSysfsNetForTest(dir: string | null): void {
+    sysfsNetDir = dir ?? "/sys/class/net";
+}
+
+/**
+ * The interface's carrier state, collapsed to `up`/`down` with the same
+ * lenient semantics the relay uses: only an explicit `down` operstate counts
+ * as down; read failures (missing entry, non-Linux dev machine) report `up`
+ * so the signature stays stable there.
+ */
+function carrierState(name: string): "up" | "down" {
+    try {
+        return readFileSync(
+            join(sysfsNetDir, name, "operstate"),
+            "utf8",
+        ).trim() === "down"
+            ? "down"
+            : "up";
+    } catch {
+        return "up";
+    }
+}
+
 /** List the machine's own IPv4 interfaces. Filtered:
  * - loopback (never carries relay traffic)
  * - MobLink tunnel TUNs (`relay${slot}_${iface}`, e.g. `relay0_wg0`) —
@@ -861,11 +889,16 @@ export function onInterfaceChange(handler: () => void): () => void {
  * fire `onInterfaceChange` handlers when it differs. Called from the monitor
  * after a reconfigure (and once at start) so per-interface consumers
  * (moblink-relay) can recreate the relays attached to changed interfaces.
+ *
+ * The signature includes the CARRIER state, not just the addresses: a pulled
+ * cable (or dropped Wi-Fi) keeps its IP for a while, so without the carrier
+ * bit the carrier-only change would never fire the handlers and the relay
+ * would keep offering a dead path to the encoders.
  */
 export function fireInterfaceChangeIfChanged(): void {
     const signature = [
         ...listNetworkInterfaces()
-            .map((i) => `${i.name}:${i.addresses.join(",")}`)
+            .map((i) => `${i.name}:${i.addresses.join(",")}:${carrierState(i.name)}`)
             .sort(),
     ].join("|");
     if (signature === lastInterfaceSignature) return;

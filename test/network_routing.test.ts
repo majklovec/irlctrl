@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { networkInterfaces, tmpdir } from "node:os";
 import { join } from "node:path";
 // The "uplinks file rewrite" block below must run before any other test that
 // triggers a file write: the routing module's lastUplinksContent cache would
@@ -10,11 +10,14 @@ import {
     addProgrammaticUplink,
     bindRouting,
     defaultRouteDetails,
+    fireInterfaceChangeIfChanged,
     isSelfGeneratedEvent,
     leaselessGateway,
+    onInterfaceChange,
     removeProgrammaticUplink,
     seedManagedTableCount,
     setRtTablesFileForTest,
+    setSysfsNetForTest,
     uplinksLines,
 } from "../client/modules/network/routing";
 import { defaultRouteRowIndex } from "../client/modules/network/route_view";
@@ -231,4 +234,44 @@ describe("self-generated route event filtering", () => {
             setRtTablesFileForTest(null);
             rmSync(rtTables, { force: true });
         });
+});
+
+describe("interface-change signature is carrier-aware", () => {
+    test("a carrier-only change (address kept) fires the per-interface handlers", () => {
+        // Pick one of the machine's real IPv4 interfaces and fixture its
+        // operstate under a fake sysfs dir.
+        const names = Object.entries(networkInterfaces() ?? {}).flatMap(
+            ([name, addrs]) =>
+                (addrs ?? []).some(
+                    (a) => a.family === "IPv4" && !a.internal,
+                )
+                    ? [name]
+                    : [],
+        );
+        if (names.length === 0) return; // no real iface — cannot exercise sysfs
+        const name = names[0];
+        const dir = join(tmpdir(), `irtctrl_sysfs_net.${process.pid}`);
+        rmSync(dir, { recursive: true, force: true });
+        mkdirSync(join(dir, name), { recursive: true });
+        const operstate = join(dir, name, "operstate");
+        setSysfsNetForTest(dir);
+        try {
+            let fired = 0;
+            const off = onInterfaceChange(() => fired++);
+            writeFileSync(operstate, "up\n");
+            fireInterfaceChangeIfChanged(); // first observation — sets baseline
+            const baseline = fired;
+            fireInterfaceChangeIfChanged();
+            expect(fired).toBe(baseline); // no change → no fire
+
+            // Cable pulled: the addresses stay, only the carrier drops.
+            writeFileSync(operstate, "down\n");
+            fireInterfaceChangeIfChanged();
+            expect(fired).toBe(baseline + 1); // carrier-only change → fire
+            off();
+        } finally {
+            setSysfsNetForTest(null);
+            rmSync(dir, { recursive: true, force: true });
+        }
+    });
 });

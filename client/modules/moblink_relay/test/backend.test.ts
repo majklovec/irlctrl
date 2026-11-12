@@ -10,6 +10,9 @@
  * would otherwise need CAP_NET_ADMIN / root to open one).
  */
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { ModuleCore } from "../../../../client/backend/module_core";
 import {
 	clearCapabilities,
@@ -36,12 +39,28 @@ import {
 
 type Iface = { name: string; addresses: string[] };
 
+/** The `onChanged` handler the last `fakeInterfaces` registered (tests fire
+ * it to simulate a network event, like the live monitor does). */
+let interfaceHandler: (() => void) | undefined;
+
 function fakeInterfaces(ifaces: Iface[]): NetworkInterfaces {
 	return {
 		list: () => ifaces.map((i) => ({ ...i })),
-		onChanged: () => () => {},
+		onChanged: (h: () => void) => {
+			interfaceHandler = h;
+			return () => {
+				if (interfaceHandler === h) interfaceHandler = undefined;
+			};
+		},
 		ensureMonitoring: async () => {},
 	};
+}
+
+/** Poll a condition until it holds or the deadline passes (the change
+ * handlers run as un-awaited promises, like the production monitor does). */
+async function until(cond: () => boolean, ms = 3000): Promise<void> {
+	const deadline = Date.now() + ms;
+	while (Date.now() < deadline && !cond()) await Bun.sleep(10);
 }
 
 const fakeUplinks: Uplinks = {
@@ -684,6 +703,123 @@ describe("syncRelays interface events (protocol.md §4)", () => {
 			config: { portMap: Record<string, number> };
 		};
 		expect(config.portMap.eth1).toBeDefined();
+	});
+});
+
+describe("immediate interface-change push via the encoder WS (protocol.md §4)", () => {
+	// Full lifecycle: `start()` subscribes to the network monitor's
+	// `onChanged`; the test fires the captured handler like `ip monitor`
+	// would, and expects the interface events to reach the encoder channel
+	// (`pushIfaceEvents`) right away — no `hello` / reconnect in between.
+	async function startModule(
+		ifaces: Iface[],
+		data: Record<string, unknown> = { enabled: true, listenPortBase: 45800 },
+	): Promise<void> {
+		provideCapability<NetworkInterfaces>(
+			"network.interfaces",
+			fakeInterfaces(ifaces),
+		);
+		const core = fakeCore(data, true); // dry-run: no UDP/mDNS listeners
+		cfg.bind?.(core);
+		mod.reseedSeen();
+		await cfg.start({ core } as never);
+	}
+
+	test("the startup snapshot is silent; a hot-plugged interface is pushed as interface_added", async () => {
+		const live: Iface[] = [{ name: "eth0", addresses: ["127.0.0.1"] }];
+		await startModule(live);
+		expect(interfaceHandler).toBeDefined();
+		// The startup sync is the silent snapshot (the WS `hello` carries it).
+		expect(mod.lastWsPushEvents()).toEqual([]);
+
+		// Hotplug: a new interface appears while encoders are connected.
+		live.push({ name: "eth1", addresses: ["127.0.0.1"] });
+		interfaceHandler?.();
+		await until(() =>
+			mod
+				.lastWsPushEvents()
+				.some(
+					(e) => e.type === "interface_added" && e.iface.iface_name === "eth1",
+				),
+		);
+		const added = mod
+			.lastWsPushEvents()
+			.find((e) => e.iface.iface_name === "eth1");
+		expect(added?.type).toBe("interface_added");
+		expect(added?.iface.state).toBe("up");
+		await cfg.stop?.();
+	});
+
+	test("a carrier drop (IP kept) is pushed as interface_down, its return as interface_up", async () => {
+		// Fixture sysfs: the "eth1" carrier can be flipped without touching
+		// the machine, exactly like a pulled cable (the address lingers).
+		const dir = join(tmpdir(), `irtctrl_sysfs_relay.${process.pid}`);
+		rmSync(dir, { recursive: true, force: true });
+		mkdirSync(join(dir, "eth1"), { recursive: true });
+		const operstate = join(dir, "eth1", "operstate");
+		writeFileSync(operstate, "up\n");
+		mod.setSysfsNetForTest(dir);
+		try {
+			const live: Iface[] = [
+				{ name: "eth0", addresses: ["127.0.0.1"] },
+				{ name: "eth1", addresses: ["127.0.0.1"] },
+			];
+			await startModule(live, { enabled: true, listenPortBase: 45810 });
+			// Keepalive ping: the relay is up before the cable drops.
+			expect(
+				(
+					(await cfg.dispatch("moblink_relay.status", {})) as {
+						moblink: { connected: boolean };
+					}
+				).moblink.connected,
+			).toBe(true);
+
+			// Cable pulled: operstate down, the IP is still there.
+			writeFileSync(operstate, "down\n");
+			interfaceHandler?.();
+			await until(() =>
+				mod
+					.lastWsPushEvents()
+					.some(
+						(e) => e.type === "interface_down" && e.iface.iface_name === "eth1",
+					),
+			);
+
+			// Cable back: the encoder must be told the path is usable again.
+			writeFileSync(operstate, "up\n");
+			interfaceHandler?.();
+			await until(() =>
+				mod
+					.lastWsPushEvents()
+					.some(
+						(e) => e.type === "interface_up" && e.iface.iface_name === "eth1",
+					),
+			);
+			await cfg.stop?.();
+		} finally {
+			mod.setSysfsNetForTest(null);
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	test("a disabled module ignores network events (no relays, no push)", async () => {
+		const live: Iface[] = [{ name: "eth0", addresses: ["127.0.0.1"] }];
+		await startModule(live, { enabled: false });
+		live.push({ name: "eth1", addresses: ["127.0.0.1"] });
+		interfaceHandler?.();
+		// Drain any in-flight handler from a previous test, then fire the
+		// (gated) handler: a disabled module neither syncs nor pushes.
+		const mark = mod.lastWsPushEvents();
+		await until(() => mod.lastWsPushEvents() !== mark, 50);
+		const settled = mod.lastWsPushEvents();
+		interfaceHandler?.();
+		await Bun.sleep(50);
+		expect(mod.lastWsPushEvents()).toBe(settled); // no new push happened
+		const status = (await cfg.dispatch("moblink_relay.status", {})) as {
+			moblink: { connected: boolean };
+		};
+		expect(status.moblink.connected).toBe(false);
+		await cfg.stop?.();
 	});
 });
 

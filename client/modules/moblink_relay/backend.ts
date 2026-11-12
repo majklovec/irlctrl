@@ -335,6 +335,14 @@ export function freePort(name: string): void {
 	saveConfig({ portMap: next });
 }
 
+/** Root of the per-interface sysfs dir (test seam: point at a fixture). */
+let sysfsNetDir = "/sys/class/net";
+
+/** Test seam: point the operstate read at a fixture directory (null restores the default). */
+export function setSysfsNetForTest(dir: string | null): void {
+	sysfsNetDir = dir ?? "/sys/class/net";
+}
+
 /**
  * Carrier state of a machine interface: `false` only when the OS explicitly
  * reports it down. Read failures (missing sysfs entry, e.g. a test-only
@@ -344,7 +352,7 @@ export function freePort(name: string): void {
 export function carrierUp(name: string): boolean {
 	try {
 		return (
-			readFileSync(join("/sys/class/net", name, "operstate"), "utf8").trim() !==
+			readFileSync(join(sysfsNetDir, name, "operstate"), "utf8").trim() !==
 			"down"
 		);
 	} catch {
@@ -694,6 +702,16 @@ function markSeen(name: string): void {
 	seenIfaces.add(name);
 }
 
+/**
+ * True once the startup snapshot sync has run. Interfaces first seen in that
+ * sync are announced silently — they go out in the WS `hello` snapshot
+ * (protocol.md §4). An interface that appears LATER (hotplug, a new segment
+ * coming up with the relay already running) is a real change and must reach
+ * the connected encoders as `interface_added` immediately. `start()`/`stop()`
+ * reset the flag so every module lifetime begins with a silent snapshot.
+ */
+let runtimeSync = false;
+
 /** Rebuild the "seen" set after a process restart (from persisted mappings).
  * Exported for tests (to reset the history between cases). */
 export function reseedSeen(): void {
@@ -722,8 +740,10 @@ const ifaceInfo = (
  *    failed bind) is marked DOWN — its mapping is kept, `interface_down`;
  *  - a DOWN interface whose path returned is started on its KEEP port and
  *    reported `interface_up`;
- *  - an interface first seen THIS process is started silently (it goes out
- *    in the WS snapshot / announce, not as `interface_added`).
+ *  - an interface first seen in the STARTUP snapshot sync is started silently
+ *    (it goes out in the WS snapshot / announce, not as `interface_added`);
+ *    one that appears later at runtime is reported `interface_added` so the
+ *    connected encoders learn about it immediately.
  *
  * The emitted events are returned (and must be forwarded to the connected
  * encoders by the caller — see `startEncoderChannels`).
@@ -843,7 +863,10 @@ export async function syncRelays(rollbackOnFailure = false): Promise<{
 						uplink: true,
 					},
 				});
-			else if (existed)
+			else if (existed || runtimeSync)
+				// `runtimeSync`: an interface first seen while the relay is
+				// already running (hotplug / new segment) must not wait for
+				// the next `hello` — connected encoders get it now.
 				events.push({
 					type: "interface_added",
 					iface: {
@@ -907,9 +930,14 @@ async function stopAll(): Promise<void> {
 	await writeStatusFile();
 }
 
-/** A network interface set changed: resync + forward the interface events. */
+/** A network interface set changed: resync + forward the interface events.
+ * Runs even when no relay is up: that is exactly the moment a recovered or
+ * hot-plugged interface must be announced (`interface_up` /
+ * `interface_added`) — skipping the sync there is what left the encoders on
+ * a dead path until the next reconnect. `enabled` (not relay count) gates it:
+ * a disabled module never starts relays from a network event. */
 async function onNetworkChange(): Promise<void> {
-	if (relays.size === 0 && downIfaces.size === 0) return;
+	if (!config().enabled) return;
 	const { events } = await syncRelays();
 	pushIfaceEvents(events);
 }
@@ -1112,10 +1140,27 @@ async function ensureControlServerEncoders(): Promise<void> {
 	}
 }
 
+/** The events the last `pushIfaceEvents` call handed to the encoder WS
+ * channels (test seam). */
+let lastPushEvents: Array<{
+	type: MoblinkRelayIfaceEventType;
+	iface: MoblinkRelayIface;
+}> = [];
+
+/** Test seam: the events the last `pushIfaceEvents` forwarded to the
+ * connected encoders (empty after a push with no changes). */
+export function lastWsPushEvents(): Array<{
+	type: MoblinkRelayIfaceEventType;
+	iface: MoblinkRelayIface;
+}> {
+	return lastPushEvents;
+}
+
 /** Forward interface change events to every connected encoder (§4). */
 export function pushIfaceEvents(
 	events: Array<{ type: MoblinkRelayIfaceEventType; iface: MoblinkRelayIface }>,
 ): void {
+	lastPushEvents = events;
 	for (const ev of events) {
 		const msg = JSON.stringify({ type: ev.type, iface: ev.iface });
 		for (const [key, st] of encoderChannels) {
@@ -1339,6 +1384,7 @@ const registration: BackendModule<ModuleCore> = {
 		// process started must not be re-announced as `interface_added` — it
 		// goes out in the WS snapshot (protocol.md §4).
 		reseedSeen();
+		runtimeSync = false; // the snapshot sync below is silent for first-seen ifaces
 		// Learn encoders (protocol.md §2): UDP announces on the discovery
 		// port + a throttled control-server lookup. The listener callback
 		// dials each new encoder's WebSocket; the sweep drops encoders that
@@ -1353,10 +1399,15 @@ const registration: BackendModule<ModuleCore> = {
 			if (res.started.length > 0) startAdvertiseAll();
 			void ensureControlServerEncoders();
 		}
+		// From here on, interface changes are runtime events: first-seen
+		// interfaces are announced `interface_added` to the connected
+		// encoders instead of waiting for the next `hello`.
+		runtimeSync = true;
 	},
 	async stop() {
 		netUnsub?.();
 		netUnsub = undefined;
+		runtimeSync = false;
 		stopRateSampler();
 		stopAdvertiseAll();
 		stopDiscovery();
@@ -1445,15 +1496,21 @@ const registration: BackendModule<ModuleCore> = {
 					patch.logLevel = level as MoblinkRelayConfig["logLevel"];
 				}
 				saveConfig(patch);
-				// Restart affected relays if the config that affects them changed.
+				// Restart affected relays if the config that affects them changed
+				// and forward the resulting interface events to the connected
+				// encoders (a config change can add/drop interfaces — the
+				// encoder must not wait for the next `hello` for that).
 				if (
 					patch.listenPortBase !== undefined ||
 					patch.interfaceAllow !== undefined ||
 					patch.interfaceIgnore !== undefined ||
 					patch.interfaceNameOverrides !== undefined
 				) {
-					if (config().enabled) await syncRelays();
-					else await stopAll();
+					if (config().enabled) {
+						const res = await syncRelays();
+						pushIfaceEvents(res.events);
+						if (res.started.length > 0) startAdvertiseAll();
+					} else await stopAll();
 				}
 				return { config: config(), moblink: buildStatus() };
 			}
