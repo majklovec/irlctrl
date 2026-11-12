@@ -1,3 +1,11 @@
+# [7.6.0](https://github.com/majklovec/irlctrl/compare/v7.5.0...v7.6.0) (2026-11-12)
+
+
+### Features
+
+* **moblink:** add NAT (SNAT) mode to the UDP relay ([5f50b85](https://github.com/majklovec/irlctrl/commit/5f50b855a4692e6f50cea6593a982edfed54992d))
+* **relay:** implement relay-encoder protocol ([bfe1ae5](https://github.com/majklovec/irlctrl/commit/bfe1ae5235276c31cd870aa7e1ab4d15316217b6)), closes [hi#water-mark](https://github.com/hi/issues/water-mark)
+
 # [7.5.0](https://github.com/majklovec/irlctrl/compare/v7.4.1...v7.5.0) (2026-11-11)
 
 
