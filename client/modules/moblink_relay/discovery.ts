@@ -42,24 +42,44 @@ function endpointSummary(eps: MoblinkAnnounce["interfaces"]): string {
 	return eps.map((e) => `${e.name}=${e.address}: ${e.listenPort}`).join(", ");
 }
 
+/** Per-target throttle: a permanently-unreachable encoder IP must not spam
+ * the log on every announce tick (60 s). */
+const lastUnicastWarn = new Map<string, number>();
+
 function sendOnce(s: dgram.Socket, announce: MoblinkAnnounce): void {
+	const payload = JSON.stringify(announce);
 	console.log(
 		`moblink_relay: advertising host=${announce.host} ifaces=[${endpointSummary(announce.interfaces)}] → ${MOBLINK_BROADCAST_ADDR}:${MOBLINK_DISCOVERY_PORT}`,
 	);
 	try {
-		s.send(
-			JSON.stringify(announce),
-			MOBLINK_DISCOVERY_PORT,
-			MOBLINK_BROADCAST_ADDR,
-			(e) => {
-				if (e)
-					console.warn(
-						`moblink_relay: discovery announce failed: ${e.message}`,
-					);
-			},
-		);
+		s.send(payload, MOBLINK_DISCOVERY_PORT, MOBLINK_BROADCAST_ADDR, (e) => {
+			if (e)
+				console.warn(`moblink_relay: discovery announce failed: ${e.message}`);
+		});
 	} catch (e) {
 		console.warn(`moblink_relay: discovery announce failed: ${String(e)}`);
+	}
+	// Unicast to every KNOWN encoder as well: the limited broadcast does not
+	// cross subnets (an encoder on a phone-hotspot / WireGuard link never
+	// sees it) and mDNS is L2-only. Once the control server — or a same-L2
+	// broadcast — seeds one entry, this keeps the pair alive across any
+	// routed path. Symmetric mirror of the encoder's unicast fallback.
+	for (const ip of knownEncoderIps()) {
+		try {
+			s.send(payload, MOBLINK_DISCOVERY_PORT, ip, (e) => {
+				if (!e) return;
+				const now = Date.now();
+				if (now - (lastUnicastWarn.get(ip) ?? 0) < 60_000) return;
+				lastUnicastWarn.set(ip, now);
+				console.warn(
+					`moblink_relay: encoder announce to ${ip} failed: ${e.message}`,
+				);
+			});
+		} catch (e) {
+			console.warn(
+				`moblink_relay: encoder unicast announce failed: ${String(e)}`,
+			);
+		}
 	}
 }
 
@@ -152,6 +172,13 @@ export function noteEncoder(e: MoblinkDiscoveredEncoder): void {
 /** The current registry entries (a copy — safe to iterate freely). */
 export function knownEncoders(): MoblinkDiscoveredEncoder[] {
 	return [...encoderRegistry.values()];
+}
+
+/** The known encoders' IPs — unicast announce targets (protocol.md §2.1). */
+export function knownEncoderIps(): string[] {
+	return [...encoderRegistry.values()]
+		.map((e) => e.ip)
+		.filter((ip): ip is string => typeof ip === "string" && ip !== "");
 }
 
 /** Drop every entry not (re)announced within TTL; returns the dropped ids. */

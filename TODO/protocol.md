@@ -55,9 +55,14 @@ that filters multicast — no longer flaps the link):
            encoder runs without `CAP_NET_ADMIN` (unprivileged container); the unicast
            fallback converges identically because the listener is not broadcast-bound.
            - Symmetric for the relay: it announces its uplink interfaces the same way,
-             and the encoder's listener learns/refreshes the relay from those messages
-             (plus the WS control channel, which remains the authoritative source for
-             the full interface list).
+             AND unicasts the same payload every tick to every KNOWN encoder's IP —
+             the limited broadcast does not cross subnets (an encoder on a
+             phone-hotspot / WireGuard link never sees it), so once ANY path (same-L2
+             broadcast, mDNS, or the control server) seeds one entry, the unicast
+             keeps the pair alive across any routed path. The encoder's listener
+             learns/refreshes the relay from those messages (plus the WS control
+             channel, which remains the authoritative source for the full interface
+             list).
              - Note: a Docker **bridge** network does not forward these datagrams between
                the container and the LAN — publish `10333:10333/udp` (done in
                `docker-compose.yaml`) or run the relay with `network_mode: host`.
@@ -121,7 +126,6 @@ After any WebSocket reconnect, the relay always sends a **full snapshot of all i
 frame in both directions refreshes the peer's discovery-registry TTL, so a
 live WebSocket is self-sustaining — discovery (UDP/mDNS/control server) is
 only needed for the initial dial. Additionally:
-
 - the relay never stops an OPEN/CONNECTING channel during reconcile (a dead
   peer closes itself; the close handler owns the re-dial/cleanup);
 - the encoder's TTL sweep never reaps a relay with a live WebSocket.

@@ -25,7 +25,12 @@ import {
 	makeMockIfaceRawSocket,
 } from "../../../../shared/lib/udp_relay";
 import * as mod from "../backend";
-import { knownEncoders, noteEncoder, sweepEncoders } from "../discovery";
+import {
+	knownEncoderIps,
+	knownEncoders,
+	noteEncoder,
+	sweepEncoders,
+} from "../discovery";
 
 type Iface = { name: string; addresses: string[] };
 
@@ -683,6 +688,26 @@ describe("encoder discovery + WS channels (protocol.md §2–§5)", () => {
 		expect(knownEncoders().some((e) => e.encoderId === "enc-ghost")).toBe(
 			false,
 		);
+	});
+
+	test("knownEncoderIps lists the registry IPs for the unicast announce path", () => {
+		noteEncoder({
+			encoderId: "enc-a",
+			ip: "10.1.1.1",
+			wsPort: 8199,
+			proto: 1,
+			lastSeen: Date.now(),
+		});
+		noteEncoder({
+			encoderId: "enc-b",
+			ip: "10.2.2.2",
+			wsPort: 8199,
+			proto: 1,
+			lastSeen: Date.now(),
+		});
+		const ips = knownEncoderIps();
+		expect(ips).toContain("10.1.1.1");
+		expect(ips).toContain("10.2.2.2");
 	});
 
 	test("a live WS channel refreshes the TTL and survives the sweep (protocol.md §3 keepalive)", () => {
