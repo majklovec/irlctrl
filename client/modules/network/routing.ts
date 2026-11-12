@@ -832,10 +832,20 @@ export interface NetworkInterfaceInfo {
 let lastInterfaceSignature = "";
 const interfaceChangedHandlers = new Set<() => void>();
 
-/** List the machine's IPv4 interfaces (loopback is filtered: it never carries relay traffic). */
+/** Name of a MobLink encoder tunnel TUN (moblink_streamer:
+ * `relay${slot}_${relayIface}`, e.g. `relay0_wg0`). These are TUNNELS to a
+ * relay's shared uplinks — they are not the machine's own interfaces, so
+ * they must not appear in the interface list (bond selection / relay
+ * eligibility): selecting one would loop traffic back through the relay. */
+const MOBLINK_TUN_RE = /^relay\d+_[a-z0-9]+$/u;
+
+/** List the machine's own IPv4 interfaces. Filtered:
+ * - loopback (never carries relay traffic)
+ * - MobLink tunnel TUNs (relay-shared paths, not own interfaces). */
 export function listNetworkInterfaces(): NetworkInterfaceInfo[] {
     const out: NetworkInterfaceInfo[] = [];
     for (const [name, addrs] of Object.entries(networkInterfaces() ?? {})) {
+        if (MOBLINK_TUN_RE.test(name)) continue;
         const ipv4 = (addrs ?? [])
             .filter((a) => a.family === "IPv4" && !a.internal)
             .map((a) => a.address);
