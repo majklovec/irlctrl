@@ -1,26 +1,42 @@
-## Detailed Relay–Encoder Behavior (English)
+## Full Detailed Summary: Relay–Encoder Architecture (Final Version)
 
-### 1. Relay creates one UDP relay per uplink interface
+This is the complete, consolidated specification of the relay–encoder behavior, incorporating all clarifications from the conversation:
 
--   The relay service continuously tracks network interfaces.
--   For every **uplink** interface, it creates a separate UDP relay instance.
--   Each UDP relay instance is bound to:
+-   No mDNS; discovery only via UDP broadcast and/or control server.
+-   No CLI parameters; all configuration is done through the UI.
+-   The term “streamer” is replaced by **encoder**.
+-   The encoder creates a **TUN interface** to aggregate relay paths into a single logical network adapter.
+-   Port allocation for UDP relays never reindexes existing interfaces.
+
+---
+
+### 1. Core Architecture
+
+-   **Relay side**: A device with multiple uplink interfaces (e.g., `eth0`, `eth1`, `usb0`). For each uplink interface, the relay creates a dedicated UDP relay instance bound to that interface’s IP address and a unique UDP port.
+-   **Encoder side**: Receives UDP packets from one or more relays and writes them into a **TUN (virtual) interface**. Local applications (e.g., an SRTLA sender) read from this TUN interface as if it were a single logical network adapter. The encoder also handles the reverse path: packets written by local apps to the TUN interface are read by the encoder and sent back over UDP to the correct relay.
+-   **Purpose**: Make physical network paths from a remote box (relay) appear as a single virtual interface on the local box (encoder), enabling aggregation and failover without modifying the local application.
+
+---
+
+### 2. UDP Relay Creation and Port Allocation (Relay Side)
+
+-   The relay continuously tracks network interfaces.
+-   For every **uplink** interface, it creates a separate UDP relay instance bound to:
     -   the IP address of that specific interface,
     -   its own UDP port.
--   In the relay UI interface list, these interfaces are marked with an **uplink icon**.
+-   In the relay UI, uplink interfaces are marked with an **uplink icon**.
 -   UDP ports are allocated sequentially from base `4000`:
     -   `eth0` → `4000`
     -   `eth1` → `4001`
     -   when `usb0` is added → `4002`
--   **Adding a new interface must not reindex existing UDP relay ports.**
--   The port allocator keeps a high-water mark of the highest assigned port. A new interface receives `highest_assigned_port + 1`.
--   Removing an interface also does not reindex other interfaces. Existing port mappings remain stable.
--   If an interface goes down, its UDP relay is marked down, but its port mapping is not reassigned.
--   If an interface is removed and later added again, it is treated as a new interface and receives the next highest port unless the UI explicitly preserves a mapping.
+-   **No reindexing on interface addition**: Adding a new interface does not change existing port assignments. The allocator keeps a high-water mark; a new interface gets `highest_assigned_port + 1`.
+-   Removing an interface does not reindex other interfaces. Port mappings remain stable.
+-   If an interface goes down, its UDP relay is marked down, but the port mapping is not reassigned.
+-   If an interface is removed and later re-added, it is treated as a new interface and receives the next highest port (unless the UI explicitly preserves a mapping).
 
 ---
 
-### 2. Encoder discovery by relay
+### 3. Encoder Discovery
 
 The relay discovers encoders only through:
 
@@ -32,15 +48,18 @@ The relay discovers encoders only through:
         - encoder IP address
         - encoder WebSocket port
         - protocol version and optional auth token.
-    - The relay listens on the configured UDP discovery port and learns the encoder WebSocket endpoint from this message.
+    - The relay listens on a configured UDP discovery port and learns the encoder WebSocket endpoint from this message.
 
 2. **Control server**
-    - The relay may ask the control server for available encoders.
+    - The relay may query the control server for available encoders.
     - The control server returns the same kind of information: encoder IP, WebSocket port, `encoder_id`, and optional token.
+
+-   **No mDNS** is used.
+-   All settings are configured in the UI, **no CLI parameters**.
 
 ---
 
-### 3. Relay connects directly to encoder over WebSocket
+### 4. WebSocket Connection and Interface Propagation
 
 -   The **encoder runs a WebSocket server**.
 -   The relay connects directly to the encoder as a **WebSocket client**.
@@ -49,18 +68,12 @@ The relay discovers encoders only through:
     -   protocol version,
     -   full list of its uplink interfaces.
 -   For each interface, the relay sends:
-    -   interface name, e.g. `eth0`,
-    -   relay interface IP address, e.g. `192.168.1.10`,
-    -   UDP relay port, e.g. `4000`.
--   **The IP address is the address of the relay interface that the encoder should use to reach the relay.** The encoder sends UDP data to this `IP:port`.
+    -   interface name (e.g., `eth0`),
+    -   relay interface IP address (e.g., `192.168.1.10`),
+    -   UDP relay port (e.g., `4000`).
+-   **The IP address is the relay interface address that the encoder should use to reach the relay.** The encoder sends UDP data to this `IP:port`.
 
----
-
-### 4. Interface changes are propagated to the encoder
-
-The relay monitors interface changes and immediately sends updates to the encoder over the existing WebSocket connection.
-
-Event types:
+**Interface change events** (sent over the existing WebSocket):
 
 -   `interface_added` — a new interface was added and received the highest port.
 -   `interface_removed` — an interface was removed.
@@ -79,11 +92,58 @@ After any WebSocket reconnect, the relay always sends a **full snapshot of all i
 
 ---
 
-### 5. Data flow
+### 5. Data Flow (with TUN Interface on Encoder)
 
--   The encoder receives the relay interface list over WebSocket.
--   For each active relay uplink interface, the encoder uses as UDP destination:
-    -   `relay_interface_ip : relay_udp_port`.
--   The relay receives UDP data on the socket bound to that interface and forwards it further.
+**Forward path (relay → encoder → local app):**
+
+1. Relay receives data from its local source and sends it as UDP packets through the physical interface bound to that relay instance.
+2. Encoder receives UDP packets from various relay paths.
+3. Encoder writes the received packets into the **TUN interface** (e.g., `tun0`), which has an IP address from a defined network (e.g., `10.3.3.0/24`).
+4. Local applications (e.g., SRTLA sender) read from this TUN interface as if it were a single logical network adapter.
+
+**Reverse path (local app → encoder → relay):**
+
+1. Local application writes response packets to the TUN interface.
+2. Encoder reads these packets from the TUN interface.
+3. Encoder sends them back over UDP to the appropriate relay (using the relay’s IP and UDP port).
+4. Relay forwards them to its local network.
+
 -   If the relay sends `interface_down` or `interface_removed`, the encoder stops using that path.
 -   If the relay sends `interface_added` or `interface_up`, the encoder may start using that path.
+
+---
+
+### 6. Alignment with Moblink
+
+The design matches Moblink as follows:
+
+-   Moblink relay-service creates a relay instance per interface.
+-   Each relay instance has its own UDP socket bound to a specific interface.
+-   The encoder acts as a WebSocket server; the relay acts as a WebSocket client.
+-   The relay sends interface information to the encoder over WebSocket.
+-   The encoder uses the relay interface IP and port for UDP communication.
+-   **Key clarification**: The encoder creates a **TUN interface** to aggregate all relay paths into a single virtual network adapter. Local applications see one interface, not multiple physical paths.
+-   The control server can be used as an alternative to UDP discovery.
+
+Items that need to be made explicit or added compared with standard Moblink behavior:
+
+-   The rule **“no port reindexing”** and allocation by `max_assigned + 1`.
+-   UI marking of uplink interfaces with an uplink icon.
+-   A defined UDP broadcast format for encoder discovery.
+-   WebSocket events `interface_added`, `interface_removed`, `interface_up`, `interface_down`, plus full-state snapshot after reconnect.
+-   Configuration only in the UI, with no CLI parameters.
+-   Discovery only via UDP broadcast and/or control server, without mDNS.
+-   Explicit description of TUN interface creation on the encoder side and the bidirectional data flow through it.
+
+---
+
+### 7. Summary of Key Clarifications
+
+-   The relay is a **pure UDP relay** whose job is to make physical interfaces from one box (relay) available on another box (encoder).
+-   The encoder **creates a virtual TUN interface** to aggregate all relay paths; this was a crucial missing piece in the initial understanding.
+-   Data flow is bidirectional: relay → UDP → encoder → TUN → local app, and local app → TUN → encoder → UDP → relay.
+-   Port allocation is stable and never reindexes existing interfaces.
+-   Discovery uses UDP broadcast and/or control server, not mDNS.
+-   All configuration is done via UI, not CLI parameters.
+-   WebSocket is used for control and interface state propagation, not for data transport.
+-   **Terminology correction**: The term “streamer” is not used; the correct term is **encoder**.

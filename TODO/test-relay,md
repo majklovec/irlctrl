@@ -1,0 +1,31 @@
+Encoder is streaming only via own interfaces, thre is no data flow on the relay interfaces.
+
+Encoder is on: ssh pi@192.168.10.101
+
+root@rpi4:/home/pi/app# ENCODER_BIN=./ceracoder ./client-arm --config ./enc.json --host 0.0.0.0 --pipelines ./pipeline
+
+relay is here (local host): majkl@bigcml:~/Documents/Software/irlctrl/app$ sudo bun run dev:client
+
+OBS SRTLA ingress is on: 83.208.44.38:5000
+
+Test lib/udp_relay library:
+
+1. create a test script, that will ensure udp relay tunnel is functioning correctly
+    - the script should send a test UDP packet through the relay
+    - the script should listen for the packet on the other end
+    - verify that the packet is received correctly
+2. it should send packets to OBS
+    - the script should send a test UDP packet to the OBS SRTLA ingress
+    - the script should listen for the packet on the OBS side
+    - test it using tcp dump
+3. test srtla_send ans source routing tables are setup ok
+    - send a test packet using srtla_send
+    - verify that the packet follows the correct route according to the source routing tables
+    - check the routing tables to ensure they are configured correctly
+
+I have stopped all processes, only OBS is running
+
+In case of failure, you can create alternative library using socat to relay UDP packets between the encoder and OBS.
+
+Best way to test is on the mobile tethered interface: enx7eafd60ad1a2 that is on relay bigcml. It should work like this:
+encoder virtual interface -> UDP -> relay (udp bound to enx7eafd60ad1a2)-> OBS SRTLA ingress
