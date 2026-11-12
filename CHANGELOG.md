@@ -1,3 +1,11 @@
+## [7.7.1](https://github.com/majklovec/irlctrl/compare/v7.7.0...v7.7.1) (2026-11-12)
+
+
+### Bug Fixes
+
+* **moblink:** keepalive so a live WS channel outlives discovery silence ([b5c23e0](https://github.com/majklovec/irlctrl/commit/b5c23e0e27615762875e39109e883e125774859c))
+* **moblink:** relay unicasts announces to known encoders ([15113e0](https://github.com/majklovec/irlctrl/commit/15113e05472bfb84d73049daae4dde34f9c95a30))
+
 # [7.7.0](https://github.com/majklovec/irlctrl/compare/v7.6.0...v7.7.0) (2026-11-12)
 
 
