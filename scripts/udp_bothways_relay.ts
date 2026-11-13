@@ -11,7 +11,7 @@
  * (the old behaviour, which breaks the reply path when bind_ip is a LAN IP the
  * egress upstream can't route back). Pass the NIC's real IP to fix it.
  */
-import { createUdpRelay } from "../shared/lib/udp_relay/src/index.ts";
+import { createUdpRelay } from "../shared/lib/gretap_relay/src/index.ts";
 
 const IFACE = process.argv[2] ?? "enx7eafd60ad1a2";
 const BIND_IP = process.argv[3] ?? "192.168.10.1";

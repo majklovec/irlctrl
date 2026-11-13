@@ -1,14 +1,18 @@
 /*
- * Moblink relay module: the per-interface UDP relays that transparently
- * bridge full IP packets between this machine's LAN interfaces and the
- * encoders. SRTLA lives only on the encoder; the relay forwards the shared
- * interfaces' L3 traffic so the encoder can reach the LAN as local peers.
+ * Moblink relay module: the per-interface relay slots that track this
+ * machine's LAN interfaces for the Moblink transport. Since the GRETAP
+ * cutover the data plane is a kernel GRETAP tunnel — the streamer side sets
+ * up `gretap_<iface>` + `br_gretap` and bridges it into its LAN NIC, so
+ * frames flow L2-over-GRE (protocol 47) between the two kernel stacks. The
+ * slots no longer forward user-space UDP traffic; they keep the port
+ * mapping, discovery and WS roles the encoder needs.
  *
  * This module is the relay-box side of the Moblink transport. It enumerates
  * the machine's eligible network interfaces (via the `network.interfaces`
  * capability, filtered by the `interfaceAllow` / `interfaceIgnore` config),
- * and for each one starts a `createUdpRelay()` from `@irlctrl/udp-relay`
- * bound to that interface's IP. It owns no TUN, no routing, and no config
+ * and for each one starts a `createUdpRelay()` from `@irlctrl/gretap-relay`
+ * (a no-op slot holder since the GRETAP cutover) for that interface's IP.
+ * It owns no TUN, no routing, and no config
  * file beyond `ctx.state.moblink`: the relay IDs live in
  * `ctx.state.moblink.relayIds` and the runtime status is written to
  * `runtimeStatusFile` on every state change.
@@ -47,7 +51,7 @@ import {
 	type IfaceRawSocket,
 	resolveInterfaceAddress,
 	type UdpRelay,
-} from "../../../shared/lib/udp_relay";
+} from "../../../shared/lib/gretap_relay";
 import {
 	MOBLINK_ANNOUNCE_INTERVAL_MS,
 	MOBLINK_DISCOVERY_PORT,

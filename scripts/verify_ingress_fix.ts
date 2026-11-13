@@ -21,6 +21,10 @@
  *   egresses out the mobile interface toward OBS with a returnable (NAT'd) source.
  *
  * Run:  sudo bun scripts/verify_ingress_fix.ts
+ *
+ * Note (GRETAP cutover): since the transport moved to the kernel GRETAP
+ * tunnel, `createUdpRelay` is a no-op slot holder — this script now only
+ * exercises the slot lifecycle/stats, not user-space forwarding.
  */
 import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -30,7 +34,7 @@ import {
 	buildUdpIpPacket,
 	createUdpRelay,
 	encodeDataFrame,
-} from "../shared/lib/udp_relay/src/index.ts";
+} from "../shared/lib/gretap_relay/src/index.ts";
 
 const IFACE = "enx7eafd60ad1a2";
 const IFACE_IP = "172.21.254.128"; // mobile NIC's own IP (egress identity)

@@ -1,6 +1,7 @@
 ## Full Detailed Summary: Relay–Encoder Architecture (Final Version)
 
 This is the complete, consolidated specification of the relay–encoder behavior, incorporating all clarifications from the conversation:
+
 -   Discovery via UDP broadcast/unicast, **mDNS**, and/or the control server (three redundant paths; see §3).
 -   No CLI parameters; all configuration is done through the UI.
 -   The term “streamer” is replaced by **encoder**.
@@ -45,61 +46,64 @@ back to the announced IP when none is known), so one physical relay occupies
 exactly ONE entry no matter how many paths learn it (and a later path for the
 same identity merges into the existing entry instead of duplicating it);
 registration is logged once per relay, not on every refresh:
+
 1. **UDP broadcast + unicast** (discovery port `10333`)
-   - The encoder periodically broadcasts its information on the network, and
-     additionally unicasts the same payload every tick to the addresses of the
-     relays it already knows.
-     - The payload contains at least:
-       - `encoder_id`
-       - encoder IP address
-       - encoder WebSocket port
-       - protocol version and optional auth token.
-       - The relay listens on `10333` (bound to `0.0.0.0`) and learns the encoder
-         WebSocket endpoint from this message.
-         - The limited broadcast (`255.255.255.255`) is refused with `EACCES` when the
-           encoder runs without `CAP_NET_ADMIN` (unprivileged container); the unicast
-           fallback converges identically because the listener is not broadcast-bound.
-           - Symmetric for the relay: it announces its uplink interfaces the same way.
-             Its announcer opens ONE SOCKET PER ATTACHED SEGMENT (bound to each
-             interface's own IP with `setBroadcast(true)`): a limited broadcast
-             (`255.255.255.255`) only egresses on the bind address's subnet, so a
-             multi-homed relay (e.g. facing an encoder on 192.168.10.x via a second
-             NIC) would be silent on every segment except the bound one with a single
-             socket. A manual `announceHost` override changes the ANNOUNCED tunnel
-             IPs, not where the discovery datagrams are sent.
-             - AND the relay unicasts the same payload every tick to every KNOWN
-               encoder's IP (from one socket — routing picks its egress): the
-               limited broadcast does not cross subnets (an encoder on a
-               phone-hotspot / WireGuard link never sees it), so once ANY path
-               (same-L2 broadcast, mDNS, or the control server) seeds one entry,
-               the unicast keeps the pair alive across any routed path. The
-               encoder's listener learns/refreshes the relay from those messages
-               (plus the WS control channel, which remains the authoritative source
-               for the full interface list).
-             - Note: a Docker **bridge** network does not forward these datagrams between
-               the container and the LAN — publish `10333:10333/udp` (done in
-               `docker-compose.yaml`) or run the relay with `network_mode: host`.
+
+    - The encoder periodically broadcasts its information on the network, and
+      additionally unicasts the same payload every tick to the addresses of the
+      relays it already knows.
+        - The payload contains at least:
+            - `encoder_id`
+            - encoder IP address
+            - encoder WebSocket port
+            - protocol version and optional auth token.
+            - The relay listens on `10333` (bound to `0.0.0.0`) and learns the encoder
+              WebSocket endpoint from this message.
+                - The limited broadcast (`255.255.255.255`) is refused with `EACCES` when the
+                  encoder runs without `CAP_NET_ADMIN` (unprivileged container); the unicast
+                  fallback converges identically because the listener is not broadcast-bound.
+                    - Symmetric for the relay: it announces its uplink interfaces the same way.
+                      Its announcer opens ONE SOCKET PER ATTACHED SEGMENT (bound to each
+                      interface's own IP with `setBroadcast(true)`): a limited broadcast
+                      (`255.255.255.255`) only egresses on the bind address's subnet, so a
+                      multi-homed relay (e.g. facing an encoder on 192.168.10.x via a second
+                      NIC) would be silent on every segment except the bound one with a single
+                      socket. A manual `announceHost` override changes the ANNOUNCED tunnel
+                      IPs, not where the discovery datagrams are sent.
+                        - AND the relay unicasts the same payload every tick to every KNOWN
+                          encoder's IP (from one socket — routing picks its egress): the
+                          limited broadcast does not cross subnets (an encoder on a
+                          phone-hotspot / WireGuard link never sees it), so once ANY path
+                          (same-L2 broadcast, mDNS, or the control server) seeds one entry,
+                          the unicast keeps the pair alive across any routed path. The
+                          encoder's listener learns/refreshes the relay from those messages
+                          (plus the WS control channel, which remains the authoritative source
+                          for the full interface list).
+                        - Note: a Docker **bridge** network does not forward these datagrams between
+                          the container and the LAN — publish `10333:10333/udp` (done in
+                          `docker-compose.yaml`) or run the relay with `network_mode: host`.
 
 2. **mDNS (DNS-SD over multicast `224.0.0.251:5353`)** (path added 2025 —
    overrides the original "no mDNS" constraint)
-   - The relay advertises the instance `_irlctrl-relay._udp.local`
-     (`instance.hostname.local`, SRV → discovery port) with a compact TXT
-     record: `h=<hostname>;ip=<primary host>;i=<iface=addr:port;…>` (truncated
-     at the 255-byte TXT limit; the encoder keeps the _longer_ endpoint set
-     across sources, so truncation never shrinks a WS-learned list).
-     - The encoder advertises `_irlctrl-encoder._udp.local`
-       (`instance.hostname.local`, SRV → its WebSocket port) with TXT
-       `id=;ip=;port=;proto=;tok=`.
-       - Both sides run a browser for the _other_ service (re-query + re-advertise
-         every 10 s). Discovered instances refresh the same TTL registries as the
-         UDP path; the WS `hello` (full interface snapshot) stays authoritative.
-         - The mDNS path is best-effort: if multicast is filtered (Docker bridge),
-           paths 1 and 3 still carry discovery. Requires no configuration.
+
+    - The relay advertises the instance `_irlctrl-relay._udp.local`
+      (`instance.hostname.local`, SRV → discovery port) with a compact TXT
+      record: `h=<hostname>;ip=<primary host>;i=<iface=addr:port;…>` (truncated
+      at the 255-byte TXT limit; the encoder keeps the _longer_ endpoint set
+      across sources, so truncation never shrinks a WS-learned list).
+        - The encoder advertises `_irlctrl-encoder._udp.local`
+          (`instance.hostname.local`, SRV → its WebSocket port) with TXT
+          `id=;ip=;port=;proto=;tok=`.
+            - Both sides run a browser for the _other_ service (re-query + re-advertise
+              every 10 s). Discovered instances refresh the same TTL registries as the
+              UDP path; the WS `hello` (full interface snapshot) stays authoritative.
+                - The mDNS path is best-effort: if multicast is filtered (Docker bridge),
+                  paths 1 and 3 still carry discovery. Requires no configuration.
 
 3. **Control server**
-   - The relay may query the control server for available encoders.
-     - The control server returns the same kind of information: encoder IP,
-       WebSocket port, `encoder_id`, and optional token.
+    - The relay may query the control server for available encoders.
+        - The control server returns the same kind of information: encoder IP,
+          WebSocket port, `encoder_id`, and optional token.
 
 -   All settings are configured in the UI, **no CLI parameters**.
 
@@ -120,12 +124,14 @@ registration is logged once per relay, not on every refresh:
 -   **The IP address is the relay interface address that the encoder should use to reach the relay.** The encoder sends UDP data to this `IP:port`.
 
 **Interface change events** (sent over the existing WebSocket):
+
 -   `interface_added` — a new interface was added and received the highest port.
 -   `interface_removed` — an interface was removed.
 -   `interface_up` — an interface became available.
 -   `interface_down` — an interface became unavailable.
 
 Each event contains at least:
+
 -   `iface_name`
 -   `ip`
 -   `udp_port`
@@ -139,21 +145,24 @@ After any WebSocket reconnect, the relay always sends a **full snapshot of all i
 frame in both directions refreshes the peer's discovery-registry TTL, so a
 live WebSocket is self-sustaining — discovery (UDP/mDNS/control server) is
 only needed for the initial dial. Additionally:
-- the relay never stops an OPEN/CONNECTING channel during reconcile (a dead
-  peer closes itself; the close handler owns the re-dial/cleanup);
-- the encoder's TTL sweep never reaps a relay with a live WebSocket.
+
+-   the relay never stops an OPEN/CONNECTING channel during reconcile (a dead
+    peer closes itself; the close handler owns the re-dial/cleanup);
+-   the encoder's TTL sweep never reaps a relay with a live WebSocket.
 
 ---
 
 ### 5. Data Flow (with TUN Interface on Encoder)
 
 **Forward path (relay → encoder → local app):**
+
 1. Relay receives data from its local source and sends it as UDP packets through the physical interface bound to that relay instance.
 2. Encoder receives UDP packets from various relay paths.
 3. Encoder writes the received packets into the **TUN interface** (e.g., `tun0`), which has an IP address from a defined network (e.g., `10.3.3.0/24`).
 4. Local applications (e.g., SRTLA sender) read from this TUN interface as if it were a single logical network adapter.
 
 **Reverse path (local app → encoder → relay):**
+
 1. Local application writes response packets to the TUN interface.
 2. Encoder reads these packets from the TUN interface.
 3. Encoder sends them back over UDP to the appropriate relay (using the relay’s IP and UDP port).
@@ -167,6 +176,7 @@ only needed for the initial dial. Additionally:
 ### 6. Alignment with Moblink
 
 The design matches Moblink as follows:
+
 -   Moblink relay-service creates a relay instance per interface.
 -   Each relay instance has its own UDP socket bound to a specific interface.
 -   The encoder acts as a WebSocket server; the relay acts as a WebSocket client.
@@ -176,6 +186,7 @@ The design matches Moblink as follows:
 -   The control server can be used as an alternative to UDP discovery.
 
 Items that need to be made explicit or added compared with standard Moblink behavior:
+
 -   The rule **“no port reindexing”** and allocation by `max_assigned + 1`.
 -   UI marking of uplink interfaces with an uplink icon.
 -   A defined UDP broadcast format for encoder discovery, plus the mDNS

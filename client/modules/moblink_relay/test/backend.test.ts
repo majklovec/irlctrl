@@ -23,10 +23,8 @@ import type {
 	Uplinks,
 } from "../../../../shared/contracts/module_capabilities";
 import {
-	buildUdpIpPacket,
-	encodeDataFrame,
 	makeMockIfaceRawSocket,
-} from "../../../../shared/lib/udp_relay";
+} from "../../../../shared/lib/gretap_relay";
 import * as mod from "../backend";
 import {
 	knownEncoderIps,
@@ -383,21 +381,18 @@ describe("relay lifecycle (real loopback UDP)", () => {
 		const base = 45210;
 		const ifaces: Iface[] = [
 			{ name: "lo", addresses: ["127.0.0.1"] },
-			{ name: "lo2", addresses: ["127.0.0.1"] },
+			// GRETAP-era failure mode: the slot binds nothing, so a
+			// per-interface failure is a rejected slot option (here: an
+			// invalid interface name), not a busy bind.
+			{ name: "bad/name", addresses: ["127.0.0.1"] },
 		];
 		provideCapability<NetworkInterfaces>(
 			"network.interfaces",
 			fakeInterfaces(ifaces),
 		);
-		// Occupy the second relay's port (base+1) so its bind fails.
-		const blocker = await Bun.udpSocket({
-			hostname: "127.0.0.1",
-			port: base + 1,
-			binaryType: "uint8array",
-		});
 
 		cfg.bind?.(fakeCore({ listenPortBase: base }, false));
-		// No throw: the conflict is per-interface, never fatal to the client.
+		// No throw: the failure is per-interface, never fatal to the client.
 		const res = (await cfg.dispatch("moblink_relay.start", {})) as {
 			moblink: {
 				connected: boolean;
@@ -407,22 +402,21 @@ describe("relay lifecycle (real loopback UDP)", () => {
 			failures: { interfaceName: string; reason: string }[];
 		};
 
-		// The healthy interface ran; the busy one was recorded, not thrown.
+		// The healthy interface ran; the bad one was recorded, not thrown.
 		expect(res.moblink.connected).toBe(true);
 		expect(res.moblink.relays.map((r) => r.interfaceName)).toEqual(["lo"]);
-		expect(res.failures.map((f) => f.interfaceName)).toEqual(["lo2"]);
-		expect(res.moblink.failures[0].reason).toMatch(/bind|EADDRINUSE|use/i);
-		await blocker.close();
+		expect(res.failures.map((f) => f.interfaceName)).toEqual(["bad/name"]);
+		expect(res.moblink.failures[0].reason).toMatch(/interfaceName/i);
 	});
 });
 
-describe("relay installs a vif forward-route in a dedicated table", () => {
-	test("onVifLearned → source-agnostic default + `from` rule in a dedicated table, never the main table", async () => {
+describe("GRETAP data plane: relay slots forward no user-space traffic", () => {
+	// GRETAP cutover: the per-interface relay slot is a no-op. Data flows
+	// through the kernel GRETAP tunnel (set up on the streamer side), so the
+	// slot never installs vif forward-routes — sending an encoder frame to
+	// its announced port must not trigger a single `ip rule`/`ip route`.
+	test("a data frame to the relay port installs no vif forward-route", async () => {
 		const base = 45410;
-		const vifIp = "10.90.0.1";
-		// `lo` is the first (only) eligible interface → dedicated table 200.
-		const table = "200";
-		// A core whose `run` records each (cmd, args) so we can assert the routing.
 		const runCalls: Array<{ cmd: string; args: string[] }> = [];
 		const coreWithRun = {
 			...fakeCore({ listenPortBase: base, nat: false }, false),
@@ -435,126 +429,18 @@ describe("relay installs a vif forward-route in a dedicated table", () => {
 		cfg.bind?.(coreWithRun);
 		await cfg.dispatch("moblink_relay.start", {});
 
-		// An encoder data frame (carrying the vif IP in the header) to lo's relay.
-		const frame = encodeDataFrame(
-			buildUdpIpPacket({
-				srcIp: vifIp,
-				dstIp: "203.0.113.10",
-				srcPort: 1000,
-				dstPort: 2000,
-				payload: new TextEncoder().encode("hi"),
-			}),
-			vifIp,
-		);
-		interface TestSock {
-			send(buf: Uint8Array, port: number, host: string): void;
-			close(): void;
-		}
-		const sock = (await Bun.udpSocket({
-			binaryType: "uint8array",
-		} as unknown as Parameters<
-			typeof Bun.udpSocket
-		>[0])) as unknown as TestSock;
-		sock.send(frame, base, "127.0.0.1");
+		// An encoder data frame (carrying the vif IP in the header) to lo's
+		// slot port.
+		// The slot's port mapping exists (announced over WS as the tunnel
+		// identity) — there is just nothing bound to it.
+		const { config } = (
+			await cfg.dispatch("moblink_relay.getConfig", {})
+		) as { config: { portMap: Record<string, number> } };
+		expect(config.portMap.lo).toBe(base);
 
-		const deadline = Date.now() + 2000;
-		while (
-			Date.now() < deadline &&
-			!runCalls.some(
-				(c) => c.cmd === "ip" && c.args[0] === "rule" && c.args[1] === "add",
-			)
-		)
-			await Bun.sleep(10);
-
-		// A source-AGNOSTIC default lives in the dedicated table, out the
-		// interface: this is what makes vif-SOURCED packets routable (the host's
-		// main-table default is source-pinned `src <relayIp>` and refuses them).
-		const routeCall = runCalls.find(
-			(c) => c.cmd === "ip" && c.args[0] === "route" && c.args[1] === "replace",
-		);
-		expect(routeCall?.args).toEqual([
-			"route",
-			"replace",
-			"default",
-			"dev",
-			"lo",
-			"table",
-			table,
-		]);
-		// The forward path is a SOURCE-scoped rule (`from <vif> lookup <table>`):
-		// only traffic the relay egresses on the vif's behalf takes the dedicated
-		// table; the relay's own traffic keeps the main-table default route.
-		const ruleAdd = runCalls.find(
-			(c) => c.cmd === "ip" && c.args[0] === "rule" && c.args[1] === "add",
-		);
-		expect(ruleAdd?.args).toEqual([
-			"rule",
-			"add",
-			"from",
-			vifIp,
-			"lookup",
-			table,
-		]);
-		// Nothing may land in the MAIN table: a main-table entry for the vif would
-		// perturb the host's local-source routing (the bug this whole fix targets).
-		for (const c of runCalls) {
-			if (c.cmd === "ip" && c.args[0] === "route")
-				expect(c.args).toContain("table");
-		}
-
-		// Teardown removes the rule and flushes the dedicated table.
-		sock.close();
-		await cfg.stop();
-		const ruleDel = runCalls.find(
-			(c) => c.cmd === "ip" && c.args[0] === "rule" && c.args[1] === "del",
-		);
-		expect(ruleDel).toBeDefined();
-		expect(ruleDel?.args).toContain(table);
-		const flush = runCalls.find(
-			(c) => c.cmd === "ip" && c.args[0] === "route" && c.args[1] === "flush",
-		);
-		expect(flush?.args).toEqual(["route", "flush", "table", table]);
-	});
-
-	test("NAT mode: no vif forward-route is installed (egress is the relay IP)", async () => {
-		const base = 45470;
-		const vifIp = "10.90.0.1";
-		const runCalls: Array<{ cmd: string; args: string[] }> = [];
-		const coreWithRun = {
-			...fakeCore({ listenPortBase: base, nat: true }, false),
-			run: async (cmd: string, args: string[]) => {
-				runCalls.push({ cmd, args });
-				return "";
-			},
-		} as unknown as ModuleCore;
-
-		cfg.bind?.(coreWithRun);
-		await cfg.dispatch("moblink_relay.start", {});
-
-		const frame = encodeDataFrame(
-			buildUdpIpPacket({
-				srcIp: vifIp,
-				dstIp: "203.0.113.10",
-				srcPort: 1000,
-				dstPort: 2000,
-				payload: new TextEncoder().encode("hi"),
-			}),
-			vifIp,
-		);
-		interface TestSock {
-			send(buf: Uint8Array, port: number, host: string): void;
-			close(): void;
-		}
-		const sock = (await Bun.udpSocket({
-			binaryType: "uint8array",
-		} as unknown as Parameters<
-			typeof Bun.udpSocket
-		>[0])) as unknown as TestSock;
-		sock.send(frame, base, "127.0.0.1");
-
-		// Give the relay a moment to learn the vif; it must NOT touch routing.
-		await Bun.sleep(200);
-
+		// The slot performs NO user-space forwarding and installs NO vif
+		// forward-route — the GRETAP tunnel is kernel-side.
+		await Bun.sleep(100);
 		expect(runCalls.some((c) => c.cmd === "ip" && c.args[0] === "rule")).toBe(
 			false,
 		);
@@ -562,7 +448,6 @@ describe("relay installs a vif forward-route in a dedicated table", () => {
 			false,
 		);
 
-		sock.close();
 		await cfg.stop();
 	});
 });

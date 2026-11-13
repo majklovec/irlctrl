@@ -10,7 +10,8 @@
         "module": "preserve",
         "paths": {
             "@ui/*": ["./shared/ui/*"],
-            "@irlctrl/udp-relay": ["./shared/lib/udp_relay/src/index.ts"]
+            "@irlctrl/udp-relay": ["./shared/lib/udp_relay/src/index.ts"],
+            "@irlctrl/gretap-relay": ["./shared/lib/gretap_relay/src/index.ts"]
         }
     }
 }

@@ -1,6 +1,6 @@
 /* Types for the moblink_relay module: config, runtime status, and the
  * frontend view. The transport types (VifStats, RelayStats, Endpoint) live in
- * `shared/lib/udp_relay`; only the module-specific envelopes are here. */
+ * `shared/lib/gretap_relay`; only the module-specific envelopes are here. */
 
 /** The persisted `ctx.state.moblink` config slice. */
 export interface MoblinkRelayConfig {

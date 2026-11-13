@@ -51,7 +51,7 @@ import {
     createUdpRelay,
     resolveInterfaceAddress,
     type UdpRelay,
-} from "../shared/lib/udp_relay/src/index";
+} from "../shared/lib/gretap_relay/src/index";
 
 // ---------------------------------------------------------------------------
 // Args

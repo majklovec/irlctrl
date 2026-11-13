@@ -1,6 +1,10 @@
 #!/usr/bin/env bun
 /**
- * Persistent UDP relay runner (`@irlctrl/udp-relay`) for the relay box.
+ * Persistent relay-slot runner (`@irlctrl/gretap-relay`) for the relay box.
+ *
+ * Note (GRETAP cutover): the data plane is now a kernel GRETAP tunnel (set
+ * up on the streamer side); `createUdpRelay` is a no-op slot holder, so this
+ * script keeps only the slot lifecycle/stats for the relay box.
  *
  * Bridges the encoder's virtual interface (TUN, e.g. 10.3.3.5/24) to one or
  * more physical uplink interfaces, egressing out each of them with SNAT
@@ -25,7 +29,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
-import { createUdpRelay, resolveInterfaceAddress } from "../shared/lib/udp_relay/src/index";
+import { createUdpRelay, resolveInterfaceAddress } from "../shared/lib/gretap_relay/src/index";
 
 const SRT_DST = process.env.SRT_DST ?? "83.208.44.38";
 const SRT_PORT = Number(process.env.SRT_PORT ?? "5000");

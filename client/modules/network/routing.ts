@@ -748,7 +748,11 @@ const extraUplinks = new Map<string, UplinkExtra>();
  * their ids; a source that is also a bonded IP is written once. Exported as a
  * test seam. */
 export function uplinksLines(ips: string[]): string[] {
-    return [...ips].filter((ip, i, all) => all.indexOf(ip) === i);
+    const merged = [
+        ...ips,
+        ...[...extraUplinks.values()].map((e) => e.source),
+    ];
+    return merged.filter((ip, i, all) => all.indexOf(ip) === i);
 }
 
 /**

@@ -129,15 +129,15 @@ describe("moblink_streamer", () => {
 		await announce(relay("203.0.113.10", [["eth0", "203.0.113.10", 4000]]));
 		expect(uplinks.added).toEqual([
 			{
-				id: "moblink:relay0_eth0",
+				id: "moblink:m0_eth0",
 				source: "10.90.0.1",
-				label: "Moblink (relay0_eth0)",
+				label: "Moblink (m0_eth0)",
 			},
 		]);
 		const v = await view();
 		expect(v.runtime.running).toBe(true);
 		expect(v.runtime.tunnels[0]).toMatchObject({
-			interfaceName: "relay0_eth0",
+			interfaceName: "gretapm0_eth0",
 			interfaceAddress: "10.90.0.1",
 			relayHost: "203.0.113.10",
 			relayPort: 4000,
@@ -145,7 +145,7 @@ describe("moblink_streamer", () => {
 		});
 		// The learned relay is mirrored to the network card registry.
 		await up().stop();
-		expect(uplinks.removed).toContain("moblink:relay0_eth0");
+		expect(uplinks.removed).toContain("moblink:m0_eth0");
 		expect(uplinks.list()).toEqual([]);
 	});
 
@@ -168,7 +168,7 @@ describe("moblink_streamer", () => {
 				.list()
 				.map((e) => e.id)
 				.sort(),
-		).toEqual(["moblink:relay0_eth0", "moblink:relay0_eth1"]);
+		).toEqual(["moblink:m0_eth0", "moblink:m0_eth1"]);
 		await up().stop();
 	});
 
@@ -183,7 +183,7 @@ describe("moblink_streamer", () => {
 	test("a relay announced while running re-reconciles and adds a TUN", async () => {
 		const { uplinks } = await setup();
 		await announce(relay("203.0.113.10", [["eth0", "203.0.113.10", 4000]]));
-		expect(uplinks.list().map((e) => e.id)).toEqual(["moblink:relay0_eth0"]);
+		expect(uplinks.list().map((e) => e.id)).toEqual(["moblink:m0_eth0"]);
 
 		await announce(relay("198.51.100.7", [["eth0", "198.51.100.7", 4000]]));
 		const v = await view();
@@ -192,7 +192,7 @@ describe("moblink_streamer", () => {
 				.list()
 				.map((e) => e.id)
 				.sort(),
-		).toEqual(["moblink:relay0_eth0", "moblink:relay1_eth0"]);
+		).toEqual(["moblink:m0_eth0", "moblink:m1_eth0"]);
 		expect(v.runtime.tunnels.some((t) => t.relayHost === "198.51.100.7")).toBe(
 			true,
 		);
@@ -214,10 +214,10 @@ describe("moblink_streamer", () => {
 	test("teardown removes the uplinks and leaves nothing registered", async () => {
 		const { uplinks } = await setup();
 		await announce(relay("203.0.113.10", [["eth0", "203.0.113.10", 4000]]));
-		expect(uplinks.list().map((e) => e.id)).toEqual(["moblink:relay0_eth0"]);
+		expect(uplinks.list().map((e) => e.id)).toEqual(["moblink:m0_eth0"]);
 		await up().stop();
 		expect(uplinks.list()).toEqual([]);
-		expect(uplinks.removed).toContain("moblink:relay0_eth0");
+		expect(uplinks.removed).toContain("moblink:m0_eth0");
 	});
 
 	test("the learned relays are reported in the view's discoveredRelays", async () => {
@@ -278,10 +278,10 @@ describe("relay WS control channel (protocol.md §3–§5)", () => {
 		await Bun.sleep(10);
 		const v = await view();
 		expect(v.discoveredRelays.map((r) => r.host)).toContain("wan-relay");
-		expect(uplinks.list().map((e) => e.id)).toEqual(["moblink:relay0_eth0"]);
+		expect(uplinks.list().map((e) => e.id)).toEqual(["moblink:m0_eth0"]);
 		// The TUN dials the INTERFACE address the relay advertised, not its id.
 		expect(v.runtime.tunnels[0]).toMatchObject({
-			interfaceName: "relay0_eth0",
+			interfaceName: "gretapm0_eth0",
 			relayHost: "198.51.100.9",
 			relayPort: 4000,
 		});
@@ -363,7 +363,7 @@ describe("relay WS control channel (protocol.md §3–§5)", () => {
 		await Bun.sleep(10);
 		const before = (await view()).runtime.tunnels[0];
 		expect(before).toMatchObject({
-			interfaceName: "relay0_eth0",
+			interfaceName: "gretapm0_eth0",
 			interfaceAddress: "10.90.0.1",
 		});
 
@@ -393,7 +393,7 @@ describe("relay WS control channel (protocol.md §3–§5)", () => {
 		await Bun.sleep(10);
 		const after = (await view()).runtime.tunnels[0];
 		expect(after).toMatchObject({
-			interfaceName: "relay0_eth0",
+			interfaceName: "gretapm0_eth0",
 			interfaceAddress: "10.90.0.1",
 		});
 		expect(after).toEqual(before);
@@ -409,7 +409,7 @@ describe("relay WS control channel (protocol.md §3–§5)", () => {
 			interfaces: [iface("eth0", "198.51.100.9", 4000)],
 		});
 		await Bun.sleep(10);
-		expect(uplinks.list().map((e) => e.id)).toEqual(["moblink:relay0_eth0"]);
+		expect(uplinks.list().map((e) => e.id)).toEqual(["moblink:m0_eth0"]);
 
 		mod.onRelayWsMessage("wan-relay", {
 			type: "interface_added",
@@ -421,7 +421,7 @@ describe("relay WS control channel (protocol.md §3–§5)", () => {
 				.list()
 				.map((e) => e.id)
 				.sort(),
-		).toEqual(["moblink:relay0_eth0", "moblink:relay0_eth1"]);
+		).toEqual(["moblink:m0_eth0", "moblink:m0_eth1"]);
 		expect(
 			(await view()).runtime.tunnels.map((t) => t.interfaceAddress),
 		).toEqual(["10.90.0.1", "10.90.1.1"]);
@@ -431,7 +431,7 @@ describe("relay WS control channel (protocol.md §3–§5)", () => {
 			iface: iface("eth1", "198.51.100.9", 4001),
 		});
 		await Bun.sleep(10);
-		expect(uplinks.list().map((e) => e.id)).toEqual(["moblink:relay0_eth0"]);
+		expect(uplinks.list().map((e) => e.id)).toEqual(["moblink:m0_eth0"]);
 		expect(
 			(await view()).discoveredRelays
 				.find((r) => r.host === "wan-relay")

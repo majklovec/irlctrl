@@ -1,6 +1,6 @@
 /*
  * moblink_streamer module (encoder side). Creates one TUN per registered
- * shared relay interface (`createVirtualInterface` from @irlctrl/udp-relay),
+ * shared relay interface (`createVirtualInterface` from @irlctrl/gretap-relay),
  * and, with `autoRegisterUplink` on, registers each TUN IP as a
  * `network.uplinks` entry so `srtla_send` picks the extra paths up without
  * user intervention (spec 100-moblink §6, §7.2, §8.3, §6.3 multi-relay
@@ -32,8 +32,9 @@ import { writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import {
 	createVirtualInterface,
+	egressIface,
 	type VirtualInterface,
-} from "@irlctrl/udp-relay";
+} from "@irlctrl/gretap-relay";
 import { requireCapability } from "../../../shared/capabilities";
 import type {
 	BackendModule,
@@ -149,7 +150,9 @@ function slotFor(
 	const slot = {
 		x,
 		y,
-		name: `relay${x}_${ifaceName}`.slice(0, 15),
+		// GRETAP: the kernel device is `gretap<name>`, so `name` must keep
+		// 6 chars of headroom (15-char iface limit).
+		name: `m${x}_${ifaceName}`.slice(0, 9),
 		localIp: `10.${90 + x}.${y}.1`,
 	};
 	tunSlots.set(key, slot);
@@ -341,13 +344,17 @@ function desiredTargets(): TunnelTarget[] {
 
 async function startTunnel(target: TunnelTarget): Promise<void> {
 	const c = config();
-	// Bind the wire-protocol UDP socket to the LAN egress IP, not the TUN IP.
-	// Binding to `localIp` (the TUN address) makes the per-source routing rule
-	// send the frame back into our own TUN (self-encapsulation loop). The LAN
-	// IP reaches the relay via the normal default route (spec 100-moblink §4.6).
+	// GRETAP: `localIp` is the VIRTUAL tunnel address (the legacy TUN IP) — no
+	// kernel interface holds it, so the LAN NIC to bridge in must be resolved
+	// explicitly. It is the interface the kernel routes to the relay (the LAN
+	// egress NIC): binding the tunnel to that NIC is what makes the bridge
+	// extend the LAN across the GRE link. A multi-NIC host must not guess, so
+	// we ask the kernel routing table for the egress to the relay specifically.
+	const localIface = (await egressIface(target.relayHost)) ?? undefined;
 	const created = await createVirtualInterface({
 		name: target.tunName,
 		localIp: target.localIp,
+		localIface,
 		bindAddress: defaultSourceIp() ?? undefined,
 		prefixLength: c.prefixLength,
 		mtu: c.mtu,

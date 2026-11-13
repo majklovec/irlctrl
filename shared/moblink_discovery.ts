@@ -42,16 +42,18 @@ export const MOBLINK_ANNOUNCE_TTL_MS = 15_000;
 export const MOBLINK_BROADCAST_ADDR = "255.255.255.255";
 
 /**
- * Name pattern of an ENCODER-side MobLink tunnel TUN (the `moblink_streamer`
- * names them `relay${slot}_${relayIface}`, e.g. `relay0_wg0`, truncated to 15
- * chars — the Linux interface-name limit). These are TUNNELS to a relay's
- * shared uplink, not the machine's own interfaces, so any interface listing
- * that means "the device's real interfaces" (the network card's
- * "Own interfaces" group, relay eligibility) must exclude them. This is the
- * single source of truth shared by the `network` backend
+ * Name pattern of an ENCODER-side MobLink tunnel interface (the
+ * `moblink_streamer` names them `m${slot}_${relayIface}`, e.g. `m0_wg0`).
+ * Pre-GRETAP these were TUNs (`relay0_wg0`, 15-char limit); after the cutover
+ * the kernel device is `gretap<name>` (e.g. `gretapm0_wg0`). Both shapes are
+ * tunnels to a relay's shared uplink, not the machine's own interfaces, so any
+ * interface listing that means "the device's real interfaces" (the network
+ * card's "Own interfaces" group, relay eligibility) must exclude them. This is
+ * the single source of truth shared by the `network` backend
  * (`listNetworkInterfaces`) and the network card.
  */
-export const MOBLINK_TUN_NAME_RE = /^relay\d+_[a-z0-9]+$/u;
+export const MOBLINK_TUN_NAME_RE =
+	/^(?:relay|gretapm)\d+_[a-z0-9]+$/u;
 
 /** True when `name` is an encoder-side MobLink tunnel TUN (see the RE above). */
 export const isMoblinkTun = (name: string): boolean =>
