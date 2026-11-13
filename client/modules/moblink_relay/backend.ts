@@ -511,15 +511,15 @@ function buildStatus(): MoblinkRuntimeStatus {
 	const downList = [...downIfaces.keys()].filter((name) =>
 		availableInterfaces.some((i) => i.name === name),
 	);
-	// The encoders this relay learned about, each with the discovery path(s)
-	// that found it and the live state of the control-channel WebSocket to it
-	// (the card shows the relay→encoder links).
+	// The encoders this relay learned about, each with its per-path
+	// last-discovery stamps and the live state of the control-channel
+	// WebSocket to it (the card shows the relay→encoder links).
 	const encoders = knownEncoders().map((e) => {
 		const ch = encoderChannels.get(e.encoderId);
 		return {
 			id: e.encoderId,
 			connected: !!ch && ch.ws.readyState === WebSocket.OPEN,
-			discoveredBy: [...e.discoveredBy],
+			discoveredAt: { ...e.discoveredAt },
 			lastSeen: e.lastSeen,
 		};
 	});
@@ -1106,8 +1106,9 @@ function startEncoderChannel(e: MoblinkDiscoveredEncoder): void {
 	ws.onopen = (): void => {
 		pendingConnects.delete(e.encoderId);
 		// The channel is live: keep the encoder's TTL fresh (a live channel
-		// is self-sustaining; discovery only matters for the dial).
-		noteEncoder(e);
+		// is self-sustaining; discovery only matters for the dial). Stamp
+		// NOW — `e` is a snapshot from channel start and goes stale.
+		noteEncoder({ ...e, lastSeen: Date.now() });
 		// Full snapshot on (re)connect — the encoder has a consistent view.
 		st.ws.send(JSON.stringify(helloMessage()));
 		lastWsAdvertiseAt = Date.now();
@@ -1133,8 +1134,8 @@ function startEncoderChannel(e: MoblinkDiscoveredEncoder): void {
 	ws.onmessage = (): void => {
 		// Any frame from the encoder (pong / events) proves the channel is
 		// alive → refresh the registry TTL so the sweep never reaps a live
-		// channel.
-		noteEncoder(e);
+		// channel. `e` is a channel-start snapshot — stamp NOW.
+		noteEncoder({ ...e, lastSeen: Date.now() });
 	};
 	const fail = (why: string): void => {
 		if (encoderChannels.get(e.encoderId) !== st) return; // replaced
@@ -1200,20 +1201,30 @@ async function ensureControlServerEncoders(): Promise<void> {
 		const devs = await core.listDevices();
 		for (const d of devs) {
 			if (d.role !== "encoder" || !d.online) continue;
-			const id = d.hostname ?? d.id;
-			if (knownEncoders().some((x) => x.encoderId === id)) continue;
 			const info = (await core.requestDevice(
 				d.id,
 				"moblink_streamer.encoderInfo",
-			)) as { ip?: string; wsPort?: number; token?: string } | null;
+			)) as {
+				encoderId?: string;
+				ip?: string;
+				wsPort?: number;
+				token?: string;
+			} | null;
 			if (!info?.ip || !info.wsPort) continue;
+			// Canonical identity: the encoder's OWN `encoder_id` (what its
+			// UDP / mDNS announces carry), NOT the control server's device
+			// name — a renamed device (the server entry saying
+			// "moblin-encoder" while the box announces "rpi4") would
+			// otherwise register under two ids and show twice.
+			const id = info.encoderId ?? d.hostname ?? d.id;
+			if (knownEncoders().some((x) => x.encoderId === id)) continue;
 			noteEncoder({
 				encoderId: id,
 				ip: info.ip,
 				wsPort: info.wsPort,
 				proto: MOBLINK_RELAY_WS_PROTOCOL,
 				token: info.token,
-				discoveredBy: ["control-server"],
+				discoveredAt: { "control-server": Date.now() },
 				lastSeen: Date.now(),
 			});
 			void refreshDirectIfaces();
@@ -1296,7 +1307,7 @@ function onMdnsEncoder(f: MdnsFound): void {
 		wsPort,
 		proto: Number(f.fields.get("proto") ?? "1") || 1,
 		token: f.fields.get("tok") ?? undefined,
-		discoveredBy: ["mdns"],
+		discoveredAt: { mdns: Date.now() },
 		lastSeen: Date.now(),
 	};
 	noteEncoder(enc);

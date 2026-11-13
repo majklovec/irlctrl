@@ -195,7 +195,9 @@ function moblinkCardBody(host: DeviceCard): m.Children {
 			{/* The encoders this relay reached (discovery + live WS state). A
 			 * green dot = the control-channel WebSocket to that encoder is
 			 * open (protocol.md §3); the "via" tag = the discovery method(s)
-			 * (UDP announce / mDNS / control server) that found the encoder. */}
+			 * (UDP announce / mDNS / control server) that found the encoder
+			 * plus the last-discovery time per path; the trailing "ago" is
+			 * the heartbeat (lastSeen). */}
 			{(() => {
 				const encs = s.encoders ?? [];
 				if (encs.length === 0) return null;
@@ -204,8 +206,18 @@ function moblinkCardBody(host: DeviceCard): m.Children {
 						<span class="muted">{t("dev.moblink.encoders")}</span>
 						<span class="encoder-links-list">
 							{encs.map((enc) => {
-								const via = (enc.discoveredBy ?? [])
-									.map((method) => t(DISCOVERY_METHOD_KEYS[method]))
+								// Per-protocol last-discovery, in a stable
+								// order (object key order is not guaranteed).
+								const via = (
+									["udp", "mdns", "control-server"] as const
+								)
+									.flatMap((method) => {
+										const at = enc.discoveredAt?.[method];
+										return at === undefined
+											? []
+											: [[method, at] as [typeof method, number]];
+									})
+									.map(([method, at]) => `${t(DISCOVERY_METHOD_KEYS[method])} ${since(at)}`)
 									.join(" · ");
 								return (
 									<span

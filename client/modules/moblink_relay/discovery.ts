@@ -257,27 +257,18 @@ const encoderRegistry = new Map<string, MoblinkDiscoveredEncoder>();
  * Record or refresh an encoder (UDP announce, mDNS, control-server lookup,
  * or a live WS keepalive). The entry's `lastSeen` is taken from `e` (the
  * callers stamp it with the announce time) so the TTL sweep can expire
- * silent encoders. `discoveredBy` is the UNION with the stored entry, so an
- * encoder first seen by one path keeps showing every path that has since
- * (re)announced it — even when a keptalive re-injects an entry captured
- * before a newer path appeared.
+ * silent encoders. `discoveredAt` merges per path: the incoming stamps
+ * win (they are the freshest observation of those paths) and the stored
+ * stamps for paths the incoming entry does not carry survive — so a
+ * keptalive re-injecting an entry captured before a newer path appeared
+ * never erases that path's last-discovery time.
  */
 export function noteEncoder(e: MoblinkDiscoveredEncoder): void {
 	const prev = encoderRegistry.get(e.encoderId);
 	encoderRegistry.set(e.encoderId, {
 		...e,
-		discoveredBy: [...e.discoveredBy, ...prevDiscoveredBy(prev, e)],
+		discoveredAt: { ...(prev?.discoveredAt ?? {}), ...(e.discoveredAt ?? {}) },
 	});
-}
-
-/** The methods `prev` recorded that `e` does not carry (deduplicated union). */
-function prevDiscoveredBy(
-	prev: MoblinkDiscoveredEncoder | undefined,
-	e: MoblinkDiscoveredEncoder,
-): MoblinkDiscoveredEncoder["discoveredBy"] {
-	if (!prev) return [];
-	const have = new Set(e.discoveredBy);
-	return prev.discoveredBy.filter((m) => !have.has(m));
 }
 
 /** The current registry entries (a copy — safe to iterate freely). */
@@ -348,7 +339,7 @@ export function startListeningForEncoders(
 				wsPort: parsed.ws_port,
 				proto: parsed.proto,
 				token: parsed.token,
-				discoveredBy: ["udp"],
+				discoveredAt: { udp: Date.now() },
 				lastSeen: Date.now(),
 			};
 			noteEncoder(e);

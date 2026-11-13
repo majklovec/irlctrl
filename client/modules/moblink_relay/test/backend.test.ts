@@ -112,7 +112,16 @@ function fakeCore(
 			})),
 		requestDevice: async (_id: string, method: string): Promise<unknown> =>
 			method === "moblink_streamer.encoderInfo"
-				? { ip: "192.0.2.20", wsPort: 8123, token: "sekret" }
+				? {
+						// The encoder's OWN id: the streamer reports its
+						// hostname — deliberately different from the
+						// control server's device label, which the relay
+						// must NOT use as the registry key.
+						encoderId: "rpi4",
+						ip: "192.0.2.20",
+						wsPort: 8123,
+						token: "sekret",
+					}
 				: null,
 	} as unknown as ModuleCore;
 }
@@ -734,13 +743,20 @@ describe("encoder discovery + WS channels (protocol.md §2–§5)", () => {
 		const deadline = Date.now() + 2000;
 		while (
 			Date.now() < deadline &&
-			!knownEncoders().some((e) => e.encoderId === "enc-1")
+			!knownEncoders().some((e) => e.encoderId === "rpi4")
 		)
 			await Bun.sleep(10);
-		expect(knownEncoders().map((e) => e.encoderId)).toContain("enc-1");
-		expect(
-			knownEncoders().find((e) => e.encoderId === "enc-1")?.discoveredBy,
-		).toEqual(["control-server"]);
+		// It is keyed by the encoder's OWN id (`encoderInfo.encoderId`,
+		// here "rpi4") — NOT by the control server's device label
+		// ("enc-1"). Keying on both would list one physical encoder
+		// twice (the "moblin-encoder"/"rpi4" duplicate).
+		const ids = knownEncoders().map((e) => e.encoderId);
+		expect(ids).toContain("rpi4");
+		expect(ids).not.toContain("enc-1");
+		const via = knownEncoders().find((e) => e.encoderId === "rpi4")
+			?.discoveredAt;
+		expect(via?.["control-server"]).toBeTypeOf("number");
+		expect(Object.keys(via ?? {})).toEqual(["control-server"]);
 	});
 
 	test("the TTL sweep drops encoders that stop announcing", () => {
@@ -749,7 +765,7 @@ describe("encoder discovery + WS channels (protocol.md §2–§5)", () => {
 			ip: "10.0.0.99",
 			wsPort: 8199,
 			proto: 1,
-			discoveredBy: ["udp"],
+			discoveredAt: { udp: Date.now() },
 			lastSeen: Date.now() - 60_000, // older than the TTL
 		});
 		expect(knownEncoders().some((e) => e.encoderId === "enc-ghost")).toBe(true);
@@ -765,7 +781,7 @@ describe("encoder discovery + WS channels (protocol.md §2–§5)", () => {
 			ip: "10.1.1.1",
 			wsPort: 8199,
 			proto: 1,
-			discoveredBy: ["udp"],
+			discoveredAt: { udp: Date.now() },
 			lastSeen: Date.now(),
 		});
 		noteEncoder({
@@ -773,7 +789,7 @@ describe("encoder discovery + WS channels (protocol.md §2–§5)", () => {
 			ip: "10.2.2.2",
 			wsPort: 8199,
 			proto: 1,
-			discoveredBy: ["udp"],
+			discoveredAt: { udp: Date.now() },
 			lastSeen: Date.now(),
 		});
 		const ips = knownEncoderIps();
@@ -787,7 +803,7 @@ describe("encoder discovery + WS channels (protocol.md §2–§5)", () => {
 			ip: "10.0.0.8",
 			wsPort: 8199,
 			proto: 1,
-			discoveredBy: ["udp"],
+			discoveredAt: { udp: Date.now() },
 			lastSeen: Date.now() - 60_000, // older than the TTL
 		});
 		// The channel's onopen/onmessage refresh (as startEncoderChannel does).
@@ -796,30 +812,34 @@ describe("encoder discovery + WS channels (protocol.md §2–§5)", () => {
 			ip: "10.0.0.8",
 			wsPort: 8199,
 			proto: 1,
-			discoveredBy: ["udp"],
+			discoveredAt: { udp: Date.now() },
 			lastSeen: Date.now(),
 		});
 		expect(sweepEncoders()).toEqual([]);
 		expect(knownEncoders().some((e) => e.encoderId === "enc-live")).toBe(true);
 	});
 
-	test("discoveredBy records every discovery method that (re)announced an encoder", () => {
+	test("discoveredAt keeps a per-path last-discovery timestamp", () => {
 		const base = {
 			encoderId: "enc-via",
 			ip: "10.0.0.7",
 			wsPort: 8199,
 			proto: 1,
 		};
-		noteEncoder({ ...base, discoveredBy: ["udp"], lastSeen: Date.now() });
+		const udpAt = Date.now() - 5_000;
+		noteEncoder({ ...base, discoveredAt: { udp: udpAt }, lastSeen: Date.now() });
 		// A second path (mDNS) (re)announces the same encoder — both stay.
-		noteEncoder({ ...base, discoveredBy: ["mdns"], lastSeen: Date.now() });
+		const mdnsAt = Date.now();
+		noteEncoder({ ...base, discoveredAt: { mdns: mdnsAt }, lastSeen: Date.now() });
 		let entry = knownEncoders().find((e) => e.encoderId === "enc-via");
-		expect(entry?.discoveredBy.sort()).toEqual(["mdns", "udp"]);
+		expect(entry?.discoveredAt).toEqual({ udp: udpAt, mdns: mdnsAt });
 		// A keptalive re-injects an entry captured BEFORE the mdns path
-		// appeared — the union with the stored entry must keep both methods.
-		noteEncoder({ ...base, discoveredBy: ["udp"], lastSeen: Date.now() });
+		// appeared — merging keeps the stored mdns stamp; the fresh udp
+		// stamp wins for its own path.
+		const udpAt2 = Date.now();
+		noteEncoder({ ...base, discoveredAt: { udp: udpAt2 }, lastSeen: Date.now() });
 		entry = knownEncoders().find((e) => e.encoderId === "enc-via");
-		expect(entry?.discoveredBy.sort()).toEqual(["mdns", "udp"]);
+		expect(entry?.discoveredAt).toEqual({ udp: udpAt2, mdns: mdnsAt });
 	});
 });
 
@@ -857,7 +877,7 @@ describe("directly-connected interfaces are not advertised", () => {
 			ip: "192.168.10.101",
 			wsPort: 8123,
 			proto: 1,
-			discoveredBy: ["udp"],
+			discoveredAt: { udp: Date.now() },
 			lastSeen: Date.now(),
 		});
 		noteEncoder({
@@ -865,7 +885,7 @@ describe("directly-connected interfaces are not advertised", () => {
 			ip: "10.44.0.9",
 			wsPort: 8123,
 			proto: 1,
-			discoveredBy: ["udp"],
+			discoveredAt: { udp: Date.now() },
 			lastSeen: Date.now(),
 		});
 		await mod.refreshDirectIfaces();
@@ -904,7 +924,7 @@ describe("directly-connected interfaces are not advertised", () => {
 			ip: "192.168.10.50",
 			wsPort: 8123,
 			proto: 1,
-			discoveredBy: ["udp"],
+			discoveredAt: { udp: Date.now() },
 			lastSeen: Date.now(),
 		});
 		await mod.refreshDirectIfaces();
@@ -943,7 +963,7 @@ describe("directly-connected interfaces are not advertised", () => {
 			ip: "192.168.10.101",
 			wsPort: 8123,
 			proto: 1,
-			discoveredBy: ["udp"],
+			discoveredAt: { udp: Date.now() },
 			lastSeen: Date.now(),
 		});
 		await mod.refreshDirectIfaces();

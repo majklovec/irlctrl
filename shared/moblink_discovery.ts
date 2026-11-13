@@ -162,10 +162,12 @@ export interface MoblinkDiscoveredEncoder {
 	wsPort: number;
 	proto: number;
 	token?: string;
-	/** The discovery paths that (re)recorded this entry — the union of every
-	 * method observed while the entry stayed alive (the card shows it so
-	 * the operator sees HOW the relay found each encoder). */
-	discoveredBy: MoblinkDiscoveryMethod[];
+	/** Last observation per discovery path (epoch ms). The card renders a
+	 * per-protocol "discovered … ago" line from these stamps. The WS
+	 * keepalive does NOT add to this map (it only refreshes `lastSeen`),
+	 * so the line stays honest about which path (re)announced the encoder
+	 * and when — even when only the live channel keeps the entry alive. */
+	discoveredAt: Partial<Record<MoblinkDiscoveryMethod, number>>;
 	/** Epoch ms we last heard from this encoder. */
 	lastSeen: number;
 }

@@ -132,10 +132,10 @@ export interface MoblinkRelayEncoderStatus {
 	id: string;
 	/** `true` while the relay's WebSocket to this encoder is open. */
 	connected: boolean;
-	/** The discovery path(s) by which the relay found this encoder (UDP
-	 * announce, mDNS, control server) — the union of every path observed
-	 * while the entry stayed alive. */
-	discoveredBy?: MoblinkDiscoveryMethod[];
+	/** Last discovery per path (epoch ms): which protocol(s) found this
+	 * encoder and when — the card renders a per-protocol "ago" line.
+	 * Absent stamps = never observed on that path. */
+	discoveredAt?: Partial<Record<MoblinkDiscoveryMethod, number>>;
 	/** Epoch ms the relay last heard from this encoder (announce / WS frame). */
 	lastSeen?: number;
 }
