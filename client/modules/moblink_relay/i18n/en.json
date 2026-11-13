@@ -36,5 +36,9 @@
 	"dev.moblink.status_starting": "Starting…",
 	"dev.moblink.tunnel": "Tunnel",
 	"dev.moblink.uplink": "Uplink",
-	"dev.moblink.upstreams": "Upstreams"
+	"dev.moblink.upstreams": "Upstreams",
+	"dev.moblink.via": "via",
+	"dev.moblink.method_udp": "UDP",
+	"dev.moblink.method_mdns": "mDNS",
+	"dev.moblink.method_control_server": "control server"
 }

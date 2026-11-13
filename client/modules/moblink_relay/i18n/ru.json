@@ -36,5 +36,9 @@
 	"dev.moblink.status_starting": "Запуск…",
 	"dev.moblink.tunnel": "Туннель",
 	"dev.moblink.uplink": "Апстим",
-	"dev.moblink.upstreams": "Апстримы"
+	"dev.moblink.upstreams": "Апстримы",
+	"dev.moblink.via": "через",
+	"dev.moblink.method_udp": "UDP",
+	"dev.moblink.method_mdns": "mDNS",
+	"dev.moblink.method_control_server": "управляющий сервер"
 }

@@ -36,5 +36,9 @@
 	"dev.moblink.status_starting": "開始中…",
 	"dev.moblink.tunnel": "トンネル",
 	"dev.moblink.uplink": "アップストリーム",
-	"dev.moblink.upstreams": "アップストリーム"
+	"dev.moblink.upstreams": "アップストリーム",
+	"dev.moblink.via": "経由",
+	"dev.moblink.method_udp": "UDP",
+	"dev.moblink.method_mdns": "mDNS",
+	"dev.moblink.method_control_server": "制御サーバー"
 }

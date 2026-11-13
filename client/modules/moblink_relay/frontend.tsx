@@ -32,6 +32,13 @@ const moblinkRuntime = (host: DeviceCard): MoblinkRuntimeStatus =>
 		encoders: [],
 	};
 
+/** i18n key per discovery method (the value carries a hyphen, so map it). */
+const DISCOVERY_METHOD_KEYS = {
+	udp: "dev.moblink.method_udp",
+	mdns: "dev.moblink.method_mdns",
+	"control-server": "dev.moblink.method_control_server",
+} as const;
+
 /** The role pictogram (bridging a hub to the shared interfaces). */
 const moblinkRelayIcon = () => (
 	<OutlineIcon class="role-icon role-icon-moblink-relay">
@@ -187,7 +194,8 @@ function moblinkCardBody(host: DeviceCard): m.Children {
 			</p>
 			{/* The encoders this relay reached (discovery + live WS state). A
 			 * green dot = the control-channel WebSocket to that encoder is
-			 * open (protocol.md §3) — the relay is talking to the encoder. */}
+			 * open (protocol.md §3); the "via" tag = the discovery method(s)
+			 * (UDP announce / mDNS / control server) that found the encoder. */}
 			{(() => {
 				const encs = s.encoders ?? [];
 				if (encs.length === 0) return null;
@@ -195,23 +203,33 @@ function moblinkCardBody(host: DeviceCard): m.Children {
 					<p class="encoder-links">
 						<span class="muted">{t("dev.moblink.encoders")}</span>
 						<span class="encoder-links-list">
-							{encs.map((enc) => (
-								<span
-									class={`encoder-link${enc.connected ? " is-on" : ""}`}
-									key={`enc:${enc.id}`}
-									title={
-										enc.connected
-											? t("dev.moblink.encoder_connected")
-											: t("dev.moblink.encoder_offline")
-									}
-								>
-									<span class="ws-dot" aria-hidden="true" />
-									{enc.id}
-									{enc.lastSeen ? (
-										<small class="muted"> · {since(enc.lastSeen)}</small>
-									) : null}
-								</span>
-							))}
+							{encs.map((enc) => {
+								const via = (enc.discoveredBy ?? [])
+									.map((method) => t(DISCOVERY_METHOD_KEYS[method]))
+									.join(" · ");
+								return (
+									<span
+										class={`encoder-link${enc.connected ? " is-on" : ""}`}
+										key={`enc:${enc.id}`}
+										title={
+											enc.connected
+												? t("dev.moblink.encoder_connected")
+												: t("dev.moblink.encoder_offline")
+										}
+									>
+										<span class="ws-dot" aria-hidden="true" />
+										{enc.id}
+										{via ? (
+											<small class="muted enc-via">
+												{`${t("dev.moblink.via")} ${via}`}
+											</small>
+										) : null}
+										{enc.lastSeen ? (
+											<small class="muted"> · {since(enc.lastSeen)}</small>
+										) : null}
+									</span>
+								);
+							})}
 						</span>
 					</p>
 				);

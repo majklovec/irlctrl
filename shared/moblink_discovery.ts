@@ -148,6 +148,13 @@ export interface MoblinkEncoderAnnounce {
 	ts: number;
 }
 
+/** A discovery path by which the relay learned an encoder (protocol.md
+ * §2): the UDP-announce listener on the well-known port, the mDNS
+ * encoder-service browser, or the control-server lookup. Not sent on the
+ * wire — the relay derives it locally from which listener recorded the
+ * entry. */
+export type MoblinkDiscoveryMethod = "udp" | "mdns" | "control-server";
+
 /** An encoder entry in the relay's TTL'd registry (an announce we've seen). */
 export interface MoblinkDiscoveredEncoder {
 	encoderId: string;
@@ -155,6 +162,10 @@ export interface MoblinkDiscoveredEncoder {
 	wsPort: number;
 	proto: number;
 	token?: string;
+	/** The discovery paths that (re)recorded this entry — the union of every
+	 * method observed while the entry stayed alive (the card shows it so
+	 * the operator sees HOW the relay found each encoder). */
+	discoveredBy: MoblinkDiscoveryMethod[];
 	/** Epoch ms we last heard from this encoder. */
 	lastSeen: number;
 }

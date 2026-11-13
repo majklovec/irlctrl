@@ -104,6 +104,10 @@ registration is logged once per relay, not on every refresh:
     - The relay may query the control server for available encoders.
         - The control server returns the same kind of information: encoder IP,
           WebSocket port, `encoder_id`, and optional token.
+    - The relay records WHICH of these paths (re)recorded each encoder —
+      `encoders[].discoveredBy` in the runtime status, the union of every
+      method observed while the entry stayed alive — and the relay card
+      shows it per encoder (`via …`).
 
 -   All settings are configured in the UI, **no CLI parameters**.
 

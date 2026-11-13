@@ -511,13 +511,15 @@ function buildStatus(): MoblinkRuntimeStatus {
 	const downList = [...downIfaces.keys()].filter((name) =>
 		availableInterfaces.some((i) => i.name === name),
 	);
-	// The encoders this relay learned about, each with the live state of the
-	// control-channel WebSocket to it (the card shows the relay→encoder links).
+	// The encoders this relay learned about, each with the discovery path(s)
+	// that found it and the live state of the control-channel WebSocket to it
+	// (the card shows the relay→encoder links).
 	const encoders = knownEncoders().map((e) => {
 		const ch = encoderChannels.get(e.encoderId);
 		return {
 			id: e.encoderId,
 			connected: !!ch && ch.ws.readyState === WebSocket.OPEN,
+			discoveredBy: [...e.discoveredBy],
 			lastSeen: e.lastSeen,
 		};
 	});
@@ -1211,6 +1213,7 @@ async function ensureControlServerEncoders(): Promise<void> {
 				wsPort: info.wsPort,
 				proto: MOBLINK_RELAY_WS_PROTOCOL,
 				token: info.token,
+				discoveredBy: ["control-server"],
 				lastSeen: Date.now(),
 			});
 			void refreshDirectIfaces();
@@ -1293,6 +1296,7 @@ function onMdnsEncoder(f: MdnsFound): void {
 		wsPort,
 		proto: Number(f.fields.get("proto") ?? "1") || 1,
 		token: f.fields.get("tok") ?? undefined,
+		discoveredBy: ["mdns"],
 		lastSeen: Date.now(),
 	};
 	noteEncoder(enc);

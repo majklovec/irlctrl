@@ -1,6 +1,7 @@
 /* Types for the moblink_relay module: config, runtime status, and the
  * frontend view. The transport types (VifStats, RelayStats, Endpoint) live in
  * `shared/lib/gretap_relay`; only the module-specific envelopes are here. */
+import type { MoblinkDiscoveryMethod } from "../../../shared/moblink_discovery";
 
 /** The persisted `ctx.state.moblink` config slice. */
 export interface MoblinkRelayConfig {
@@ -131,6 +132,10 @@ export interface MoblinkRelayEncoderStatus {
 	id: string;
 	/** `true` while the relay's WebSocket to this encoder is open. */
 	connected: boolean;
+	/** The discovery path(s) by which the relay found this encoder (UDP
+	 * announce, mDNS, control server) — the union of every path observed
+	 * while the entry stayed alive. */
+	discoveredBy?: MoblinkDiscoveryMethod[];
 	/** Epoch ms the relay last heard from this encoder (announce / WS frame). */
 	lastSeen?: number;
 }

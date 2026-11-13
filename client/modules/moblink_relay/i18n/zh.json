@@ -36,5 +36,9 @@
 	"dev.moblink.status_starting": "正在启动…",
 	"dev.moblink.tunnel": "隧道",
 	"dev.moblink.uplink": "上游",
-	"dev.moblink.upstreams": "上游"
+	"dev.moblink.upstreams": "上游",
+	"dev.moblink.via": "经由",
+	"dev.moblink.method_udp": "UDP",
+	"dev.moblink.method_mdns": "mDNS",
+	"dev.moblink.method_control_server": "控制服务器"
 }
