@@ -34,6 +34,15 @@ import {
 	stopAnnouncing,
 	sweepEncoders,
 } from "../discovery";
+import { MOBLINK_ANNOUNCE_TTL_MS } from "../../../../shared/moblink_discovery";
+
+/** Expire every registry entry (the discovery registry is module-level and
+ * TTL'd — a plain `sweepEncoders()` only drops already-expired entries). */
+function clearEncoders(): void {
+	for (const e of knownEncoders())
+		noteEncoder({ ...e, lastSeen: Date.now() - MOBLINK_ANNOUNCE_TTL_MS - 1 });
+	sweepEncoders();
+}
 
 type Iface = { name: string; addresses: string[] };
 
@@ -784,5 +793,154 @@ describe("encoder discovery + WS channels (protocol.md §2–§5)", () => {
 		});
 		expect(sweepEncoders()).toEqual([]);
 		expect(knownEncoders().some((e) => e.encoderId === "enc-live")).toBe(true);
+	});
+});
+
+describe("directly-connected interfaces are not advertised", () => {
+	// An encoder that sits on one of the relay's own segments reaches it
+	// directly — that interface must never reach the encoder (no gretap
+	// tunnel back through the relay). Only the routed paths stay.
+	const ifaces: Iface[] = [
+		{ name: "eno1", addresses: ["192.168.10.1"] },
+		{ name: "eno2", addresses: ["192.168.1.136"] },
+		{ name: "enx9a9a55564a44", addresses: ["172.21.254.109"] },
+	];
+
+	test("an encoder on a relay segment hides that interface; routed paths stay", async () => {
+		clearEncoders();
+		provideCapability<NetworkInterfaces>(
+			"network.interfaces",
+			fakeInterfaces(ifaces),
+		);
+		const coreWithRun = {
+			...fakeCore({ listenPortBase: 4000, portMap: {} }),
+			run: async (cmd: string, args: string[]) => {
+				if (cmd === "ip" && args[0] === "route" && args[1] === "get") {
+					if (args[2] === "192.168.10.101")
+						return "192.168.10.101 dev eno1 src 192.168.10.1 uid 0";
+					if (args[2] === "10.44.0.9")
+						return "10.44.0.9 via 192.168.1.1 dev eno2 src 192.168.1.136 uid 0";
+				}
+				return "";
+			},
+		} as unknown as ModuleCore;
+		cfg.bind?.(coreWithRun);
+		noteEncoder({
+			encoderId: "enc-direct",
+			ip: "192.168.10.101",
+			wsPort: 8123,
+			proto: 1,
+			lastSeen: Date.now(),
+		});
+		noteEncoder({
+			encoderId: "enc-routed",
+			ip: "10.44.0.9",
+			wsPort: 8123,
+			proto: 1,
+			lastSeen: Date.now(),
+		});
+		await mod.refreshDirectIfaces();
+		// eno1 is on-link to the encoder (no `via`) → filtered; eno2 + the
+		// modem path are routed → still advertised.
+		expect(mod.relayIfaceList().map((i) => i.iface_name)).toEqual([
+			"eno2",
+			"enx9a9a55564a44",
+		]);
+		const p = mod.announcePayload();
+		expect(p?.interfaces.map((i) => i.name)).toEqual([
+			"eno2",
+			"enx9a9a55564a44",
+		]);
+	});
+
+	test("no known encoders → the previous mapping is kept", async () => {
+		clearEncoders();
+		provideCapability<NetworkInterfaces>(
+			"network.interfaces",
+			fakeInterfaces(ifaces),
+		);
+		const coreWithRun = {
+			...fakeCore({ listenPortBase: 4000, portMap: {} }),
+			run: async (cmd: string, args: string[]) =>
+				cmd === "ip" && args[0] === "route" && args[1] === "get"
+					? `${args[2]} dev eno1 src 192.168.10.1 uid 0`
+					: "",
+		} as unknown as ModuleCore;
+		cfg.bind?.(coreWithRun);
+
+		// First: classify eno1 as directly connected while an encoder is
+		// known on its segment.
+		noteEncoder({
+			encoderId: "enc-prev",
+			ip: "192.168.10.50",
+			wsPort: 8123,
+			proto: 1,
+			lastSeen: Date.now(),
+		});
+		await mod.refreshDirectIfaces();
+		expect(mod.relayIfaceList().map((i) => i.iface_name)).toEqual([
+			"eno2",
+			"enx9a9a55564a44",
+		]);
+
+		// Then: the encoder TTL-expires → nothing is classified, and the
+		// previous mapping must be kept (no collapse to an empty set).
+		clearEncoders();
+		await mod.refreshDirectIfaces();
+		expect(mod.relayIfaceList().map((i) => i.iface_name)).toEqual([
+			"eno2",
+			"enx9a9a55564a44",
+		]);
+	});
+
+	test("events for a directly-connected interface are never pushed to the encoder", async () => {
+		clearEncoders();
+		provideCapability<NetworkInterfaces>(
+			"network.interfaces",
+			fakeInterfaces(ifaces),
+		);
+		const coreWithRun = {
+			...fakeCore({ listenPortBase: 4000, portMap: {} }),
+			run: async (cmd: string, args: string[]) => {
+				if (cmd === "ip" && args[0] === "route" && args[1] === "get")
+					return "192.168.10.101 dev eno1 src 192.168.10.1 uid 0";
+				return "";
+			},
+		} as unknown as ModuleCore;
+		cfg.bind?.(coreWithRun);
+		noteEncoder({
+			encoderId: "enc-direct",
+			ip: "192.168.10.101",
+			wsPort: 8123,
+			proto: 1,
+			lastSeen: Date.now(),
+		});
+		await mod.refreshDirectIfaces();
+		mod.pushIfaceEvents([
+			{
+				type: "interface_added",
+				iface: {
+					iface_name: "eno1",
+					ip: "192.168.10.1",
+					udp_port: 4000,
+					state: "up",
+					uplink: true,
+				},
+			},
+			{
+				type: "interface_added",
+				iface: {
+					iface_name: "eno2",
+					ip: "192.168.1.136",
+					udp_port: 4001,
+					state: "up",
+					uplink: true,
+				},
+			},
+		]);
+		// Only the routed interface's event survives the fan-out filter.
+		expect(mod.lastWsPushEvents().map((e) => e.iface.iface_name)).toEqual([
+			"eno2",
+		]);
 	});
 });

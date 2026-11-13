@@ -80,14 +80,46 @@ export function resolveInterfaceAddress(
     return ipv4.address;
 }
 
+/**
+ * Deterministic GRE key for a tunnel pair. Kernel GRE demux matching is
+ * address-based for keyless tunnels (`daddr == remote`), which cannot match
+ * a symmetric pair on heterogeneous subnets — a frame the relay sends to the
+ * encoder's address matches no demux on the encoder. A keyed tunnel is
+ * demuxed by (protocol, key) alone, so the outer addresses are irrelevant.
+ * Both ends derive the same key from the endpoint pair.
+ */
+export function greKeyForEndpoints(ipA: string, ipB: string): number {
+    const num = (ip: string) =>
+        ip.split(".").reduce((acc, o) => (acc << 8) + parseInt(o, 10), 0) >>> 0;
+    const [lo, hi] = num(ipA) <= num(ipB) ? [ipA, ipB] : [ipB, ipA];
+    const s = `${lo}|${hi}`;
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h === 0 ? 1 : h;
+}
+
 /** The `ip` argv that creates one side of the tunnel (pure — unit-testable). */
 export function gretapSetupCommands(
     name: string,
     peerIp: string,
     mtu: number,
+    greKey?: number,
 ): string[][] {
+    const keyArgs = greKey ? ["okey", String(greKey), "ikey", String(greKey)] : [];
     return [
-        ["link", "add", `gretap${name}`, "type", "gretap", "remote", peerIp],
+        [
+            "link",
+            "add",
+            `gretap${name}`,
+            "type",
+            "gretap",
+            "remote",
+            peerIp,
+            ...keyArgs,
+        ],
         ["link", "set", `gretap${name}`, "mtu", String(mtu)],
         ["link", "add", `br-${name}`, "type", "bridge"],
         ["link", "set", `br-${name}`, "up"],
@@ -146,6 +178,7 @@ export async function setUpGretap(opts: {
     localIp: string;
     localIface?: string;
     mtu?: number;
+    greKey?: number;
 }): Promise<{ name: string; bridge: string; localIface: string }> {
     const name = opts.name;
     const mtu = opts.mtu ?? DEFAULT_GRETAP_MTU;
@@ -165,7 +198,7 @@ export async function setUpGretap(opts: {
     }
 
     const runAll = async () => {
-        for (const args of gretapSetupCommands(name, opts.peerIp, mtu))
+        for (const args of gretapSetupCommands(name, opts.peerIp, mtu, opts.greKey))
             await ipRunner(args);
         await ipRunner(["link", "set", localIface, "master", `br-${name}`]);
         await ipRunner(["link", "set", localIface, "up"]);

@@ -35,6 +35,12 @@ export interface VirtualInterfaceOptions {
     relay: Endpoint;
     /** Legacy: ignored (there is no userspace socket to bind). */
     bindAddress?: string;
+    /**
+     * GRE key shared by both tunnel ends (keyed demux: outer addresses are
+     * ignored by the kernel, so the tunnel works across asymmetric subnets).
+     * Derive it with `greKeyForEndpoints(peerIp, localIp)`. Default: none.
+     */
+    greKey?: number;
     /** Tunnel MTU (default 1500). */
     mtu?: number;
     /** Legacy: ignored (GRE keepalives are kernel-side). */
@@ -129,6 +135,7 @@ class VifImpl implements VirtualInterface {
                 localIp: this.localIp,
                 localIface: this.opts.localIface,
                 mtu: this.mtu,
+                greKey: this.opts.greKey,
             });
         } catch (e) {
             const message = e instanceof Error ? e.message : String(e);

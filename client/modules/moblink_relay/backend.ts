@@ -206,6 +206,14 @@ function stopRateSampler(): void {
 const downIfaces = new Map<string, { reason?: string }>();
 /** The last interface address each relay was created for (hotplug detection). */
 const lastIfaceAddr = new Map<string, string>();
+/**
+ * Relay interfaces that sit on a known encoder's own segment (the kernel
+ * routes to the encoder on-link, no gateway): that encoder reaches the
+ * relay through them directly, so the relay must not advertise them — the
+ * encoder uses such a path as a plain direct uplink, not a gretap tunnel.
+ * Kept fresh by `refreshDirectIfaces()`.
+ */
+const directIfaces = new Set<string>();
 /** Interfaces that failed to start (name → reason), surfaced in status/card. */
 const failures = new Map<string, string>();
 /**
@@ -288,6 +296,54 @@ export function eligibleInterfaces(
 		)
 		.map((i) => i.name)
 		.sort();
+}
+
+/**
+ * The interfaces this relay advertises: the eligible set minus the
+ * directly-connected ones (`directIfaces`). An encoder on the same segment
+ * as one of those uses it as a plain direct uplink — tunneling the segment
+ * back through the relay would be a L2 loop, so those never reach an
+ * encoder (announce, WS snapshot/events, status).
+ */
+export function advertisedInterfaces(
+	ifaces: Array<{ name: string; addresses: string[] }>,
+	cfg: ReturnType<typeof config>,
+): string[] {
+	return eligibleInterfaces(ifaces, cfg).filter((n) => !directIfaces.has(n));
+}
+
+/**
+ * Refresh `directIfaces`: for each discovered encoder IP, `ip route get
+ * <ip>` shows the egress `dev`; when there is no `via` gateway the
+ * destination is on-link (same segment as that relay interface), i.e. that
+ * interface is directly connected to the encoder. The lookup is read-only;
+ * on any failure the previous mapping is kept (an unresolvable encoder IP
+ * simply classifies no interface).
+ */
+export async function refreshDirectIfaces(): Promise<void> {
+	try {
+		const next = new Set<string>();
+		let sawEncoder = false;
+		for (const e of knownEncoders()) {
+			if (!e.ip) continue;
+			sawEncoder = true;
+			const out = await core.run("ip", ["route", "get", e.ip], true);
+			const m = out.match(/\bdev ([\w.-]+)\b/);
+			if (m && !/\bvia\s/.test(out)) next.add(m[1]);
+		}
+		// No encoder currently known (all TTL-expired) — keep the previous
+		// mapping. Collapsing to an empty set would let a directly-connected
+		// interface leak back into the advertise during the expiry window,
+		// and the encoder would rebuild a redundant tunnel over it.
+		if (!sawEncoder) return;
+		const prev = [...directIfaces].join(",");
+		directIfaces.clear();
+		for (const name of next) directIfaces.add(name);
+		if (prev !== [...directIfaces].join(","))
+			console.log(`[moblink_relay] directly-connected ifaces: [${[...directIfaces].join(", ")}]`);
+	} catch {
+		/* core unbound / lookup failed — keep the previous mapping */
+	}
 }
 
 /** The interface address a relay should bind to (first IPv4, or the override). */
@@ -398,7 +454,7 @@ export function effectiveAnnounceHost(): string {
 	const ifaces = netIfaces?.list() ?? [];
 	const auto =
 		[...relays.values()][0]?.interfaceAddress ??
-		eligibleInterfaces(ifaces, cfg)
+		advertisedInterfaces(ifaces, cfg)
 			.map((name) => ifaceAddress(name, ifaces, cfg))
 			.find(Boolean);
 	return auto ?? "";
@@ -413,7 +469,7 @@ export function effectiveAnnounceHost(): string {
 export function relayIfaceList(): MoblinkRelayIface[] {
 	const cfg = config();
 	const ifaces = netIfaces?.list() ?? [];
-	return eligibleInterfaces(ifaces, cfg).map((name) => ({
+	return advertisedInterfaces(ifaces, cfg).map((name) => ({
 		iface_name: name,
 		ip: ifaceAddress(name, ifaces, cfg) ?? "",
 		udp_port: allocatePort(name),
@@ -425,7 +481,7 @@ export function relayIfaceList(): MoblinkRelayIface[] {
 function buildStatus(): MoblinkRuntimeStatus {
 	const cfg = config();
 	const ifaces = netIfaces?.list() ?? [];
-	const availableInterfaces = eligibleInterfaces(ifaces, cfg).map((name) => {
+	const availableInterfaces = advertisedInterfaces(ifaces, cfg).map((name) => {
 		const rate = liveRates.get(name);
 		return {
 			name,
@@ -953,6 +1009,9 @@ async function stopAll(): Promise<void> {
  * a disabled module never starts relays from a network event. */
 async function onNetworkChange(): Promise<void> {
 	if (!config().enabled) return;
+	// A segment change can move an encoder on- or off-link from one of our
+	// interfaces — reclassify before the events below are fanned out.
+	await refreshDirectIfaces();
 	const { events } = await syncRelays();
 	pushIfaceEvents(events);
 }
@@ -1154,6 +1213,7 @@ async function ensureControlServerEncoders(): Promise<void> {
 				token: info.token,
 				lastSeen: Date.now(),
 			});
+			void refreshDirectIfaces();
 			const enc = knownEncoders().find((x) => x.encoderId === id);
 			if (enc) startEncoderChannel(enc);
 		}
@@ -1178,12 +1238,16 @@ export function lastWsPushEvents(): Array<{
 	return lastPushEvents;
 }
 
-/** Forward interface change events to every connected encoder (§4). */
+/** Forward interface change events to every connected encoder (§4).
+ * Directly-connected interfaces are dropped: advertising them (e.g. an
+ * `interface_added` for hot-plugged media) would make the encoder tunnel a
+ * segment it already owns — it must stay a plain direct uplink. */
 export function pushIfaceEvents(
 	events: Array<{ type: MoblinkRelayIfaceEventType; iface: MoblinkRelayIface }>,
 ): void {
-	lastPushEvents = events;
-	for (const ev of events) {
+	const visible = events.filter((ev) => !directIfaces.has(ev.iface.iface_name));
+	lastPushEvents = visible;
+	for (const ev of visible) {
 		const msg = JSON.stringify({ type: ev.type, iface: ev.iface });
 		for (const [key, st] of encoderChannels) {
 			try {
@@ -1202,6 +1266,9 @@ export function pushIfaceEvents(
  * Exposed for tests.
  */
 export function onEncoderAnnounced(e: MoblinkDiscoveredEncoder): void {
+	// A (new) encoder may sit on one of our segments — reclassify the
+	// direct set before the snapshot/events go out to it.
+	void refreshDirectIfaces();
 	if (!encoderChannels.has(e.encoderId) && !pendingConnects.has(e.encoderId))
 		startEncoderChannel(e);
 }
@@ -1251,6 +1318,9 @@ function startDiscovery(): void {
 	if (!encoderSweep) {
 		encoderSweep = setInterval(() => {
 			sweepEncoders();
+			// Self-heal the direct set: a sweep may have dropped encoders,
+			// releasing interfaces that were filtered out for them.
+			void refreshDirectIfaces();
 			reconcileEncoderChannels();
 			void ensureControlServerEncoders();
 		}, MOBLINK_ANNOUNCE_INTERVAL_MS);

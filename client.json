@@ -90,5 +90,14 @@
     "quality": true,
     "remoteHost": "192.168.1.136",
     "remotePort": "5000"
+  },
+  "moblink": {
+    "interfaceIgnore": [
+      "docker.*",
+      "veth.*",
+      "br-mob",
+      "gretapmob",
+      "wg0"
+    ]
   }
 }

@@ -31,6 +31,7 @@ export {
     setIpRunner,
     resolveInterfaceAddress,
     egressIface,
+    greKeyForEndpoints,
     gretapSetupCommands,
     gretapTeardownCommands,
     setUpGretap,

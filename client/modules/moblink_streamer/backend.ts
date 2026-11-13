@@ -33,6 +33,7 @@ import { hostname } from "node:os";
 import {
 	createVirtualInterface,
 	egressIface,
+	greKeyForEndpoints,
 	type VirtualInterface,
 } from "@irlctrl/gretap-relay";
 import { requireCapability } from "../../../shared/capabilities";
@@ -351,11 +352,21 @@ async function startTunnel(target: TunnelTarget): Promise<void> {
 	// extend the LAN across the GRE link. A multi-NIC host must not guess, so
 	// we ask the kernel routing table for the egress to the relay specifically.
 	const localIface = (await egressIface(target.relayHost)) ?? undefined;
+	// Keyed GRE: keyless kernel demux matches on the outer destination
+	// address only, which can never match a symmetric pair across
+	// asymmetric subnets (the relay's frames arrive addressed to the
+	// encoder and match no encoder tunnel). Both ends derive the same key
+	// from the endpoint pair, and keyed demux ignores addresses entirely.
+	const greKey = greKeyForEndpoints(
+		target.relayHost,
+		defaultSourceIp() ?? target.localIp,
+	);
 	const created = await createVirtualInterface({
 		name: target.tunName,
 		localIp: target.localIp,
 		localIface,
 		bindAddress: defaultSourceIp() ?? undefined,
+		greKey,
 		prefixLength: c.prefixLength,
 		mtu: c.mtu,
 		keepaliveIntervalMs: c.keepaliveIntervalMs,
