@@ -2,8 +2,8 @@
  * Modems module: ModemManager integration — enumerate the modems, their
  * signal / operator / registration details, and the control actions
  * (enable / disable / connect / disconnect / reset). Serves the roles that
- * manage their uplinks through modems (relay, encoder); the network module
- * enriches its interface list with `modems.source`.
+ * manage their uplinks through modems (relay, encoder, moblink_relay); the
+ * network module enriches its interface list with `modems.source`.
  */
 import type { ModuleCore } from "../../backend/module_core";
 import type {
@@ -38,7 +38,7 @@ const registration: BackendModule<ModuleCore> = {
     kind: "device",
     id: "modems",
     title: "Modems",
-    roles: ["relay", "encoder"],
+    roles: ["relay", "encoder", "moblink_relay"],
     dependencies: [],
     methods: [
         "modems.list",

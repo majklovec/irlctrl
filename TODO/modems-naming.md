@@ -1,36 +1,72 @@
-On Ubuntu and Debian, systemd-udevd names USB network interfaces after their MAC address (wwx... / enx...) by default because MACAddressPolicy or NamePolicy prioritizes mac over path for USB devices.
-You can force systemd to name all WWAN/USB network interfaces by their physical USB port path (e.g., wwp0s20f0u1u2) instead of their MAC address by overriding the default .link policy.
+Tohole to vsechno nastavi spravne pojmenovani WWAN rozhrani a MAC adresy pro Huawei modemy.
 
-Step 1: Create a Custom systemd .link File
+```sh
+#!/usr/bin/env bash
+set -euo pipefail
 
-Create /etc/systemd/network/10-wwan-path-naming.link (files in /etc/systemd/network/ take priority over /usr/lib/systemd/network/99-default.link):
-ini
-[Match]
-Type=wwan
+if [[ $EUID -ne 0 ]]; then
+   echo "Error: Please run this script as root (sudo)." >&2
+   exit 1
+fi
 
-[Link]
-NamePolicy=keep kernel database onboard slot path
-AlternativeNamesPolicy=database onboard slot path
-Při použití kódu buďte obezřetní.
-(Note: By removing mac from NamePolicy, systemd falls back to path, which constructs the interface name directly from the PCI controller and USB hub/port chain.)
+echo "[1/5] Cleaning up old/conflicting naming rules..."
+rm -f /etc/systemd/network/00-wwan-path-naming.link \
+      /etc/systemd/network/10-wwan-path-naming.link \
+      /etc/udev/rules.d/75-huawei-mac.rules \
+      /etc/udev/rules.d/75-huawei-universal-mac.rules \
+      /etc/udev/rules.d/75-huawei-port-mac.rules
 
-Step 2: Update initramfs and Reboot (or Reload)
+echo "[2/5] Creating MAC & ARP helper script (/usr/local/sbin/set-huawei-port-mac.sh)..."
+cat << 'EOF' > /usr/local/sbin/set-huawei-port-mac.sh
+#!/usr/bin/env bash
+IFACE="$1"
+[[ -z "$IFACE" || ! -e "/sys/class/net/$IFACE/device" ]] && exit 0
 
-Because network interface naming happens early during boot and device initialization:
-• Update initramfs so the rule is active at boot:bash
-sudo update-initramfs -u
-Při použití kódu buďte obezřetní.
-• Reboot your machine (or unplug and replug the USB modems after running sudo udevadm control --reload-rules).
+PORT=$(basename "$(dirname "$(readlink -f "/sys/class/net/$IFACE/device")")")
+HASH=$(printf '%s' "$PORT" | md5sum)
+NEW_MAC="02:${HASH:0:2}:${HASH:2:2}:${HASH:4:2}:${HASH:6:2}:${HASH:8:2}"
 
-Verify the New Interface Names
+ip link set dev "$IFACE" down 2>/dev/null || true
+ip link set dev "$IFACE" address "$NEW_MAC" arp off
+EOF
+chmod 0755 /usr/local/sbin/set-huawei-port-mac.sh
 
-After rebooting or replugging the modems, check your interface names and MAC addresses:
-bash
-ip -br link show | grep ww
-Při použití kódu buďte obezřetní.
-You will now see predictable, port-based names alongside your port-hashed MAC addresses—for example:
-• wwp0s20f0u1u2 -> 02:a4:8f:19:c2:0b
-• wwp0s20f0u1u3 -> 02:7b:11:4e:90:d1
-What if the modem presents as usb0 / enx... (HiLink/CDC-ECM mode)?
-If any of your modems expose an Ethernet-style interface (enx...) instead of wwan, change Type=wwan in the [Match] section to Driver=cdc_ncm huawei_cdc_ncm cdc_ether so it covers both Stick and HiLink modes.
-If the interface names still show up as wwx... after replugging, paste the output of udevadm info -q property -p /sys/class/net/ww\* | grep -E 'ID_NET_NAME|DEVTYPE' so we can see which naming property systemd is picking up.
+echo "[3/5] Installing WWAN naming & MAC udev rule (/etc/udev/rules.d/85-huawei-port-mac.rules)..."
+cat << 'EOF' > /etc/udev/rules.d/85-huawei-port-mac.rules
+SUBSYSTEM=="net", ACTION=="add", ATTRS{idVendor}=="12d1", PROGRAM="/bin/bash -c 'PORT=$(basename $(dirname $(readlink -f /sys/class/net/%k/device))); echo wwp${PORT//[-.]/u} | cut -c1-15'", NAME="%c", RUN+="/usr/local/sbin/set-huawei-port-mac.sh %c"
+EOF
+chmod 0644 /etc/udev/rules.d/85-huawei-port-mac.rules
+
+echo "[4/5] Installing UDisks ignore rule (/etc/udev/rules.d/99-huawei-modem-ignore.rules)..."
+cat << 'EOF' > /etc/udev/rules.d/99-huawei-modem-ignore.rules
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="12d1", ATTR{idProduct}=="1506", ENV{UDISKS_IGNORE}="1"
+EOF
+chmod 0644 /etc/udev/rules.d/99-huawei-modem-ignore.rules
+
+echo "[5/5] Reloading udev rules and updating initramfs..."
+udevadm control --reload-rules
+udevadm trigger --subsystem-match=usb --attr-match=idVendor=12d1 --attr-match=idProduct=1506
+if command -v update-initramfs >/dev/null 2>&1; then
+    update-initramfs -u
+fi
+
+# Re-bind any currently attached Huawei NCM/WWAN USB interfaces so naming/MAC/ARP apply immediately
+for dev in /sys/class/net/*; do
+    [[ -e "$dev/device" ]] || continue
+    if udevadm info -a -p "$dev" 2>/dev/null | grep -q 'ATTRS{idVendor}=="12d1"'; then
+        IFACE=$(basename "$dev")
+        USB_IFACE=$(basename "$(readlink -f "$dev/device")")
+        DRIVER=$(basename "$(readlink -f "$dev/device/driver")" 2>/dev/null || true)
+        if [[ -n "$DRIVER" && -e "/sys/bus/usb/drivers/$DRIVER/unbind" ]]; then
+            echo "Rebinding $IFACE ($USB_IFACE on $DRIVER)..."
+            echo "$USB_IFACE" > "/sys/bus/usb/drivers/$DRIVER/unbind"
+            sleep 0.5
+            echo "$USB_IFACE" > "/sys/bus/usb/drivers/$DRIVER/bind"
+        fi
+    fi
+done
+
+echo ""
+echo "Done! Current WWAN interfaces:"
+ip -br link show | grep ww || echo "No WWAN interfaces found."
+```

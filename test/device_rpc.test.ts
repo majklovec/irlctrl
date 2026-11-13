@@ -95,6 +95,7 @@ describe("device RPC surface", () => {
                 "moblink_relay.getConfig",
                 "moblink_relay.setConfig",
                 "moblink_streamer.status",
+                "moblink_streamer.encoderInfo",
                 "moblink_streamer.getConfig",
                 "moblink_streamer.setConfig",
                 "modems.list",

@@ -365,6 +365,9 @@ describe("role presets from the registrations", () => {
             "network",
             "ssh",
         ]);
+        // The relay box keeps its modem uplinks dialled (the MobLink relay
+        // itself is opt-in).
+        expect(on("moblink_relay")).toEqual(["modems"]);
         expect(on("obs")).toEqual(["obs"]);
     });
 
