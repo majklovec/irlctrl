@@ -1,3 +1,22 @@
+# [7.11.0](https://github.com/majklovec/irlctrl/compare/v7.10.0...v7.11.0) (2026-11-14)
+
+
+### Features
+
+* **moblink:** add GRE key, filter direct ifaces ([c09d42b](https://github.com/majklovec/irlctrl/commit/c09d42b1c96cab2018160fe6caab07408765e063))
+* **moblink:** enable modems for moblink_relay ([1ae2d8b](https://github.com/majklovec/irlctrl/commit/1ae2d8bf969ad101602faead9f8f0d322873acba))
+* **moblink:** show encoder discovery paths ([6f61d21](https://github.com/majklovec/irlctrl/commit/6f61d214b8f83846c7650508ccfa80a32b2e89da))
+* **moblink:** show per-path discovery age ([ebe8dd9](https://github.com/majklovec/irlctrl/commit/ebe8dd933078927bf8690ea5ce22d0ceedbe7a43))
+* **moblink:** use kernel GRETAP tunnel ([f54e3fa](https://github.com/majklovec/irlctrl/commit/f54e3fa67b3fc1df7973b64c884c7160d107de43))
+* **modems:** add 3GPP scan and setup ([68d70af](https://github.com/majklovec/irlctrl/commit/68d70afb6541a0c9f8c27ea30d17c143c80b17a1))
+* **modems:** tune uboot and band mode setup ([815b7e9](https://github.com/majklovec/irlctrl/commit/815b7e90a609db9b18dfcb402dc378a4ad6b9139))
+* **speedtest:** add librespeed module ([d114eb5](https://github.com/majklovec/irlctrl/commit/d114eb5eacf49891d565a21617d6152aff8d3b80))
+* **speedtest:** measure and show server ping ([c96ce3a](https://github.com/majklovec/irlctrl/commit/c96ce3a98e227f643dbf9819fe9157baaf373fc1))
+* sysinfo ([d916138](https://github.com/majklovec/irlctrl/commit/d916138bb53836dba9ddbfb41593dabb1e2b17a7))
+* **ui:** add shared line chart component ([7f3d64a](https://github.com/majklovec/irlctrl/commit/7f3d64ac21c97e98225d1e10c8081cf2c6ca3585))
+* **ui:** add speed chart and remove modem creds ([0f56764](https://github.com/majklovec/irlctrl/commit/0f56764ae8df48102c66790afccd5e02c872ccd7))
+* **ui:** improve card layouts and load metrics ([7e1b357](https://github.com/majklovec/irlctrl/commit/7e1b357940dae8649860eb43b24302c05ffd137f))
+
 # [7.10.0](https://github.com/majklovec/irlctrl/compare/v7.9.0...v7.10.0) (2026-11-12)
 
 
