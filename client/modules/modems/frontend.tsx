@@ -312,24 +312,6 @@ function netSetupRow(host: DeviceCard, modem: ModemInfo): m.Vnode {
 					/>
 				}
 			/>
-			<Field
-				label={t("dev.username")}
-				control={
-					<Input target={state} prop="username" disabled={state.autoConfig} />
-				}
-			/>
-			<Field
-				label={t("dev.password")}
-				control={
-					<Input
-						target={state}
-						prop="password"
-						type="password"
-						autoComplete="new-password"
-						disabled={state.autoConfig}
-					/>
-				}
-			/>
 			<Break />
 			<CheckField
 				label={t("dev.roaming")}

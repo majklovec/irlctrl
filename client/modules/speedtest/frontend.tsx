@@ -1,6 +1,6 @@
 /*
  * Speedtest card: server + interface pickers, the live run view (phase,
- * progress, cumulative Mbps, sparkline), the summary and the error banner.
+ * speed chart, progress, cumulative Mbps), the summary and the error banner.
  *
  * State is module-owned (a device page has one card host). Live frames arrive
  * on the `speedtest.run` event; selections persist through the device
@@ -9,7 +9,7 @@
  * memory (a page reload re-fetches it via `speedtest.last`).
  */
 import "./styles.css";
-import { Actions, Button, Card, Select } from "@ui/components/";
+import { Actions, Button, Card, LineChart, Select } from "@ui/components/";
 import { card, type DeviceCard } from "@ui/device/store";
 import { t } from "@ui/i18n";
 import m from "mithril";
@@ -30,8 +30,9 @@ interface LiveView {
 	phase: "ping" | "download" | "upload" | null;
 	progress: number;
 	mbps: number | null;
-	/** Instantaneous samples for the sparkline (last ≤ 60). */
-	inst: number[];
+	/** Instantaneous samples per phase for the chart (last ≤ 60 each). */
+	down: number[];
+	up: number[];
 	/** Last cumulative frame (for the instant-mbps difference, spec §7.3). */
 	cum: { mbps: number; seconds: number } | null;
 }
@@ -43,6 +44,8 @@ interface LastView {
 	serverId: number | null;
 	finishedAt: string;
 	report: SpeedtestReport;
+	/** Per-phase instant-Mbps samples of the measured run (null for a re-fetched result). */
+	chart: { down: number[]; up: number[] } | null;
 }
 
 interface UiState {
@@ -118,6 +121,8 @@ function boot(host: DeviceCard): void {
 					serverId: r.serverId ?? null,
 					finishedAt: r.finishedAt ?? r.result.timestamp,
 					report: r.result,
+					// A re-fetched result has no live samples to chart.
+					chart: null,
 				};
 			m.redraw();
 		});
@@ -148,7 +153,8 @@ function startRun(host: DeviceCard): void {
 		phase: "ping",
 		progress: 0,
 		mbps: null,
-		inst: [],
+		down: [],
+		up: [],
 		cum: null,
 	};
 	m.redraw();
@@ -208,13 +214,15 @@ function onRunEvent(_event: string, data: unknown): void {
 				phase: null,
 				progress: 0,
 				mbps: null,
-				inst: [],
+				down: [],
+				up: [],
 				cum: null,
 			};
+			// Series persist across phases: upload keeps the download line
+			// (fresh runs start with empty arrays in startRun).
 			ui.live.phase = phase;
 			ui.live.progress = 0;
 			ui.live.mbps = null;
-			ui.live.inst = [];
 			ui.live.cum = null;
 			break;
 		}
@@ -224,19 +232,23 @@ function onRunEvent(_event: string, data: unknown): void {
 				phase: env.data.phase as LiveView["phase"],
 				progress: 0,
 				mbps: null,
-				inst: [],
+				down: [],
+				up: [],
 				cum: null,
 			};
 			live.mbps = env.data.mbps;
 			live.progress = env.data.progress;
-			// Instantaneous throughput for the sparkline (spec §7.3).
-			live.inst.push(
-				instantMbps(live.cum, {
-					mbps: env.data.mbps,
-					seconds: env.data.seconds,
-				}),
-			);
-			if (live.inst.length > 60) live.inst.shift();
+			// Instantaneous throughput per phase for the chart (spec §7.3).
+			if (live.phase === "download" || live.phase === "upload") {
+				const series = live.phase === "upload" ? live.up : live.down;
+				series.push(
+					instantMbps(live.cum, {
+						mbps: env.data.mbps,
+						seconds: env.data.seconds,
+					}),
+				);
+				if (series.length > 60) series.shift();
+			}
 			live.cum = { mbps: env.data.mbps, seconds: env.data.seconds };
 			break;
 		}
@@ -252,6 +264,11 @@ function onRunEvent(_event: string, data: unknown): void {
 					serverId: ui.serverId === "" ? null : Number(ui.serverId),
 					finishedAt: report.timestamp,
 					report,
+					// Keep the measured curves visible in the summary (result
+					// always precedes exit, so ui.live still holds the series).
+					chart: ui.live
+						? { down: [...ui.live.down], up: [...ui.live.up] }
+						: null,
 				};
 			break;
 		}
@@ -370,6 +387,9 @@ function liveView(): m.Vnode {
 					{live.mbps !== null ? `${live.mbps.toFixed(2)} Mbps` : ""}
 				</span>
 			</div>
+			{live.down.length + live.up.length >= 2
+				? speedChart(live.down, live.up)
+				: null}
 			{live.phase !== "ping" ? (
 				<div
 					class="st-bar"
@@ -388,34 +408,37 @@ function liveView(): m.Vnode {
 					<div class="st-bar-spin" />
 				</div>
 			)}
-			{live.inst.length >= 2 ? <Sparkline points={live.inst} /> : null}
 		</div>
 	);
 }
 
-/** A tiny inline-SVG sparkline of the instantaneous Mbps samples. */
-function Sparkline({ points }: { points: number[] }): m.Vnode {
-	const w = 240;
-	const h = 36;
-	const max = Math.max(...points, 1);
-	const step = w / (points.length - 1);
-	const d = points
-		.map(
-			(p, i) =>
-				`${i === 0 ? "M" : "L"}${(i * step).toFixed(1)} ${(
-					h - 2 - (p / max) * (h - 4)
-				).toFixed(1)}`,
-		)
-		.join(" ");
+/** The download + upload instant-Mbps curves (also kept in the summary). */
+function speedChart(down: number[], up: number[]): m.Vnode {
 	return (
-		<svg
-			class="st-spark"
-			viewBox={`0 0 ${w} ${h}`}
-			preserveAspectRatio="none"
-			aria-hidden="true"
-		>
-			<path d={d} fill="none" stroke="currentColor" stroke-width="1.5" />
-		</svg>
+		<div class="st-chart">
+			<LineChart
+				series={[
+					{
+						key: "down",
+						label: t("speedtest.download"),
+						points: down.map((v, i): { t: number; v: number } => ({
+							t: i,
+							v,
+						})),
+					},
+					{
+						key: "up",
+						label: t("speedtest.upload"),
+						points: up.map((v, i): { t: number; v: number } => ({
+							t: i,
+							v,
+						})),
+					},
+				]}
+				title={t("speedtest.title")}
+				showXAxis={false}
+			/>
+		</div>
 	);
 }
 
@@ -426,6 +449,9 @@ function summaryView(): m.Vnode {
 	const clientBits = [r.client?.org, r.client?.ip].filter(Boolean).join(" · ");
 	return (
 		<div class="st-summary">
+			{last.chart && last.chart.down.length + last.chart.up.length >= 2
+				? speedChart(last.chart.down, last.chart.up)
+				: null}
 			<div class="st-nums">
 				<span class="st-num st-num-down" title={t("speedtest.download")}>
 					⬇ {r.download.toFixed(2)} <em>Mbps</em>
