@@ -92,51 +92,23 @@
     background: var(--accent-hover);
 }
 
-/* Viewers line chart (svg.spark) */
+/* Viewers line chart (the shared svg.lc — see @ui/components/linechart). */
 .dash-widget-body .stats-spark {
     flex: 1;
     min-height: 0;
     display: flex;
     align-items: stretch;
 }
-.dash-widget-body svg.spark {
-    width: 100%;
-    height: 100%;
-    display: block;
-}
-.dash-widget-body svg.spark .spark-grid line {
-    stroke: var(--border);
-    opacity: 0.6;
-    stroke-width: 0.75;
-    stroke-dasharray: 1, 1;
-    vector-effect: non-scaling-stroke;
-}
-.dash-widget-body svg.spark .spark-axis text {
-    fill: var(--muted);
-    font-family: inherit;
-    font-size: 0.9rem;
-}
-.dash-widget-body svg.spark .spark-points circle {
-    fill: var(--accent);
-}
-.dash-widget-body svg.spark .spark-line polyline {
-    stroke: var(--accent);
-    fill: none;
-    stroke-width: 1;
-    stroke-linejoin: round;
-    stroke-linecap: round;
-    vector-effect: non-scaling-stroke;
-}
-.dash-widget-body svg.spark .spark-line .stats-line-youtube {
+.dash-widget-body svg.lc .lc-line-youtube {
     stroke: var(--brand-youtube);
 }
-.dash-widget-body svg.spark .spark-line .stats-line-twitch {
+.dash-widget-body svg.lc .lc-line-twitch {
     stroke: var(--brand-twitch);
 }
-.dash-widget-body svg.spark .spark-line .stats-line-kick {
+.dash-widget-body svg.lc .lc-line-kick {
     stroke: var(--brand-kick);
 }
-.dash-widget-body svg.spark .spark-line .stats-line-total {
+.dash-widget-body svg.lc .lc-line-total {
     stroke: var(--accent-hover);
     stroke-width: 1.75;
 }

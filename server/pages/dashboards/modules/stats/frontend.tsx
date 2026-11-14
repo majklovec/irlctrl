@@ -1,6 +1,6 @@
 // Stats dashboard widget for YouTube, Twitch, and Kick channel references.
 
-import { Badge } from "@ui/components/";
+import { Badge, LineChart } from "@ui/components/";
 import { t } from "@ui/i18n";
 // biome-ignore lint/style/useImportType: used in JSX
 import m from "mithril";
@@ -15,7 +15,6 @@ import {
 	statsSeriesCapFromConfig,
 	statsSpecsFromConfig,
 } from "./config";
-import { LineChart } from "./graph_linechart";
 import { currentViewerTotal, mergeViewerSeries } from "./series";
 import type { StatsLive } from "./types";
 import "./styles.css";

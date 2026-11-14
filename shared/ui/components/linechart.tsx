@@ -1,20 +1,42 @@
-import type { MithrilJSXComponent } from "@ui/jsx";
+/** @jsx m */
+/**
+ * Shared multi-series line chart (inline SVG, no dependencies).
+ *
+ * Every series is stretched across the plot width (its own x-domain), so
+ * series of differing lengths never overflow; when the x-axis is shown the
+ * tick labels are taken from the longest series' `t` values (ms timestamps).
+ * Sizing is responsive through a ResizeObserver, falling back to a 260x110
+ * viewBox before the first observation.
+ */
 import m from "mithril";
-import type { StatsSample } from "./types";
+import type { MithrilJSXComponent } from "../jsx";
+
+export interface ChartSample {
+	/** X value — ms timestamp for time series, opaque when the axis is hidden. */
+	t: number;
+	/** Y value (oldest first). */
+	v: number;
+}
+
+export interface ChartSeries {
+	/** Stable id; also drives the per-series `lc-line-{key}` CSS hook. */
+	key: string;
+	label: string;
+	points: ChartSample[];
+}
+
+interface LineChartState {
+	width: number | null;
+	height: number | null;
+	observer: ResizeObserver;
+}
 
 const W_FALLBACK = 260;
 const H_FALLBACK = 110;
 const M = { left: 44, right: 10, top: 12, bottom: 20 } as const;
+const BOTTOM_NO_AXIS = 6;
 const GRID_SPACING = 28;
 const TICK_MIN_WIDTH = 56;
-
-type Pt = [number, number];
-type ChartSeries = { key: string; label: string; points: StatsSample[] };
-type State = {
-	width: number | null;
-	height: number | null;
-	observer: ResizeObserver;
-};
 
 function gridLines(
 	vertical: number,
@@ -45,7 +67,7 @@ function timeLabel(t: number): string {
 		: `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/** Multi-platform viewer chart; every series shares the same time axis. */
+/** Multi-series line chart; series share the y scale and plot width. */
 export const LineChart = {
 	oncreate(vnode) {
 		const el = vnode.dom as SVGElement;
@@ -71,21 +93,25 @@ export const LineChart = {
 		vnode.state.observer.disconnect();
 	},
 	view: (vnode) => {
-		const { series } = vnode.attrs;
+		const { series, title, showXAxis = true } = vnode.attrs;
 		const points = series.flatMap((line) => line.points);
-		if (!points.length)
-			return <svg class="spark" role="img" aria-hidden="true" />;
-		const timeline = series[0]?.points ?? [];
+		if (!points.length) return <svg class="lc" role="img" aria-hidden="true" />;
+		const timeline = series.reduce<ChartSample[]>(
+			(longest, line) =>
+				line.points.length > longest.length ? line.points : longest,
+			[],
+		);
 		const n = timeline.length;
 
 		const w = Math.round(vnode.state?.width ?? W_FALLBACK);
 		const h = Math.round(vnode.state?.height ?? H_FALLBACK);
+		const bottom = showXAxis ? M.bottom : BOTTOM_NO_AXIS;
 		const x0 = M.left,
 			x1 = w - M.right;
 		const y0 = M.top,
-			y1 = h - M.bottom;
+			y1 = h - bottom;
 		if (x1 - x0 < 20 || y1 - y0 < 20)
-			return <svg class="spark" role="img" aria-hidden="true" />;
+			return <svg class="lc" role="img" aria-hidden="true" />;
 		const gridV = Math.max(2, Math.round((x1 - x0) / GRID_SPACING));
 		const gridH = Math.max(2, Math.round((y1 - y0) / GRID_SPACING));
 		const min = 0;
@@ -104,22 +130,17 @@ export const LineChart = {
 				tickCount === 1 ? 0 : Math.round((i * (n - 1)) / (tickCount - 1));
 			const x = xs(idx);
 			xTicks.push(
-				<text key={`x${i}`} x={x} y={y1 + M.bottom - 5} text-anchor="middle">
+				<text key={`x${i}`} x={x} y={y1 + bottom - 5} text-anchor="middle">
 					{timeLabel(timeline[idx]?.t ?? 0)}
 				</text>,
 			);
 		}
 
 		return (
-			<svg
-				class="spark"
-				viewBox={`0 0 ${w} ${h}`}
-				role="img"
-				aria-label={vnode.attrs.title}
-			>
+			<svg class="lc" viewBox={`0 0 ${w} ${h}`} role="img" aria-label={title}>
 				{[
-					<g class="spark-grid">{gridLines(gridV, gridH, x0, x1, y0, y1)}</g>,
-					<g class="spark-axis">
+					<g class="lc-grid">{gridLines(gridV, gridH, x0, x1, y0, y1)}</g>,
+					<g class="lc-axis">
 						{[
 							<text key="max" x={5} y={y0 + 3.5}>
 								{fmt(max)}
@@ -129,12 +150,12 @@ export const LineChart = {
 							</text>,
 						]}
 					</g>,
-					<g class="spark-axis">{xTicks}</g>,
-					<g class="spark-line">
+					showXAxis ? <g class="lc-axis">{xTicks}</g> : null,
+					<g class="lc-line">
 						{series.map((line) => (
 							<polyline
 								key={line.key}
-								class={`stats-line stats-line-${line.key}`}
+								class={`lc-line-${line.key}`}
 								points={line.points
 									.map((point, index) => [xs(index), ys(point.v)].join(","))
 									.join(" ")}
@@ -145,4 +166,7 @@ export const LineChart = {
 			</svg>
 		);
 	},
-} as MithrilJSXComponent<{ series: ChartSeries[]; title?: string }, State>;
+} as MithrilJSXComponent<
+	{ series: ChartSeries[]; title?: string; showXAxis?: boolean },
+	LineChartState
+>;
