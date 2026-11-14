@@ -1,0 +1,2 @@
+ATTRS{idVendor}=="12d1", ATTRS{idProduct}=="1506", ENV{ID_MM_HUAWEI_NDISDUP_SUPPORTED}="1"
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="12d1", ATTR{idProduct}=="1506", ENV{UDISKS_IGNORE}="1"
