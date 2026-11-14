@@ -139,6 +139,7 @@ describe("device RPC surface", () => {
                 "ssh.stop",
                 "ssh.reset_password",
                 "ssh.set_password",
+                "systeminfo.get",
             ].sort(),
         );
     });

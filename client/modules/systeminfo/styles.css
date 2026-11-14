@@ -1,0 +1,87 @@
+/* systeminfo card (module-scoped). */
+
+.systeminfo-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.systeminfo-card .systeminfo-empty {
+    padding: 0.5rem 0;
+    color: var(--muted);
+}
+
+.systeminfo-card .systeminfo-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.systeminfo-card .systeminfo-os {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    text-align: right;
+}
+
+.systeminfo-card .systeminfo-section h4 {
+    margin: 0.5rem 0 0.25rem;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.75;
+}
+
+.systeminfo-card .systeminfo-load {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.systeminfo-card .systeminfo-load meter.load {
+    flex: 0 0 6rem;
+    min-width: 3rem;
+}
+
+.systeminfo-card .systeminfo-cores {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(5.5rem, auto));
+    gap: 0.25rem 0.5rem;
+    justify-content: end;
+    font-variant-numeric: tabular-nums;
+}
+
+.systeminfo-card .systeminfo-temps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.systeminfo-card .systeminfo-throttle.warn {
+    color: var(--warn);
+    font-weight: 600;
+}
+
+.systeminfo-card .systeminfo-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.systeminfo-card .systeminfo-table th,
+.systeminfo-card .systeminfo-table td {
+    padding: 0.15rem 0.4rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.systeminfo-card .systeminfo-table th {
+    font-weight: 600;
+    opacity: 0.7;
+}

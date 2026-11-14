@@ -33,6 +33,7 @@ const DEVICE_ORDER = [
     "obs",
     "relay",
     "ssh",
+    "systeminfo",
 ];
 /** The channel widget modules (device-independent dashboard widgets). */
 const WIDGET_IDS = ["stats", "chat"];
@@ -356,7 +357,13 @@ describe("role presets from the registrations", () => {
                 .filter(([, slice]) => slice.enabled)
                 .map(([key]) => key)
                 .sort();
-        expect(on("relay")).toEqual(["modems", "network", "relay", "ssh"]);
+        expect(on("relay")).toEqual([
+            "modems",
+            "network",
+            "relay",
+            "ssh",
+            "systeminfo",
+        ]);
         // The MobLink streamer runs always on encoders (no start/stop).
         expect(on("encoder")).toEqual([
             "encoder",
@@ -364,11 +371,12 @@ describe("role presets from the registrations", () => {
             "modems",
             "network",
             "ssh",
+            "systeminfo",
         ]);
         // The relay box keeps its modem uplinks dialled (the MobLink relay
         // itself is opt-in).
-        expect(on("moblink_relay")).toEqual(["modems"]);
-        expect(on("obs")).toEqual(["obs"]);
+        expect(on("moblink_relay")).toEqual(["modems", "systeminfo"]);
+        expect(on("obs")).toEqual(["obs", "systeminfo"]);
     });
 
     test("a module's stored slice key is its id unless it declares a configKey", () => {
