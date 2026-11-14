@@ -2,7 +2,8 @@
  * Backend file helpers.
  */
 import { randomBytes } from "node:crypto";
-import { rename, unlink, writeFile } from "node:fs/promises";
+import { readdir, rename, unlink, writeFile } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 
 /**
  * Replace `path` atomically: write a fresh sibling file, then rename it over the target.
@@ -23,5 +24,27 @@ export async function writeFileAtomic(
     } catch (err: unknown) {
         await unlink(tmp).catch(() => {});
         throw err;
+    }
+}
+
+/**
+ * Remove leftover `<path>.<hex>.tmp` files. A save renames its temp file into
+ * place, so any `.tmp` sibling is a stale artifact of a process that was
+ * killed (crash / force-quit / OOM) between the write and the rename. These
+ * accumulate across runs — a fresh boot is the safe point to clear them, since
+ * no other process is mid-save for a config a single device owns.
+ */
+export async function removeStaleTmps(path: string): Promise<void> {
+    const dir = dirname(path);
+    const prefix = `${basename(path)}`;
+    const files = await readdir(dir).catch(() => [] as string[]);
+    for (const name of files) {
+        if (
+            name.startsWith(prefix + ".") &&
+            name.endsWith(".tmp") &&
+            name !== basename(path)
+        ) {
+            await unlink(join(dir, name)).catch(() => {});
+        }
     }
 }

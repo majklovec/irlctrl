@@ -31,6 +31,8 @@ export interface DeviceCard {
         key: string | null,
         method: string,
         params?: Params,
+        /** Override the default RPC timeout (ms) for long-running methods. */
+        opts?: { timeoutMs?: number },
     ) => Promise<T | undefined>;
     press: (id: string, method: string, params?: Params) => void;
     applyStatus: (status: Status) => void;
@@ -67,6 +69,7 @@ export function createCardHost(opts: {
         key: string | null,
         method: string,
         params?: Params,
+        opts?: { timeoutMs?: number },
     ): Promise<T | undefined> {
         if (key) {
             if (pending(key)) return undefined;
@@ -74,7 +77,11 @@ export function createCardHost(opts: {
             m.redraw();
         }
         try {
-            const result = await rpc.call<T>(method, params);
+            const result = await rpc.call<T>(
+                method,
+                params,
+                opts?.timeoutMs,
+            );
             if (key) {
                 awaiting.add(key);
                 setTimeout(() => {

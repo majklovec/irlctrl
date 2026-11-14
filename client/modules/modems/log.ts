@@ -18,6 +18,8 @@ const log: LogWording = {
             "mlog.done.modem_disconnected",
         ),
         "modems.reset": modemAction("Reset", "mlog.done.modem_reset"),
+        "modems.scan": modemAction("Scan", "mlog.done.modem_scan"),
+        "modems.setup": modemAction("Setup", "mlog.done.modem_setup"),
     },
     sections: { modems: "Modems" },
     labels: {

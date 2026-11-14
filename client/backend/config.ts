@@ -19,6 +19,7 @@ import {
 } from "../../shared/args";
 import { defaultRole, registeredRoleIds } from "../../shared/registry";
 import { REMOTE_URL_RE, type Role } from "../../shared/validate";
+import { removeStaleTmps } from "./files";
 
 export { argv, type Role };
 
@@ -27,6 +28,9 @@ const TMP = tmpdir();
 // Device config: the core settings plus every module's own sections; live
 // process state is memory-only and never persisted.
 export const CONFIG_FILE = argEnv("--config", "CONFIG_FILE", join(TMP, "config.json"));
+// A crashed run leaves `<config>.<hex>.tmp` orphans; a fresh boot is the safe
+// moment to clear them (nothing else is mid-save on a single-device config).
+await removeStaleTmps(CONFIG_FILE);
 // A fresh device (no config file) shows the setup wizard first
 export const CONFIG_EXISTS = await Bun.file(CONFIG_FILE).exists();
 /** Config file contents at startup (null when missing or unreadable); state.ts builds on it. */

@@ -465,11 +465,11 @@ function speedtestBody(host: DeviceCard): m.Vnode {
 	return (
 		<Card title={t("speedtest.title")} class="mod-speedtest-card">
 			<div class="st-form">
-				<label class="st-field">
+				<div class="st-field">
 					<span class="st-field-label">{t("speedtest.server")}</span>
 					{serverCombo(host)}
-				</label>
-				<label class="st-field">
+				</div>
+				<div class="st-field">
 					<span class="st-field-label">{t("speedtest.interface")}</span>
 					<Select
 						target={ui}
@@ -482,7 +482,7 @@ function speedtestBody(host: DeviceCard): m.Vnode {
 							</option>
 						))}
 					</Select>
-				</label>
+				</div>
 			</div>
 			<div class="st-actions">
 				<Button

@@ -26,9 +26,15 @@ import {
 
 const STALE_DEVICE_MS = 5 * 60 * 1000;
 const PRUNE_INTERVAL_MS = 30 * 1000;
-// A flapping device link loses forwarded requests; fail before the client's
-// 30 s timeout so the page surfaces the error and retries promptly.
+// Default forward timeout for a request relayed to a device. A flapping device
+// link loses forwarded requests; fail before the client's 30 s default so the
+// page surfaces the error and retries promptly.
 const REQUEST_TIMEOUT_MS = 20_000;
+// A caller (e.g. a 3GPP network scan, whose worst case is ~12 min) may ask the
+// proxy to wait longer by carrying a `timeoutMs` on the request. Cap it at the
+// 15 min the frontend budgets so the proxy never cuts a call off before the
+// client would, while a single slow call still cannot pin a slot indefinitely.
+const MAX_REQUEST_TIMEOUT_MS = 15 * 60 * 1000;
 
 interface Device {
     /** Stable uuid; the key of this entry. Hostnames change, so the id does not */
@@ -198,7 +204,15 @@ export function createDevices({
         clientId: unknown,
         method: string,
         params: unknown,
+        /** How long to wait for the device to answer. Defaults to the 20 s
+         * flapping-link guard; a long-running call (e.g. a 3GPP scan) may carry
+         * a larger `timeoutMs` on the request. */
+        timeoutMs?: number,
     ): void {
+        const timeout =
+            typeof timeoutMs === "number" && Number.isFinite(timeoutMs) && timeoutMs > 0
+                ? Math.min(timeoutMs, MAX_REQUEST_TIMEOUT_MS)
+                : REQUEST_TIMEOUT_MS;
         const sid = nextRequestId++;
         const timer = setTimeout(() => {
             pending.delete(sid);
@@ -206,7 +220,7 @@ export function createDevices({
                 viewer,
                 errorResponse(clientId, method, "device did not respond", 504),
             );
-        }, REQUEST_TIMEOUT_MS);
+        }, timeout);
         pending.set(sid, {
             deviceId: device.id,
             viewer,
@@ -410,7 +424,9 @@ export function createDevices({
             return;
         }
 
-        forwardRequest(d, d.ws, ws, clientId, method, msg.params);
+        const timeoutMs =
+            typeof msg.timeoutMs === "number" ? msg.timeoutMs : undefined;
+        forwardRequest(d, d.ws, ws, clientId, method, msg.params, timeoutMs);
     }
 
     const deviceSummary = (d: Device): DeviceSummary => ({

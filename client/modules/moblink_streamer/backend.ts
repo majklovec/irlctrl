@@ -28,7 +28,7 @@
  * survives), re-up paths reuse their TUN slot, and TUN local IPs are stable
  * per endpoint.
  */
-import { writeFileSync } from "node:fs";
+import { unlinkSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import {
 	createVirtualInterface,
@@ -211,16 +211,34 @@ function statusFile(): MoblinkStreamerStatusFile {
 	};
 }
 
+/** Warn at most once per process so a persistently unwritable path (e.g. a
+ * `/tmp` file owned by a different UID) doesn't spam every reconcile tick. */
+let statusFileWarned = false;
 function writeStatusFile(): void {
 	if (core.config.DRY_RUN) return;
+	const body = JSON.stringify(statusFile(), null, 2);
 	try {
-		writeFileSync(
-			config().runtimeStatusFile,
-			JSON.stringify(statusFile(), null, 2),
-		);
+		writeFileSync(config().runtimeStatusFile, body);
+		statusFileWarned = false;
+		return;
 	} catch (e) {
+		const reason = errorMessage(e);
+		// The path is a fixed shared location; when a previous run (often a
+		// different UID, e.g. dev vs. prod root) left the file in place, a
+		// write over it can fail. Clear it and try once more — that is the
+		// common cross-user /tmp conflict.
+		try {
+			unlinkSync(config().runtimeStatusFile);
+			writeFileSync(config().runtimeStatusFile, body);
+			statusFileWarned = false;
+			return;
+		} catch {
+			// fall through to the (warn-once) message below
+		}
+		if (statusFileWarned) return;
+		statusFileWarned = true;
 		console.warn(
-			`moblink_streamer: status file write failed: ${errorMessage(e)}`,
+			`moblink_streamer: status file write failed: ${reason}`,
 		);
 	}
 }

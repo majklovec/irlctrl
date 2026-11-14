@@ -5,6 +5,7 @@
  */
 import { flag } from "../../shared/args";
 import { i18nReady, t } from "../../shared/i18n";
+import { errorMessage } from "../../shared/util";
 import { startApiServer } from "./api";
 import { REMOTE_URL, ROLE } from "./config";
 import { flushLog, logEvent } from "./eventlog";
@@ -50,8 +51,21 @@ async function main(): Promise<void> {
 		}, 8000);
 		forceExit.unref?.();
 		try {
-			await stopModules();
-			await flushLog();
+			// A single module's teardown must not turn a graceful Ctrl+C into
+			// a hard crash: stopModules/flushLog are best-effort on the way out,
+			// so a rejection is logged and we still exit 0.
+			try {
+				await stopModules();
+			} catch (e) {
+				console.warn(
+					`[shutdown] module stop failed: ${errorMessage(e)}`,
+				);
+			}
+			try {
+				await flushLog();
+			} catch (e) {
+				console.warn(`[shutdown] log flush failed: ${errorMessage(e)}`);
+			}
 		} finally {
 			clearTimeout(forceExit);
 		}

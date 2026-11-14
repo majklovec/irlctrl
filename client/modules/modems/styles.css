@@ -26,3 +26,64 @@
     padding: 0.35rem 0.6rem;
     font-size: 0.8rem;
 }
+/* Network scan / PLMN / APN row under the action buttons. */
+.mod-modems-card .modem .net {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 0.6rem;
+    margin-top: 0.75rem;
+}
+.mod-modems-card .modem .net label {
+    flex: 1 1 8rem;
+    min-width: 8rem;
+}
+.mod-modems-card .modem .net button {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.8rem;
+}
+/* Scan feedback line under the network/APN fields (spans the whole row). */
+.mod-modems-card .modem .net .scan-status {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--muted);
+}
+.mod-modems-card .modem .net .scan-status.error {
+    color: var(--danger, #c0392b);
+}
+.mod-modems-card .modem .net .scan-status.warn {
+    color: var(--warn, #b07d10);
+}
+/* Boolean switches (roaming / auto-config) sit inline in the .net row. */
+.mod-modems-card .modem .net label.check {
+    flex: 0 0 auto;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    user-select: none;
+}
+/* Band-mode checkbox group: a captioned row of compact 2G/3G/4G/5G toggles. */
+.mod-modems-card .modem .net .band {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.9rem;
+    padding: 0.4rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card-subtle, transparent);
+}
+.mod-modems-card .modem .net .band .band-label {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-weight: 600;
+}
+.mod-modems-card .modem .net .band label.band-opt {
+    flex: 0 0 auto;
+    min-width: 0;
+}

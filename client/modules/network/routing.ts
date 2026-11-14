@@ -581,6 +581,13 @@ async function enforceDefaultRoute(): Promise<void> {
                 return;
             }
 
+            // Already in place: re-adding would churn netlink (and re-trigger
+            // the monitor on every tick) for no effect.
+            const main = (await ip(["-4", "route", "show", "default"], true))
+                .split("\n")
+                .find((line) => !line.includes("table"));
+            if (main === route) return;
+
             await clearMainDefaultRoutes();
             await ip(["route", "add", ...routeArgs]);
             console.log(
@@ -942,7 +949,9 @@ async function runReconcile(reason: string): Promise<void> {
                 `[monitor] ${reason}: uplinks changed — reloading srtla_send`,
             );
             await fireUplinksChanged();
-        } else {
+        } else if (process.env.NETWORK_VERBOSE) {
+            // No-ops are routine (any route event fires a reconcile); log them
+            // only when explicitly debugging the monitor.
             console.log(`[monitor] ${reason}: uplinks unchanged — no reload`);
         }
         // The interface set (any interface, not only bonded ones) may have

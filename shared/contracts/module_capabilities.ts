@@ -21,10 +21,29 @@ export interface Modem {
 	primaryPort?: string;
 	deviceId?: string;
 	simPath?: string;
+	/** Current band mode from `modem.generic.current-modes`. `allowed` is empty
+	 * when the modem is in auto mode (no fixed band). Set for `mm` modems. */
+	currentModes?: { allowed: string[]; preferred: string[] };
+	/** The RATs the modem supports, from `modem.generic.supported-modes`. */
+	supportedModes?: string[];
 	/** Carrier IPv4 gateway (from the active bearer). Cellular gateways never
 	 * appear in the main routing table, so the network module needs this to
 	 * build a working per-uplink default route. */
 	gateway?: string;
+}
+
+/** A PLMN seen by a 3GPP network scan (`modems.scan`). */
+export interface ScannedNetwork {
+	/** The PLMN as reported by the scan, dotted "MCC,MNC" (e.g. "505,01"). */
+	plmn: string;
+	/** MCC + MNC as contiguous digits (e.g. "50501") — the form ModemManager's
+	 * RegisterToOperator (`mmcli --3gpp-register-in-operator`) expects. */
+	plmnId: string;
+	/** The modem's registration state for this PLMN: current / available / forbidden. */
+	status: string;
+	/** The radio access technology the scan saw for this PLMN (gsm / umts / lte / nr5g). */
+	accessTech?: string;
+	operatorName?: string;
 }
 
 /** The `modems.source` capability (modems module): enumerate modems and

@@ -159,15 +159,37 @@ export function notifyStateChange(): void {
 }
 
 let lastConfig = "";
+/** Newest config awaiting persist, plus the single in-flight writer it drains. */
+let pendingConfig: string | null = null;
+let draining: Promise<void> | null = null;
 
-/** Persist the permanent parameters; no-op when they have not changed. */
+/**
+ * Persist the permanent parameters; no-op when they have not changed. Saves
+ * coalesce onto one in-flight writer: rapid successive changes only ever have
+ * a single `writeFileAtomic` outstanding, so a crash can orphan at most one
+ * `.tmp` (which `removeStaleTmps` clears on the next boot) instead of a burst.
+ */
 export async function saveState(): Promise<void> {
 	notifyStateChange();
 	if (DRY_RUN) return;
 	const config = stableStringify(projectConfig(state));
 	if (config === lastConfig) return;
 	lastConfig = config;
-	await writeFileAtomic(CONFIG_FILE, config);
+	pendingConfig = config;
+	if (!draining) draining = drainConfig();
+	return draining;
+}
+
+async function drainConfig(): Promise<void> {
+	try {
+		while (pendingConfig !== null) {
+			const toWrite = pendingConfig;
+			pendingConfig = null;
+			await writeFileAtomic(CONFIG_FILE, toWrite);
+		}
+	} finally {
+		draining = null;
+	}
 }
 
 /** Leave the setup wizard; the caller has seeded the module slices. */

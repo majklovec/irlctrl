@@ -10,17 +10,31 @@ import type {
     BackendModule,
     Params,
 } from "../../../shared/contracts/backend_module";
-import { ApiError, requireIndex } from "../../../shared/params";
+import {
+    ApiError,
+    optionalApn,
+    optionalBoolean,
+    optionalPassword,
+    optionalPlmn,
+    optionalRat,
+    optionalRatList,
+    optionalUsername,
+    requireIndex,
+} from "../../../shared/params";
 import log from "./log";
 import {
     bindModemManager,
     detectModems,
+    gsmProfile,
     modemSource,
     performModemAction,
+    pruneOrphanGsmConns,
+    scanMobileNetworks,
+    setupModemNetwork,
     startModemAutodial,
     stopModemAutodial,
 } from "./modems";
-import type { ModemInfo } from "./types";
+import type { ModemInfo, ModemNetworkSetup } from "./types";
 
 let core: ModuleCore;
 
@@ -47,6 +61,9 @@ const registration: BackendModule<ModuleCore> = {
         "modems.reset",
         "modems.connect",
         "modems.disconnect",
+        "modems.scan",
+        "modems.profile",
+        "modems.setup",
     ],
     events: [],
     log,
@@ -57,6 +74,11 @@ const registration: BackendModule<ModuleCore> = {
     async start(ctx) {
         core = ctx.core;
         bindModemManager(core);
+        // Clear stale gsm profiles (no device-id / sim-id) so old autoconnect
+        // connections don't keep dialing behind the active one.
+        void pruneOrphanGsmConns().catch((err: unknown) =>
+            console.warn("[modems] orphan prune failed:", String(err)),
+        );
         // Keep every registered modem on the network: a persistent NM gsm
         // autoconnect profile dials on boot, and this re-dials on drop.
         startModemAutodial();
@@ -68,6 +90,44 @@ const registration: BackendModule<ModuleCore> = {
         switch (method) {
             case "modems.list":
                 return { modems: await modemStatus() };
+            case "modems.scan": {
+                const index = requireIndex(p);
+                return { index, networks: await scanMobileNetworks(index) };
+            }
+            case "modems.profile": {
+                const index = requireIndex(p);
+                return { index, profile: await gsmProfile(index) ?? null };
+            }
+            case "modems.setup": {
+                const index = requireIndex(p);
+                const setup: ModemNetworkSetup = {
+                    plmn: optionalPlmn(p),
+                    operatorName:
+                        typeof p.operatorName === "string"
+                            ? p.operatorName
+                            : undefined,
+                    apn: optionalApn(p),
+                    username: optionalUsername(p),
+                    password: optionalPassword(p),
+                    allowRoaming: optionalBoolean(p, "allowRoaming"),
+                    autoConfig: optionalBoolean(p, "autoConfig"),
+                    allowedModes: optionalRatList(p),
+                    preferredMode: optionalRat(p),
+                };
+                const hasField = (Object.keys(setup) as (keyof ModemNetworkSetup)[])
+                    .filter((key) => key !== "operatorName")
+                    .some((key) => setup[key] !== undefined);
+                if (!hasField)
+                    throw new ApiError(
+                        "at least one of plmn, apn, username, password, " +
+                            "allowRoaming, autoConfig, allowedModes or " +
+                            "preferredMode is required",
+                    );
+                return {
+                    index,
+                    ok: await setupModemNetwork(index, setup),
+                };
+            }
             default: {
                 const action = method.slice("modems.".length);
                 if (!(MODEM_ACTIONS as readonly string[]).includes(action))

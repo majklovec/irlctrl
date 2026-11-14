@@ -110,6 +110,109 @@ export function requireIndex(p: Params, key = "index"): number {
 	return n;
 }
 
+/** A 3GPP PLMN ("505,01" or "50501") normalized to contiguous digits. */
+export function optionalPlmn(p: Params, key = "plmn"): string | undefined {
+	const v = p[key];
+	if (v === undefined || v === null || v === "") return undefined;
+	const digits = String(v).replace(/[,\s-]/g, "");
+	if (!/^\d{5,6}$/.test(digits))
+		throw new ApiError(`${key} must be an MCC,MNC code (e.g. 505,01)`);
+	return digits;
+}
+
+/** An APN: printable without whitespace (a space means a copy/paste bug). */
+export function optionalApn(p: Params, key = "apn"): string | undefined {
+	const v = p[key];
+	if (v === undefined || v === null || v === "") return undefined;
+	if (typeof v !== "string") throw new ApiError(`${key} must be a string`);
+	const s = v.trim();
+	if (!s) return undefined;
+	if (!/^[A-Za-z0-9._:-]{1,64}$/.test(s))
+		throw new ApiError(
+			`${key} must be 1-64 letters, digits, dots, colons, underscores or dashes`,
+		);
+	return s;
+}
+
+/** An APN username: trimmed, validated, `undefined` when absent/blank. */
+export function optionalUsername(
+	p: Params,
+	key = "username",
+): string | undefined {
+	const v = p[key];
+	if (v === undefined || v === null) return undefined;
+	if (typeof v !== "string") throw new ApiError(`${key} must be a string`);
+	const s = v.trim();
+	if (!s) return undefined;
+	if (!USERNAME_RE.test(s))
+		throw new ApiError(
+			`${key} must be 1-64 letters, digits or . _ @ - characters`,
+		);
+	return s;
+}
+
+/**
+ * An APN password: `undefined` when the key is absent (leave as-is), or the
+ * raw string otherwise — an empty string explicitly clears the password.
+ */
+export function optionalPassword(
+	p: Params,
+	key = "password",
+): string | undefined {
+	const v = p[key];
+	if (v === undefined || v === null) return undefined;
+	if (typeof v !== "string") throw new ApiError(`${key} must be a string`);
+	return v;
+}
+
+/** A boolean that may be omitted (`undefined` = leave as-is). */
+export function optionalBoolean(
+	p: Params,
+	key: string,
+): boolean | undefined {
+	const v = p[key];
+	if (v === undefined) return undefined;
+	if (typeof v !== "boolean") throw new ApiError(`${key} must be a boolean`);
+	return v;
+}
+
+/** ModemManager RATs — the bands `--set-allowed-modes`/`preferred` accept. */
+export const RAT_MODES = ["gsm", "umts", "lte", "nr5g"] as const;
+export type RatMode = (typeof RAT_MODES)[number];
+
+/** A list of RATs for `--set-allowed-modes`; `undefined` when absent. */
+export function optionalRatList(
+	p: Params,
+	key = "allowedModes",
+): string[] | undefined {
+	const v = p[key];
+	if (v === undefined) return undefined;
+	if (!Array.isArray(v) || !v.every((x) => typeof x === "string")) {
+		throw new ApiError(`${key} must be an array of strings`);
+	}
+	for (const rat of v) {
+		if (!(RAT_MODES as readonly string[]).includes(rat))
+			throw new ApiError(
+				`${key} entries must be one of ${RAT_MODES.join(", ")}`,
+			);
+	}
+	return v;
+}
+
+/** A single RAT (or none) for `--set-preferred-mode`; `undefined` when absent. */
+export function optionalRat(
+	p: Params,
+	key = "preferredMode",
+): string | undefined {
+	const v = p[key];
+	if (v === undefined || v === null || v === "" || v === "auto")
+		return undefined;
+	if (typeof v !== "string") throw new ApiError(`${key} must be a string`);
+	if (!(RAT_MODES as readonly string[]).includes(v))
+		throw new ApiError(`${key} must be one of ${RAT_MODES.join(", ")}`);
+	return v;
+}
+
 // ----------------------------------------------------------------------
 // Device settings (setup wizard and settings page); undefined = not set
 // ----------------------------------------------------------------------

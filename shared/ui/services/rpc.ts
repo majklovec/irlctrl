@@ -80,7 +80,19 @@ export class RpcClient {
                     reject(e);
                 },
             });
-            this.ws.send(JSON.stringify({ id, method, params }));
+            // A proxy (the control server) may time out a forwarded request
+            // before the client would. Forward the client's timeout so the
+            // proxy waits as long as the caller is willing to.
+            this.ws.send(
+                JSON.stringify({
+                    id,
+                    method,
+                    params,
+                    ...(timeoutMs !== DEFAULT_TIMEOUT_MS
+                        ? { timeoutMs }
+                        : {}),
+                }),
+            );
         });
     }
 
