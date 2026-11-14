@@ -1,1 +1,4 @@
-SUBSYSTEM=="net", ACTION=="add", ATTRS{idVendor}=="12d1", PROGRAM="/bin/bash -c 'PORT=$(basename $(dirname $(readlink -f /sys/class/net/%k/device))); echo wwp${PORT//[-.]/u} | cut -c1-15'", NAME="%c", RUN+="/usr/local/sbin/set-huawei-port-mac.sh %c"
+ACTION=="add", SUBSYSTEM=="net", ATTRS{idVendor}=="12d1", \
+  PROGRAM="/usr/local/sbin/huawei-net name %k", \
+  NAME="%c", \
+  RUN+="/usr/local/sbin/huawei-net mac $name"

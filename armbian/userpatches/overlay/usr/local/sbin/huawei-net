@@ -1,0 +1,57 @@
+#!/bin/bash
+# /usr/local/sbin/huawei-net
+#
+# Deterministic naming + MAC for Huawei (12d1) USB modem net interfaces.
+#
+#   huawei-net name <kernel-ifname>   # udev PROGRAM= (prints new name)
+#   huawei-net mac  <ifname>          # udev RUN+=   (applies MAC)
+#
+# Both subcommands derive the USB port path the same way, so the same
+# physical modem port always yields the same name and the same MAC —
+# regardless of the kernel-assigned name or plug order.
+
+set -u
+
+# Print the USB port path (e.g. "1-1") for a net interface's device.
+# One readlink, everything else pure bash.
+port_of() {
+	local iface=$1 path
+	path=$(readlink -f "/sys/class/net/$iface/device") || return 1
+	printf '%s' "${path%/*}" | sed 's#.*/##'
+}
+
+case "${1:-}" in
+name)
+	k=${2:-}
+	[ -n "$k" ] || exit 1
+	port=$(port_of "$k") || exit 1
+	port=${port//[-.]/u}        # 1-1 / 1-1.2 -> 1u1 / 1u1u2
+	port=${port//[^a-zA-Z0-9]/} # sanitize
+	[ -n "$port" ] || exit 1
+	printf 'wwp%.12s\n' "$port" # "wwp" + 12 = 15 (IFNAMSIZ-1)
+	;;
+
+mac)
+	iface=${2:-}
+	[ -n "$iface" ] && [ -e "/sys/class/net/$iface/device" ] || exit 0
+	port=$(port_of "$iface") || exit 0
+
+	h=$(printf '%s' "$port" | md5sum) || exit 0
+	new_mac="02:${h:0:2}:${h:2:2}:${h:4:2}:${h:6:2}:${h:8:2}"
+
+	# Idempotent: no link bounce if the MAC is already right.
+	cur=$(cat "/sys/class/net/$iface/address" 2>/dev/null) || exit 0
+	[ "$cur" = "$new_mac" ] && exit 0
+
+	# Preserve up/down state.
+	was_up=0
+	[ "$(cat "/sys/class/net/$iface/operstate" 2>/dev/null)" = up ] && was_up=1
+
+	ip link set dev "$iface" down 2>/dev/null || true
+	ip link set dev "$iface" address "$new_mac" 2>/dev/null || true
+	[ "$was_up" -eq 1 ] && ip link set dev "$iface" up 2>/dev/null || true
+	;;
+*)
+	exit 1
+	;;
+esac
