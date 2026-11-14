@@ -318,6 +318,7 @@ function serverCombo(host: DeviceCard): m.Vnode {
 					ui.comboOpen = true;
 					m.redraw();
 				}}
+				class="w-full"
 			/>
 			{ui.comboOpen ? (
 				<div class="st-combo-list">
@@ -491,7 +492,7 @@ function speedtestBody(host: DeviceCard): m.Vnode {
 	return (
 		<Card title={t("speedtest.title")} class="mod-speedtest-card">
 			<div class="st-form">
-				<div class="st-field">
+				<div class="st-field w-full">
 					<span class="st-field-label">{t("speedtest.server")}</span>
 					{serverCombo(host)}
 				</div>

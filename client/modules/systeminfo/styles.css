@@ -1,87 +1,118 @@
 /* systeminfo card (module-scoped). */
 
 .systeminfo-card {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    font-size: 0.85rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	font-size: 0.85rem;
 }
 
 .systeminfo-card .systeminfo-empty {
-    padding: 0.5rem 0;
-    color: var(--muted);
+	padding: 0.5rem 0;
+	color: var(--muted);
 }
 
 .systeminfo-card .systeminfo-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 0.5rem;
-    padding-bottom: 0.25rem;
-    border-bottom: 1px solid var(--border);
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 0.5rem;
+	padding-bottom: 0.25rem;
+	border-bottom: 1px solid var(--border);
 }
 
 .systeminfo-card .systeminfo-os {
-    font-size: 0.75rem;
-    opacity: 0.7;
-    text-align: right;
+	font-size: 0.75rem;
+	opacity: 0.7;
+	text-align: right;
 }
 
 .systeminfo-card .systeminfo-section h4 {
-    margin: 0.5rem 0 0.25rem;
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    opacity: 0.75;
+	margin: 0.5rem 0 0.25rem;
+	font-size: 0.72rem;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	opacity: 0.75;
 }
 
 .systeminfo-card .systeminfo-load {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-variant-numeric: tabular-nums;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	font-variant-numeric: tabular-nums;
 }
 
 .systeminfo-card .systeminfo-load meter.load {
-    flex: 0 0 6rem;
-    min-width: 3rem;
+	flex: 0 0 6rem;
+	min-width: 3rem;
 }
 
+/* Fixed-width columns and cell parts keep every core meter in the same
+ * horizontal position (vertically aligned columns). */
 .systeminfo-card .systeminfo-cores {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(5.5rem, auto));
-    gap: 0.25rem 0.5rem;
-    justify-content: end;
-    font-variant-numeric: tabular-nums;
+	display: grid;
+	grid-template-columns: repeat(auto-fill, 8.5rem);
+	gap: 0.25rem 0.5rem;
+	margin-top: 1rem;
+	margin-bottom: 1rem;
+	font-variant-numeric: tabular-nums;
+}
+
+.systeminfo-card .systeminfo-core {
+	display: flex;
+	align-items: center;
+	gap: 0.3rem;
+}
+
+.systeminfo-card .systeminfo-core-id {
+	flex: 0 0 1.8rem;
+}
+
+.systeminfo-card .systeminfo-core-pct {
+	flex: 0 0 2.2rem;
+	text-align: right;
+}
+
+.systeminfo-card .systeminfo-core meter.load {
+	flex: 0 0 2.5rem;
+	min-width: 1.5rem;
 }
 
 .systeminfo-card .systeminfo-temps {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem 0.75rem;
-    font-variant-numeric: tabular-nums;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem 0.75rem;
+	font-variant-numeric: tabular-nums;
 }
 
 .systeminfo-card .systeminfo-throttle.warn {
-    color: var(--warn);
-    font-weight: 600;
+	color: var(--warn);
+	font-weight: 600;
 }
 
 .systeminfo-card .systeminfo-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.75rem;
-    font-variant-numeric: tabular-nums;
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.75rem;
+	font-variant-numeric: tabular-nums;
 }
 
 .systeminfo-card .systeminfo-table th,
 .systeminfo-card .systeminfo-table td {
-    padding: 0.15rem 0.4rem;
-    text-align: left;
-    border-bottom: 1px solid var(--border);
+	padding: 0.15rem 0.4rem;
+	text-align: left;
+	border-bottom: 1px solid var(--border);
+}
+
+/* Disk usage meter in the Used column. */
+.systeminfo-card .systeminfo-table meter.load {
+	width: 3rem;
+	min-width: 1.5rem;
+	margin-right: 0.4rem;
+	vertical-align: middle;
 }
 
 .systeminfo-card .systeminfo-table th {
-    font-weight: 600;
-    opacity: 0.7;
+	font-weight: 600;
+	opacity: 0.7;
 }

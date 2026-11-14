@@ -5,6 +5,7 @@
 	"sysinfo.stale_title": "Der letzte Telemetrie-Datensatz ist älter als 10 s",
 	"sysinfo.cpu": "CPU",
 	"sysinfo.cores": "Kerne",
+	"sysinfo.overall_load": "Gesamtauslastung",
 	"sysinfo.temperatures": "Temperaturen",
 	"sysinfo.memory": "Arbeitsspeicher",
 	"sysinfo.disks": "Laufwerke",

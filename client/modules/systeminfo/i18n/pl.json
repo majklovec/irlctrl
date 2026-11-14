@@ -5,6 +5,7 @@
 	"sysinfo.stale_title": "Ostatni klatka telemetrii jest starsza niż 10 s",
 	"sysinfo.cpu": "CPU",
 	"sysinfo.cores": "rdzenie",
+	"sysinfo.overall_load": "Całkowite obciążenie",
 	"sysinfo.temperatures": "Temperatury",
 	"sysinfo.memory": "Pamięć",
 	"sysinfo.disks": "Dyski",

@@ -5,6 +5,7 @@
 	"sysinfo.stale_title": "最後のテレメトリフレームは10秒以上古いです",
 	"sysinfo.cpu": "CPU",
 	"sysinfo.cores": "コア",
+	"sysinfo.overall_load": "全体負荷",
 	"sysinfo.temperatures": "温度",
 	"sysinfo.memory": "メモリ",
 	"sysinfo.disks": "ディスク",

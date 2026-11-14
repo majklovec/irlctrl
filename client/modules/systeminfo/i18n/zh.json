@@ -5,6 +5,7 @@
 	"sysinfo.stale_title": "最新遥测帧已超过 10 秒",
 	"sysinfo.cpu": "CPU",
 	"sysinfo.cores": "核心",
+	"sysinfo.overall_load": "总负载",
 	"sysinfo.temperatures": "温度",
 	"sysinfo.memory": "内存",
 	"sysinfo.disks": "磁盘",

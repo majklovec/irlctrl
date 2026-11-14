@@ -5,6 +5,7 @@
 	"sysinfo.stale_title": "O último quadro de telemetria tem mais de 10 s",
 	"sysinfo.cpu": "CPU",
 	"sysinfo.cores": "núcleos",
+	"sysinfo.overall_load": "Carga total",
 	"sysinfo.temperatures": "Temperaturas",
 	"sysinfo.memory": "Memória",
 	"sysinfo.disks": "Discos",

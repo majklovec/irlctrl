@@ -3,6 +3,7 @@
 
 .mod-speedtest-card .st-form {
     display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.5rem;
     margin-bottom: 0.5rem;
 }
@@ -243,4 +244,8 @@
     margin-top: 0.3rem;
     font-size: 0.78rem;
     color: var(--muted);
+}
+
+.w-full {
+    width: 100%;
 }

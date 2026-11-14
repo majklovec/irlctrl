@@ -16,6 +16,11 @@ import type { FrontendModule } from "../../../shared/contracts/frontend_module";
 import type { Status } from "../../../shared/contracts/wire";
 import type { SystemInfo } from "./types";
 
+/** `/dev/sda1` → `sda`, `/dev/mmcblk0p2` → `mmcblk0`, `/dev/nvme0n1p3` → `nvme0n1`. */
+function diskBase(device: string): string {
+	return device.replace(/^\/dev\//, "").replace(/p?\d+$/, "");
+}
+
 /** Bytes → "1.2 GB" style string. */
 function fmt(bytes: number): string {
 	const units = ["B", "KB", "MB", "GB", "TB"];
@@ -95,7 +100,17 @@ function interfacesCard(host: DeviceCard, status: Status): m.Vnode {
 							{info.cpu.model} · {info.cpu.cores} {t("sysinfo.cores")} ·{" "}
 							{info.cpu.speedMHz} MHz
 						</div>
+						<div class="systeminfo-cores">
+							{info.cpu.loadPerCore.map((v, i) => (
+								<span key={i} class="systeminfo-core">
+									<span class="systeminfo-core-id">C{i}:</span>
+									<meter min={0} max={100} value={v} class="load" />
+									<span class="systeminfo-core-pct">{v.toFixed(0)}%</span>
+								</span>
+							))}
+						</div>
 						<div class="systeminfo-load">
+							<span>{t("sysinfo.overall_load")}</span>
 							<meter
 								min={0}
 								max={100}
@@ -103,13 +118,6 @@ function interfacesCard(host: DeviceCard, status: Status): m.Vnode {
 								class="load"
 							/>
 							{info.cpu.overallLoad.toFixed(1)}%
-						</div>
-						<div class="systeminfo-cores">
-							{info.cpu.loadPerCore.map((v, i) => (
-								<span key={i} class="systeminfo-core">
-									C{i}: {v.toFixed(0)}%
-								</span>
-							))}
 						</div>
 					</div>
 
@@ -154,7 +162,50 @@ function interfacesCard(host: DeviceCard, status: Status): m.Vnode {
 
 					<div class="systeminfo-section">
 						<h4>{t("sysinfo.disks")}</h4>
-						{info.filesystems.length > 0 && (
+						{info.physicalDisks.length > 0 ? (
+							<table class="systeminfo-table">
+								<thead>
+									<tr>
+										<th>{t("sysinfo.disk")}</th>
+										<th>{t("sysinfo.used")}</th>
+										<th>{t("sysinfo.rw")}</th>
+										<th>{t("sysinfo.util")}</th>
+									</tr>
+								</thead>
+								<tbody>
+									{info.physicalDisks.map((d, i) => {
+										// Used = all filesystems mounted from this disk's
+										// partitions, aggregated up to the disk size.
+										const used = info.filesystems
+											.filter((f) => diskBase(f.device) === d.name)
+											.reduce((sum, f) => sum + f.usedBytes, 0);
+										const pct =
+											d.sizeBytes > 0
+												? Math.min(100, (used / d.sizeBytes) * 100)
+												: 0;
+										return (
+											<tr key={i}>
+												<td
+													title={`${d.vendor ? `${d.vendor} ` : ""}${d.model}`}
+												>
+													{d.name}
+												</td>
+												<td>
+													<meter min={0} max={100} value={pct} class="load" />{" "}
+													{fmt(used)} / {fmt(d.sizeBytes)}
+												</td>
+												<td>
+													{fmt(d.readBytesPerSec)}/s · {fmt(d.writeBytesPerSec)}
+													/s
+												</td>
+												<td>{d.ioUtilization.toFixed(1)}%</td>
+											</tr>
+										);
+									})}
+								</tbody>
+							</table>
+						) : info.filesystems.length > 0 ? (
+							// No /sys/block info: fall back to the plain mount list.
 							<table class="systeminfo-table">
 								<thead>
 									<tr>
@@ -177,31 +228,7 @@ function interfacesCard(host: DeviceCard, status: Status): m.Vnode {
 									))}
 								</tbody>
 							</table>
-						)}
-						{info.physicalDisks.length > 0 && (
-							<table class="systeminfo-table">
-								<thead>
-									<tr>
-										<th>{t("sysinfo.disk")}</th>
-										<th>{t("sysinfo.rw")}</th>
-										<th>{t("sysinfo.util")}</th>
-									</tr>
-								</thead>
-								<tbody>
-									{info.physicalDisks.map((d, i) => (
-										<tr key={i}>
-											<td title={`${d.vendor ? `${d.vendor} ` : ""}${d.model}`}>
-												{d.name}
-											</td>
-											<td>
-												{fmt(d.readBytesPerSec)}/s · {fmt(d.writeBytesPerSec)}/s
-											</td>
-											<td>{d.ioUtilization.toFixed(1)}%</td>
-										</tr>
-									))}
-								</tbody>
-							</table>
-						)}
+						) : null}
 					</div>
 
 					<div class="systeminfo-section">

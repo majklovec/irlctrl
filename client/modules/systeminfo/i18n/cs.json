@@ -5,6 +5,7 @@
 	"sysinfo.stale_title": "Poslední telemetrický snímek je starší než 10 s",
 	"sysinfo.cpu": "CPU",
 	"sysinfo.cores": "jádra",
+	"sysinfo.overall_load": "Celkové zatížení",
 	"sysinfo.temperatures": "Teploty",
 	"sysinfo.memory": "Paměť",
 	"sysinfo.disks": "Disky",

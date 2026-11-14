@@ -5,6 +5,7 @@
 	"sysinfo.stale_title": "Последнему кадру телеметрии больше 10 с",
 	"sysinfo.cpu": "CPU",
 	"sysinfo.cores": "ядер",
+	"sysinfo.overall_load": "Общая нагрузка",
 	"sysinfo.temperatures": "Температуры",
 	"sysinfo.memory": "Память",
 	"sysinfo.disks": "Диски",
