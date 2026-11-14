@@ -12,14 +12,17 @@ import {
     buildSpeedtestArgv,
     type SpeedtestArgvOptions,
 } from "../client/modules/speedtest/argv";
+import type { SpeedtestServer } from "../client/modules/speedtest/types";
 import { linuxArchAsset } from "../client/modules/speedtest/arch";
 import { instantMbps } from "../client/modules/speedtest/inst_mbps";
 import { pickAsset } from "../client/modules/speedtest/cli";
 import { listInterfaces, pickDefaultInterface } from "../client/modules/speedtest/interfaces";
 import { NdjsonParser, parseLine } from "../client/modules/speedtest/parser";
 import {
+    measurePings,
     normalizeServers,
     ServerListCache,
+    sortServersByPing,
 } from "../client/modules/speedtest/server_list";
 import {
     CliResolver,
@@ -154,12 +157,16 @@ describe("server list", () => {
                 name: "Frankfurt, Germany (FS IT-Systeme GmbH)",
                 sponsor: "FS IT-Systeme GmbH",
                 url: "https://speed.fs-it.systems/",
+                ping: null,
+                pingUrl: "https://speed.fs-it.systems/backend/empty.php",
             },
             {
                 id: 79,
                 name: "Prague, Czech Republic (CESNET)",
                 sponsor: "CESNET",
                 url: "https://speedtest.cesnet.cz/",
+                ping: null,
+                pingUrl: "https://speedtest.cesnet.cz/backend/empty.php",
             },
         ]);
         const mixed = normalizeServers([
@@ -171,10 +178,83 @@ describe("server list", () => {
             { name: "no server url", server: 3 },
         ]);
         expect(mixed).toEqual([
-            { id: 1, name: "ok", sponsor: "", url: "https://a/" },
+            {
+                id: 1,
+                name: "ok",
+                sponsor: "",
+                url: "https://a/",
+                ping: null,
+                pingUrl: "https://a/empty.php",
+            },
         ]);
         expect(normalizeServers({})).toEqual([]);
         expect(normalizeServers(null)).toEqual([]);
+    });
+
+    test("sortServersByPing: measured ascending, unmeasured keep order last", () => {
+        const mk = (id: number, ping: number | null) => ({
+            id,
+            name: `s${id}`,
+            sponsor: "",
+            url: `https://s${id}/`,
+            ping,
+            pingUrl: `https://s${id}/empty.php`,
+        });
+        expect(sortServersByPing([mk(1, 90), mk(2, null), mk(3, 12), mk(4, null)]))
+            .toEqual([mk(3, 12), mk(1, 90), mk(2, null), mk(4, null)]);
+        // Stable for equal pings.
+        expect(sortServersByPing([mk(1, 5), mk(2, 5)]).map((s) => s.id)).toEqual([
+            1, 2,
+        ]);
+    });
+
+    test("measurePings fills RTT, keeps failures null, respects the budget", async () => {
+        let t = 0;
+        const mk = (id: number, pingUrl: string): SpeedtestServer => ({
+            id,
+            name: `s${id}`,
+            sponsor: "",
+            url: pingUrl,
+            ping: null,
+            pingUrl,
+        });
+        const servers = [
+            mk(1, "https://a"),
+            mk(2, "https://b"),
+            mk(3, "https://slow"),
+        ];
+        await measurePings(servers, {
+            now: () => (t += 1),
+            fetch: async (url) => {
+                if (String(url).includes("slow")) throw new Error("down");
+                t += 40; // 40 ms round trip
+            },
+        });
+        // Shared clock: the RTT is ≥ the probe time, exact value up to skew.
+        expect(servers[0].ping).toBeGreaterThanOrEqual(40);
+        expect(servers[1].ping).toBeGreaterThanOrEqual(40);
+        expect(servers[2].ping).toBeNull();
+    });
+
+    test("get() serves the list sorted by measured ping", async () => {
+        await withTempDir(async (dir) => {
+            const list = new ServerListCache({
+                dir,
+                fetch: async () =>
+                    (await readFixture("servers-sample.json")).trim(),
+                ping: async (servers) => {
+                    for (const s of servers)
+                        // Deterministic fake RTT: id 79 is faster than 105.
+                        s.ping = s.id === 79 ? 11 : 42;
+                },
+                now: () => 0,
+            });
+            await list.refresh(); // land the cache first
+            const res = await list.get();
+            expect(res.available).toBeTrue();
+            expect(res.servers.map((s) => s.id)).toEqual([79, 105]);
+            expect(res.servers[0].ping).toBe(11);
+        });
     });
 
     test("TTL: no refetch before 1 h, refetch after", async () => {
@@ -187,6 +267,7 @@ describe("server list", () => {
                     fetched++;
                     return (await readFixture("servers-sample.json")).trim();
                 },
+                ping: async () => {},
                 now: () => nowMs,
             });
             const first = await list.get(); // stale → background refresh kicked
@@ -257,6 +338,7 @@ describe("server list", () => {
                     await gate;
                     return (await readFixture("servers-sample.json")).trim();
                 },
+                ping: async () => {},
                 now: () => 0,
             });
             const done = Promise.all([list.refresh(), list.refresh()]);

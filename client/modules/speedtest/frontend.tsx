@@ -332,6 +332,9 @@ function serverCombo(host: DeviceCard): m.Vnode {
 							}}
 						>
 							{s.name}
+							{s.ping !== null ? (
+								<span class="st-ping">{s.ping} ms</span>
+							) : null}
 						</button>
 					))}
 					{matches.length > shown.length ? (

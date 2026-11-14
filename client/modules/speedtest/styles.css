@@ -50,6 +50,17 @@
     background: transparent;
     color: var(--text);
     cursor: pointer;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+/* The measured RTT at the right edge of a server row. */
+.mod-speedtest-card .st-ping {
+    color: var(--muted);
+    font-size: 0.85em;
+    white-space: nowrap;
 }
 
 .mod-speedtest-card .st-combo-list button:hover {

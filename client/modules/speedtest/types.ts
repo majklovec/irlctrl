@@ -10,6 +10,10 @@ export interface SpeedtestServer {
     name: string;
     sponsor: string;
     url: string;
+    /** Round-trip time to the server's ping endpoint in ms (null = not measured). */
+    ping: number | null;
+    /** Absolute ping endpoint (`server` + `pingURL`); "" when the list has none. */
+    pingUrl: string;
 }
 
 /** The server-list payload: `available` is false when a fetch failed and no

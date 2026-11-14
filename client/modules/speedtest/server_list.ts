@@ -17,6 +17,10 @@ import type { SpeedtestServer, SpeedtestServers } from "./types";
 export const SERVERS_URL = "https://librespeed.org/backend-servers/servers.php";
 export const SERVERS_TTL_MS = 60 * 60 * 1000;
 export const FETCH_TIMEOUT_MS = 10_000;
+/** How many ping probes run at once and how long the whole pass may take. */
+export const PING_CONCURRENCY = 12;
+export const PING_TIMEOUT_MS = 1500;
+export const PING_PASS_BUDGET_MS = 6000;
 
 /**
  * Normalize the raw list for the UI. Requires numeric `id`, string `name`
@@ -35,15 +39,83 @@ export function normalizeServers(raw: unknown): SpeedtestServer[] {
             typeof e.server !== "string"
         )
             continue;
+        const base = (e.server as string).replace(/\/$/, "");
+        const pingPath =
+            typeof e.pingURL === "string" && e.pingURL ? e.pingURL : "empty.php";
         out.push({
             id: e.id,
             name: e.name,
             sponsor: typeof e.sponsorName === "string" ? e.sponsorName : "",
             url: e.server,
+            ping: null,
+            pingUrl: `${base}/${pingPath.replace(/^\//, "")}`,
         });
     }
     return out;
 }
+
+/**
+ * Measured servers first (ascending ping), the unmeasured keep their list
+ * order after them. Stable for equal pings.
+ */
+export function sortServersByPing(servers: SpeedtestServer[]): SpeedtestServer[] {
+    return [...servers].sort(
+        (a, b) =>
+            (a.ping ?? Number.MAX_SAFE_INTEGER) - (b.ping ?? Number.MAX_SAFE_INTEGER),
+    );
+}
+
+/**
+ * One ping pass: probe every server's ping endpoint (concurrency-capped, with
+ * a per-probe and a total time budget); failures stay `null`. Never throws.
+ */
+export async function measurePings(
+    servers: SpeedtestServer[],
+    opts: {
+        now?: () => number;
+        fetch?: (url: string, init?: RequestInit) => Promise<unknown>;
+    } = {},
+): Promise<void> {
+    const now = opts.now ?? (() => performance.now());
+    const doFetch =
+        opts.fetch ?? ((url, init) => globalThis.fetch(url, init));
+    const deadline = now() + PING_PASS_BUDGET_MS;
+    const pending = servers.filter((s) => s.ping === null && s.pingUrl);
+    let i = 0;
+    const worker = async () => {
+        for (;;) {
+            if (now() > deadline) return;
+            const s = pending[i++];
+            if (!s) return;
+            const controller = new AbortController();
+            const timer = setTimeout(
+                () => controller.abort(),
+                PING_TIMEOUT_MS,
+            );
+            const t0 = now();
+            try {
+                await doFetch(s.pingUrl, {
+                    signal: controller.signal,
+                    cache: "no-store",
+                });
+                s.ping = Math.round(now() - t0);
+            } catch {
+                // Unreachable / slow — the server simply sorts last.
+            } finally {
+                clearTimeout(timer);
+            }
+        }
+    };
+    await Promise.all(
+        Array.from(
+            { length: Math.min(PING_CONCURRENCY, pending.length) },
+            () => worker(),
+        ),
+    );
+}
+
+/** A ping pass: fills each server's `ping` in place (injectable for tests). */
+export type PingPass = (servers: SpeedtestServer[]) => Promise<void>;
 
 /** A fetch function with the timeout behavior we need (injectable for tests). */
 export type ListFetcher = (url: string) => Promise<string>;
@@ -68,6 +140,8 @@ export interface ServerListCacheOptions {
     /** Directory holding `servers.json` (created on demand). */
     dir: string;
     fetch?: ListFetcher;
+    /** The ping pass (measures each server's RTT in place). */
+    ping?: PingPass;
     now?: () => number;
     ttlMs?: number;
     log?: (message: string) => void;
@@ -81,6 +155,8 @@ export class ServerListCache {
     private readonly log: (message: string) => void;
     /** Single-flight: concurrent refreshes share one download. */
     private inflight: Promise<void> | null = null;
+    /** Single-flight: concurrent callers share one ping pass. */
+    private pings: Promise<void> | null = null;
     /** In-memory copy of the cache (normalized + raw text + mtime). */
     private cached: {
         text: string;
@@ -141,18 +217,31 @@ export class ServerListCache {
         return this.inflight !== null;
     }
 
+    /** One bounded ping pass for the current cache (single-flight). */
+    private ensurePings(): Promise<void> {
+        const pass: PingPass = this.opts.ping ?? measurePings;
+        if (!this.pings)
+            this.pings = pass(this.cached?.servers ?? []).finally(
+                () => (this.pings = null),
+            );
+        return this.pings;
+    }
+
     /**
-     * The list for the UI: serve the cache, start a background refresh when
-     * it is stale (or when `force`). A failed refresh keeps the stale cache;
-     * with no cache and a failed fetch → `available: false`.
+     * The list for the UI, sorted by measured ping (unmeasured last). Serves
+     * the cache, starts a background refresh when stale (or `force`) and a
+     * bounded ping pass when anything is unmeasured. A failed refresh keeps
+     * the stale cache; with no cache and a failed fetch → `available: false`.
      */
     async get(force = false): Promise<SpeedtestServers> {
         await this.load();
         const stale = !this.cached || this.now() - this.cached.at >= this.ttlMs;
         if (stale || force) void this.refresh();
+        if (this.cached?.servers.some((s) => s.ping === null))
+            await this.ensurePings();
         return {
             available: this.cached !== null,
-            servers: this.cached?.servers ?? [],
+            servers: sortServersByPing(this.cached?.servers ?? []),
             cachedAt: this.cached?.at ?? null,
             refreshing: this.inflight !== null,
         };
