@@ -1,0 +1,93 @@
+{
+  "autostart": false,
+  "color": "#3b82f6",
+  "hostname": "majkl-relay",
+  "language": "en",
+  "passwordHash": "scrypt$7e84485370ad803092829ff11ed6e640$98a3c2cba5b6b29509a3d70859fd797c56b11e8ed4015fdc47522a6cbfea318acdf7b8b9b7c553e9d80f98fcdc885b2a2730d178c56b86d0f9f2e8fde3bf5764",
+  "remoteUrl": "",
+  "role": "relay",
+  "username": "majkl",
+  "uuid": "58bbdeb9-fa2b-4a8a-afe9-345038efc844",
+  "modules": {
+    "broadcaster": {
+      "enabled": false,
+      "profile": "copy",
+      "profilesDir": "/root/.config/broadcaster/profiles",
+      "outputs": [],
+      "profiles": []
+    },
+    "encoder": {
+      "enabled": false
+    },
+    "moblink_relay": {
+      "enabled": false,
+      "listenPortBase": 4000,
+      "logLevel": "info",
+      "interfaceAllow": [],
+      "interfaceIgnore": [
+        "docker.*",
+        "veth.*"
+      ],
+      "interfaceNameOverrides": {}
+    },
+    "moblink_streamer": {
+      "enabled": false
+    },
+    "modems": {
+      "enabled": true
+    },
+    "network": {
+      "enabled": true
+    },
+    "obs": {
+      "autoSwitch": true,
+      "enabled": false,
+      "failBehaviour": "pause",
+      "instantlySwitchOnRecover": true,
+      "logToFile": true,
+      "obsPassword": "hesloheslo",
+      "obsSourceName": "",
+      "obsUrl": "ws://host.docker.internal:4455",
+      "onlySwitchWhenStreaming": false,
+      "pollIntervalMs": 1000,
+      "retryAttempts": 5,
+      "sceneEvents": true,
+      "optionalScenes": {
+        "ending": "",
+        "privacy": "",
+        "starting": ""
+      },
+      "scenes": {
+        "low": "",
+        "normal": "",
+        "offline": ""
+      },
+      "triggers": {
+        "low": 500,
+        "offline": 400,
+        "rtt": 1500
+      }
+    },
+    "relay": {
+      "enabled": true
+    },
+    "speedtest": {
+      "enabled": true,
+      "interface": null,
+      "serverId": 79
+    },
+    "ssh": {
+      "enabled": true
+    },
+    "systeminfo": {
+      "enabled": true
+    }
+  },
+  "relay": {
+    "listenPort": "6000",
+    "mode": "enhanced",
+    "quality": true,
+    "remoteHost": "asd",
+    "remotePort": "6000"
+  }
+}

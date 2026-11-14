@@ -1,0 +1,24 @@
+[
+    {
+        "name": "Frankfurt, Germany (FS IT-Systeme GmbH)",
+        "server": "https://speed.fs-it.systems/",
+        "id": 105,
+        "dlURL": "backend/garbage.php",
+        "ulURL": "backend/empty.php",
+        "pingURL": "backend/empty.php",
+        "getIpURL": "backend/getIP.php",
+        "sponsorName": "FS IT-Systeme GmbH",
+        "sponsorURL": "https://go.bytevault.systems/fsit-web-spd1"
+    },
+    {
+        "name": "Prague, Czech Republic (CESNET)",
+        "server": "https://speedtest.cesnet.cz/",
+        "id": 79,
+        "dlURL": "backend/garbage.php",
+        "ulURL": "backend/empty.php",
+        "pingURL": "backend/empty.php",
+        "getIpURL": "backend/getIP.php",
+        "sponsorName": "CESNET",
+        "sponsorURL": "https://www.cesnet.cz"
+    }
+]

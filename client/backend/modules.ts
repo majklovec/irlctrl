@@ -92,10 +92,13 @@ export const defaultModules = (role: Role): ModulesState =>
  * role's default, existing slices are backfilled with new default fields
  * (stored values win). Unknown stored keys are kept.
  */
-export function ensureModuleSlices(role: Role = effectiveRole()): ModulesState {
+export function ensureModuleSlices(
+    role: Role = effectiveRole(),
+    mods: Module[] = DEVICE_MODULES,
+): ModulesState {
     const stored = state.settings.modules ?? {};
     const modules: ModulesState = { ...stored };
-    for (const mod of DEVICE_MODULES) {
+    for (const mod of mods) {
         const key = configKey(mod);
         // A renamed module adopts the slice stored under its former key.
         if (!(key in stored))
@@ -184,10 +187,18 @@ const startCtx = (mod: Module) => ({
 const shouldRun = (mod: Module): boolean =>
     servesRole(mod, effectiveRole()) && moduleSlice(mod)?.enabled === true;
 
-/** Start every settings-enabled module that serves the current role, in dependency order. */
-export async function startModules(): Promise<void> {
-    for (const mod of DEVICE_MODULES)
-        if (shouldRun(mod)) await mod.start(startCtx(mod));
+/** Start every settings-enabled module that serves the current role, in dependency order.
+ * `mods` is a test seam; the process starts with the full registry. */
+export async function startModules(mods: Module[] = DEVICE_MODULES): Promise<void> {
+    // A device without a config file has no stored slices yet; seed the
+    // defaults so its default-enabled modules (speedtest, ...) start and can
+    // emit events. The in-memory slices are persisted on the first save.
+    if (!state.settings.modules) ensureModuleSlices(effectiveRole(), mods);
+    for (const mod of mods)
+        if (shouldRun(mod)) {
+            started.add(mod);
+            await mod.start(startCtx(mod));
+        }
 }
 
 /** Stop every module (unstarted ones are no-ops by contract). */
@@ -197,8 +208,12 @@ export async function stopModules(): Promise<void> {
 
 /** Restart one module (stop, then start when it should run). */
 export async function restartModule(mod: Module): Promise<void> {
+    started.delete(mod);
     await mod.stop();
-    if (shouldRun(mod)) await mod.start(startCtx(mod));
+    if (shouldRun(mod)) {
+        started.add(mod);
+        await mod.start(startCtx(mod));
+    }
 }
 
 /** Modules whose contributions apply to the current role (enabled or not). */
@@ -273,10 +288,25 @@ export function methodAllowed(method: string): boolean {
     return true;
 }
 
+const started = new Set<Module>();
+
+/** Whether the module's `start` has run (its `emit` is wired). */
+export const moduleStarted = (mod: Module): boolean => started.has(mod);
+
 /** Dispatch an RPC method to the module that owns it. */
-export function callModule(method: string, params: Params): Promise<unknown> {
+export async function callModule(
+    method: string,
+    params: Params,
+): Promise<unknown> {
     const mod = METHOD_OWNER.get(method);
-    if (!mod) return Promise.reject(new Error(`unknown method ${method}`));
+    if (!mod) throw new Error(`unknown method ${method}`);
+    if (!started.has(mod) && shouldRun(mod)) {
+        // Late start: the slice may only exist now (setup just completed, no
+        // config file at boot). Without this the module would work — but its
+        // events would be dropped because start never captured its emit.
+        started.add(mod);
+        await mod.start(startCtx(mod));
+    }
     return mod.dispatch(method, params);
 }
 
@@ -285,7 +315,7 @@ export const runAutostart = (): void =>
     runAutostartWith(async () => {
         let resumed = false;
         for (const mod of DEVICE_MODULES)
-            if (shouldRun(mod) && mod.resume && (await mod.resume()))
+            if (moduleStarted(mod) && mod.resume && (await mod.resume()))
                 resumed = true;
         return resumed;
     });

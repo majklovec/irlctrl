@@ -4,9 +4,17 @@ import { join } from "node:path";
 import {
     defaultModules,
     ensureModuleSlices,
+    moduleStarted,
     safeModules,
+    startModules,
 } from "../client/backend/modules";
+import type { ModuleCore } from "../client/backend/module_core";
 import { state } from "../client/backend/state";
+import type {
+    BackendModule,
+    Emit,
+    Params,
+} from "../shared/contracts/backend_module";
 import { MODULE_ROOTS } from "../shared/paths";
 import {
     ALL_MODULES,
@@ -32,6 +40,7 @@ const DEVICE_ORDER = [
     "moblink_streamer",
     "obs",
     "relay",
+    "speedtest",
     "ssh",
     "systeminfo",
 ];
@@ -361,6 +370,7 @@ describe("role presets from the registrations", () => {
             "modems",
             "network",
             "relay",
+            "speedtest",
             "ssh",
             "systeminfo",
         ]);
@@ -370,13 +380,15 @@ describe("role presets from the registrations", () => {
             "moblink_streamer",
             "modems",
             "network",
+            "speedtest",
             "ssh",
             "systeminfo",
         ]);
         // The relay box keeps its modem uplinks dialled (the MobLink relay
         // itself is opt-in).
-        expect(on("moblink_relay")).toEqual(["modems", "systeminfo"]);
-        expect(on("obs")).toEqual(["obs", "systeminfo"]);
+        // speedtest serves every role (no `roles` field) → enabled everywhere.
+        expect(on("moblink_relay")).toEqual(["modems", "speedtest", "systeminfo"]);
+        expect(on("obs")).toEqual(["obs", "speedtest", "systeminfo"]);
     });
 
     test("a module's stored slice key is its id unless it declares a configKey", () => {
@@ -418,6 +430,81 @@ describe("role presets from the registrations", () => {
         } finally {
             state.settings.modules = saved;
             state.settings.role = role;
+        }
+    });
+});
+
+describe("module start on a fresh device (no config file, no slices)", () => {
+    const save = () => ({
+        modules: state.settings.modules,
+        role: state.settings.role,
+    });
+    const restore = (saved: {
+        modules: typeof state.settings.modules;
+        role: typeof state.settings.role;
+    }) => {
+        state.settings.modules = saved.modules;
+        state.settings.role = saved.role;
+    };
+
+    const makeStub = (id: string, emitOf: { current: Emit | undefined }) => {
+        const mod: BackendModule<ModuleCore> = {
+            kind: "device",
+            id,
+            title: id,
+            methods: [],
+            events: [],
+            async start(ctx) {
+                emitOf.current = ctx.emit;
+            },
+            async stop() {
+                emitOf.current = undefined;
+            },
+            dispatch(): unknown {
+                return { ok: true };
+            },
+        };
+        return mod;
+    };
+
+    test("startModules seeds default slices and wires every default-enabled module's emit", async () => {
+        const a = { current: undefined as Emit | undefined };
+        const b = { current: undefined as Emit | undefined };
+        const saved = save();
+        try {
+            state.settings.role = "relay";
+            state.settings.modules = undefined;
+            await startModules([makeStub("alpha", a), makeStub("beta", b)]);
+
+            // Slices are seeded with the role defaults.
+            expect(state.settings.modules?.["alpha"]).toEqual({ enabled: true });
+            expect(state.settings.modules?.["beta"]).toEqual({ enabled: true });
+            // Both modules started, and their start() captured the emit —
+            // the regression: without the seed the slices were missing, the
+            // modules never started, and every event was silently dropped.
+            expect(a.current, "alpha emit wired").toBeInstanceOf(Function);
+            expect(b.current, "beta emit wired").toBeInstanceOf(Function);
+        } finally {
+            restore(saved);
+        }
+    });
+
+    test("startModules honors an explicit disable over the default", async () => {
+        const a = { current: undefined as Emit | undefined };
+        const b = { current: undefined as Emit | undefined };
+        const saved = save();
+        try {
+            state.settings.role = "relay";
+            state.settings.modules = {
+                "alpha": { enabled: false },
+                "beta": { enabled: true },
+            };
+            await startModules([makeStub("alpha", a), makeStub("beta", b)]);
+
+            expect(a.current, "alpha stays stopped").toBeUndefined();
+            expect(b.current, "beta emit wired").toBeInstanceOf(Function);
+        } finally {
+            restore(saved);
         }
     });
 });

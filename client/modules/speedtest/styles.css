@@ -1,0 +1,228 @@
+/* Speedtest card: pickers, the live run view, the summary, the error banner.
+ * Scoped under .mod-speedtest-card; colours come from the design tokens. */
+
+.mod-speedtest-card .st-form {
+    display: grid;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.mod-speedtest-card .st-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.mod-speedtest-card .st-field-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+}
+
+/* ── searchable server combobox ── */
+.mod-speedtest-card .st-combo {
+    position: relative;
+}
+
+.mod-speedtest-card .st-combo-list {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    max-height: 16rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    padding: 0.2rem;
+    background: var(--base-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-sm);
+}
+
+.mod-speedtest-card .st-combo-list button {
+    text-align: left;
+    padding: 0.35rem 0.5rem;
+    border: none;
+    border-radius: var(--radius-xs);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.mod-speedtest-card .st-combo-list button:hover {
+    background: var(--card-subtle);
+}
+
+.mod-speedtest-card .st-combo-list button.sel {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.mod-speedtest-card .st-combo-list .muted {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.8rem;
+}
+
+/* ── actions row ── */
+.mod-speedtest-card .st-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+}
+
+.mod-speedtest-card .st-refresh {
+    font-size: 0.8rem;
+    color: var(--muted);
+    text-decoration: none;
+}
+
+.mod-speedtest-card .st-refresh:hover {
+    color: var(--accent);
+}
+
+/* ── warnings / errors ── */
+.mod-speedtest-card .st-warn {
+    margin: 0.4rem 0;
+    padding: 0.5rem 0.6rem;
+    font-size: 0.85rem;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--warn) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+}
+
+.mod-speedtest-card .st-error {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin: 0.5rem 0;
+    padding: 0.55rem 0.7rem;
+    font-size: 0.88rem;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--bad) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--bad) 40%, transparent);
+}
+
+/* ── live view ── */
+.mod-speedtest-card .st-live {
+    margin: 0.6rem 0;
+    padding: 0.6rem 0.7rem;
+    border-radius: var(--radius-sm);
+    background: var(--card-subtle);
+}
+
+.mod-speedtest-card .st-live-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.4rem;
+}
+
+.mod-speedtest-card .st-live-phase {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.mod-speedtest-card .st-live-mbps {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+}
+
+.mod-speedtest-card .st-live-upload .st-live-mbps {
+    color: var(--ok);
+}
+
+.mod-speedtest-card .st-bar {
+    height: 10px;
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    overflow: hidden;
+}
+
+.mod-speedtest-card .st-bar-fill {
+    height: 100%;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    transition: width var(--t);
+}
+
+.mod-speedtest-card .st-live-upload .st-bar-fill {
+    background: var(--ok);
+}
+
+/* indeterminate ping phase: a sliding pulse */
+.mod-speedtest-card .st-bar-ping {
+    position: relative;
+}
+
+.mod-speedtest-card .st-bar-spin {
+    position: absolute;
+    inset: 0;
+    width: 34%;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    animation: st-ping-slide 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes st-ping-slide {
+    from {
+        left: 0;
+    }
+    to {
+        left: 66%;
+    }
+}
+
+.mod-speedtest-card .st-spark {
+    display: block;
+    width: 100%;
+    height: 36px;
+    margin-top: 0.4rem;
+    color: var(--muted);
+}
+
+/* ── summary ── */
+.mod-speedtest-card .st-summary {
+    margin: 0.6rem 0 0.2rem;
+}
+
+.mod-speedtest-card .st-nums {
+    display: flex;
+    gap: 0.9rem;
+    flex-wrap: wrap;
+    font-size: 1.15rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.mod-speedtest-card .st-num em {
+    font-style: normal;
+    font-size: 0.75rem;
+    color: var(--muted);
+}
+
+.mod-speedtest-card .st-num-down {
+    color: var(--accent);
+}
+
+.mod-speedtest-card .st-num-up {
+    color: var(--ok);
+}
+
+.mod-speedtest-card .st-meta {
+    margin-top: 0.45rem;
+    font-size: 0.85rem;
+}
+
+.mod-speedtest-card .st-muted {
+    margin-top: 0.3rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+}
