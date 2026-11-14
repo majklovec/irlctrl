@@ -21,7 +21,7 @@
     "dev.scan": "Scan",
     "dev.scan_empty": "Scan finished — no networks found",
     "dev.scan_failed": "Scan failed — check the modem and try again (see device log)",
-    "dev.scan_running": "Scanning… (may take several minutes)",
+    "dev.scan_running": "Scanning…",
     "dev.tech": "Tech",
     "dev.username": "Username",
     "mlog.done.modem_connected": "Modem #{{index}} connected",

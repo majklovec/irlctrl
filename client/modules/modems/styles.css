@@ -66,24 +66,25 @@
     cursor: pointer;
     user-select: none;
 }
-/* Band-mode checkbox group: a captioned row of compact 2G/3G/4G/5G toggles. */
+/* Band-mode checkbox group: a grid of compact 2G/3G/4G/5G toggles under the
+ * field's own caption (the "Bands" label sits on its own row). */
 .mod-modems-card .modem .net .band {
-    flex-basis: 100%;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.4rem 0.9rem;
-    padding: 0.4rem 0.55rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+    gap: 0.25rem 0.5rem;
+    padding: 0.45rem 0.55rem;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--card-subtle, transparent);
 }
-.mod-modems-card .modem .net .band .band-label {
-    font-size: 0.8rem;
-    color: var(--muted);
-    font-weight: 600;
-}
 .mod-modems-card .modem .net .band label.band-opt {
-    flex: 0 0 auto;
     min-width: 0;
+}
+
+.mod-modems-card .modem .net input,
+.mod-modems-card .modem .net select {
+    width: 100%;
+}
+.mod-modems-card .modem .net input[type="checkbox"] {
+    width: auto;
 }

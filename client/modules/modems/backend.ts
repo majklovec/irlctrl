@@ -5,11 +5,8 @@
  * manage their uplinks through modems (relay, encoder, moblink_relay); the
  * network module enriches its interface list with `modems.source`.
  */
-import type { ModuleCore } from "../../backend/module_core";
-import type {
-    BackendModule,
-    Params,
-} from "../../../shared/contracts/backend_module";
+
+import type { BackendModule } from "../../../shared/contracts/backend_module";
 import {
     ApiError,
     optionalApn,
@@ -21,6 +18,7 @@ import {
     optionalUsername,
     requireIndex,
 } from "../../../shared/params";
+import type { ModuleCore } from "../../backend/module_core";
 import log from "./log";
 import {
     bindModemManager,
@@ -96,7 +94,7 @@ const registration: BackendModule<ModuleCore> = {
             }
             case "modems.profile": {
                 const index = requireIndex(p);
-                return { index, profile: await gsmProfile(index) ?? null };
+                return { index, profile: (await gsmProfile(index)) ?? null };
             }
             case "modems.setup": {
                 const index = requireIndex(p);
@@ -114,7 +112,9 @@ const registration: BackendModule<ModuleCore> = {
                     allowedModes: optionalRatList(p),
                     preferredMode: optionalRat(p),
                 };
-                const hasField = (Object.keys(setup) as (keyof ModemNetworkSetup)[])
+                const hasField = (
+                    Object.keys(setup) as (keyof ModemNetworkSetup)[]
+                )
                     .filter((key) => key !== "operatorName")
                     .some((key) => setup[key] !== undefined);
                 if (!hasField)
@@ -123,9 +123,11 @@ const registration: BackendModule<ModuleCore> = {
                             "allowRoaming, autoConfig, allowedModes or " +
                             "preferredMode is required",
                     );
+                const result = await setupModemNetwork(index, setup);
                 return {
                     index,
-                    ok: await setupModemNetwork(index, setup),
+                    ok: result.ok,
+                    modes: result.modes,
                 };
             }
             default: {

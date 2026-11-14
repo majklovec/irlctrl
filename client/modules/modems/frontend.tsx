@@ -8,27 +8,27 @@ import {
 	Break,
 	Button,
 	Card,
-	CheckField,
 	Checkbox,
+	CheckField,
+	type Child,
 	DefinitionList,
 	Field,
 	Input,
 	Options,
 	Select,
-	type Child,
 } from "@ui/components/";
 import { confirmDialog } from "@ui/components/confirm";
 import { card, type DeviceCard } from "@ui/device/store";
 import { t } from "@ui/i18n";
 import m from "mithril";
 import type {
-	FrontendModule,
 	DeviceDashboardWidget,
+	FrontendModule,
 } from "../../../shared/contracts/frontend_module";
-import { ratLabel } from "./modems";
-import type { GsmProfile } from "./modems";
-import type { ModemInfo, ModemsStatus, ScannedNetwork } from "./types";
 import log from "./log";
+import type { GsmProfile } from "./modems";
+import { ratLabel } from "./modems";
+import type { ModemInfo, ModemsStatus, ScannedNetwork } from "./types";
 
 async function modemAction(
 	host: DeviceCard,
@@ -114,10 +114,7 @@ const netStateOf = (index: number): ModemNetState => {
  * actual settings, not blanks (belaUI keeps the config in the form). `profile`
  * remembers the original values so `applyNetworkSetup` only sends what changed.
  */
-async function loadProfile(
-	host: DeviceCard,
-	modem: ModemInfo,
-): Promise<void> {
+async function loadProfile(host: DeviceCard, modem: ModemInfo): Promise<void> {
 	const index = modem.index;
 	const state = netStateOf(index);
 	state.profileLoading = true;
@@ -132,8 +129,8 @@ async function loadProfile(
 	const profile = res?.profile ?? {};
 	state.profile = profile;
 	state.plmn = profile.networkId ?? "";
-	state.plmnName = state.networks.find((n) => n.plmnId === state.plmn)
-		?.operatorName ?? "";
+	state.plmnName =
+		state.networks.find((n) => n.plmnId === state.plmn)?.operatorName ?? "";
 	state.apn = profile.apn ?? "";
 	state.username = profile.username ?? "";
 	state.password = ""; // never shown; empty = "unchanged"
@@ -168,9 +165,7 @@ async function scanNetworks(host: DeviceCard, index: number): Promise<void> {
 	state.scanning = false;
 	if (res?.networks) {
 		state.networks = res.networks;
-		state.scanError = res.networks.length
-			? undefined
-			: t("dev.scan_empty");
+		state.scanError = res.networks.length ? undefined : t("dev.scan_empty");
 	} else {
 		// The RPC rejected (or timed out) — `act` swallows the error and
 		// returns undefined. Surface an actionable hint; the root cause is
@@ -214,7 +209,22 @@ function applyNetworkSetup(host: DeviceCard, index: number): void {
 		params.allowedModes = state.allowedModes;
 		params.preferredMode = state.preferredMode || undefined;
 	}
-	void host.act(`modem:modems.setup:${index}`, "modems.setup", params);
+	void host.act<{ modes?: { allowed: string[]; preferred?: string } }>(
+		`modem:modems.setup:${index}`,
+		"modems.setup",
+		params,
+	).then((res) => {
+		// A modem only accepts the combinations it publishes, so the backend
+		// widens the request to the smallest accepted one — resync the form
+		// checkboxes to what the modem actually has now.
+		if (res?.modes) {
+			state.allowedModes = [...res.modes.allowed];
+			state.preferredMode = (res.modes.preferred ?? "") as string;
+			state.baseAllowedModes = [...res.modes.allowed];
+			state.basePreferredMode = state.preferredMode;
+			m.redraw();
+		}
+	});
 }
 
 /** Whether the form differs from the profile it was loaded from. */
@@ -232,12 +242,10 @@ function setupDirty(state: ModemNetState): boolean {
 /** The network / band-mode / APN setup form under the modem's action buttons. */
 function netSetupRow(host: DeviceCard, modem: ModemInfo): m.Vnode {
 	const state = netStateOf(modem.index);
-	const options = state.networks.map(
-		(n): readonly [string, string] => [
-			n.plmnId,
-			`${n.operatorName ?? t("dev.network_unknown")} (${n.plmn}${n.accessTech ? ` · ${n.accessTech}` : ""} · ${n.status})`,
-		],
-	);
+	const options = state.networks.map((n): readonly [string, string] => [
+		n.plmnId,
+		`${n.operatorName ?? t("dev.network_unknown")} (${n.plmn}${n.accessTech ? ` · ${n.accessTech}` : ""} · ${n.status})`,
+	]);
 	const applyDisabled =
 		host.busy.has(`modem:modems.setup:${modem.index}`) ||
 		state.profileLoading ||
@@ -265,7 +273,10 @@ function netSetupRow(host: DeviceCard, modem: ModemInfo): m.Vnode {
 		const i = state.allowedModes.indexOf(rat);
 		if (i >= 0) state.allowedModes.splice(i, 1);
 		else state.allowedModes.push(rat);
-		if (state.preferredMode && !state.allowedModes.includes(state.preferredMode))
+		if (
+			state.preferredMode &&
+			!state.allowedModes.includes(state.preferredMode)
+		)
 			state.preferredMode = "";
 		m.redraw();
 	};
@@ -280,8 +291,8 @@ function netSetupRow(host: DeviceCard, modem: ModemInfo): m.Vnode {
 						disabled={state.scanning}
 						onChange={(value) => {
 							state.plmnName =
-								state.networks.find((n) => n.plmnId === value)
-									?.operatorName ?? "";
+								state.networks.find((n) => n.plmnId === value)?.operatorName ??
+								"";
 						}}
 					>
 						<option value="">{placeholder}</option>
@@ -304,11 +315,7 @@ function netSetupRow(host: DeviceCard, modem: ModemInfo): m.Vnode {
 			<Field
 				label={t("dev.username")}
 				control={
-					<Input
-						target={state}
-						prop="username"
-						disabled={state.autoConfig}
-					/>
+					<Input target={state} prop="username" disabled={state.autoConfig} />
 				}
 			/>
 			<Field
@@ -327,33 +334,45 @@ function netSetupRow(host: DeviceCard, modem: ModemInfo): m.Vnode {
 			<CheckField
 				label={t("dev.roaming")}
 				control={
-					<Checkbox target={state} prop="allowRoaming" onChange={() => m.redraw()} />
+					<Checkbox
+						target={state}
+						prop="allowRoaming"
+						onChange={() => m.redraw()}
+					/>
 				}
 			/>
 			<CheckField
 				label={t("dev.autoconfig")}
 				control={
-					<Checkbox target={state} prop="autoConfig" onChange={() => m.redraw()} />
+					<Checkbox
+						target={state}
+						prop="autoConfig"
+						onChange={() => m.redraw()}
+					/>
 				}
 			/>
 			<Break />
-			<div class="band">
-				<span class="band-label">{t("dev.bands")}</span>
-				{rats.map((rat) => (
-					<CheckField
-						key={rat}
-						class="band-opt"
-						label={ratLabel(rat)}
-						control={
-							<input
-								type="checkbox"
-								checked={state.allowedModes.includes(rat)}
-								onclick={() => toggleRat(rat)}
+			<Field
+				label={t("dev.bands")}
+				control={
+					<div class="band">
+						{rats.map((rat) => (
+							<CheckField
+								key={rat}
+								class="band-opt"
+								label={ratLabel(rat)}
+								control={
+									<input
+										type="checkbox"
+										checked={state.allowedModes.includes(rat)}
+										onclick={() => toggleRat(rat)}
+									/>
+								}
 							/>
-						}
-					/>
-				))}
-			</div>
+						))}
+					</div>
+				}
+			/>
 			<Field
 				label={t("dev.preferred_band")}
 				control={
@@ -425,13 +444,16 @@ function modemPanel(host: DeviceCard, modem: ModemInfo): m.Vnode {
 			onclick={onclick ?? (() => void modemAction(host, method, modem.index))}
 		/>
 	);
-	const connected = modem.state === "connected";
+
 	const name =
 		[modem.manufacturer, modem.model].filter(Boolean).join(" ") ||
 		t("dev.modem_fallback");
 	// Prefill the setup form with the modem's persisted profile once, so the
 	// user edits the real settings (belaUI keeps the config in the form).
-	if (!netStateOf(modem.index).profileLoaded && !netStateOf(modem.index).profileLoading)
+	if (
+		!netStateOf(modem.index).profileLoaded &&
+		!netStateOf(modem.index).profileLoading
+	)
 		void loadProfile(host, modem);
 	return (
 		<article class="modem" key={modem.index}>
@@ -450,14 +472,12 @@ function modemPanel(host: DeviceCard, modem: ModemInfo): m.Vnode {
 				]}
 			/>
 			<Actions>
-				{control(t("ui.enable"), "modems.enable")}
-				{control(t("ui.disable"), "modems.disable")}
-				{control(t("dev.scan"), "modems.scan", "secondary", () =>
-					void scanNetworks(host, modem.index),
+				{control(
+					t("dev.scan"),
+					"modems.scan",
+					"secondary",
+					() => void scanNetworks(host, modem.index),
 				)}
-				{connected
-					? control(t("ui.disconnect"), "modems.disconnect")
-					: control(t("ui.connect"), "modems.connect")}
 				{control(t("ui.reset"), "modems.reset", "danger")}
 			</Actions>
 			{netSetupRow(host, modem)}

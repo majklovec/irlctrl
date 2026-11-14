@@ -1,0 +1,1 @@
+U_BOOT_PARAMETERS="console=ttyFIQ0,1500000 console=tty1 earlyprintk usb-storage.quirks=0x2537:0x1066:u,0x2537:0x1068:u cma=128M net.ifnames=0"

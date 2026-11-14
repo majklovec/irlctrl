@@ -26,6 +26,11 @@ export interface Modem {
 	currentModes?: { allowed: string[]; preferred: string[] };
 	/** The RATs the modem supports, from `modem.generic.supported-modes`. */
 	supportedModes?: string[];
+	/** The exact (allowed, preferred) RAT combinations the modem accepts,
+	 * each as a bitmask over generation order (bit 0 = 2G/GSM, 1 = 3G/UMTS,
+	 * 2 = 4G/LTE, 3 = 5G/NR) — mmcli only sets combinations from this list.
+	 * Empty/absent = MM reported none (requests are sent as-is). */
+	supportedCombinations?: { allowed: number; preferred: number }[];
 	/** Carrier IPv4 gateway (from the active bearer). Cellular gateways never
 	 * appear in the main routing table, so the network module needs this to
 	 * build a working per-uplink default route. */

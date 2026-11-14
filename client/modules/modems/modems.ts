@@ -35,8 +35,7 @@ const AUTO_DIAL_MS = 5000;
 /** How long `nmcli conn up` may block before we give up on one modem (s). */
 const ACTIVATE_TIMEOUT_S = 60;
 
-/** ModemManager RAT names in generation order — the values `--set-allowed-modes`
- * and `--set-preferred-mode` accept (belaUI parity). `auto`/`none` are the
+/** ModemManager RAT names in generation order. `auto`/`none` are the
  * reserved "no fixed mode" tokens, not real bands. */
 const RAT_ORDER = ["gsm", "umts", "lte", "nr5g"] as const;
 const RAT_LABELS: Record<string, string> = {
@@ -45,20 +44,48 @@ const RAT_LABELS: Record<string, string> = {
     lte: "4G (LTE)",
     nr5g: "5G (NR)",
 };
-/** A value we accept for `--set-allowed-modes` / `--set-preferred-mode`. */
-const isValidRat = (v: string): boolean =>
-    (RAT_ORDER as readonly string[]).includes(v);
-
-/** Split a ModemManager modes value ("gsm|lte" or "gsm, lte" or "auto") into
- * its RAT tokens. `auto` / empty are the "no fixed mode" sentinels. */
+/** `--set-allowed-modes` / `--set-preferred-mode` take generation tokens
+ * ("2g|3g|4g|5g"), NOT the D-Bus RAT names ("GSM|LTE" is rejected). */
+const RAT_GEN: Record<string, string> = {
+    gsm: "2g",
+    umts: "3g",
+    lte: "4g",
+    nr5g: "5g",
+};
+/** Bit per RAT in a mode mask (bit position = generation order). */
+const RAT_BIT: Record<string, number> = Object.fromEntries(
+    RAT_ORDER.map((rat, i) => [rat, 1 << i]),
+);
+const ratBits = (rats: readonly string[]): number =>
+    rats.reduce((bits, rat) => bits | (RAT_BIT[rat] ?? 0), 0);
+const ratsOf = (bits: number): string[] =>
+    RAT_ORDER.filter((rat) => bits & RAT_BIT[rat]);
+/** Every token a modes string can carry — the D-Bus RAT names and mmcli's
+ * generation tokens ("2g", …, "5gnr") — normalized onto RAT_ORDER. */
+const RAT_ALIASES: Record<string, string> = {
+    gsm: "gsm",
+    umts: "umts",
+    lte: "lte",
+    nr5g: "nr5g",
+    "2g": "gsm",
+    "3g": "umts",
+    "4g": "lte",
+    "5g": "nr5g",
+    "5gnr": "nr5g",
+};
+/** Split a ModemManager modes value ("gsm|lte", "2g, 4g" or "auto") into its
+ * RAT tokens, generation-ordered. `auto` / empty are the "no fixed mode"
+ * sentinels. */
 function splitModes(v: string | undefined): string[] {
     if (!v) return [];
     const trimmed = v.trim();
     if (!trimmed || trimmed.toLowerCase() === "auto") return [];
-    return trimmed
-        .split(/[|,]/)
-        .map((s) => s.trim())
-        .filter(isValidRat);
+    const rats = new Set<string>();
+    for (const part of trimmed.split(/[|,]/)) {
+        const rat = RAT_ALIASES[part.trim().toLowerCase()];
+        if (rat) rats.add(rat);
+    }
+    return RAT_ORDER.filter((rat) => rats.has(rat));
 }
 
 /** The modem's current band mode from `modem.generic.current-modes`
@@ -72,15 +99,42 @@ function parseCurrentModes(
     return { allowed: splitModes(allowed), preferred: splitModes(preferred) };
 }
 
+/** One (allowed, preferred) RAT combination the modem accepts, as bit masks
+ * in generation order (bit 0 = 2G, 1 = 3G, 2 = 4G, 3 = 5G). */
+export interface ModeCombo {
+    allowed: number;
+    preferred: number;
+}
+
+/** Parse one `modem.generic.supported-modes` entry
+ * ("allowed: 2g, 3g, 4g; preferred: 4g") into its masks. */
+export function parseModeCombo(value: string): ModeCombo | null {
+    const allowed = splitModes(value.match(/allowed:\s*([^;]*)/)?.[1]);
+    if (!allowed.length) return null;
+    return {
+        allowed: ratBits(allowed),
+        preferred: ratBits(
+            splitModes(value.match(/preferred:\s*([^;]*)/)?.[1]),
+        ),
+    };
+}
+
+/** The exact (allowed, preferred) combinations a modem accepts; mmcli only
+ * lets you set combinations from this list. */
+function supportedCombinations(detail: Record<string, string>): ModeCombo[] {
+    const combos: ModeCombo[] = [];
+    for (const [key, value] of Object.entries(detail)) {
+        if (!/^modem\.generic\.supported-modes\.value\[\d+\]$/.test(key)) continue;
+        const combo = parseModeCombo(value);
+        if (combo) combos.push(combo);
+    }
+    return combos;
+}
+
 /** The RATs a modem can use, from `modem.generic.supported-modes` (a
  * keyvalue array of "allowed: …, …; preferred: …" strings, one per value). */
 function supportedModes(detail: Record<string, string>): string[] {
-    const set = new Set<string>();
-    for (const [key, value] of Object.entries(detail)) {
-        if (!/^modem\.generic\.supported-modes\.value\[\d+\]$/.test(key)) continue;
-        for (const rat of splitModes(value.match(/allowed:\s*([^;]*)/)?.[1]))
-            set.add(rat);
-    }
+    const set = new Set(supportedCombinations(detail).flatMap((c) => ratsOf(c.allowed)));
     // Fall back to the current mode when the property is absent (some modems).
     if (!set.size) for (const rat of parseCurrentModes(detail).allowed) set.add(rat);
     return RAT_ORDER.filter((rat) => set.has(rat));
@@ -152,6 +206,7 @@ async function modemDetails(
     if (signal) info.signalQuality = Number(signal[1]);
     info.currentModes = parseCurrentModes(detail);
     info.supportedModes = supportedModes(detail);
+    info.supportedCombinations = supportedCombinations(detail);
     return info;
 }
 
@@ -653,42 +708,118 @@ async function waitModemState(
 // Band mode (belaUI parity — mmSetNetworkTypes)
 // ------------------------------------------------------------------------
 
+/** The outcome of a `setModemModes` call. */
+export interface ModesResult {
+    /** The modem accepted the (possibly widened) combination. */
+    ok: boolean;
+    /** The allowed RATs as the modem actually accepted them. */
+    allowed: string[];
+    /** The preferred RAT, if the modem accepts one for this combination. */
+    preferred: string | undefined;
+    /** Requested RATs no supported combination admits (ok = false). */
+    rejected: string[];
+}
+
 /**
- * Set the modem's allowed/preferred radio bands, mirroring belaUI.js
- * `mmSetNetworkTypes`: `mmcli -m <id> --set-allowed-modes=<A|B[|…]>`
- * [plus `--set-preferred-mode=<M>` when a preferred band is chosen]. An empty
- * `allowed` list means "auto" (no fixed band). Returns true on the modem's
- * "successfully set current modes" confirmation.
+ * Set the modem's allowed/preferred radio bands:
+ * `mmcli -m <id> --set-allowed-modes=<2g|3g|…>` [plus
+ * `--set-preferred-mode=<nG>`].
+ *
+ * A modem rejects any combination its firmware did not publish in
+ * `modem.generic.supported-modes` — usually the ascending allowed sets
+ * ("2g", "2g, 3g", "2g, 3g, 4g", …), each paired with "preferred: none" and,
+ * optionally, per-generation preferred entries. So the request is matched
+ * against `supported`: it is widened to the smallest accepted combination
+ * that contains every requested RAT, and the preferred mode is dropped when
+ * no accepted combination prefers it. A `supported` list of `[]`/`undefined`
+ * means MM published none, so the request is sent as-is (best effort). A
+ * single allowed RAT is sent without a preferred mode.
  */
 export async function setModemModes(
     index: number,
     allowed: readonly string[],
     preferred?: string,
-): Promise<boolean> {
-    const rats = allowed
-        .filter((v) => isValidRat(v))
-        .map((v) => v.toUpperCase());
-    // Dedupe while preserving generation order (gsm < umts < lte < nr5g).
-    const allowedList = RAT_ORDER.map((r) => r.toUpperCase()).filter((r) =>
-        rats.includes(r),
-    );
-    const pref = preferred && allowedList.includes(preferred.toUpperCase())
-        ? preferred.toUpperCase()
-        : undefined;
-    if (!allowedList.length && !pref) return true; // nothing to change
+    supported?: readonly ModeCombo[],
+): Promise<ModesResult> {
+    const requested = RAT_ORDER.filter((rat) => allowed.includes(rat));
+    if (!requested.length)
+        return { ok: true, allowed: [], preferred: undefined, rejected: [] };
+
+    const want = ratBits(requested);
+    const prefBit =
+        preferred && (want & RAT_BIT[preferred]) !== 0 ? RAT_BIT[preferred] : 0;
+
+    // A modem only accepts the (allowed, preferred) combinations its firmware
+    // publishes in `modem.generic.supported-modes` — typically the ascending
+    // allowed sets ("2g", "2g, 3g", "2g, 3g, 4g", …), each paired with
+    // "preferred: none" and, where the firmware allows, preferred entries.
+    // Widen the request to the smallest accepted allowed-set that contains
+    // every requested RAT, and keep the preference only when the modem
+    // publishes it for that exact set. A `supported` list of `[]`/`undefined`
+    // means MM published none, so the request is sent as-is (best effort).
+    let base: ModeCombo | undefined;
+    let prefMask = 0;
+    if (supported?.length) {
+        const covers = (c: ModeCombo) => (c.allowed & want) === want;
+        for (const c of supported) {
+            if (!covers(c)) continue;
+            if (!base || ratsOf(c.allowed).length < ratsOf(base.allowed).length)
+                base = c;
+        }
+        if (!base)
+            return {
+                ok: false,
+                allowed: [],
+                preferred: undefined,
+                rejected: requested,
+            };
+        if (prefBit)
+            for (const c of supported)
+                if (c.allowed === base.allowed && (c.preferred & prefBit) !== 0) {
+                    prefMask = c.preferred;
+                    break;
+                }
+    }
+
+    // Send the accepted combination, not the raw request (it is only a subset
+    // of it). A single allowed RAT takes no preferred mode. Without a
+    // supported list (or for its unverified part) fall back to the raw
+    // request, validated only against the allowed set above.
+    const finalAllowed = ratsOf(base?.allowed ?? want);
+    const effPref = supported?.length ? prefMask : prefBit;
+    const prefSet =
+        effPref && finalAllowed.length > 1 ? ratsOf(effPref) : undefined;
     const args = [
         "-m",
         String(index),
-        `--set-allowed-modes=${allowedList.join("|")}`,
+        `--set-allowed-modes=${finalAllowed.map((r) => RAT_GEN[r]).join("|")}`,
     ];
-    if (pref) args.push(`--set-preferred-mode=${pref}`);
+    if (prefSet)
+        args.push(
+            `--set-preferred-mode=${prefSet.map((r) => RAT_GEN[r]).join("|")}`,
+        );
     try {
-        return (
+        const ok = (
             await mmcliStrict(...args)
         ).includes("successfully set current modes");
+        if (!ok)
+            console.log(
+                `[modems] setModes: modem ${index} did not confirm ${args.join(" ")}`,
+            );
+        return {
+            ok,
+            allowed: finalAllowed,
+            preferred: prefSet?.[0],
+            rejected: ok ? [] : requested,
+        };
     } catch (err) {
         console.log(`[modems] setModes: ${errorMessage(err)}`);
-        return false;
+        return {
+            ok: false,
+            allowed: [],
+            preferred: undefined,
+            rejected: requested,
+        };
     }
 }
 
@@ -763,25 +894,51 @@ export function setupToGsmFields(
  * Every field of `setup` is optional — `undefined` leaves that setting as-is.
  * Returns true when the connection comes up.
  */
+/** Outcome of `setupModemNetwork`: `ok` = the data call is up; `modes` = the
+ * bands the modem actually accepted (may differ from the request — it is
+ * widened to the smallest supported combination; the form resyncs to it). */
+export interface NetworkSetupResult {
+    ok: boolean;
+    modes?: { allowed: string[]; preferred?: string };
+}
+
 export async function setupModemNetwork(
     index: number,
     setup: ModemNetworkSetup,
-): Promise<boolean> {
+): Promise<NetworkSetupResult> {
     const modem = await modemByIndex(index);
-    if (!modem) return false;
+    if (!modem) return { ok: false };
 
     // Cache the operator name for a selected network (belaUI parity).
     if (setup.plmn && setup.operatorName)
         rememberOperator(setup.plmn, setup.operatorName);
 
     // 1. Band mode — set before wiring the data call (belaUI sets modes while
-    //    the connection is down).
-    if (setup.allowedModes !== undefined)
-        await setModemModes(
+    //    the connection is down). The modem only accepts the combinations it
+    //    publishes in supported-modes; when none admits the request, fail
+    //    loudly instead of dialing on the unchanged bands.
+    let modes: ModesResult | undefined;
+    if (setup.allowedModes !== undefined) {
+        modes = await setModemModes(
             index,
             setup.allowedModes,
             setup.preferredMode,
+            modem.supportedCombinations,
         );
+        if (!modes.ok)
+            throw new Error(
+                `modem ${index} does not accept the requested bands ` +
+                    `(${modes.rejected.map(ratLabel).join(", ")}); ` +
+                    `supported modes: ${
+                        (modem.supportedCombinations ?? []).map(
+                            (c) =>
+                                `${ratsOf(c.allowed).map(ratLabel).join(", ")}` +
+                                (c.preferred ? ` (preferred: ${ratsOf(c.preferred).map(ratLabel).join(", ")})` : ""),
+                        )
+                            .join("; ") || "none reported"
+                    }`,
+            );
+    }
 
     // 2. PLMN pin — a new network requires a fresh registration (belaUI drops
     //    the call, `--3gpp-register-in-operator`, then re-dials).
@@ -812,7 +969,7 @@ export async function setupModemNetwork(
 
     // 3. Profile fields, then bring the connection up.
     const uuid = await ensureGsmConn(modem);
-    if (!uuid) return false;
+    if (!uuid) return { ok: false, ...(modes ? { modes } : {}) };
     const gsmFields = setupToGsmFields(setup);
     if (Object.keys(gsmFields).length) {
         const args = ["con", "modify", uuid];
@@ -821,7 +978,10 @@ export async function setupModemNetwork(
         }
         await nmcli(...args);
     }
-    return activateGsmConn(uuid);
+    return {
+        ok: await activateGsmConn(uuid),
+        ...(modes ? { modes } : {}),
+    };
 }
 
 const modemActions: Record<string, (index: number) => Promise<boolean>> = {

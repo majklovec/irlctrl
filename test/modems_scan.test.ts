@@ -8,6 +8,7 @@
 import { describe, expect, test } from "bun:test";
 import {
     bindModemManager,
+    parseModeCombo,
     parseScanNetworkEntry,
     pruneOrphanGsmConns,
     scanMobileNetworks,
@@ -339,37 +340,169 @@ describe("setupToGsmFields", () => {
     });
 });
 
+describe("parseModeCombo", () => {
+    test("parses a generation-token mode entry", () => {
+        expect(parseModeCombo("allowed: 2g, 3g, 4g; preferred: 4g")).toEqual({
+            allowed: 0b0111,
+            preferred: 0b0100,
+        });
+    });
+    test("parses a D-Bus-name entry without preference", () => {
+        expect(parseModeCombo("allowed: gsm, lte; preferred: none")).toEqual({
+            allowed: 0b0101,
+            preferred: 0,
+        });
+    });
+    test("parses 5G tokens", () => {
+        expect(parseModeCombo("allowed: 4g, 5g; preferred: 5g")).toEqual({
+            allowed: 0b1100,
+            preferred: 0b1000,
+        });
+        expect(parseModeCombo("allowed: 4g, 5gnr; preferred: 5gnr")).toEqual({
+            allowed: 0b1100,
+            preferred: 0b1000,
+        });
+    });
+    test("rejects garbage", () => {
+        expect(parseModeCombo("")).toBeNull();
+        expect(parseModeCombo("preferred: 4g")).toBeNull();
+    });
+});
+
 describe("setModemModes", () => {
-    test("builds allowed/preferred args and checks the success marker", async () => {
-        const { core, calls } = coreStub(async () =>
-            "successfully set current modes in the modem",
+    // A live modem's published list: ascending allowed sets, each with
+    // "preferred: none", plus a 4G-preferred entry on the full 2G/3G/4G set.
+    const supported234 = [
+        { allowed: 0b0001, preferred: 0 }, // 2g
+        { allowed: 0b0011, preferred: 0 }, // 2g, 3g
+        { allowed: 0b0100, preferred: 0 }, // 4g
+        { allowed: 0b0111, preferred: 0 }, // 2g, 3g, 4g
+        { allowed: 0b0111, preferred: 0b0100 }, // 2g, 3g, 4g (preferred: 4g)
+    ];
+    /** A stub whose mmcli succeeds; each test gets its own call log. */
+    const ok = () => coreStub(async () => "successfully set current modes in the modem");
+
+    test("sends generation tokens and keeps the preferred the modem admits", async () => {
+        const s = ok();
+        bindModemManager(s.core);
+        const res = await setModemModes(
+            2,
+            ["gsm", "lte"],
+            "lte",
+            supported234,
         );
-        bindModemManager(core);
-        const ok = await setModemModes(2, ["gsm", "lte"], "lte");
-        expect(ok).toBe(true);
-        const mmcli = calls.find((c) => c.includes("--set-allowed-modes"));
-        expect(mmcli).toContain("--set-allowed-modes=GSM|LTE");
-        expect(mmcli).toContain("--set-preferred-mode=LTE");
+        expect(res).toEqual({
+            ok: true,
+            allowed: ["gsm", "umts", "lte"],
+            preferred: "lte",
+            rejected: [],
+        });
+        const mmcli = s.calls.find((c) => c.includes("--set-allowed-modes"));
+        expect(mmcli).toContain("--set-allowed-modes=2g|3g|4g");
+        expect(mmcli).toContain("--set-preferred-mode=4g");
     });
-    test("omits the preferred mode when none is chosen", async () => {
-        const { core, calls } = coreStub(async () =>
-            "successfully set current modes in the modem",
+    test("widens the allowed set to the smallest supported superset", async () => {
+        const s = ok();
+        bindModemManager(s.core);
+        const res = await setModemModes(
+            2,
+            ["gsm", "lte"],
+            undefined,
+            supported234,
         );
-        bindModemManager(core);
-        await setModemModes(2, ["umts"], undefined);
-        const mmcli = calls.find((c) => c.includes("--set-allowed-modes"));
-        expect(mmcli).toContain("--set-allowed-modes=UMTS");
+        expect(res.allowed).toEqual(["gsm", "umts", "lte"]);
+        const mmcli = s.calls.find((c) => c.includes("--set-allowed-modes"));
+        expect(mmcli).toContain("--set-allowed-modes=2g|3g|4g");
         expect(mmcli).not.toContain("--set-preferred-mode");
     });
-    test("a preferred mode not in the allowed set is dropped", async () => {
+    test("omits the preferred mode when the modem publishes none for the set", async () => {
+        const s = ok();
+        bindModemManager(s.core);
+        const res = await setModemModes(2, ["lte"], "lte", supported234);
+        expect(res.preferred).toBeUndefined();
+        const mmcli = s.calls.find((c) => c.includes("--set-allowed-modes"));
+        expect(mmcli).toContain("--set-allowed-modes=4g");
+        expect(mmcli).not.toContain("--set-preferred-mode");
+    });
+    test("drops a preferred mode the modem cannot prefer", async () => {
+        const s = ok();
+        bindModemManager(s.core);
+        const res = await setModemModes(
+            2,
+            ["gsm", "umts", "lte"],
+            "nr5g",
+            supported234,
+        );
+        expect(res).toEqual({
+            ok: true,
+            allowed: ["gsm", "umts", "lte"],
+            preferred: undefined,
+            rejected: [],
+        });
+        const mmcli = s.calls.find((c) => c.includes("--set-allowed-modes"));
+        expect(mmcli).toContain("--set-allowed-modes=2g|3g|4g");
+        expect(mmcli).not.toContain("--set-preferred-mode");
+    });
+    test("rejects a band no supported combination admits, without calling mmcli", async () => {
+        const { core, calls } = coreStub(async () => "");
+        bindModemManager(core);
+        const res = await setModemModes(2, ["nr5g"], "nr5g", supported234);
+        expect(res.ok).toBe(false);
+        expect(res.rejected).toEqual(["nr5g"]);
+        expect(calls.filter((c) => c.includes("--set-allowed-modes"))).toEqual(
+            [],
+        );
+    });
+    test("a preferred mode outside the allowed set is ignored", async () => {
+        const s = ok();
+        bindModemManager(s.core);
+        const res = await setModemModes(2, ["gsm"], "lte", supported234);
+        expect(res.allowed).toEqual(["gsm"]);
+        const mmcli = s.calls.find((c) => c.includes("--set-allowed-modes"));
+        expect(mmcli).toContain("--set-allowed-modes=2g");
+        expect(mmcli).not.toContain("--set-preferred-mode");
+    });
+    test("sends the request as-is when the modem reports no supported list", async () => {
+        const s = ok();
+        bindModemManager(s.core);
+        const res = await setModemModes(2, ["gsm", "lte"], "lte");
+        expect(res.ok).toBe(true);
+        expect(res.allowed).toEqual(["gsm", "lte"]);
+        expect(res.preferred).toBe("lte");
+        const mmcli = s.calls.find((c) => c.includes("--set-allowed-modes"));
+        expect(mmcli).toContain("--set-allowed-modes=2g|4g");
+        expect(mmcli).toContain("--set-preferred-mode=4g");
+    });
+    test("a single allowed RAT is sent without a preferred mode", async () => {
         const { core, calls } = coreStub(async () =>
             "successfully set current modes in the modem",
         );
         bindModemManager(core);
-        await setModemModes(2, ["gsm"], "lte");
+        await setModemModes(2, ["gsm"], "gsm", [
+            { allowed: 0b0001, preferred: 0b0001 },
+        ]);
         const mmcli = calls.find((c) => c.includes("--set-allowed-modes"));
-        expect(mmcli).toContain("--set-allowed-modes=GSM");
+        expect(mmcli).toContain("--set-allowed-modes=2g");
         expect(mmcli).not.toContain("--set-preferred-mode");
+    });
+    test("an empty request is a no-op", async () => {
+        const { core, calls } = coreStub(async () => "");
+        bindModemManager(core);
+        const res = await setModemModes(2, [], undefined, supported234);
+        expect(res).toEqual({
+            ok: true,
+            allowed: [],
+            preferred: undefined,
+            rejected: [],
+        });
+        expect(calls).toEqual([]);
+    });
+    test("a missing success marker is a failure", async () => {
+        const coreStub2 = coreStub(async () => "something unexpected");
+        bindModemManager(coreStub2.core);
+        const res = await setModemModes(2, ["gsm", "lte"], "lte", supported234);
+        expect(res.ok).toBe(false);
+        expect(res.rejected).toEqual(["gsm", "lte"]);
     });
 });
 
